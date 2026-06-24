@@ -117,3 +117,110 @@ exports.getMe = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+exports.updateUsername = async (req, res) => {
+  try {
+    const { username } = req.body;
+
+    if (!username || !username.trim()) {
+      return res.status(400).json({ message: 'Username is required' });
+    }
+
+    const existingUser = await User.findOne({ 
+      username, 
+      _id: { $ne: req.user.id } 
+    });
+
+    if (existingUser) {
+      return res.status(400).json({ message: 'Username already taken' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { username: username.trim() },
+      { new: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({
+      _id: user._id,
+      name: user.name,
+      username: user.username,
+      email: user.email,
+      mobileNumber: user.mobileNumber,
+      role: user.role,
+      balance: user.balance
+    });
+  } catch (error) {
+    console.error('Update username error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Update user profile (username, mobileNumber, name)
+// @route   PUT /api/auth/update-profile
+// @access  Private
+exports.updateProfile = async (req, res) => {
+  try {
+    const { username, mobileNumber, name } = req.body;
+    const updateFields = {};
+
+    if (username && username.trim()) {
+      // Check if username is taken by another user
+      const existingUser = await User.findOne({ 
+        username: username.trim(), 
+        _id: { $ne: req.user.id } 
+      });
+      if (existingUser) {
+        return res.status(400).json({ message: 'Username already taken' });
+      }
+      updateFields.username = username.trim();
+    }
+
+    if (mobileNumber && mobileNumber.trim()) {
+      // Check if mobile number is taken by another user
+      const existingMobile = await User.findOne({ 
+        mobileNumber: mobileNumber.trim(), 
+        _id: { $ne: req.user.id } 
+      });
+      if (existingMobile) {
+        return res.status(400).json({ message: 'Mobile number already in use' });
+      }
+      updateFields.mobileNumber = mobileNumber.trim();
+    }
+
+    if (name && name.trim()) {
+      updateFields.name = name.trim();
+    }
+
+    if (Object.keys(updateFields).length === 0) {
+      return res.status(400).json({ message: 'No fields to update' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      updateFields,
+      { new: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({
+      _id: user._id,
+      name: user.name,
+      username: user.username,
+      email: user.email,
+      mobileNumber: user.mobileNumber,
+      role: user.role,
+      balance: user.balance
+    });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};

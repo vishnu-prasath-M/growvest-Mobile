@@ -3,13 +3,24 @@ const Transaction = require('../models/Transaction');
 // Get current user transactions (using token)
 exports.getMyTransactions = async (req, res) => {
   try {
+    // Always filter by userId first (most reliable)
+    // Fall back to userEmail only if userId is not present in some records
     const transactions = await Transaction.find({ 
       $or: [
         { userId: req.user.id },
-        { userEmail: req.user.email }
+        { userId: req.user._id }
       ]
     }).sort({ createdAt: -1 });
-    res.status(200).json(transactions);
+    
+    // If no transactions found by userId, try by email as fallback
+    if (transactions.length === 0 && req.user.email) {
+      const emailTransactions = await Transaction.find({ 
+        userEmail: req.user.email 
+      }).sort({ createdAt: -1 });
+      res.status(200).json(emailTransactions);
+    } else {
+      res.status(200).json(transactions);
+    }
   } catch (error) {
     res.status(500).json({ message: 'Error fetching your transactions', error: error.message });
   }

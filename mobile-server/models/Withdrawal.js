@@ -30,15 +30,12 @@ const withdrawalSchema = new mongoose.Schema({
   paidAt: {
     type: Date,
   },
-  paidBy: {
+  date: {
     type: String,
   },
   processed: {
     type: Boolean,
     default: false,
-  },
-  date: {
-    type: String, // String for easier display on frontend matching previous logic
   }
 }, { timestamps: true });
 

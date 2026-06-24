@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Growvest",
+    "slug": "zenvest",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "icon": "./app/assets/growvest-logo.png",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "splash": {
+      "image": "./app/assets/growvest-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#085428"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.growvest.mobile",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": ["upi", "googlepay", "phonepe", "paytm", "bhim"]
+      }
+    },
+    "android": {
+      "package": "com.growvest.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./app/assets/growvest-logo.png",
+        "backgroundColor": "#085428"
+      }
+    },
+    "web": {
+      "favicon": "./app/assets/growvest-logo.png"
+    },
+    "plugins": [
+      "expo-asset",
+      "expo-font",
+      "expo-splash-screen"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "88b3eaf2-f492-41c1-9d89-027bebe60784"
+      }
+    },
+    "owner": "itz-vp"
+  }
+}

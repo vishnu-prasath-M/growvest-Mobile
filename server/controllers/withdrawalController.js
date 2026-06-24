@@ -51,116 +51,302 @@ exports.getWithdrawals = async (req, res) => {
   }
 };
 
+/**
+ * Process a withdrawal: deduct from user balances and investments, 
+ * update transaction, mark as processed.
+ * This is idempotent - checks `processed` flag before running.
+ */
+async function processWithdrawalDeductions(withdrawal) {
+  if (withdrawal.processed) {
+    console.log(`Withdrawal ${withdrawal._id} already processed, skipping deduction.`);
+    return { alreadyProcessed: true };
+  }
+
+  const user = await User.findOne({
+    $or: [{ email: withdrawal.userEmail }, { mobileNumber: withdrawal.userEmail }]
+  });
+
+  if (!user) {
+    console.error(`User not found for withdrawal ${withdrawal._id} (email: ${withdrawal.userEmail})`);
+    return { error: 'User not found' };
+  }
+
+  // Deduct from user.balance (ensure it never goes negative)
+  user.balance = Math.max(0, (user.balance || 0) - withdrawal.amount);
+  await user.save();
+
+  // Deduct from investments of the matching type
+  const investOrConditions = [];
+  if (withdrawal.userEmail) investOrConditions.push({ userEmail: withdrawal.userEmail });
+  if (user.mobileNumber) investOrConditions.push({ mobileNumber: user.mobileNumber });
+
+  const Investment = require('../models/Investment');
+  const approvedInvestments = await Investment.find({
+    $or: investOrConditions,
+    status: 'approved',
+    type: withdrawal.withdrawType || 'saving'
+  }).sort({ startDate: 1 });
+
+  let remainingWithdrawAmount = withdrawal.amount;
+  for (const inv of approvedInvestments) {
+    if (remainingWithdrawAmount <= 0) break;
+
+    let updatedInterestEarned = inv.interestEarned || 0;
+    let updatedAmount = inv.amount || 0;
+    let updatedStatus = inv.status;
+
+    // 1. Deduct from interest first
+    if (remainingWithdrawAmount >= updatedInterestEarned) {
+      remainingWithdrawAmount -= updatedInterestEarned;
+      updatedInterestEarned = 0;
+    } else {
+      updatedInterestEarned -= remainingWithdrawAmount;
+      remainingWithdrawAmount = 0;
+    }
+
+    // 2. Deduct from amount/principal next
+    if (remainingWithdrawAmount > 0) {
+      if (remainingWithdrawAmount >= updatedAmount) {
+        remainingWithdrawAmount -= updatedAmount;
+        updatedAmount = 0;
+        updatedStatus = 'withdrawn';
+      } else {
+        updatedAmount -= remainingWithdrawAmount;
+        remainingWithdrawAmount = 0;
+      }
+    }
+
+    await Investment.updateOne(
+      { _id: inv._id },
+      {
+        $set: {
+          amount: updatedAmount,
+          interestEarned: updatedInterestEarned,
+          status: updatedStatus
+        }
+      }
+    );
+  }
+
+  // Mark withdrawal as processed
+  await Withdrawal.updateOne(
+    { _id: withdrawal._id },
+    { $set: { processed: true, paidAt: withdrawal.paidAt || new Date() } }
+  );
+
+  // Update transaction record to paid
+  const tx = await Transaction.findOneAndUpdate(
+    { referenceId: withdrawal._id, referenceType: 'Withdrawal' },
+    {
+      $set: {
+        status: 'paid',
+        updatedAt: new Date(),
+        description: `Withdrawal completed - ₹${withdrawal.amount}`
+      }
+    },
+    { new: true }
+  );
+
+  if (!tx) {
+    console.warn(`No transaction found for withdrawal ${withdrawal._id}, creating one.`);
+    // Create transaction if it doesn't exist
+    await Transaction.create({
+      userId: user._id,
+      userEmail: withdrawal.userEmail,
+      type: 'withdrawal',
+      amount: withdrawal.amount,
+      status: 'paid',
+      referenceId: withdrawal._id,
+      referenceType: 'Withdrawal',
+      description: `Withdrawal completed - ₹${withdrawal.amount}`
+    });
+  }
+
+  return { success: true, user, remainingWithdrawAmount };
+}
+
 exports.updateWithdrawalStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, paidAt } = req.body;
+    const { status, paidAt, paidBy } = req.body;
 
     const withdrawal = await Withdrawal.findById(id);
     if (!withdrawal) {
       return res.status(404).json({ message: 'Withdrawal request not found' });
     }
 
-    const updateData = { status };
-    if (paidAt) {
-      updateData.paidAt = paidAt;
-    }
-
-    // Update withdrawal status
-    const updatedWithdrawal = await Withdrawal.findByIdAndUpdate(id, updateData, { new: true });
-
-    // Update user balance and transaction when withdrawal is paid or approved
-    if ((status === 'paid' || status === 'approved') && withdrawal.status !== 'paid' && withdrawal.status !== 'approved') {
-      const user = await User.findOne({ 
-        $or: [{ email: withdrawal.userEmail }, { mobileNumber: withdrawal.userEmail }] 
-      });
-      if (user) {
-        // Deduct from user balance
-        user.balance -= withdrawal.amount;
-        await user.save();
-
-        // Deduct withdrawal amount from user's approved investments of withdrawal.withdrawType
-        const investOrConditions = [];
-        if (withdrawal.userEmail) investOrConditions.push({ userEmail: withdrawal.userEmail });
-        if (user.mobileNumber) investOrConditions.push({ mobileNumber: user.mobileNumber });
-
-        const Investment = require('../models/Investment');
-        const approvedInvestments = await Investment.find({
-          $or: investOrConditions,
-          status: 'approved',
-          type: withdrawal.withdrawType
-        }).sort({ startDate: 1 });
-
-        let remainingWithdrawAmount = withdrawal.amount;
-        for (const inv of approvedInvestments) {
-          if (remainingWithdrawAmount <= 0) break;
-
-          let updatedInterestEarned = inv.interestEarned || 0;
-          let updatedAmount = inv.amount || 0;
-          let updatedStatus = inv.status;
-
-          // 1. Deduct from interest first
-          if (remainingWithdrawAmount >= updatedInterestEarned) {
-            remainingWithdrawAmount -= updatedInterestEarned;
-            updatedInterestEarned = 0;
-          } else {
-            updatedInterestEarned -= remainingWithdrawAmount;
-            remainingWithdrawAmount = 0;
-          }
-
-          // 2. Deduct from amount/principal next
-          if (remainingWithdrawAmount > 0) {
-            if (remainingWithdrawAmount >= updatedAmount) {
-              remainingWithdrawAmount -= updatedAmount;
-              updatedAmount = 0;
-              updatedStatus = 'withdrawn';
-            } else {
-              updatedAmount -= remainingWithdrawAmount;
-              remainingWithdrawAmount = 0;
-            }
-          }
-
-          // Save the updated investment
-          await Investment.updateOne(
-            { _id: inv._id },
-            { 
-              $set: { 
-                amount: updatedAmount, 
-                interestEarned: updatedInterestEarned,
-                status: updatedStatus
-              } 
-            }
-          );
-        }
-
-        // Update transaction record
-        await Transaction.findOneAndUpdate(
-          { referenceId: withdrawal._id, referenceType: 'Withdrawal' },
-          { 
-            status: status,
-            updatedAt: new Date(),
-            description: `Withdrawal completed - ₹${withdrawal.amount}`
-          },
-          { new: true }
-        );
+    // If marking as approved or paid, run the complete deduction process
+    if (status === 'approved' || status === 'paid') {
+      // Check if already processed to avoid double deductions
+      if (withdrawal.processed) {
+        console.log(`Withdrawal ${withdrawal._id} already processed, skipping deduction.`);
+        // Just update status and return
+        const updateData = { status };
+        if (paidAt) updateData.paidAt = paidAt;
+        if (paidBy) updateData.paidBy = paidBy;
+        const updatedWithdrawal = await Withdrawal.findByIdAndUpdate(id, updateData, { new: true });
+        return res.status(200).json(updatedWithdrawal);
       }
-    } else {
-      // Update transaction record for other statuses (rejected, pending/requested)
+
+      // Update status and paidAt/paidBy first
+      const updateData = { status };
+      if (paidAt) updateData.paidAt = paidAt;
+      if (paidBy) updateData.paidBy = paidBy;
+      // If status is approved, set paidAt to current time
+      if (status === 'approved' && !paidAt) {
+        updateData.paidAt = new Date();
+      }
+
+      await Withdrawal.findByIdAndUpdate(id, updateData, { new: true });
+
+      // Refresh withdrawal to get updated state
+      const updatedWithdrawal = await Withdrawal.findById(id);
+
+      // Process deductions (checks processed flag internally)
+      const result = await processWithdrawalDeductions(updatedWithdrawal);
+
+      if (result.error) {
+        return res.status(400).json({ message: result.error });
+      }
+
+      // Explicitly update transaction status to 'paid' to ensure it's reflected in user dashboard
       await Transaction.findOneAndUpdate(
         { referenceId: withdrawal._id, referenceType: 'Withdrawal' },
-        { 
-          status: status === 'rejected' ? 'rejected' : 'pending',
-          updatedAt: new Date(),
-          description: status === 'rejected'
-            ? `Withdrawal rejected - ₹${withdrawal.amount}`
-            : `Withdrawal requested - ₹${withdrawal.amount}`
+        {
+          $set: {
+            status: 'paid',
+            updatedAt: new Date(),
+            description: `Withdrawal completed - ₹${withdrawal.amount}`
+          }
         },
         { new: true }
       );
+
+      return res.status(200).json(updatedWithdrawal);
     }
+
+    // For rejected status
+    const updateData = { status };
+    const updatedWithdrawal = await Withdrawal.findByIdAndUpdate(id, updateData, { new: true });
+
+    // Update transaction record for rejected status
+    await Transaction.findOneAndUpdate(
+      { referenceId: withdrawal._id, referenceType: 'Withdrawal' },
+      {
+        $set: {
+          status: 'rejected',
+          updatedAt: new Date(),
+          description: `Withdrawal rejected - ₹${withdrawal.amount}`
+        }
+      },
+      { new: true }
+    );
 
     res.status(200).json(updatedWithdrawal);
   } catch (error) {
     res.status(500).json({ message: 'Error updating withdrawal', error: error.message });
+  }
+};
+
+/**
+ * Migration endpoint: Find ALL paid withdrawals that are NOT marked as processed,
+ * and fix their transaction status + mark them as processed WITHOUT re-deducting
+ * (since old code may have partially deducted already).
+ * 
+ * For each unprocessed paid withdrawal:
+ *   - If transaction status is already "paid" → just mark as processed (deduction already happened)
+ *   - If transaction status is NOT "paid" → update transaction to "paid" and mark as processed
+ *   - Do NOT re-run investment deductions (to avoid double deductions from old buggy code)
+ */
+exports.migrateUnprocessedPaidWithdrawals = async (req, res) => {
+  try {
+    // Find all paid withdrawals that haven't been processed yet
+    const unprocessedWithdrawals = await Withdrawal.find({
+      status: 'paid',
+      $or: [
+        { processed: false },
+        { processed: { $exists: false } }
+      ]
+    });
+
+    console.log(`Found ${unprocessedWithdrawals.length} unprocessed paid withdrawals.`);
+
+    const results = [];
+    for (const withdrawal of unprocessedWithdrawals) {
+      const existingTx = await Transaction.findOne({
+        referenceId: withdrawal._id,
+        referenceType: 'Withdrawal'
+      });
+
+      let action = 'unknown';
+      
+      if (existingTx && existingTx.status === 'paid') {
+        // Transaction already shows paid - deduction likely already happened
+        // Just mark as processed
+        await Withdrawal.updateOne(
+          { _id: withdrawal._id },
+          { $set: { processed: true } }
+        );
+        action = 'marked-processed-only (tx already paid)';
+      } else if (existingTx) {
+        // Transaction exists but is NOT paid - update it to paid
+        // Do NOT re-deduct balances (old code may have partially deducted)
+        await Transaction.findOneAndUpdate(
+          { _id: existingTx._id },
+          {
+            $set: {
+              status: 'paid',
+              updatedAt: new Date(),
+              description: `Withdrawal completed - ₹${withdrawal.amount}`
+            }
+          }
+        );
+        await Withdrawal.updateOne(
+          { _id: withdrawal._id },
+          { $set: { processed: true } }
+        );
+        action = 'fixed-tx-status + marked-processed (no re-deduction)';
+      } else {
+        // No transaction at all - create one
+        const user = await User.findOne({
+          $or: [{ email: withdrawal.userEmail }, { mobileNumber: withdrawal.userEmail }]
+        });
+        if (user) {
+          await Transaction.create({
+            userId: user._id,
+            userEmail: withdrawal.userEmail,
+            type: 'withdrawal',
+            amount: withdrawal.amount,
+            status: 'paid',
+            referenceId: withdrawal._id,
+            referenceType: 'Withdrawal',
+            description: `Withdrawal completed - ₹${withdrawal.amount}`
+          });
+          await Withdrawal.updateOne(
+            { _id: withdrawal._id },
+            { $set: { processed: true } }
+          );
+          action = 'created-missing-tx + marked-processed (no re-deduction)';
+        } else {
+          action = 'error-user-not-found';
+        }
+      }
+
+      results.push({
+        withdrawalId: withdrawal._id,
+        amount: withdrawal.amount,
+        userEmail: withdrawal.userEmail,
+        prevTxStatus: existingTx?.status || 'none',
+        action
+      });
+    }
+
+    res.status(200).json({
+      message: `Processed ${results.length} unprocessed withdrawals`,
+      processedCount: results.length,
+      details: results
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error during migration', error: error.message });
   }
 };

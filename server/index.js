@@ -78,6 +78,7 @@ const withdrawalRoutes = require('./routes/withdrawalRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const transactionRoutes = require('./routes/transactionRoutes');
 const userRoutes = require('./routes/userRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
 
 app.use('/api/investments', investmentRoutes);
 app.use('/api/auth', authRoutes);
@@ -85,6 +86,7 @@ app.use('/api/withdrawals', withdrawalRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

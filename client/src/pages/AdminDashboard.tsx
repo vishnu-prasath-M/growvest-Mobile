@@ -217,9 +217,25 @@ const AdminDashboard = () => {
         body: JSON.stringify({ status: action }),
       });
       if (res.ok) {
-        setWithdrawList((prev) =>
-          prev.map((w) => (w.id === id ? { ...w, status: action } : w))
-        );
+        // Refresh withdrawal list from server to get updated data
+        fetch(`${API_URL}/api/withdrawals`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (Array.isArray(data)) {
+              setWithdrawList(data.map((w: any) => ({
+                id: w?._id || "unknown",
+                user: w?.userName || "Unknown",
+                amount: `₹${(w?.amount || 0).toLocaleString("en-IN")}`,
+                rawAmount: w?.amount || 0,
+                date: w?.date || "",
+                status: w?.status || "pending",
+                upi: w?.upiId || ""
+              })));
+            }
+          })
+          .catch(err => console.error("Error fetching withdrawals:", err));
       }
     } catch (error) {
       console.error("Error updating withdrawal status:", error);
@@ -751,9 +767,10 @@ const AdminDashboard = () => {
                       <div className="flex items-center gap-4">
                         <div
                           className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${
-                            w.status === "approved" ? "bg-accent" : w.status === "pending" ? "bg-amber-50" : "bg-red-50"
+                            w.status === "paid" ? "bg-green-50" : w.status === "approved" ? "bg-accent" : w.status === "pending" ? "bg-amber-50" : "bg-red-50"
                           }`}
                         >
+                          {w.status === "paid" && <CheckCircle className="h-5 w-5 text-green-600" />}
                           {w.status === "approved" && <CheckCircle className="h-5 w-5 text-secondary" />}
                           {w.status === "pending" && <ArrowDownToLine className="h-5 w-5 text-amber-600" />}
                           {w.status === "rejected" && <XCircle className="h-5 w-5 text-red-500" />}
@@ -965,9 +982,23 @@ const AdminDashboard = () => {
                       })
                     });
                     if (res.ok) {
+                      // Immediately update local withdrawList state (no need to wait for re-fetch)
                       setWithdrawList(prev =>
-                        prev.map((w) => (w.id === payModalData.id ? { ...w, status: 'approved' } : w)) // UI uses 'approved' for green paid state
+                        prev.map(w => w.id === payModalData.id ? { ...w, status: 'paid' as WithdrawStatus } : w)
                       );
+                      
+                      // Also refresh users list to update overview card balances
+                      fetch(`${API_URL}/api/users`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                      })
+                        .then(res => res.json())
+                        .then(data => {
+                          if (Array.isArray(data)) {
+                            setAllUsers(data);
+                          }
+                        })
+                        .catch(err => console.error("Error refreshing users:", err));
+                      
                       setPayModalData(null);
                     }
                   } catch (error) {

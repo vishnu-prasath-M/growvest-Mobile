@@ -89,14 +89,14 @@ const getEnrichedUserData = async (query) => {
   const savingInvested = savingInvestments.reduce((acc, inv) => acc + inv.amount, 0);
   const savingInterest = savingInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
   const savingWithdrawn = savingWithdrawals.reduce((acc, wd) => acc + wd.amount, 0);
-  let savingBalance = savingInvested + savingInterest;
+  let savingBalance = savingInvested + savingInterest - savingWithdrawn;
   if (savingBalance < 0) savingBalance = 0;
 
   // Calculate totals for FIXED
   const fixedInvested = fixedInvestments.reduce((acc, inv) => acc + inv.amount, 0);
   const fixedInterest = fixedInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
   const fixedWithdrawn = fixedWithdrawals.reduce((acc, wd) => acc + wd.amount, 0);
-  let fixedBalance = fixedInvested + fixedInterest;
+  let fixedBalance = fixedInvested + fixedInterest - fixedWithdrawn;
   if (fixedBalance < 0) fixedBalance = 0;
 
   const availableFixed = fixedInvestments.filter(inv => {
@@ -106,8 +106,8 @@ const getEnrichedUserData = async (query) => {
 
   const availableToWithdraw = savingBalance + availableFixed;
 
-  // Total balance
-  let totalBalance = savingBalance + fixedBalance;
+  // Total balance - use user.balance if available, otherwise calculate from investments
+  let totalBalance = user.balance !== undefined ? user.balance : (savingBalance + fixedBalance);
   if (totalBalance < 0) totalBalance = 0;
 
   // Total calculations
@@ -211,12 +211,12 @@ exports.getUserDetailByEmail = async (req, res) => {
     const savingInvested = savingInvestments.reduce((acc, inv) => acc + inv.amount, 0);
     const savingInterest = savingInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
     const savingWithdrawn = savingWithdrawals.reduce((acc, wd) => acc + wd.amount, 0);
-    const savingBalance = Math.max(0, savingInvested + savingInterest);
+    const savingBalance = Math.max(0, savingInvested + savingInterest - savingWithdrawn);
 
     const fixedInvested = fixedInvestments.reduce((acc, inv) => acc + inv.amount, 0);
     const fixedInterest = fixedInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
     const fixedWithdrawn = fixedWithdrawals.reduce((acc, wd) => acc + wd.amount, 0);
-    const fixedBalance = Math.max(0, fixedInvested + fixedInterest);
+    const fixedBalance = Math.max(0, fixedInvested + fixedInterest - fixedWithdrawn);
 
     const totalInvested = savingInvested + fixedInvested;
     const totalInterest = savingInterest + fixedInterest;
