@@ -4,7 +4,7 @@ const getBaseUrl = () => {
   if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
   }
-  return 'https://growvest-online.onrender.com/api';
+  return 'https://growvest-mobile.onrender.com/api';
 };
 
 export const API_BASE_URL = getBaseUrl();

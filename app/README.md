@@ -24,7 +24,7 @@ A React Native mobile application for Zenvest investment platform, built with Ex
 ## Backend Integration
 
 The app connects to the existing Zenvest backend API:
-- **Base URL**: https://growvest-online.onrender.com/api
+- **Base URL**: https://growvest-mobile.onrender.com/api
 - **Authentication**: JWT token
 
 ## Getting Started
@@ -176,7 +176,7 @@ expo build:ios
 
 1. **Metro bundler issues**: Clear cache with `npm start -- --clear`
 2. **Dependency issues**: Delete `node_modules` and run `npm install`
-3. **API connection issues**: Ensure backend is running at https://growvest-online.onrender.com
+3. **API connection issues**: Ensure backend is running at https://growvest-mobile.onrender.com
 
 ## License
 

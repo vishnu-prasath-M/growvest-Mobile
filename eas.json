@@ -11,7 +11,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://growvest-online.onrender.com/api"
+        "EXPO_PUBLIC_API_URL": "https://growvest-mobile.onrender.com/api"
       }
     },
     "preview": {
@@ -20,7 +20,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://growvest-online.onrender.com/api"
+        "EXPO_PUBLIC_API_URL": "https://growvest-mobile.onrender.com/api"
       }
     },
     "production": {
@@ -28,7 +28,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://growvest-online.onrender.com/api"
+        "EXPO_PUBLIC_API_URL": "https://growvest-mobile.onrender.com/api"
       }
     }
   },
