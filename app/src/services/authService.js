@@ -2,6 +2,34 @@ import api from './apiService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_ENDPOINTS } from '../config/api';
 
+const normalizeError = (error) => {
+  const data = error.response?.data;
+  if (typeof data === 'string') {
+    return { message: data };
+  }
+  if (data && typeof data === 'object' && data.message) {
+    return data;
+  }
+  return { message: error.message || 'Something went wrong' };
+};
+
+const persistUserProfile = async (profile) => {
+  if (!profile) {
+    return null;
+  }
+
+  const stored = await AsyncStorage.getItem('userData');
+  const parsed = stored ? JSON.parse(stored) : {};
+  const updated = { ...parsed, ...profile };
+  await AsyncStorage.setItem('userData', JSON.stringify(updated));
+  return updated;
+};
+
+const refreshUserProfile = async () => {
+  const response = await api.get(API_ENDPOINTS.ME);
+  return persistUserProfile(response.data);
+};
+
 export const authService = {
   // Register user
   register: async (userData) => {
@@ -13,7 +41,7 @@ export const authService = {
       }
       return response.data;
     } catch (error) {
-      throw error.response?.data || error.message;
+      throw normalizeError(error);
     }
   },
 
@@ -27,7 +55,7 @@ export const authService = {
       }
       return response.data;
     } catch (error) {
-      throw error.response?.data || error.message;
+      throw normalizeError(error);
     }
   },
 
@@ -37,7 +65,7 @@ export const authService = {
       const response = await api.get(API_ENDPOINTS.ME);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error.message;
+      throw normalizeError(error);
     }
   },
 
@@ -82,57 +110,32 @@ export const authService = {
   // Update username
   updateUsername: async (username) => {
     try {
-      const response = await api.put(API_ENDPOINTS.UPDATE_USERNAME, { username });
-      if (response.data) {
-        // Update stored user data
-        const userData = await AsyncStorage.getItem('userData');
-        if (userData) {
-          const parsed = JSON.parse(userData);
-          const updated = { ...parsed, ...response.data };
-          await AsyncStorage.setItem('userData', JSON.stringify(updated));
-        }
-      }
-      return response.data;
+      await api.put(API_ENDPOINTS.UPDATE_USERNAME, { username });
+      return await refreshUserProfile();
     } catch (error) {
-      throw error.response?.data || error.message;
+      throw normalizeError(error);
     }
   },
 
   // Update mobile number
   updateMobileNumber: async (mobileNumber) => {
     try {
-      const response = await api.put(API_ENDPOINTS.UPDATE_MOBILE, { mobileNumber });
-      if (response.data) {
-        // Update stored user data
-        const userData = await AsyncStorage.getItem('userData');
-        if (userData) {
-          const parsed = JSON.parse(userData);
-          const updated = { ...parsed, ...response.data };
-          await AsyncStorage.setItem('userData', JSON.stringify(updated));
-        }
-      }
-      return response.data;
+      await api.put(API_ENDPOINTS.UPDATE_PROFILE, { mobileNumber });
+      return await refreshUserProfile();
     } catch (error) {
-      throw error.response?.data || error.message;
+      throw normalizeError(error);
     }
   },
 
   // Update user profile (username, mobileNumber, name)
   updateProfile: async (profileData) => {
     try {
-      const response = await api.put(API_ENDPOINTS.UPDATE_PROFILE, profileData);
-      if (response.data) {
-        // Update stored user data
-        const userData = await AsyncStorage.getItem('userData');
-        if (userData) {
-          const parsed = JSON.parse(userData);
-          const updated = { ...parsed, ...response.data };
-          await AsyncStorage.setItem('userData', JSON.stringify(updated));
-        }
-      }
-      return response.data;
+      await api.put(API_ENDPOINTS.UPDATE_PROFILE, profileData);
+      return await refreshUserProfile();
     } catch (error) {
-      throw error.response?.data || error.message;
+      throw normalizeError(error);
     }
   },
+
+  refreshUserProfile,
 };

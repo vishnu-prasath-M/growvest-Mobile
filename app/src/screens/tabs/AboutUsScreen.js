@@ -80,14 +80,14 @@ const AboutUsScreen = ({ navigation }) => {
           <Text style={styles.contactTitle}>Contact Us</Text>
           
           <TouchableOpacity style={styles.contactItem} onPress={() => {
-            Linking.openURL('https://wa.me/917305897557?text=Hello Growvest Support, I need assistance.');
+            Linking.openURL('https://wa.me/918300278515?text=Hello Growvest Support, I need assistance.');
           }}>
             <View style={[styles.contactIcon, { backgroundColor: '#dcfce7' }]}>
               <MaterialCommunityIcons name="whatsapp" size={22} color="#25d366" />
             </View>
             <View style={styles.contactContent}>
               <Text style={styles.contactLabel}>WhatsApp</Text>
-              <Text style={styles.contactValue}>+91 7305897557</Text>
+              <Text style={styles.contactValue}>+91 8300278515</Text>
             </View>
             <MaterialCommunityIcons name="open-in-new" size={20} color={colors.textTertiary} />
           </TouchableOpacity>

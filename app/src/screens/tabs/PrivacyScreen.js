@@ -75,7 +75,7 @@ const PrivacyScreen = ({ navigation }) => {
 
           <Text style={styles.heading}>10. Contact Us</Text>
           <Text style={styles.paragraph}>
-            For questions about this Privacy Policy, contact us via WhatsApp at +91 7305897557 or email at support@growvest.com.
+            For questions about this Privacy Policy, contact us via WhatsApp at +91 8300278515 or email at support@growvest.com.
           </Text>
         </View>
 

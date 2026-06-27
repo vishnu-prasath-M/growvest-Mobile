@@ -75,7 +75,7 @@ const TermsScreen = ({ navigation }) => {
 
           <Text style={styles.heading}>10. Contact</Text>
           <Text style={styles.paragraph}>
-            For any questions regarding these terms, please contact us via WhatsApp at +91 7305897557 or email at support@growvest.com.
+            For any questions regarding these terms, please contact us via WhatsApp at +91 8300278515 or email at support@growvest.com.
           </Text>
         </View>
 

@@ -16,13 +16,16 @@ import { Card, Button, TextInput, Portal, Surface } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
-import { dashboardService } from '../../services/dashboardService';
+import { userService } from '../../services/userService';
 import { withdrawalService } from '../../services/withdrawalService';
 import { colors, typography } from '../../theme/theme';
+import { mapProfileToWithdrawUser } from '../../utils/userBalances';
+import { useScreenInsets } from '../../hooks/useScreenInsets';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const WithdrawScreen = () => {
+  const insets = useScreenInsets(8);
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -34,19 +37,10 @@ const WithdrawScreen = () => {
 
   const fetchUserData = async () => {
     try {
-      const data = await dashboardService.getDashboard();
-      // The dashboard API returns data with balances
-      const userInfo = {
-        ...(data?.user || {}),
-        savingBalance: data?.balances?.savingBalance || 0,
-        fixedBalance: data?.balances?.fixedBalance || 0,
-        availableToWithdraw: data?.balances?.availableToWithdraw || 0,
-        totalBalance: data?.balances?.totalBalance || 0,
-        totalInterest: data?.balances?.totalInterest || 0,
-      };
-      setUserData(userInfo);
+      const profile = await userService.getUserProfile();
+      setUserData(mapProfileToWithdrawUser(profile));
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('Error fetching user profile:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -127,7 +121,7 @@ const WithdrawScreen = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.screenHeader}>
+      <View style={[styles.screenHeader, { paddingTop: insets.top }]}>
         <Text style={styles.screenTitle}>Withdraw Funds</Text>
         <Text style={styles.screenSubtitle}>Request withdrawal from your deposits</Text>
       </View>
@@ -347,7 +341,6 @@ const styles = StyleSheet.create({
   },
   screenHeader: {
     paddingHorizontal: 24,
-    paddingTop: 56,
     paddingBottom: 12,
     backgroundColor: colors.background,
   },

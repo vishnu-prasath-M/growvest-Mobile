@@ -7,7 +7,13 @@ const userSchema = new mongoose.Schema({
   email: { type: String, sparse: true, unique: true },
   password: { type: String, required: true },
   balance: { type: Number, default: 0 },
-  role: { type: String, default: 'user' }
+  role: { type: String, default: 'user' },
+  fcmTokens: [{
+    token: { type: String, required: true },
+    platform: { type: String, enum: ['android', 'ios', 'web'], default: 'android' },
+    deviceId: { type: String },
+    updatedAt: { type: Date, default: Date.now },
+  }],
 }, {
   timestamps: true
 });

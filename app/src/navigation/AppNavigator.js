@@ -149,6 +149,11 @@ const AppNavigator = () => {
         <>
           <Stack.Screen name="MainTabs" component={TabNavigator} />
           <Stack.Screen 
+            name="Transactions" 
+            component={TransactionsScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
             name="InvestmentAmount" 
             component={InvestmentAmountScreen}
             options={stackHeaderOptions('Invest Now')}

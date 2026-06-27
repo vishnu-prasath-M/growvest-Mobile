@@ -17,10 +17,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { dashboardService } from '../../services/dashboardService';
 import { authService } from '../../services/authService';
 import { colors, typography, spacing } from '../../theme/theme';
+import { useScreenInsets } from '../../hooks/useScreenInsets';
+import { useAuth } from '../../context/AuthContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const HomeScreen = ({ navigation }) => {
+  const insets = useScreenInsets(8);
+  const { user: authUser, updateUser } = useAuth();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -30,16 +34,28 @@ const HomeScreen = ({ navigation }) => {
 
   const fetchUserAndDashboard = async () => {
     try {
-      // Get username from stored user data first
-      const userData = await authService.getUserData();
-      if (userData?.username || userData?.name) {
-        setUserName(userData?.name || userData?.username || '');
+      if (authUser?.name || authUser?.username) {
+        setUserName(authUser.name || authUser.username || '');
+      } else {
+        const userData = await authService.getUserData();
+        if (userData?.username || userData?.name) {
+          setUserName(userData?.name || userData?.username || '');
+        }
+      }
+
+      try {
+        const freshUser = await authService.refreshUserProfile();
+        if (freshUser?.name || freshUser?.username) {
+          setUserName(freshUser.name || freshUser.username || '');
+          await updateUser(freshUser);
+        }
+      } catch (profileError) {
+        console.warn('Could not refresh profile for home greeting:', profileError?.message || profileError);
       }
       
       const data = await dashboardService.getDashboard();
       setDashboardData(data);
       
-      // Also try to get username from dashboard response
       if (data?.user?.name || data?.user?.username) {
         setUserName(data?.user?.name || data?.user?.username);
       }
@@ -54,7 +70,7 @@ const HomeScreen = ({ navigation }) => {
   useFocusEffect(
     useCallback(() => {
       fetchUserAndDashboard();
-    }, [])
+    }, [authUser?.username, authUser?.name, authUser?.mobileNumber])
   );
 
   useEffect(() => {
@@ -87,11 +103,29 @@ const HomeScreen = ({ navigation }) => {
 
   const userData = dashboardData?.user;
   const balances = dashboardData?.balances;
-  const stats = dashboardData?.stats;
-  const pendingRequests = stats?.pendingRequests || 0;
+  const pendingRequests = dashboardData?.stats?.pendingRequests || 0;
 
   return (
     <View style={styles.container}>
+      <View style={[styles.header, { paddingTop: insets.top }]}>
+        <View style={styles.headerLeft}>
+          <Text style={styles.greetingLabel}>Good Morning,</Text>
+          <Text style={styles.username} numberOfLines={1}>
+            {userName || userData?.username || 'Investor'}
+          </Text>
+        </View>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Profile')}
+          style={styles.avatarButton}
+        >
+          <View style={[styles.avatar, styles.avatarWithShadow]}>
+            <Text style={styles.avatarText}>
+              {(userName || userData?.username || 'U').charAt(0).toUpperCase()}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -105,28 +139,7 @@ const HomeScreen = ({ navigation }) => {
           />
         }
       >
-        {/* Animated fade-in container */}
         <Animated.View style={{ opacity: fadeAnim }}>
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerLeft}>
-              <Text style={styles.greetingLabel}>Good Morning,</Text>
-              <Text style={styles.username} numberOfLines={1}>
-                {userName || userData?.username || 'Investor'}
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('Profile')}
-              style={styles.avatarButton}
-            >
-              <View style={[styles.avatar, styles.avatarWithShadow]}>
-                <Text style={styles.avatarText}>
-                  {(userName || userData?.username || 'U').charAt(0).toUpperCase()}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-
           {/* Current Balance - Premium Hero Card */}
           <View style={styles.balanceHeroContainer}>
             <LinearGradient
@@ -274,7 +287,7 @@ const HomeScreen = ({ navigation }) => {
               <TouchableOpacity
                 style={styles.quickAction}
                 activeOpacity={0.85}
-                onPress={() => navigation.navigate('Investments')}
+                onPress={() => navigation.navigate('Transactions')}
               >
                 <LinearGradient
                   colors={['#1e40af', '#2563eb']}
@@ -282,10 +295,10 @@ const HomeScreen = ({ navigation }) => {
                   end={{ x: 1, y: 1 }}
                   style={styles.quickActionGradient}
                 >
-                  <MaterialCommunityIcons name="chart-box-outline" size={28} color={colors.white} />
+                  <MaterialCommunityIcons name="history" size={28} color={colors.white} />
                 </LinearGradient>
-                <Text style={styles.quickActionTitle}>My Deposits</Text>
-                <Text style={styles.quickActionSub}>View all</Text>
+                <Text style={styles.quickActionTitle}>History</Text>
+                <Text style={styles.quickActionSub}>Transactions</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -328,8 +341,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingTop: 56,
     paddingBottom: 8,
+    backgroundColor: colors.background,
+    zIndex: 1,
   },
   headerLeft: {
     flex: 1,

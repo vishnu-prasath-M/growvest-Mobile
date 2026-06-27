@@ -5,27 +5,35 @@ import {
   StyleSheet,
   ScrollView,
   RefreshControl,
-  Alert,
-  Dimensions,
-  Animated,
+  TouchableOpacity,
 } from 'react-native';
 import { Card } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { transactionService } from '../../services/transactionService';
+import { authService } from '../../services/authService';
 import { colors, typography } from '../../theme/theme';
+import { useScreenInsets } from '../../hooks/useScreenInsets';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-const TransactionsScreen = () => {
+const TransactionsScreen = ({ navigation }) => {
+  const insets = useScreenInsets(8);
+  const canGoBack = navigation?.canGoBack?.() ?? false;
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchTransactions = async () => {
     try {
+      const user = await authService.getUserData();
       const data = await transactionService.getMyTransactions();
-      setTransactions(data);
+      const userTransactions = Array.isArray(data)
+        ? data.filter((tx) =>
+            (user?._id && String(tx.userId) === String(user._id)) ||
+            (user?.email && tx.userEmail?.toLowerCase() === user.email.toLowerCase()) ||
+            (user?.mobileNumber && tx.mobileNumber === user.mobileNumber)
+          )
+        : [];
+      setTransactions(userTransactions);
     } catch (error) {
       console.error('Error fetching transactions:', error);
     } finally {
@@ -132,7 +140,12 @@ const TransactionsScreen = () => {
   return (
     <View style={styles.container}>
       {/* Fixed Header */}
-      <View style={styles.screenHeader}>
+      <View style={[styles.screenHeader, { paddingTop: insets.top }]}>
+        {canGoBack ? (
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <MaterialCommunityIcons name="arrow-left" size={24} color={colors.text} />
+          </TouchableOpacity>
+        ) : null}
         <Text style={styles.screenTitle}>Transactions</Text>
         <Text style={styles.screenSubtitle}>
           {transactions.length > 0 
@@ -247,9 +260,17 @@ const styles = StyleSheet.create({
   },
   screenHeader: {
     paddingHorizontal: 24,
-    paddingTop: 56,
     paddingBottom: 12,
     backgroundColor: colors.background,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+    marginLeft: -8,
   },
   screenTitle: {
     ...typography.h2,

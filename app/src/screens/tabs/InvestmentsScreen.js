@@ -14,8 +14,10 @@ import { useFocusEffect } from '@react-navigation/native';
 import { investmentService } from '../../services/investmentService';
 import { authService } from '../../services/authService';
 import { colors, typography } from '../../theme/theme';
+import { useScreenInsets } from '../../hooks/useScreenInsets';
 
 const InvestmentsScreen = () => {
+  const insets = useScreenInsets(8);
   const [investments, setInvestments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -204,7 +206,7 @@ const InvestmentsScreen = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.screenHeader}>
+      <View style={[styles.screenHeader, { paddingTop: insets.top }]}>
         <Text style={styles.screenTitle}>My Investments</Text>
         <Text style={styles.screenSubtitle}>
           {investments.length > 0 
@@ -273,7 +275,6 @@ const styles = StyleSheet.create({
   },
   screenHeader: {
     paddingHorizontal: 24,
-    paddingTop: 56,
     paddingBottom: 12,
     backgroundColor: colors.background,
   },

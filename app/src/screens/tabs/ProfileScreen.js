@@ -16,8 +16,10 @@ import { useFocusEffect } from '@react-navigation/native';
 import { authService } from '../../services/authService';
 import { useAuth } from '../../context/AuthContext';
 import { colors, typography } from '../../theme/theme';
+import { useScreenInsets } from '../../hooks/useScreenInsets';
 
 const ProfileScreen = ({ navigation }) => {
+  const insets = useScreenInsets(8);
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -26,14 +28,31 @@ const ProfileScreen = ({ navigation }) => {
   const [newMobileNumber, setNewMobileNumber] = useState('');
   const [savingUsername, setSavingUsername] = useState(false);
   const [savingMobile, setSavingMobile] = useState(false);
-  const { logout, updateUser } = useAuth();
+  const { logout, updateUser, user: authUser } = useAuth();
+
+  const getErrorMessage = (error) => {
+    if (!error) return 'Something went wrong';
+    if (typeof error === 'string') return error;
+    return error.message || 'Something went wrong';
+  };
 
   const fetchUserData = async () => {
     try {
-      const user = await authService.getUserData();
-      setUserData(user);
+      const user = await authService.refreshUserProfile();
+      if (user) {
+        await updateUser(user);
+        setUserData(user);
+        return;
+      }
     } catch (error) {
-      console.error('Error fetching user data:', error);
+      console.error('Error fetching user profile from API:', error);
+    }
+
+    try {
+      const cachedUser = await authService.getUserData();
+      setUserData(cachedUser);
+    } catch (error) {
+      console.error('Error fetching cached user data:', error);
     } finally {
       setLoading(false);
     }
@@ -75,12 +94,12 @@ const ProfileScreen = ({ navigation }) => {
     setSavingUsername(true);
     try {
       const updatedUser = await authService.updateUsername(newUsername.trim());
-      updateUser(updatedUser);
+      await updateUser(updatedUser);
       setUserData(updatedUser);
       setEditModalVisible(false);
       Alert.alert('Success', 'Username updated successfully');
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to update username');
+      Alert.alert('Error', getErrorMessage(error));
     } finally {
       setSavingUsername(false);
     }
@@ -96,26 +115,26 @@ const ProfileScreen = ({ navigation }) => {
       Alert.alert('Error', 'Mobile number cannot be empty');
       return;
     }
-    if (newMobileNumber.trim().length < 10) {
-      Alert.alert('Error', 'Please enter a valid mobile number');
+    if (newMobileNumber.trim().length !== 10 || !/^\d{10}$/.test(newMobileNumber.trim())) {
+      Alert.alert('Error', 'Please enter a valid 10-digit mobile number');
       return;
     }
     setSavingMobile(true);
     try {
       const updatedUser = await authService.updateMobileNumber(newMobileNumber.trim());
-      updateUser(updatedUser);
+      await updateUser(updatedUser);
       setUserData(updatedUser);
       setEditMobileModalVisible(false);
       Alert.alert('Success', 'Mobile number updated successfully');
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to update mobile number');
+      Alert.alert('Error', getErrorMessage(error));
     } finally {
       setSavingMobile(false);
     }
   };
 
   const handleContactSupport = () => {
-    Linking.openURL('https://wa.me/917305897557?text=Hello Growvest Support, I need assistance.');
+    Linking.openURL('https://wa.me/918300278515?text=Hello Growvest Support, I need assistance.');
   };
 
   const getInitial = () => {
@@ -142,7 +161,7 @@ const ProfileScreen = ({ navigation }) => {
         showsVerticalScrollIndicator={false}
       >
         {/* Premium Profile Header */}
-        <View style={styles.profileHeader}>
+        <View style={[styles.profileHeader, { paddingTop: insets.top }]}>
           <View style={styles.avatarWrapper}>
             <View style={styles.avatarRing}>
               <View style={styles.avatar}>
@@ -412,7 +431,6 @@ const styles = StyleSheet.create({
   // Profile Header
   profileHeader: {
     alignItems: 'center',
-    paddingTop: 56,
     paddingBottom: 24,
     paddingHorizontal: 24,
   },

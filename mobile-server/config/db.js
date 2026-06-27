@@ -9,7 +9,7 @@ const connectDB = async () => {
     // Try to set DNS servers for SRV resolution - use system DNS first
     // This fixes "querySrv ECONNREFUSED" on networks where default DNS blocks SRV lookups
     try {
-      dns.setServers(['10.226.25.182', '8.8.8.8', '8.8.4.4']);
+      dns.setServers(['8.8.8.8', '8.8.4.4']);
     } catch (e) {
       // Ignore DNS set errors
     }

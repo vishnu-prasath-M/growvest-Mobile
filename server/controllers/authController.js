@@ -121,14 +121,17 @@ exports.getMe = async (req, res) => {
 exports.updateUsername = async (req, res) => {
   try {
     const { username } = req.body;
+    const trimmedUsername = typeof username === 'string' ? username.trim() : '';
 
-    if (!username || !username.trim()) {
+    if (!trimmedUsername) {
       return res.status(400).json({ message: 'Username is required' });
     }
 
-    const existingUser = await User.findOne({ 
-      username, 
-      _id: { $ne: req.user.id } 
+    const userId = req.user._id || req.user.id;
+
+    const existingUser = await User.findOne({
+      username: trimmedUsername,
+      _id: { $ne: userId },
     });
 
     if (existingUser) {
@@ -136,9 +139,9 @@ exports.updateUsername = async (req, res) => {
     }
 
     const user = await User.findByIdAndUpdate(
-      req.user.id,
-      { username: username.trim() },
-      { new: true }
+      userId,
+      { username: trimmedUsername, name: trimmedUsername },
+      { new: true, runValidators: true }
     ).select('-password');
 
     if (!user) {
@@ -152,10 +155,13 @@ exports.updateUsername = async (req, res) => {
       email: user.email,
       mobileNumber: user.mobileNumber,
       role: user.role,
-      balance: user.balance
+      balance: user.balance,
     });
   } catch (error) {
     console.error('Update username error:', error);
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'Username already taken' });
+    }
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -167,32 +173,38 @@ exports.updateProfile = async (req, res) => {
   try {
     const { username, mobileNumber, name } = req.body;
     const updateFields = {};
+    const userId = req.user._id || req.user.id;
 
-    if (username && username.trim()) {
-      // Check if username is taken by another user
-      const existingUser = await User.findOne({ 
-        username: username.trim(), 
-        _id: { $ne: req.user.id } 
+    if (username && typeof username === 'string' && username.trim()) {
+      const trimmedUsername = username.trim();
+      const existingUser = await User.findOne({
+        username: trimmedUsername,
+        _id: { $ne: userId },
       });
       if (existingUser) {
         return res.status(400).json({ message: 'Username already taken' });
       }
-      updateFields.username = username.trim();
+      updateFields.username = trimmedUsername;
+      updateFields.name = trimmedUsername;
     }
 
-    if (mobileNumber && mobileNumber.trim()) {
-      // Check if mobile number is taken by another user
-      const existingMobile = await User.findOne({ 
-        mobileNumber: mobileNumber.trim(), 
-        _id: { $ne: req.user.id } 
+    if (mobileNumber && typeof mobileNumber === 'string' && mobileNumber.trim()) {
+      const trimmedMobile = mobileNumber.trim();
+      if (!/^\d{10}$/.test(trimmedMobile)) {
+        return res.status(400).json({ message: 'Invalid mobile number. Must be 10 digits.' });
+      }
+
+      const existingMobile = await User.findOne({
+        mobileNumber: trimmedMobile,
+        _id: { $ne: userId },
       });
       if (existingMobile) {
         return res.status(400).json({ message: 'Mobile number already in use' });
       }
-      updateFields.mobileNumber = mobileNumber.trim();
+      updateFields.mobileNumber = trimmedMobile;
     }
 
-    if (name && name.trim()) {
+    if (name && typeof name === 'string' && name.trim()) {
       updateFields.name = name.trim();
     }
 
@@ -201,9 +213,9 @@ exports.updateProfile = async (req, res) => {
     }
 
     const user = await User.findByIdAndUpdate(
-      req.user.id,
+      userId,
       updateFields,
-      { new: true }
+      { new: true, runValidators: true }
     ).select('-password');
 
     if (!user) {
@@ -217,10 +229,13 @@ exports.updateProfile = async (req, res) => {
       email: user.email,
       mobileNumber: user.mobileNumber,
       role: user.role,
-      balance: user.balance
+      balance: user.balance,
     });
   } catch (error) {
     console.error('Update profile error:', error);
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'Username or mobile number already in use' });
+    }
     res.status(500).json({ message: 'Server error' });
   }
 };

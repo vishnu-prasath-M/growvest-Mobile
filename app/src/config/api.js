@@ -4,8 +4,7 @@ const getBaseUrl = () => {
   if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
   }
-  // Use mobile server URL
-  return 'https://growvest-mobile-server.onrender.com/api/mobile';
+  return 'https://growvest-online.onrender.com/api';
 };
 
 export const API_BASE_URL = getBaseUrl();
@@ -18,6 +17,9 @@ export const API_ENDPOINTS = {
   UPDATE_USERNAME: '/auth/username',
   UPDATE_MOBILE: '/auth/mobile',
   UPDATE_PROFILE: '/auth/update-profile',
+  
+  // User profile (balances + account data — same as web client)
+  USER_PROFILE: '/users/profile',
   
   // Dashboard
   DASHBOARD: '/dashboard',
@@ -33,4 +35,7 @@ export const API_ENDPOINTS = {
   // Withdrawals
   WITHDRAWALS: '/withdrawals',
   WITHDRAWAL_BY_ID: (id) => `/withdrawals/${id}`,
+
+  // Push notifications (FCM)
+  FCM_TOKEN: '/users/fcm-token',
 };

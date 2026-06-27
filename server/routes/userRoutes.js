@@ -15,6 +15,12 @@ router.get('/detail/:email', protect, admin, userController.getUserDetailByEmail
 // GET /api/users/profile - Get current user profile (using token)
 router.get('/profile', protect, userController.getUserProfile);
 
+// PUT /api/users/fcm-token - Save FCM push notification token
+router.put('/fcm-token', protect, userController.saveFcmToken);
+
+// DELETE /api/users/fcm-token - Remove FCM push notification token
+router.delete('/fcm-token', protect, userController.removeFcmToken);
+
 // GET /api/users/email/:email - Get user by email (used by user dashboard)
 router.get('/email/:email', userController.getUserByEmail);
 

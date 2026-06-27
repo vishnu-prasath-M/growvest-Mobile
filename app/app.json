@@ -5,12 +5,12 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "icon": "./assets/logo-h.jpeg",
+    "icon": "./assets/icon.png",
     "assetBundlePatterns": [
       "**/*"
     ],
     "splash": {
-      "image": "./assets/logo-h.jpeg",
+      "image": "./assets/icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#085428"
     },
@@ -23,18 +23,42 @@
     },
     "android": {
       "package": "com.growvest.mobile",
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "POST_NOTIFICATIONS",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/growvest-logo.png",
         "backgroundColor": "#085428"
       }
     },
     "web": {
-      "favicon": "./assets/logo-h.jpeg"
+      "favicon": "./assets/icon.png"
     },
     "plugins": [
       "expo-asset",
       "expo-font",
-      "expo-splash-screen"
+      "expo-splash-screen",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#085428",
+          "defaultChannel": "growvest-default",
+          "sounds": []
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35
+          }
+        }
+      ]
     ],
     "extra": {
       "eas": {

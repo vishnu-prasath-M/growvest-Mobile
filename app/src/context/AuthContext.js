@@ -34,6 +34,13 @@ export const AuthProvider = ({ children }) => {
               setUser(userToStore);
               await AsyncStorage.setItem('userData', JSON.stringify(userToStore));
             }
+
+            try {
+              const { notificationService } = await import('../services/notificationService');
+              await notificationService.syncTokenWithBackend();
+            } catch (syncError) {
+              console.warn('FCM token sync on startup failed:', syncError?.message || syncError);
+            }
           } catch (err) {
             console.error('Verify token failed:', err);
             if (err.response?.status === 401) {
@@ -53,11 +60,17 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (userToken, userData) => {
     setToken(userToken);
-    // Remove the nested token inside user object to keep it clean, or keep it
     const { token: _, ...userProfile } = userData;
     setUser(userProfile);
     await AsyncStorage.setItem('userToken', userToken);
     await AsyncStorage.setItem('userData', JSON.stringify(userProfile));
+
+    try {
+      const { notificationService } = await import('../services/notificationService');
+      await notificationService.syncTokenWithBackend();
+    } catch (error) {
+      console.warn('FCM token sync after login failed:', error?.message || error);
+    }
   };
 
   const logout = async () => {
@@ -67,11 +80,10 @@ export const AuthProvider = ({ children }) => {
   };
 
   const updateUser = async (newUserData) => {
-    setUser((prev) => {
-      const updated = prev ? { ...prev, ...newUserData } : newUserData;
-      AsyncStorage.setItem('userData', JSON.stringify(updated));
-      return updated;
-    });
+    const updated = user ? { ...user, ...newUserData } : newUserData;
+    setUser(updated);
+    await AsyncStorage.setItem('userData', JSON.stringify(updated));
+    return updated;
   };
 
   return (

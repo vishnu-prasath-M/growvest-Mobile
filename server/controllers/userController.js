@@ -358,3 +358,94 @@ exports.getAllUsers = async (req, res) => {
 };
 
 exports.syncInvestmentInterest = syncInvestmentInterest;
+
+// @desc    Save or update FCM token for push notifications
+// @route   PUT /api/users/fcm-token
+// @access  Private
+exports.saveFcmToken = async (req, res) => {
+  try {
+    const { fcmToken, platform = 'android', deviceId } = req.body;
+
+    if (!fcmToken || typeof fcmToken !== 'string') {
+      return res.status(400).json({ message: 'FCM token is required' });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const now = new Date();
+    const normalizedPlatform = ['android', 'ios', 'web'].includes(platform) ? platform : 'android';
+    const tokens = Array.isArray(user.fcmTokens) ? [...user.fcmTokens] : [];
+
+    const existingIndex = tokens.findIndex((entry) => {
+      if (entry.token === fcmToken) {
+        return true;
+      }
+      return deviceId && entry.deviceId && entry.deviceId === deviceId;
+    });
+
+    const tokenEntry = {
+      token: fcmToken.trim(),
+      platform: normalizedPlatform,
+      deviceId: deviceId || null,
+      updatedAt: now,
+    };
+
+    if (existingIndex >= 0) {
+      tokens[existingIndex] = tokenEntry;
+    } else {
+      tokens.push(tokenEntry);
+    }
+
+    const dedupedTokens = [];
+    const seen = new Set();
+    for (let i = tokens.length - 1; i >= 0; i -= 1) {
+      const key = tokens[i].token;
+      if (!seen.has(key)) {
+        seen.add(key);
+        dedupedTokens.unshift(tokens[i]);
+      }
+    }
+
+    user.fcmTokens = dedupedTokens.slice(-10);
+    await user.save();
+
+    res.status(200).json({
+      message: 'FCM token saved',
+      tokenCount: user.fcmTokens.length,
+    });
+  } catch (error) {
+    console.error('Save FCM token error:', error);
+    res.status(500).json({ message: 'Error saving FCM token', error: error.message });
+  }
+};
+
+// @desc    Remove FCM token on logout or device unregister
+// @route   DELETE /api/users/fcm-token
+// @access  Private
+exports.removeFcmToken = async (req, res) => {
+  try {
+    const { fcmToken } = req.body;
+
+    if (!fcmToken) {
+      return res.status(400).json({ message: 'FCM token is required' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { $pull: { fcmTokens: { token: fcmToken } } },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.status(200).json({ message: 'FCM token removed' });
+  } catch (error) {
+    console.error('Remove FCM token error:', error);
+    res.status(500).json({ message: 'Error removing FCM token', error: error.message });
+  }
+};

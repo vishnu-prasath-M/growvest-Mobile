@@ -87,7 +87,7 @@ const InvestmentPaymentScreen = ({ navigation, route }) => {
   const upiApps = [
     { 
       name: 'Google Pay', 
-      logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f2/Google_Pay_Logo.svg/512px-Google_Pay_Logo.svg.png',
+      logo: 'https://img.icons8.com/?size=100&id=am4ltuIYDpQ5&format=png&color=000000',
       color: '#4285F4', 
       bg: '#e8f0fe' 
     },
@@ -99,13 +99,13 @@ const InvestmentPaymentScreen = ({ navigation, route }) => {
     },
     { 
       name: 'Paytm', 
-      logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/Paytm_logo.svg/512px-Paytm_logo.svg.png',
+      logo: 'https://img.icons8.com/?size=100&id=68067&format=png&color=000000',
       color: '#00BAF2', 
       bg: '#e0f7fe' 
     },
     { 
       name: 'BHIM', 
-      logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/BHIM_Logo.svg/512px-BHIM_Logo.svg.png',
+      logo: 'https://img.icons8.com/?size=100&id=5RcHTSNy4fbL&format=png&color=000000',
       color: '#1a73e8', 
       bg: '#e8f0fe' 
     },
