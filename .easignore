@@ -1,5 +1,5 @@
-android/
-ios/
 android_backup/
-app/android/
-app/ios/
+app/android_backup/
+android/.gradle/
+android/build/
+android/app/build/

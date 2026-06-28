@@ -1,9 +1,9 @@
-import { DefaultTheme } from 'react-native-paper';
+import { MD3LightTheme } from 'react-native-paper';
 
 export const theme = {
-  ...DefaultTheme,
+  ...MD3LightTheme,
   colors: {
-    ...DefaultTheme.colors,
+    ...MD3LightTheme.colors,
     primary: '#085428',        // Website Primary (Forest Green)
     secondary: '#25b053',      // Website Secondary (Grass Green)
     accent: '#eaf5ef',         // Website Accent (Mint Background)
@@ -17,27 +17,7 @@ export const theme = {
     backdrop: 'rgba(0,0,0,0.5)',
   },
   fonts: {
-    ...DefaultTheme.fonts,
-    regular: {
-      fontFamily: 'System',
-      fontWeight: '400',
-    },
-    medium: {
-      fontFamily: 'System',
-      fontWeight: '600',
-    },
-    light: {
-      fontFamily: 'System',
-      fontWeight: '300',
-    },
-    thin: {
-      fontFamily: 'System',
-      fontWeight: '100',
-    },
-    bold: {
-      fontFamily: 'System',
-      fontWeight: '700',
-    },
+    ...MD3LightTheme.fonts,
   },
   roundness: 16,
 };
