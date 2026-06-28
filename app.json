@@ -50,7 +50,6 @@
       [
         "expo-notifications",
         {
-          "icon": "./app/assets/icon.png",
           "color": "#085428",
           "defaultChannel": "growvest-default",
           "sounds": []
@@ -64,7 +63,9 @@
             "targetSdkVersion": 35
           }
         }
-      ]
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging"
     ],
     "owner": "my-player",
     "extra": {

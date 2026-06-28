@@ -64,7 +64,7 @@ const configureNotificationHandler = () => {
 const getDeviceId = async () => {
   try {
     if (Platform.OS === 'android') {
-      return Application.androidId;
+      return Application.getAndroidId();
     }
     return await Application.getIosIdForVendorAsync();
   } catch {
