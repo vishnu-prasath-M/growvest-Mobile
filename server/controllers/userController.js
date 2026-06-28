@@ -74,25 +74,19 @@ const getEnrichedUserData = async (query) => {
   const withdrawalQuery = withdrawalOrConditions.length > 0
     ? { $or: withdrawalOrConditions, status: { $in: ['paid', 'approved'] } }
     : { status: { $in: ['paid', 'approved'] }, userEmail: '__no_match__' };
-
-  // Get all paid withdrawals by email OR mobile number
   const withdrawals = await Withdrawal.find(withdrawalQuery);
 
-  // Separate by type
   const savingInvestments = investments.filter(inv => inv.type === 'saving');
   const fixedInvestments = investments.filter(inv => inv.type === 'fixed');
 
   const savingWithdrawals = withdrawals.filter(wd => wd.withdrawType === 'saving');
   const fixedWithdrawals = withdrawals.filter(wd => wd.withdrawType === 'fixed');
-
-  // Calculate totals for SAVING
   const savingInvested = savingInvestments.reduce((acc, inv) => acc + inv.amount, 0);
   const savingInterest = savingInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
   const savingWithdrawn = savingWithdrawals.reduce((acc, wd) => acc + wd.amount, 0);
   let savingBalance = savingInvested + savingInterest - savingWithdrawn;
   if (savingBalance < 0) savingBalance = 0;
 
-  // Calculate totals for FIXED
   const fixedInvested = fixedInvestments.reduce((acc, inv) => acc + inv.amount, 0);
   const fixedInterest = fixedInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
   const fixedWithdrawn = fixedWithdrawals.reduce((acc, wd) => acc + wd.amount, 0);

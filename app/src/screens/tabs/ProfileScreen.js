@@ -42,6 +42,7 @@ const ProfileScreen = ({ navigation }) => {
       if (user) {
         await updateUser(user);
         setUserData(user);
+        setLoading(false);
         return;
       }
     } catch (error) {
