@@ -1,8 +1,15 @@
 import { Platform } from 'react-native';
 
 const getBaseUrl = () => {
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL;
+  try {
+    // In release builds, process.env may be undefined.
+    // babel-preset-expo replaces EXPO_PUBLIC_* at build time,
+    // but we guard against process.env being absent at runtime.
+    if (typeof process !== 'undefined' && process.env && process.env.EXPO_PUBLIC_API_URL) {
+      return process.env.EXPO_PUBLIC_API_URL;
+    }
+  } catch (e) {
+    console.warn('[api] process.env not available, using fallback URL');
   }
   return 'https://growvest-mobile.onrender.com/api';
 };

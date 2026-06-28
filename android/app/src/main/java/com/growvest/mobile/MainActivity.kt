@@ -1,4 +1,4 @@
-package com.growvest
+package com.growvest.mobile
 
 import android.os.Build
 import android.os.Bundle

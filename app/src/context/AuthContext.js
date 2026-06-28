@@ -13,44 +13,62 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const initAuth = async () => {
       try {
+        console.log('[AuthContext] Starting auth initialization...');
         const storedToken = await AsyncStorage.getItem('userToken');
         const storedUser = await AsyncStorage.getItem('userData');
+        
+        console.log('[AuthContext] Stored token found:', !!storedToken);
         
         if (storedToken) {
           setToken(storedToken);
           if (storedUser) {
             try {
               setUser(JSON.parse(storedUser));
+              console.log('[AuthContext] Stored user data loaded');
             } catch (err) {
-              console.error('Error parsing stored user data:', err);
+              console.error('[AuthContext] Error parsing stored user data:', err);
             }
           }
           
-          // Verify token against server
+          // Verify token against server with timeout
           try {
-            const response = await api.get(API_ENDPOINTS.ME);
+            console.log('[AuthContext] Verifying token with server...');
+            const response = await Promise.race([
+              api.get(API_ENDPOINTS.ME),
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('API timeout')), 10000)
+              )
+            ]);
+            
             if (response.data) {
               const userToStore = response.data;
               setUser(userToStore);
               await AsyncStorage.setItem('userData', JSON.stringify(userToStore));
+              console.log('[AuthContext] Token verified, user data updated');
             }
 
             try {
               const { notificationService } = await import('../services/notificationService');
               await notificationService.syncTokenWithBackend();
+              console.log('[AuthContext] FCM token synced');
             } catch (syncError) {
-              console.warn('FCM token sync on startup failed:', syncError?.message || syncError);
+              console.warn('[AuthContext] FCM token sync on startup failed:', syncError?.message || syncError);
             }
           } catch (err) {
-            console.error('Verify token failed:', err);
+            console.error('[AuthContext] Verify token failed:', err?.message || err);
             if (err.response?.status === 401) {
+              console.log('[AuthContext] Token invalid, logging out...');
               await logout();
+            } else {
+              // If server is unreachable or timeout, continue with stored token
+              console.warn('[AuthContext] Server unreachable or timeout, continuing with stored token');
             }
           }
         }
       } catch (e) {
-        console.error('Failed to load auth state from AsyncStorage:', e);
+        console.error('[AuthContext] Failed to load auth state from AsyncStorage:', e?.message || e);
       } finally {
+        console.log('[AuthContext] Auth initialization complete, loading:', false);
         setLoading(false);
       }
     };

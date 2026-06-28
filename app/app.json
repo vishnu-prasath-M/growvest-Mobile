@@ -18,7 +18,13 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.growvest.mobile",
       "infoPlist": {
-        "LSApplicationQueriesSchemes": ["upi", "googlepay", "phonepe", "paytm", "bhim"]
+        "LSApplicationQueriesSchemes": [
+          "upi",
+          "googlepay",
+          "phonepe",
+          "paytm",
+          "bhim"
+        ]
       }
     },
     "android": {
@@ -60,11 +66,11 @@
         }
       ]
     ],
+    "owner": "my-player",
     "extra": {
       "eas": {
-        "projectId": "88b3eaf2-f492-41c1-9d89-027bebe60784"
+        "projectId": "f4211c90-3448-400b-9e0c-82933dd6dbed"
       }
-    },
-    "owner": "itz-vp"
+    }
   }
 }

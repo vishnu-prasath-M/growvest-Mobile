@@ -1,4 +1,4 @@
-package com.growvest
+package com.growvest.mobile
 
 import android.app.Application
 import android.content.res.Configuration
