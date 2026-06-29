@@ -63,9 +63,7 @@
             "targetSdkVersion": 35
           }
         }
-      ],
-      "@react-native-firebase/app",
-      "@react-native-firebase/messaging"
+      ]
     ],
     "owner": "my-player",
     "extra": {
