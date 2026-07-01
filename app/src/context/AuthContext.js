@@ -95,6 +95,13 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
     setUser(null);
     await AsyncStorage.multiRemove(['userToken', 'userData']);
+
+    try {
+      const { notificationService } = await import('../services/notificationService');
+      await notificationService.removeTokenFromBackend();
+    } catch (error) {
+      console.warn('FCM token removal on logout failed:', error?.message || error);
+    }
   };
 
   const updateUser = async (newUserData) => {

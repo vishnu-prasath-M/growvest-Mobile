@@ -11,7 +11,6 @@ const NotificationProvider = ({ children }) => {
     let service = null;
 
     const setupNotifications = async () => {
-      // Set a timeout to ensure we never block rendering
       const timeout = setTimeout(() => {
         if (active) {
           console.warn('[NotificationProvider] Setup timed out, continuing without notifications');

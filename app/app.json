@@ -50,6 +50,7 @@
       [
         "expo-notifications",
         {
+          "icon": "./assets/icon.png",
           "color": "#085428",
           "defaultChannel": "growvest-default",
           "sounds": []
