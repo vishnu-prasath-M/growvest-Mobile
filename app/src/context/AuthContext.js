@@ -46,15 +46,6 @@ export const AuthProvider = ({ children }) => {
               await AsyncStorage.setItem('userData', JSON.stringify(userToStore));
               console.log('[AuthContext] Token verified, user data updated');
             }
-
-            // Notification sync disabled - investigating crash
-            // try {
-            //   const { notificationService } = await import('../services/notificationService');
-            //   await notificationService.syncTokenWithBackend();
-            //   console.log('[AuthContext] FCM token synced');
-            // } catch (syncError) {
-            //   console.warn('[AuthContext] FCM token sync on startup failed:', syncError?.message || syncError);
-            // }
           } catch (err) {
             console.error('[AuthContext] Verify token failed:', err?.message || err);
             if (err.response?.status === 401) {
@@ -84,27 +75,19 @@ export const AuthProvider = ({ children }) => {
     await AsyncStorage.setItem('userToken', userToken);
     await AsyncStorage.setItem('userData', JSON.stringify(userProfile));
 
-    // Notification sync disabled - investigating crash
-    // try {
-    //   const { notificationService } = await import('../services/notificationService');
-    //   await notificationService.syncTokenWithBackend();
-    // } catch (error) {
-    //   console.warn('FCM token sync after login failed:', error?.message || error);
-    // }
+    try {
+      const { notificationService } = await import('../services/notificationService');
+      await notificationService.registerDevice(userProfile._id || userProfile.id, userProfile.username);
+      await notificationService.sendWelcomeNotification();
+    } catch (error) {
+      console.warn('[AuthContext] Notification setup failed:', error?.message || error);
+    }
   };
 
   const logout = async () => {
     setToken(null);
     setUser(null);
     await AsyncStorage.multiRemove(['userToken', 'userData']);
-
-    // Notification sync disabled - investigating crash
-    // try {
-    //   const { notificationService } = await import('../services/notificationService');
-    //   await notificationService.removeTokenFromBackend();
-    // } catch (error) {
-    //   console.warn('FCM token removal on logout failed:', error?.message || error);
-    // }
   };
 
   const updateUser = async (newUserData) => {

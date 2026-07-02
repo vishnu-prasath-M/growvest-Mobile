@@ -29,12 +29,7 @@
     },
     "android": {
       "package": "com.growvest.mobile",
-      "googleServicesFile": "./google-services.json",
-      "permissions": [
-        "POST_NOTIFICATIONS",
-        "RECEIVE_BOOT_COMPLETED",
-        "VIBRATE"
-      ],
+      "permissions": [],
       "adaptiveIcon": {
         "foregroundImage": "./assets/growvest-logo.png",
         "backgroundColor": "#085428"
@@ -47,15 +42,7 @@
       "expo-asset",
       "expo-font",
       "expo-splash-screen",
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/icon.png",
-          "color": "#085428",
-          "defaultChannel": "growvest-default",
-          "sounds": []
-        }
-      ],
+      "expo-notifications",
       [
         "expo-build-properties",
         {

@@ -13,7 +13,6 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AppNavigator from './src/navigation/AppNavigator';
 import { navigationRef } from './src/navigation/navigationRef';
-import NotificationProvider from './src/providers/NotificationProvider';
 import { theme } from './src/theme/theme';
 import { AuthProvider } from './src/context/AuthContext';
 
@@ -70,25 +69,23 @@ function AppContent() {
     <SafeAreaProvider>
       <PaperProvider theme={theme}>
         <AuthProvider>
-          <NotificationProvider>
-            <NavigationContainer
-              ref={navigationRef}
-              theme={{
-                colors: {
-                  primary: theme.colors.primary,
-                  background: theme.colors.background,
-                  card: theme.colors.surface,
-                  text: theme.colors.text,
-                  border: theme.colors.border,
-                  notification: theme.colors.primary,
-                },
-                dark: false,
-              }}
-            >
-              <StatusBar style="dark" />
-              <AppNavigator />
-            </NavigationContainer>
-          </NotificationProvider>
+          <NavigationContainer
+            ref={navigationRef}
+            theme={{
+              colors: {
+                primary: theme.colors.primary,
+                background: theme.colors.background,
+                card: theme.colors.surface,
+                text: theme.colors.text,
+                border: theme.colors.border,
+                notification: theme.colors.primary,
+              },
+              dark: false,
+            }}
+          >
+            <StatusBar style="dark" />
+            <AppNavigator />
+          </NavigationContainer>
         </AuthProvider>
       </PaperProvider>
     </SafeAreaProvider>

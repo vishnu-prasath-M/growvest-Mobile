@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Investment = require('../models/Investment');
 const Withdrawal = require('../models/Withdrawal');
+const DeviceToken = require('../models/DeviceToken');
 
 // Helper function to calculate daily interest for an investment
 // Formula: (currentBalance * rate%) / 365 * daysSinceStart
@@ -441,5 +442,41 @@ exports.removeFcmToken = async (req, res) => {
   } catch (error) {
     console.error('Remove FCM token error:', error);
     res.status(500).json({ message: 'Error removing FCM token', error: error.message });
+  }
+};
+
+// @desc    Register device for push notifications
+// @route   POST /api/users/register-device
+// @access  Private
+exports.registerDevice = async (req, res) => {
+  try {
+    const { userId, username, deviceToken, platform } = req.body;
+
+    if (!userId || !username || !deviceToken) {
+      return res.status(400).json({ message: 'userId, username, and deviceToken are required' });
+    }
+
+    const normalizedPlatform = ['android', 'ios', 'web'].includes(platform) ? platform : 'android';
+
+    const existingToken = await DeviceToken.findOne({ deviceToken });
+
+    if (existingToken) {
+      await DeviceToken.findByIdAndUpdate(
+        existingToken._id,
+        { userId, username, platform: normalizedPlatform, updatedAt: Date.now() }
+      );
+    } else {
+      await DeviceToken.create({
+        userId,
+        username,
+        deviceToken,
+        platform: normalizedPlatform
+      });
+    }
+
+    res.status(200).json({ message: 'Device registered successfully' });
+  } catch (error) {
+    console.error('Register device error:', error);
+    res.status(500).json({ message: 'Error registering device', error: error.message });
   }
 };

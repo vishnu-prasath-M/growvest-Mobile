@@ -9,6 +9,7 @@ import {
   Alert,
   Dimensions,
   Animated,
+  Modal,
 } from 'react-native';
 import { Card, Button } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -29,6 +30,7 @@ const HomeScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [userName, setUserName] = useState('');
+  const [investModalVisible, setInvestModalVisible] = useState(false);
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -253,7 +255,7 @@ const HomeScreen = ({ navigation }) => {
               <TouchableOpacity
                 style={styles.quickAction}
                 activeOpacity={0.85}
-                onPress={() => navigation.navigate('InvestmentAmount')}
+                onPress={() => setInvestModalVisible(true)}
               >
                 <LinearGradient
                   colors={['#064e3b', '#065f46']}
@@ -307,6 +309,75 @@ const HomeScreen = ({ navigation }) => {
           <View style={{ height: 100 }} />
         </Animated.View>
       </ScrollView>
+
+      {/* Invest Now Modal */}
+      <Modal
+        visible={investModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setInvestModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setInvestModalVisible(false)}
+        >
+          <View style={styles.modalContent} activeOpacity={1}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Invest Now</Text>
+              <TouchableOpacity onPress={() => setInvestModalVisible(false)}>
+                <MaterialCommunityIcons name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={styles.modalOption}
+              activeOpacity={0.85}
+              onPress={() => {
+                setInvestModalVisible(false);
+                navigation.navigate('InvestmentAmount');
+              }}
+            >
+              <LinearGradient
+                colors={['#064e3b', '#065f46']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.modalOptionGradient}
+              >
+                <MaterialCommunityIcons name="chart-line-variant" size={32} color={colors.white} />
+              </LinearGradient>
+              <View style={styles.modalOptionText}>
+                <Text style={styles.modalOptionTitle}>New Investment</Text>
+                <Text style={styles.modalOptionSub}>Start a new deposit</Text>
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.modalOption}
+              activeOpacity={0.85}
+              onPress={() => {
+                setInvestModalVisible(false);
+                navigation.navigate('Investments');
+              }}
+            >
+              <LinearGradient
+                colors={['#047857', '#059669']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.modalOptionGradient}
+              >
+                <MaterialCommunityIcons name="account-cash" size={32} color={colors.white} />
+              </LinearGradient>
+              <View style={styles.modalOptionText}>
+                <Text style={styles.modalOptionTitle}>My Investments</Text>
+                <Text style={styles.modalOptionSub}>View your deposits</Text>
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -628,6 +699,62 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textTertiary,
     fontWeight: '500',
+  },
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '85%',
+    backgroundColor: colors.white,
+    borderRadius: 24,
+    padding: 24,
+    ...colors.shadow.elevated,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  modalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  modalOptionGradient: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  modalOptionText: {
+    flex: 1,
+  },
+  modalOptionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 2,
+  },
+  modalOptionSub: {
+    fontSize: 13,
+    color: colors.textTertiary,
   },
 });
 

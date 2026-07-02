@@ -12,7 +12,7 @@ import SignupScreen from '../screens/auth/SignupScreen';
 
 // Tab Screens
 import HomeScreen from '../screens/tabs/HomeScreen';
-import InvestmentsScreen from '../screens/tabs/InvestmentsScreen';
+import ChitFundScreen from '../screens/tabs/ChitFundScreen';
 import TransactionsScreen from '../screens/tabs/TransactionsScreen';
 import WithdrawScreen from '../screens/tabs/WithdrawScreen';
 import ProfileScreen from '../screens/tabs/ProfileScreen';
@@ -21,6 +21,9 @@ import ProfileScreen from '../screens/tabs/ProfileScreen';
 import InvestmentAmountScreen from '../screens/investment/InvestmentAmountScreen';
 import InvestmentPaymentScreen from '../screens/investment/InvestmentPaymentScreen';
 import InvestmentStatusScreen from '../screens/investment/InvestmentStatusScreen';
+
+// Investment List Screen (used from modal)
+import InvestmentsScreen from '../screens/tabs/InvestmentsScreen';
 
 // Additional Screens
 import AboutUsScreen from '../screens/tabs/AboutUsScreen';
@@ -41,7 +44,7 @@ const TabIcon = ({ name, focused, color }) => {
 const getTabIconName = (routeName, focused) => {
   const icons = {
     Home: focused ? 'home-variant' : 'home-variant-outline',
-    Investments: focused ? 'trending-up' : 'trending-up',
+    ChitFund: focused ? 'cash-multiple' : 'cash-multiple',
     Withdraw: focused ? 'cash-fast' : 'cash-fast',
     Profile: focused ? 'account' : 'account-outline',
   };
@@ -90,7 +93,7 @@ const TabNavigator = () => {
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Investments" component={InvestmentsScreen} />
+      <Tab.Screen name="ChitFund" component={ChitFundScreen} options={{ tabBarLabel: 'Chit Fund' }} />
       <Tab.Screen name="Withdraw" component={WithdrawScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
@@ -167,6 +170,11 @@ const AppNavigator = () => {
             name="InvestmentStatus" 
             component={InvestmentStatusScreen}
             options={stackHeaderOptions('Status')}
+          />
+          <Stack.Screen 
+            name="Investments" 
+            component={InvestmentsScreen}
+            options={{ headerShown: false }}
           />
           <Stack.Screen 
             name="AboutUs" 
