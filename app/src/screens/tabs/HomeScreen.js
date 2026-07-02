@@ -375,6 +375,35 @@ const HomeScreen = ({ navigation }) => {
               </View>
               <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
             </TouchableOpacity>
+
+            <View style={styles.modalDivider}>
+              <View style={styles.modalDividerLine} />
+              <Text style={styles.modalDividerText}>New</Text>
+              <View style={styles.modalDividerLine} />
+            </View>
+
+            <TouchableOpacity
+              style={styles.modalOption}
+              activeOpacity={0.85}
+              onPress={() => {
+                setInvestModalVisible(false);
+                navigation.navigate('ChitFundHome');
+              }}
+            >
+              <LinearGradient
+                colors={['#7c3aed', '#8b5cf6']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.modalOptionGradient}
+              >
+                <MaterialCommunityIcons name="cash-multiple" size={32} color={colors.white} />
+              </LinearGradient>
+              <View style={styles.modalOptionText}>
+                <Text style={styles.modalOptionTitle}>Chit Fund</Text>
+                <Text style={styles.modalOptionSub}>Join a savings community</Text>
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
+            </TouchableOpacity>
           </View>
         </TouchableOpacity>
       </Modal>
@@ -755,6 +784,24 @@ const styles = StyleSheet.create({
   modalOptionSub: {
     fontSize: 13,
     color: colors.textTertiary,
+  },
+  modalDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+    gap: 12,
+  },
+  modalDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.borderLight,
+  },
+  modalDividerText: {
+    fontSize: 11,
+    color: colors.textTertiary,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 });
 

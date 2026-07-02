@@ -9,6 +9,7 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 const investmentRoutes = require('./routes/investmentRoutes');
 const transactionRoutes = require('./routes/transactionRoutes');
 const withdrawalRoutes = require('./routes/withdrawalRoutes');
+const chitFundRoutes = require('./routes/chitFundRoutes');
 
 const app = express();
 
@@ -26,6 +27,7 @@ app.use('/api/mobile/dashboard', dashboardRoutes);
 app.use('/api/mobile/investments', investmentRoutes);
 app.use('/api/mobile/transactions', transactionRoutes);
 app.use('/api/mobile/withdrawals', withdrawalRoutes);
+app.use('/api/mobile/chits', chitFundRoutes);
 
 // Health check
 app.get('/api/mobile/health', (req, res) => {

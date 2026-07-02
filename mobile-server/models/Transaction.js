@@ -30,7 +30,7 @@ const transactionSchema = new mongoose.Schema({
   },
   referenceType: {
     type: String,
-    enum: ['Investment', 'Withdrawal']
+    enum: ['Investment', 'Withdrawal', 'ChitMember', 'ChitPayment']
   },
   description: {
     type: String,

@@ -30,6 +30,26 @@ import AboutUsScreen from '../screens/tabs/AboutUsScreen';
 import TermsScreen from '../screens/tabs/TermsScreen';
 import PrivacyScreen from '../screens/tabs/PrivacyScreen';
 
+// Chit Fund Screens
+import ChitFundHomeScreen from '../screens/chitfund/ChitFundHomeScreen';
+import ExploreChitsScreen from '../screens/chitfund/ExploreChitsScreen';
+import MyChitsScreen from '../screens/chitfund/MyChitsScreen';
+import ChitDetailsScreen from '../screens/chitfund/ChitDetailsScreen';
+import JoinChitScreen from '../screens/chitfund/JoinChitScreen';
+import ChitPaymentScreen from '../screens/chitfund/ChitPaymentScreen';
+import ChitPaymentStatusScreen from '../screens/chitfund/ChitPaymentStatusScreen';
+import PaymentSuccessScreen from '../screens/chitfund/PaymentSuccessScreen';
+import PaymentFailedScreen from '../screens/chitfund/PaymentFailedScreen';
+import MonthlyDueScreen from '../screens/chitfund/MonthlyDueScreen';
+import AuctionScreen from '../screens/chitfund/AuctionScreen';
+import WinnerHistoryScreen from '../screens/chitfund/WinnerHistoryScreen';
+import DividendHistoryScreen from '../screens/chitfund/DividendHistoryScreen';
+import PaymentHistoryScreen from '../screens/chitfund/PaymentHistoryScreen';
+import ReceiptsScreen from '../screens/chitfund/ReceiptsScreen';
+import RulesScreen from '../screens/chitfund/RulesScreen';
+import FAQScreen from '../screens/chitfund/FAQScreen';
+import SupportScreen from '../screens/chitfund/SupportScreen';
+
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -189,6 +209,98 @@ const AppNavigator = () => {
           <Stack.Screen 
             name="Privacy" 
             component={PrivacyScreen}
+            options={{ headerShown: false }}
+          />
+
+          {/* Chit Fund Screens */}
+          <Stack.Screen 
+            name="ChitFundHome" 
+            component={ChitFundHomeScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="ExploreChits" 
+            component={ExploreChitsScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="MyChits" 
+            component={MyChitsScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="ChitDetails" 
+            component={ChitDetailsScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="JoinChit" 
+            component={JoinChitScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="ChitPayment" 
+            component={ChitPaymentScreen}
+            options={stackHeaderOptions('Payment')}
+          />
+          <Stack.Screen 
+            name="ChitPaymentStatus" 
+            component={ChitPaymentStatusScreen}
+            options={stackHeaderOptions('Status')}
+          />
+          <Stack.Screen 
+            name="PaymentSuccess" 
+            component={PaymentSuccessScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="PaymentFailed" 
+            component={PaymentFailedScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="MonthlyDue" 
+            component={MonthlyDueScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="Auction" 
+            component={AuctionScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="WinnerHistory" 
+            component={WinnerHistoryScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="DividendHistory" 
+            component={DividendHistoryScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="PaymentHistory" 
+            component={PaymentHistoryScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="Receipts" 
+            component={ReceiptsScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="ChitRules" 
+            component={RulesScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="ChitFAQ" 
+            component={FAQScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="ChitSupport" 
+            component={SupportScreen}
             options={{ headerShown: false }}
           />
         </>
