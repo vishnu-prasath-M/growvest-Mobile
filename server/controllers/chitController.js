@@ -290,8 +290,9 @@ const makePayment = async (req, res) => {
     const member = await ChitMember.findOne({ _id: memberId, userId });
     if (!member) return res.status(404).json({ message: 'Membership not found' });
 
-    if (member.status !== 'active') {
-      return res.status(400).json({ message: 'Your membership is not active' });
+    // Allow pending members to submit payment (join fee) and active members for monthly payments
+    if (!['active', 'pending'].includes(member.status)) {
+      return res.status(400).json({ message: 'Your membership is not active or pending' });
     }
 
     // Check if payment already exists for this month
@@ -397,9 +398,15 @@ const getWinners = async (req, res) => {
     const result = winners.map((w) => ({
       _id: w._id,
       chitName: w.chitId?.name || 'Unknown',
+      user: {
+        _id: w.userId?._id,
+        username: w.userId?.name || w.userId?.username || 'Member',
+      },
       username: w.userId?.name || w.userId?.username || 'Member',
       memberNumber: w.memberNumber,
+      month: w.currentMonth || w.currentMonth,
       winningAmount: w.totalPaid,
+      discount: w.chitId?.totalPot ? w.chitId.totalPot - w.totalPaid : 0,
       wonAt: w.updatedAt,
     }));
 

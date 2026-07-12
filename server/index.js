@@ -8,6 +8,7 @@ const User = require('./models/User');
 const Investment = require('./models/Investment');
 const { syncInvestmentInterest } = require('./controllers/userController');
 const { initializeSettings } = require('./controllers/settingsController');
+const { seedChits } = require('./utils/seedChits');
 
 // Feature 7: Daily Interest Cron Setup (12:00 AM)
 cron.schedule("0 0 * * *", async () => {
@@ -43,6 +44,9 @@ mongoose.connect(MONGO_URI)
     
     // Initialize default settings (UPI ID, etc.)
     await initializeSettings();
+
+    // Seed default Chits
+    await seedChits();
 
     // Seed Admin User
     try {

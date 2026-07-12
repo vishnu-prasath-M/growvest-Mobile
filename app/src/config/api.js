@@ -45,4 +45,17 @@ export const API_ENDPOINTS = {
 
   // Push notifications (FCM)
   FCM_TOKEN: '/users/fcm-token',
+
+  // Chit Fund
+  CHITS: '/chits',
+  CHIT_BY_ID: (id) => `/chits/${id}`,
+  MY_CHITS: '/chits/my',
+  CHIT_DASHBOARD: '/chits/dashboard',
+  JOIN_CHIT: '/chits/join',
+  CHIT_PAYMENT: '/chits/payment',
+  CHIT_PAYMENTS: '/chits/payments',
+  CHIT_WINNERS: '/chits/winners',
+  CHIT_DIVIDENDS: '/chits/dividends',
+  CHIT_MEMBERS: (id) => `/chits/${id}/members`,
+  CHIT_AUCTION: (id) => `/chits/${id}/auction`,
 };

@@ -22,20 +22,17 @@ const ChitPaymentStatusScreen = ({ navigation, route }) => {
   const submitPayment = async () => {
     setLoading(true);
     try {
+      const payload = { chitId, memberId, month, amount, lateFee };
       if (type === 'join') {
         // The member was already created in JoinChit, now we create a payment record
-        await chitFundService.payChitInstallment({
-          chitId, memberId, month, amount, lateFee, transactionRef: 'UPI_PENDING_VERIFICATION'
-        });
+        await chitFundService.makePayment(payload);
         navigation.replace('PaymentSuccess', {
           title: 'Join Request Submitted!',
           message: 'Your payment and join request are pending admin verification.',
           nextScreen: 'ChitFund',
         });
       } else {
-        await chitFundService.payChitInstallment({
-          chitId, memberId, month, amount, lateFee, transactionRef: 'UPI_PENDING_VERIFICATION'
-        });
+        await chitFundService.makePayment(payload);
         navigation.replace('PaymentSuccess', {
           title: 'Payment Submitted!',
           message: 'Your chit payment has been recorded and is pending verification.',

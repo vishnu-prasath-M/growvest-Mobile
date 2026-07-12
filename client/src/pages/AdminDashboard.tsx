@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { generateUPILink } from "@/utils/upi";
 import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "@/context/AuthContext";
+import ChitFundAdmin from "@/components/admin/ChitFundAdmin";
 
 const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" ? "http://localhost:5000" : "https://growvest-mobile.onrender.com");
 
@@ -76,13 +77,14 @@ const statusStyle: Record<string, string> = {
   paid: "bg-accent text-accent-foreground border-accent-foreground/10",
 };
 
-type AdminTab = "overview" | "pending" | "users" | "withdrawals" | "settings";
+type AdminTab = "overview" | "pending" | "users" | "withdrawals" | "chits" | "settings";
 
 const navItems: { label: string; tab: AdminTab; icon: React.ElementType; badge?: number }[] = [
   { label: "Overview", tab: "overview", icon: LayoutDashboard },
   { label: "Pending Investments", tab: "pending", icon: Clock, badge: 3 },
   { label: "Users", tab: "users", icon: Users },
   { label: "Withdrawals", tab: "withdrawals", icon: ArrowDownToLine, badge: 2 },
+  { label: "Chit Funds", tab: "chits", icon: TrendingUp },
   { label: "Settings", tab: "settings", icon: Settings },
 ];
 
@@ -1013,20 +1015,6 @@ const AdminDashboard = () => {
           </div>
         </div>
       )}
-
-          {/* ── SETTINGS ── */}
-          {activeTab === "settings" && (
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4 }}
-              className="max-w-3xl mx-auto px-4 w-full flex flex-col items-center justify-center"
-            >
-              <div className="mb-8 w-full">
-                <h2 className="font-heading text-3xl font-bold text-foreground text-center">Admin Settings</h2>
-                <p className="text-sm font-body text-muted-foreground mt-2 text-center">
-                  Manage your security preferences and payment details
-                </p>
               </div>
               
               <div className="w-full flex flex-col md:flex-row justify-center gap-6">
