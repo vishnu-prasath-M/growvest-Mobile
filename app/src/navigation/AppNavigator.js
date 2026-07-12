@@ -11,6 +11,8 @@ import { ActivityIndicator } from 'react-native';
 // Auth Screens
 import LoginScreen from '../screens/auth/LoginScreen';
 import SignupScreen from '../screens/auth/SignupScreen';
+import KYCScreen from '../screens/auth/KYCScreen';
+import BankDetailsScreen from '../screens/auth/BankDetailsScreen';
 
 // Tab Screens
 import HomeScreen from '../screens/tabs/HomeScreen';
@@ -296,6 +298,8 @@ const AppNavigator = () => {
           <Stack.Screen name="ChitRules" component={RulesScreen} options={{ headerShown: false }} />
           <Stack.Screen name="ChitFAQ" component={FAQScreen} options={{ headerShown: false }} />
           <Stack.Screen name="ChitSupport" component={SupportScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="KYC" component={KYCScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="BankDetails" component={BankDetailsScreen} options={{ headerShown: false }} />
         </>
       ) : (
         <>
