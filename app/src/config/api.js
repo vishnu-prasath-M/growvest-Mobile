@@ -46,6 +46,20 @@ export const API_ENDPOINTS = {
   // Push notifications (FCM)
   FCM_TOKEN: '/users/fcm-token',
 
+  // Notifications
+  NOTIFICATIONS: '/notifications',
+  NOTIFICATION_READ: (id) => `/notifications/${id}/read`,
+  NOTIFICATION_READ_ALL: '/notifications/read-all',
+  NOTIFICATION_UNREAD_COUNT: '/notifications/unread-count',
+
+  // KYC
+  KYC_SUBMIT: '/kyc/submit',
+  KYC_STATUS: '/kyc/status',
+  KYC_ALL: '/kyc/all',
+  KYC_DETAIL: (id) => `/kyc/${id}`,
+  KYC_REVIEW: (id) => `/kyc/${id}/review`,
+  KYC_STATS: '/kyc/stats',
+
   // Chit Fund
   CHITS: '/chits',
   CHIT_BY_ID: (id) => `/chits/${id}`,

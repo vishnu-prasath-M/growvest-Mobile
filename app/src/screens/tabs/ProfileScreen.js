@@ -28,6 +28,7 @@ const ProfileScreen = ({ navigation }) => {
   const [newMobileNumber, setNewMobileNumber] = useState('');
   const [savingUsername, setSavingUsername] = useState(false);
   const [savingMobile, setSavingMobile] = useState(false);
+  const [kycStatus, setKycStatus] = useState(null);
   const { logout, updateUser, user: authUser } = useAuth();
 
   const getErrorMessage = (error) => {
@@ -48,7 +49,19 @@ const ProfileScreen = ({ navigation }) => {
     finally { setLoading(false); }
   };
 
-  useFocusEffect(useCallback(() => { fetchUserData(); }, []));
+  // Fetch KYC status
+  const fetchKYCStatus = async () => {
+    try {
+      const api = (await import('../../services/apiService')).default;
+      const { API_ENDPOINTS } = await import('../../config/api');
+      const response = await api.get(API_ENDPOINTS.KYC_STATUS);
+      setKycStatus(response.data);
+    } catch (error) {
+      console.error('Error fetching KYC status:', error);
+    }
+  };
+
+  useFocusEffect(useCallback(() => { fetchUserData(); fetchKYCStatus(); }, []));
 
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
@@ -112,13 +125,31 @@ const ProfileScreen = ({ navigation }) => {
     );
   }
 
+  const getKYCStatusInfo = () => {
+    if (!kycStatus || kycStatus.status === 'not_submitted') {
+      return { label: 'Not Submitted', badge: 'Submit Now', tint: colors.warningLight, iconColor: colors.warning, icon: 'shield-off' };
+    }
+    if (kycStatus.status === 'pending') {
+      return { label: 'Pending', badge: 'Pending', tint: colors.warningLight, iconColor: colors.warning, icon: 'shield-clock' };
+    }
+    if (kycStatus.status === 'approved') {
+      return { label: 'Verified', badge: 'Verified', tint: colors.successLight, iconColor: colors.success, icon: 'shield-check' };
+    }
+    if (kycStatus.status === 'rejected') {
+      return { label: 'Rejected', badge: 'Rejected', tint: colors.errorLight, iconColor: colors.error, icon: 'shield-off' };
+    }
+    return { label: 'Not Submitted', badge: 'Submit Now', tint: colors.warningLight, iconColor: colors.warning, icon: 'shield-off' };
+  };
+
+  const kycInfo = getKYCStatusInfo();
+
   const menuGroups = [
     {
       title: 'Account',
       items: [
         { icon: 'account-edit', label: 'Edit Profile', tint: colors.primaryLight, iconColor: colors.primary, onPress: handleEditUsername },
-        { icon: 'shield-check', label: 'KYC Verification', tint: colors.successLight, iconColor: colors.success, badge: 'Verified', onPress: null },
-        { icon: 'bank-outline', label: 'Bank Details', tint: colors.primaryLight, iconColor: colors.primary, onPress: handleEditMobileNumber },
+        { icon: kycInfo.icon, label: 'KYC Verification', tint: kycInfo.tint, iconColor: kycInfo.iconColor, badge: kycInfo.badge, onPress: () => navigation.navigate('KYC') },
+        { icon: 'bank-outline', label: 'Bank Details', tint: colors.primaryLight, iconColor: colors.primary, onPress: () => navigation.navigate('BankDetails') },
       ],
     },
     {

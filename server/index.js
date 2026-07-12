@@ -27,6 +27,8 @@ cron.schedule("0 0 * * *", async () => {
 });
 const investmentRoutes = require('./routes/investmentRoutes');
 const chitAdminRoutes = require('./routes/chitAdminRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const kycRoutes = require('./routes/kycRoutes');
 
 const app = express();
 app.use(cors());
@@ -93,6 +95,8 @@ app.use('/api/transactions', transactionRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/chits', chitAdminRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/kyc', kycRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

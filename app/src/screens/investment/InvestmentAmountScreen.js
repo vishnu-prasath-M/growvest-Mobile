@@ -12,6 +12,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { authService } from '../../services/authService';
 import { colors, typography } from '../../theme/theme';
+import TopBar from '../../components/TopBar';
 
 const InvestmentAmountScreen = ({ navigation, route }) => {
   const [amount, setAmount] = useState('');
@@ -70,6 +71,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
 
   return (
     <View style={styles.container}>
+      <TopBar title="New Investment" navigation={navigation} showBack={navigation?.canGoBack?.() ?? false} />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
