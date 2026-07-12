@@ -7,18 +7,17 @@ import {
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
-import { Button, Card } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { investmentService } from '../../services/investmentService';
-import { colors, typography } from '../../theme/theme';
+import { colors } from '../../theme/theme';
 
 const InvestmentStatusScreen = ({ navigation, route }) => {
   const { amount, type, userData } = route.params;
   const [loading, setLoading] = useState(false);
 
-  const formatCurrency = (value) => {
-    return `₹${value?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`;
-  };
+  const formatCurrency = (value) =>
+    `₹${value?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`;
 
   const handleConfirm = () => {
     Alert.alert(
@@ -49,10 +48,7 @@ const InvestmentStatusScreen = ({ navigation, route }) => {
           {
             text: 'OK',
             onPress: () => {
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'MainTabs' }],
-              });
+              navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
             },
           },
         ]
@@ -72,16 +68,19 @@ const InvestmentStatusScreen = ({ navigation, route }) => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Success Indicator */}
+        {/* Success Header */}
         <View style={styles.successSection}>
-          <View style={styles.successIconContainer}>
-            <View style={styles.successIconRing}>
-              <MaterialCommunityIcons name="check-circle" size={64} color={colors.success} />
-            </View>
-          </View>
+          <LinearGradient
+            colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.successIconRing}
+          >
+            <MaterialCommunityIcons name="check" size={48} color={colors.gold} />
+          </LinearGradient>
           <Text style={styles.successTitle}>Payment Recorded</Text>
           <Text style={styles.successSubtitle}>
-            Your investment request has been recorded and is pending admin approval
+            Your investment request has been recorded and is pending admin approval.
           </Text>
         </View>
 
@@ -91,17 +90,13 @@ const InvestmentStatusScreen = ({ navigation, route }) => {
           
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Type</Text>
-            <View style={[styles.detailBadge, { 
-              backgroundColor: type === 'saving' ? colors.savingLight : colors.fixedLight 
-            }]}>
+            <View style={[styles.detailBadge, { backgroundColor: type === 'saving' ? colors.successLight : colors.primaryLight }]}>
               <MaterialCommunityIcons 
                 name={type === 'saving' ? 'piggy-bank' : 'lock'} 
                 size={14} 
-                color={type === 'saving' ? colors.saving : colors.fixed} 
+                color={type === 'saving' ? colors.success : colors.primary} 
               />
-              <Text style={[styles.detailBadgeText, { 
-                color: type === 'saving' ? colors.saving : colors.fixed 
-              }]}>
+              <Text style={[styles.detailBadgeText, { color: type === 'saving' ? colors.success : colors.primary }]}>
                 {type === 'saving' ? 'Saving Deposit' : 'Fixed Deposit'}
               </Text>
             </View>
@@ -118,9 +113,9 @@ const InvestmentStatusScreen = ({ navigation, route }) => {
 
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Status</Text>
-            <View style={[styles.statusPill, { backgroundColor: colors.warningLight }]}>
-              <MaterialCommunityIcons name="clock-outline" size={14} color={colors.warning} />
-              <Text style={[styles.statusText, { color: colors.warning }]}>Pending Approval</Text>
+            <View style={[styles.detailBadge, { backgroundColor: '#fef3c7' }]}>
+              <MaterialCommunityIcons name="clock-outline" size={14} color="#d97706" />
+              <Text style={[styles.detailBadgeText, { color: '#d97706' }]}>Pending Approval</Text>
             </View>
           </View>
         </View>
@@ -130,13 +125,13 @@ const InvestmentStatusScreen = ({ navigation, route }) => {
           <Text style={styles.stepsTitle}>What happens next?</Text>
           
           {[
-            { icon: 'clock-outline', color: colors.primary, title: 'Admin Review', text: 'Reviewed within 24-48 hours' },
-            { icon: 'check-circle-outline', color: colors.success, title: 'Approval', text: 'Investment starts earning interest' },
+            { icon: 'clock-outline', color: '#d97706', title: 'Admin Review', text: 'Reviewed within 24-48 hours' },
+            { icon: 'check-decagram', color: colors.success, title: 'Approval', text: 'Investment starts earning interest' },
             { icon: 'trending-up', color: colors.primary, title: 'Earn Interest', text: 'Interest calculated daily' },
           ].map((step, i) => (
             <View key={i} style={styles.stepCard}>
               <View style={[styles.stepIconWrapper, { backgroundColor: step.color + '15' }]}>
-                <MaterialCommunityIcons name={step.icon} size={24} color={step.color} />
+                <MaterialCommunityIcons name={step.icon} size={22} color={step.color} />
               </View>
               <View style={styles.stepContent}>
                 <Text style={styles.stepTitle}>{step.title}</Text>
@@ -148,35 +143,38 @@ const InvestmentStatusScreen = ({ navigation, route }) => {
 
         {/* Info Note */}
         <View style={styles.infoNote}>
-          <MaterialCommunityIcons name="information-outline" size={20} color={colors.info} />
+          <MaterialCommunityIcons name="information-outline" size={20} color={colors.primary} />
           <Text style={styles.infoText}>
-            Track your investment status in the Investments tab
+            Track your investment status in the Investments tab.
           </Text>
         </View>
 
         {/* Action Buttons */}
         <View style={styles.buttonRow}>
-          <TouchableOpacity
-            style={styles.backBtn}
-            onPress={() => navigation.goBack()}
-            disabled={loading}
-          >
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} disabled={loading}>
             <Text style={styles.backBtnText}>Back</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.confirmBtn, loading && styles.confirmBtnDisabled]}
+            style={[styles.confirmBtnOuter, loading && styles.confirmBtnDisabled]}
+            activeOpacity={0.85}
             onPress={handleConfirm}
             disabled={loading}
-            activeOpacity={0.85}
           >
-            {loading ? (
-              <Text style={styles.confirmBtnText}>Processing...</Text>
-            ) : (
-              <>
-                <MaterialCommunityIcons name="check-circle" size={20} color={colors.white} />
-                <Text style={styles.confirmBtnText}>Confirm & Submit</Text>
-              </>
-            )}
+            <LinearGradient
+              colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.confirmBtnGradient}
+            >
+              {loading ? (
+                <Text style={styles.confirmBtnText}>Processing...</Text>
+              ) : (
+                <>
+                  <Text style={styles.confirmBtnText}>Confirm & Submit</Text>
+                  <MaterialCommunityIcons name="check-circle" size={20} color={colors.white} />
+                </>
+              )}
+            </LinearGradient>
           </TouchableOpacity>
         </View>
 
@@ -187,194 +185,68 @@ const InvestmentStatusScreen = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-  },
+  container: { flex: 1, backgroundColor: colors.background },
+  scrollView: { flex: 1 },
+  scrollContent: { padding: 20 },
+  
   // Success
-  successSection: {
-    alignItems: 'center',
-    paddingVertical: 24,
-  },
-  successIconContainer: {
-    marginBottom: 16,
-  },
+  successSection: { alignItems: 'center', paddingVertical: 32 },
   successIconRing: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: colors.successLight,
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 96, height: 96, borderRadius: 48,
+    justifyContent: 'center', alignItems: 'center',
+    marginBottom: 20, shadowColor: '#1A5C39',
+    shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 10,
   },
-  successTitle: {
-    ...typography.h2,
-    marginBottom: 8,
-  },
-  successSubtitle: {
-    ...typography.body2,
-    textAlign: 'center',
-    lineHeight: 22,
-    paddingHorizontal: 20,
-  },
+  successTitle: { fontSize: 26, fontWeight: '800', color: colors.text, letterSpacing: -0.5, marginBottom: 8 },
+  successSubtitle: { fontSize: 15, color: colors.textMuted, textAlign: 'center', lineHeight: 22, paddingHorizontal: 20 },
+  
   // Details
   detailsCard: {
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    ...colors.shadow.card,
+    backgroundColor: colors.surface, borderRadius: 24, padding: 20, marginBottom: 20,
+    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
-  detailsTitle: {
-    ...typography.h4,
-    marginBottom: 16,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  detailLabel: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    fontWeight: '500',
-  },
-  detailBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    gap: 4,
-  },
-  detailBadgeText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  detailValue: {
-    fontSize: 16,
-    color: colors.text,
-    fontWeight: '700',
-  },
-  detailDivider: {
-    height: 1,
-    backgroundColor: colors.borderLight,
-    marginVertical: 12,
-  },
-  statusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    gap: 4,
-  },
-  statusText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
+  detailsTitle: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 16 },
+  detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 },
+  detailLabel: { fontSize: 14, color: colors.textSecondary, fontWeight: '500' },
+  detailValue: { fontSize: 18, color: colors.text, fontWeight: '800' },
+  detailBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, gap: 6 },
+  detailBadgeText: { fontSize: 13, fontWeight: '700' },
+  detailDivider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.borderLight, marginVertical: 12 },
+  
   // Steps
-  stepsSection: {
-    marginBottom: 16,
-  },
-  stepsTitle: {
-    ...typography.h4,
-    marginBottom: 12,
-  },
+  stepsSection: { marginBottom: 20 },
+  stepsTitle: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 12 },
   stepCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.white,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 8,
-    ...colors.shadow.card,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface,
+    borderRadius: 16, padding: 16, marginBottom: 10,
+    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
   },
-  stepIconWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
-  stepContent: {
-    flex: 1,
-  },
-  stepTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 2,
-  },
-  stepText: {
-    fontSize: 13,
-    color: colors.textSecondary,
-  },
+  stepIconWrapper: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
+  stepContent: { flex: 1 },
+  stepTitle: { fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 2 },
+  stepText: { fontSize: 13, color: colors.textMuted },
+  
   // Info
   infoNote: {
-    flexDirection: 'row',
-    padding: 14,
-    backgroundColor: colors.infoLight,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-    marginBottom: 24,
-    alignItems: 'flex-start',
+    flexDirection: 'row', padding: 16, backgroundColor: colors.primaryLight,
+    borderRadius: 16, marginBottom: 32, alignItems: 'flex-start',
   },
-  infoText: {
-    flex: 1,
-    fontSize: 14,
-    color: colors.text,
-    marginLeft: 12,
-    lineHeight: 20,
-    fontWeight: '500',
-  },
+  infoText: { flex: 1, fontSize: 14, color: colors.primary, marginLeft: 12, lineHeight: 20, fontWeight: '600' },
+  
   // Buttons
-  buttonRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
+  buttonRow: { flexDirection: 'row', gap: 12 },
   backBtn: {
-    flex: 1,
-    height: 50,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
+    flex: 1, height: 56, borderRadius: 16, borderWidth: 1.5, borderColor: colors.border,
+    justifyContent: 'center', alignItems: 'center',
   },
-  backBtnText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textSecondary,
+  backBtnText: { fontSize: 16, fontWeight: '700', color: colors.textSecondary },
+  confirmBtnOuter: { flex: 1.5, shadowColor: '#1A5C39', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 16, elevation: 10 },
+  confirmBtnGradient: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    height: 56, borderRadius: 16, gap: 8,
   },
-  confirmBtn: {
-    flex: 1.5,
-    height: 50,
-    borderRadius: 14,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
-    ...colors.shadow.button,
-  },
-  confirmBtnDisabled: {
-    opacity: 0.6,
-  },
-  confirmBtnText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.white,
-  },
+  confirmBtnDisabled: { opacity: 0.6 },
+  confirmBtnText: { fontSize: 16, fontWeight: '700', color: colors.white },
 });
 
 export default InvestmentStatusScreen;

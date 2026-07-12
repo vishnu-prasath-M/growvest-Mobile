@@ -8,21 +8,21 @@ import {
   Alert,
   Modal,
   TouchableOpacity,
-  Dimensions,
   KeyboardAvoidingView,
   Platform,
+  TextInput,
 } from 'react-native';
-import { Card, Button, TextInput, Portal, Surface } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { userService } from '../../services/userService';
 import { withdrawalService } from '../../services/withdrawalService';
-import { colors, typography } from '../../theme/theme';
+import { colors } from '../../theme/theme';
 import { mapProfileToWithdrawUser } from '../../utils/userBalances';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
+import { Portal } from 'react-native-paper';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const QUICK_AMOUNTS = [1000, 5000, 10000, 25000];
 
 const WithdrawScreen = () => {
   const insets = useScreenInsets(8);
@@ -74,21 +74,15 @@ const WithdrawScreen = () => {
       Alert.alert('Error', 'Please enter a valid amount');
       return;
     }
-
-    const availableBalance = withdrawType === 'saving' 
-      ? userData?.savingBalance 
-      : userData?.fixedBalance;
-
+    const availableBalance = withdrawType === 'saving' ? userData?.savingBalance : userData?.fixedBalance;
     if (parseFloat(amount) > availableBalance) {
       Alert.alert('Error', 'Insufficient balance');
       return;
     }
-
     if (!upiId.trim()) {
       Alert.alert('Error', 'Please enter your UPI ID');
       return;
     }
-
     setWithdrawing(true);
     try {
       await withdrawalService.createWithdrawal({
@@ -110,20 +104,27 @@ const WithdrawScreen = () => {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <View style={styles.loadingContent}>
-          <MaterialCommunityIcons name="bank-transfer-out" size={40} color={colors.primaryLight} />
+      <View style={styles.container}>
+        <View style={[styles.headerPlaceholder, { paddingTop: insets.top + 24 }]}>
+          <Text style={styles.headerSub}>Withdraw</Text>
+          <Text style={styles.headerTitle}>Move money out</Text>
+        </View>
+        <View style={styles.loadingContainer}>
+          <MaterialCommunityIcons name="bank-transfer-out" size={36} color={colors.border} />
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
       </View>
     );
   }
 
+  const availableToWithdraw = userData?.availableToWithdraw || 0;
+
   return (
     <View style={styles.container}>
-      <View style={[styles.screenHeader, { paddingTop: insets.top }]}>
-        <Text style={styles.screenTitle}>Withdraw Funds</Text>
-        <Text style={styles.screenSubtitle}>Request withdrawal from your deposits</Text>
+      {/* Header */}
+      <View style={[styles.pageHeader, { paddingTop: insets.top + 24 }]}>
+        <Text style={styles.headerSub}>Withdraw</Text>
+        <Text style={styles.headerTitle}>Move money out</Text>
       </View>
 
       <ScrollView
@@ -139,149 +140,184 @@ const WithdrawScreen = () => {
           />
         }
       >
-        {/* Withdrawable Amount Banner */}
-        <View style={styles.withdrawableBanner}>
-          <MaterialCommunityIcons name="cash-multiple" size={28} color={colors.success} />
-          <View style={styles.withdrawableText}>
-            <Text style={styles.withdrawableLabel}>Total Withdrawable Amount</Text>
-            <Text style={styles.withdrawableValue}>{formatCurrency(userData?.availableToWithdraw)}</Text>
-          </View>
+        {/* Available Balance Hero Card */}
+        <View style={styles.heroOuter}>
+          <LinearGradient
+            colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.heroCard}
+          >
+            <View style={styles.heroBlobGold} />
+            <Text style={styles.heroLabel}>Available Balance</Text>
+            <Text style={styles.heroAmount}>{formatCurrency(availableToWithdraw)}</Text>
+            <Text style={styles.heroNote}>Instant withdrawal • No fees</Text>
+          </LinearGradient>
         </View>
 
         {/* Balance Cards */}
-        <View style={styles.balancesSection}>
-          <Text style={styles.sectionTitle}>Your Balances</Text>
-          
-          {/* Saving Balance Card */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Choose account</Text>
+
+          {/* Saving */}
           <View style={styles.balanceCard}>
             <View style={styles.balanceCardLeft}>
-              <View style={[styles.balanceIconWrapper, { backgroundColor: colors.savingLight }]}>
-                <MaterialCommunityIcons name="piggy-bank" size={28} color={colors.saving} />
+              <View style={[styles.balanceIconBox, { backgroundColor: colors.successLight }]}>
+                <MaterialCommunityIcons name="piggy-bank" size={24} color={colors.success} />
               </View>
               <View style={styles.balanceInfo}>
-                <Text style={styles.balanceLabel}>Saving Balance</Text>
-                <Text style={styles.balanceAmount}>{formatCurrency(userData?.savingBalance)}</Text>
-                <Text style={styles.balanceRate}>12% p.a. interest</Text>
+                <Text style={styles.balanceCardLabel}>Saving Balance</Text>
+                <Text style={styles.balanceCardAmount}>{formatCurrency(userData?.savingBalance)}</Text>
+                <Text style={styles.balanceCardRate}>Withdraw anytime</Text>
               </View>
             </View>
             <TouchableOpacity
-              style={[styles.withdrawBtn, { backgroundColor: colors.saving }]}
+              style={styles.withdrawActionBtn}
               activeOpacity={0.85}
               onPress={() => openWithdrawModal('saving')}
             >
-              <MaterialCommunityIcons name="bank-transfer-out" size={18} color={colors.white} />
-              <Text style={styles.withdrawBtnText}>Withdraw</Text>
+              <LinearGradient
+                colors={['#0E3D23', '#1A5C39']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.withdrawActionGradient}
+              >
+                <Text style={styles.withdrawActionText}>Withdraw</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
 
-          {/* Fixed Balance Card */}
+          {/* Fixed */}
           <View style={styles.balanceCard}>
             <View style={styles.balanceCardLeft}>
-              <View style={[styles.balanceIconWrapper, { backgroundColor: colors.fixedLight }]}>
-                <MaterialCommunityIcons name="lock" size={28} color={colors.fixed} />
+              <View style={[styles.balanceIconBox, { backgroundColor: colors.primaryLight }]}>
+                <MaterialCommunityIcons name="lock-outline" size={24} color={colors.primary} />
               </View>
               <View style={styles.balanceInfo}>
-                <Text style={styles.balanceLabel}>Fixed Balance</Text>
-                <Text style={styles.balanceAmount}>{formatCurrency(userData?.fixedBalance)}</Text>
-                <Text style={styles.balanceRate}>24% p.a. interest</Text>
+                <Text style={styles.balanceCardLabel}>Fixed Balance</Text>
+                <Text style={styles.balanceCardAmount}>{formatCurrency(userData?.fixedBalance)}</Text>
+                <Text style={styles.balanceCardRate}>After lock period</Text>
               </View>
             </View>
             <TouchableOpacity
-              style={[styles.withdrawBtn, { backgroundColor: colors.fixed }]}
+              style={styles.withdrawActionBtn}
               activeOpacity={0.85}
               onPress={() => openWithdrawModal('fixed')}
             >
-              <MaterialCommunityIcons name="bank-transfer-out" size={18} color={colors.white} />
-              <Text style={styles.withdrawBtnText}>Withdraw</Text>
+              <LinearGradient
+                colors={['#0E3D23', '#1A5C39']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.withdrawActionGradient}
+              >
+                <Text style={styles.withdrawActionText}>Withdraw</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Info Card */}
-        <View style={styles.infoCard}>
-          <View style={styles.infoHeaderContainer}>
-            <MaterialCommunityIcons name="information-outline" size={22} color={colors.info} />
-            <Text style={styles.infoTitle}>Withdrawal Rules</Text>
-          </View>
-          <View style={styles.infoContent}>
-            <View style={styles.infoRow}>
-              <View style={styles.infoDot} />
-              <Text style={styles.infoText}>Saving deposits: Withdraw anytime</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <View style={styles.infoDot} />
-              <Text style={styles.infoText}>Fixed deposits: Withdraw after 1 year lock period</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <View style={styles.infoDot} />
-              <Text style={styles.infoText}>Withdrawals processed within 24-48 hours</Text>
-            </View>
-          </View>
+        {/* Security Notice */}
+        <View style={styles.securityNotice}>
+          <MaterialCommunityIcons name="shield-check" size={16} color={colors.primary} />
+          <Text style={styles.securityText}>Protected by 256-bit encryption. Funds arrive within 24-48 hours.</Text>
         </View>
 
-        <View style={{ height: 100 }} />
+        {/* Rules Card */}
+        <View style={styles.rulesCard}>
+          <View style={styles.rulesHeader}>
+            <MaterialCommunityIcons name="information-outline" size={20} color={colors.primary} />
+            <Text style={styles.rulesTitle}>Withdrawal Rules</Text>
+          </View>
+          {[
+            'Saving deposits: Withdraw anytime',
+            'Fixed deposits: Withdraw after 1 year lock period',
+            'Withdrawals processed within 24-48 hours',
+          ].map((rule, i) => (
+            <View key={i} style={styles.ruleRow}>
+              <View style={styles.ruleDot} />
+              <Text style={styles.ruleText}>{rule}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={{ height: 110 }} />
       </ScrollView>
 
       {/* Withdraw Modal */}
       <Portal>
         <Modal
           visible={withdrawModalVisible}
-          onDismiss={() => setWithdrawModalVisible(false)}
-          contentContainerStyle={styles.modalOverlay}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setWithdrawModalVisible(false)}
         >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          >
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalWrapper}>
+            <TouchableOpacity
+              style={styles.modalOverlay}
+              activeOpacity={1}
+              onPress={() => setWithdrawModalVisible(false)}
+            />
+            <View style={styles.modalSheet}>
+              <View style={styles.modalHandle} />
+              <View style={styles.modalHeaderRow}>
                 <Text style={styles.modalTitle}>
                   Withdraw from {withdrawType === 'saving' ? 'Saving' : 'Fixed'}
                 </Text>
-                <TouchableOpacity onPress={() => setWithdrawModalVisible(false)}>
-                  <MaterialCommunityIcons name="close" size={24} color={colors.textSecondary} />
+                <TouchableOpacity onPress={() => setWithdrawModalVisible(false)} style={styles.modalCloseBtn}>
+                  <MaterialCommunityIcons name="close" size={18} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
 
-              <View style={styles.modalBalanceDisplay}>
+              {/* Balance display */}
+              <View style={styles.modalBalanceBox}>
                 <Text style={styles.modalBalanceLabel}>Available Balance</Text>
                 <Text style={styles.modalBalanceAmount}>
                   {formatCurrency(withdrawType === 'saving' ? userData?.savingBalance : userData?.fixedBalance)}
                 </Text>
               </View>
 
-              <View style={styles.modalInputGroup}>
-                <Text style={styles.modalInputLabel}>Amount to Withdraw</Text>
-                <View style={styles.amountInputContainer}>
-                  <Text style={styles.currencySymbol}>₹</Text>
-                  <TextInput
-                    value={amount}
-                    onChangeText={setAmount}
-                    mode="flat"
-                    keyboardType="numeric"
-                    style={styles.amountInput}
-                    placeholder="0"
-                    placeholderTextColor={colors.border}
-                    underlineColor="transparent"
-                    activeUnderlineColor="transparent"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.modalInputGroup}>
-                <Text style={styles.modalInputLabel}>UPI ID</Text>
+              {/* Amount input */}
+              <Text style={styles.inputLabel}>Amount to Withdraw</Text>
+              <View style={styles.amountInputRow}>
+                <Text style={styles.currencySymbol}>₹</Text>
                 <TextInput
-                  value={upiId}
-                  onChangeText={setUpiId}
-                  mode="outlined"
-                  style={styles.upiInput}
-                  outlineColor={colors.border}
-                  activeOutlineColor={colors.primary}
-                  placeholder="yourname@upi"
-                  placeholderTextColor={colors.textTertiary}
-                  left={<TextInput.Icon icon="bank" color={colors.textSecondary} />}
+                  style={styles.amountInput}
+                  value={amount}
+                  onChangeText={setAmount}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor={colors.border}
                 />
               </View>
 
+              {/* Quick amounts */}
+              <View style={styles.quickAmountRow}>
+                {QUICK_AMOUNTS.map((q) => (
+                  <TouchableOpacity
+                    key={q}
+                    style={styles.quickAmountChip}
+                    onPress={() => setAmount(String(q))}
+                  >
+                    <Text style={styles.quickAmountText}>+₹{q.toLocaleString()}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* UPI input */}
+              <Text style={[styles.inputLabel, { marginTop: 16 }]}>UPI ID</Text>
+              <View style={styles.upiInputRow}>
+                <MaterialCommunityIcons name="bank" size={18} color={colors.textMuted} />
+                <TextInput
+                  style={styles.upiInput}
+                  value={upiId}
+                  onChangeText={setUpiId}
+                  placeholder="yourname@upi"
+                  placeholderTextColor={colors.textMuted}
+                  autoCapitalize="none"
+                />
+              </View>
+
+              {/* Actions */}
               <View style={styles.modalActions}>
                 <TouchableOpacity
                   style={styles.cancelBtn}
@@ -291,19 +327,20 @@ const WithdrawScreen = () => {
                   <Text style={styles.cancelBtnText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.submitBtn, withdrawing && styles.submitBtnDisabled]}
+                  style={[styles.submitBtnOuter, withdrawing && styles.submitBtnDisabled]}
                   onPress={handleWithdraw}
                   disabled={withdrawing}
                   activeOpacity={0.85}
                 >
-                  {withdrawing ? (
-                    <Text style={styles.submitBtnText}>Processing...</Text>
-                  ) : (
-                    <>
-                      <MaterialCommunityIcons name="check-circle" size={20} color={colors.white} />
-                      <Text style={styles.submitBtnText}>Submit</Text>
-                    </>
-                  )}
+                  <LinearGradient
+                    colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.submitBtnGradient}
+                  >
+                    {!withdrawing && <MaterialCommunityIcons name="check-circle" size={18} color={colors.white} />}
+                    <Text style={styles.submitBtnText}>{withdrawing ? 'Processing...' : 'Submit'}</Text>
+                  </LinearGradient>
                 </TouchableOpacity>
               </View>
             </View>
@@ -315,290 +352,151 @@ const WithdrawScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
+  container: { flex: 1, backgroundColor: colors.background },
+  scrollView: { flex: 1 },
+  scrollContent: { paddingBottom: 20 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { fontSize: 14, color: colors.textMuted, marginTop: 12 },
+  headerPlaceholder: { paddingHorizontal: 20, paddingBottom: 16 },
+
+  // Page Header
+  pageHeader: { paddingHorizontal: 20, paddingBottom: 16, backgroundColor: colors.background },
+  headerSub: { fontSize: 12, color: colors.textMuted, fontWeight: '500' },
+  headerTitle: { fontSize: 26, fontWeight: '800', color: colors.text, letterSpacing: -0.8, marginTop: 2 },
+
+  // Hero Card
+  heroOuter: { marginHorizontal: 20, marginBottom: 8 },
+  heroCard: {
+    borderRadius: 28, padding: 24, overflow: 'hidden',
+    shadowColor: '#1A5C39', shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.28, shadowRadius: 40, elevation: 20,
   },
-  scrollView: {
-    flex: 1,
+  heroBlobGold: {
+    position: 'absolute', bottom: -30, right: -20,
+    width: 140, height: 140, borderRadius: 70,
+    backgroundColor: 'rgba(212,168,67,0.18)',
   },
-  scrollContent: {
-    paddingBottom: 20,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.background,
-  },
-  loadingContent: {
-    alignItems: 'center',
-  },
-  loadingText: {
-    ...typography.body1,
-    color: colors.textTertiary,
-    marginTop: 12,
-  },
-  screenHeader: {
-    paddingHorizontal: 24,
-    paddingBottom: 12,
-    backgroundColor: colors.background,
-  },
-  screenTitle: {
-    ...typography.h2,
-    marginBottom: 4,
-  },
-  screenSubtitle: {
-    ...typography.body2,
-  },
-  // Withdrawable Banner
-  withdrawableBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f0fdf4',
-    marginHorizontal: 16,
-    marginTop: 8,
-    padding: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#bbf7d0',
-  },
-  withdrawableText: {
-    marginLeft: 16,
-    flex: 1,
-  },
-  withdrawableLabel: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  withdrawableValue: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: colors.success,
-    letterSpacing: -0.5,
-  },
-  // Balances
-  balancesSection: {
-    paddingHorizontal: 16,
-    marginTop: 20,
-  },
-  sectionTitle: {
-    ...typography.h4,
-    marginBottom: 12,
-  },
+  heroLabel: { fontSize: 11, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: '600' },
+  heroAmount: { fontSize: 38, fontWeight: '800', color: '#F8FAF9', letterSpacing: -1.5, marginTop: 8 },
+  heroNote: { fontSize: 12, color: colors.gold, fontWeight: '600', marginTop: 6 },
+
+  // Section
+  section: { paddingHorizontal: 16, marginTop: 20 },
+  sectionLabel: { fontSize: 14, fontWeight: '600', color: colors.textSecondary, marginBottom: 12 },
+
+  // Balance Cards
   balanceCard: {
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    ...colors.shadow.card,
+    backgroundColor: colors.surface, borderRadius: 20,
+    padding: 16, marginBottom: 10,
+    flexDirection: 'row', alignItems: 'center',
+    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
-  balanceCardLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
+  balanceCardLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  balanceIconBox: {
+    width: 48, height: 48, borderRadius: 14,
+    justifyContent: 'center', alignItems: 'center', marginRight: 14,
   },
-  balanceIconWrapper: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
+  balanceInfo: { flex: 1 },
+  balanceCardLabel: { fontSize: 12, color: colors.textMuted, fontWeight: '500' },
+  balanceCardAmount: { fontSize: 18, fontWeight: '700', color: colors.text, letterSpacing: -0.3, marginTop: 2 },
+  balanceCardRate: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
+  withdrawActionBtn: { marginLeft: 12 },
+  withdrawActionGradient: {
+    paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12,
+    shadowColor: '#1A5C39', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2, shadowRadius: 8, elevation: 6,
   },
-  balanceInfo: {
-    flex: 1,
+  withdrawActionText: { fontSize: 13, fontWeight: '700', color: '#F8FAF9' },
+
+  // Security Notice
+  securityNotice: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginHorizontal: 16, marginTop: 12,
+    backgroundColor: colors.accent, borderRadius: 14,
+    padding: 12,
   },
-  balanceLabel: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    fontWeight: '500',
-    marginBottom: 2,
+  securityText: { flex: 1, fontSize: 12, color: colors.accentFg, lineHeight: 17 },
+
+  // Rules Card
+  rulesCard: {
+    margin: 16, backgroundColor: colors.surface, borderRadius: 20, padding: 16,
+    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
-  balanceAmount: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.text,
-    letterSpacing: -0.3,
+  rulesHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  rulesTitle: { fontSize: 15, fontWeight: '600', color: colors.text },
+  ruleRow: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 8 },
+  ruleDot: {
+    width: 6, height: 6, borderRadius: 3,
+    backgroundColor: colors.primary, marginTop: 6, marginRight: 10,
   },
-  balanceRate: {
-    fontSize: 11,
-    color: colors.textTertiary,
-    marginTop: 2,
+  ruleText: { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
+
+  // Modal
+  modalWrapper: { flex: 1, justifyContent: 'flex-end' },
+  modalOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
+  modalSheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24,
   },
-  withdrawBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-    gap: 6,
+  modalHandle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: colors.border, alignSelf: 'center', marginBottom: 20,
   },
-  withdrawBtnText: {
-    color: colors.white,
-    fontSize: 13,
-    fontWeight: '700',
+  modalHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 19, fontWeight: '700', color: colors.text, letterSpacing: -0.4 },
+  modalCloseBtn: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: colors.muted, justifyContent: 'center', alignItems: 'center',
   },
-  // Info Card
-  infoCard: {
-    margin: 16,
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    padding: 16,
-    ...colors.shadow.card,
+  modalBalanceBox: {
+    backgroundColor: colors.primaryLight, borderRadius: 14,
+    padding: 14, marginBottom: 20,
   },
-  infoHeaderContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  modalBalanceLabel: { fontSize: 12, color: colors.textMuted, fontWeight: '500' },
+  modalBalanceAmount: { fontSize: 22, fontWeight: '700', color: colors.primary, letterSpacing: -0.5, marginTop: 4 },
+  inputLabel: { fontSize: 13, fontWeight: '600', color: colors.text, marginBottom: 8 },
+  amountInputRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: colors.background, borderRadius: 14,
+    paddingHorizontal: 16, height: 56,
+    borderWidth: 1.5, borderColor: colors.border,
     marginBottom: 12,
   },
-  infoTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-    marginLeft: 10,
+  currencySymbol: { fontSize: 22, fontWeight: '700', color: colors.textSecondary, marginRight: 6 },
+  amountInput: { flex: 1, fontSize: 22, fontWeight: '700', color: colors.text, padding: 0 },
+  quickAmountRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  quickAmountChip: {
+    backgroundColor: colors.accent, borderRadius: 999,
+    paddingHorizontal: 14, paddingVertical: 7,
   },
-  infoContent: {
-    gap: 10,
+  quickAmountText: { fontSize: 12, fontWeight: '700', color: colors.primary },
+  upiInputRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: colors.background, borderRadius: 14,
+    paddingHorizontal: 14, height: 50,
+    borderWidth: 1.5, borderColor: colors.border, gap: 8,
   },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  infoDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.primary,
-    marginTop: 6,
-    marginRight: 10,
-  },
-  infoText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 20,
-    flex: 1,
-  },
-  // Modal
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContent: {
-    backgroundColor: colors.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    ...typography.h3,
-  },
-  modalBalanceDisplay: {
-    backgroundColor: colors.primaryLight,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 20,
-  },
-  modalBalanceLabel: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  modalBalanceAmount: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  modalInputGroup: {
-    marginBottom: 16,
-  },
-  modalInputLabel: {
-    fontSize: 14,
-    color: colors.text,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  amountInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    height: 56,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-  },
-  currencySymbol: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: colors.text,
-    marginRight: 8,
-  },
-  amountInput: {
-    flex: 1,
-    fontSize: 22,
-    fontWeight: '600',
-    color: colors.text,
-    height: 56,
-    backgroundColor: 'transparent',
-    padding: 0,
-  },
-  upiInput: {
-    backgroundColor: colors.background,
-    height: 52,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
-  },
+  upiInput: { flex: 1, fontSize: 15, color: colors.text, padding: 0 },
+  modalActions: { flexDirection: 'row', gap: 12, marginTop: 20 },
   cancelBtn: {
-    flex: 1,
-    height: 48,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
+    flex: 1, height: 50, borderRadius: 14,
+    borderWidth: 1.5, borderColor: colors.border,
+    justifyContent: 'center', alignItems: 'center',
   },
-  cancelBtnText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textSecondary,
+  cancelBtnText: { fontSize: 15, fontWeight: '600', color: colors.textSecondary },
+  submitBtnOuter: { flex: 1.5 },
+  submitBtnGradient: {
+    height: 50, borderRadius: 14,
+    justifyContent: 'center', alignItems: 'center',
+    flexDirection: 'row', gap: 8,
+    shadowColor: '#1A5C39', shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25, shadowRadius: 12, elevation: 8,
   },
-  submitBtn: {
-    flex: 1.5,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
-    ...colors.shadow.button,
-  },
-  submitBtnDisabled: {
-    opacity: 0.6,
-  },
-  submitBtnText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.white,
-  },
+  submitBtnDisabled: { opacity: 0.6 },
+  submitBtnText: { fontSize: 15, fontWeight: '700', color: colors.white },
 });
 
 export default WithdrawScreen;

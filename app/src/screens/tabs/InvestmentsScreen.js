@@ -5,36 +5,34 @@ import {
   StyleSheet,
   ScrollView,
   RefreshControl,
-  Alert,
-  Animated,
+  TouchableOpacity,
 } from 'react-native';
-import { Card } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { investmentService } from '../../services/investmentService';
 import { authService } from '../../services/authService';
-import { colors, typography } from '../../theme/theme';
+import { colors } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
+import TopBar from '../../components/TopBar';
+import StatusChip from '../../components/StatusChip';
 
-const InvestmentsScreen = () => {
+const FILTERS = ['All', 'Fixed', 'Saving', 'Pending'];
+
+const InvestmentsScreen = ({ navigation }) => {
   const insets = useScreenInsets(8);
   const [investments, setInvestments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [userData, setUserData] = useState(null);
+  const [activeFilter, setActiveFilter] = useState('All');
 
   const fetchInvestments = async () => {
     try {
       const user = await authService.getUserData();
-      setUserData(user);
-      
       const allInvestments = await investmentService.getInvestments();
-      
-      // Filter investments for current user
-      const userInvestments = allInvestments.filter(inv => 
+      const userInvestments = allInvestments.filter(inv =>
         inv.userEmail === user?.email || inv.mobileNumber === user?.mobileNumber
       );
-      
       setInvestments(userInvestments);
     } catch (error) {
       console.error('Error fetching investments:', error);
@@ -44,160 +42,41 @@ const InvestmentsScreen = () => {
     }
   };
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchInvestments();
-    }, [])
-  );
+  useFocusEffect(useCallback(() => { fetchInvestments(); }, []));
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchInvestments();
-  };
+  const onRefresh = () => { setRefreshing(true); fetchInvestments(); };
 
-  const formatCurrency = (amount) => {
-    return `₹${amount?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`;
-  };
+  const formatCurrency = (amount) =>
+    `₹${amount?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`;
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'approved':
-        return colors.success;
-      case 'pending':
-        return colors.warning;
-      case 'rejected':
-        return colors.error;
-      case 'withdrawn':
-        return colors.textSecondary;
-      default:
-        return colors.textSecondary;
-    }
+  const getStatusLabel = (status) => {
+    const map = { approved: 'Active', pending: 'Pending', rejected: 'Failed', withdrawn: 'Withdrawn' };
+    return map[status] || 'Pending';
   };
 
-  const getStatusBg = (status) => {
-    switch (status) {
-      case 'approved':
-        return colors.successLight;
-      case 'pending':
-        return colors.warningLight;
-      case 'rejected':
-        return '#fef2f2';
-      case 'withdrawn':
-        return '#f3f4f6';
-      default:
-        return '#f3f4f6';
-    }
-  };
+  const filteredInvestments = investments.filter((inv) => {
+    if (activeFilter === 'All') return true;
+    if (activeFilter === 'Fixed') return inv.type === 'fixed';
+    if (activeFilter === 'Saving') return inv.type === 'saving';
+    if (activeFilter === 'Pending') return inv.status === 'pending';
+    return true;
+  });
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'approved':
-        return 'check-circle';
-      case 'pending':
-        return 'clock-outline';
-      case 'rejected':
-        return 'close-circle';
-      case 'withdrawn':
-        return 'bank-transfer-out';
-      default:
-        return 'help-circle';
-    }
-  };
-
-  const savingInvestments = investments.filter(inv => inv.type === 'saving');
-  const fixedInvestments = investments.filter(inv => inv.type === 'fixed');
-
-  const renderInvestmentCard = (investment) => (
-    <View key={investment._id} style={styles.investmentCard}>
-      <View style={styles.cardTop}>
-        <View style={styles.cardTypeSection}>
-          <View style={[styles.typeBadge, { 
-            backgroundColor: investment.type === 'saving' ? colors.savingLight : colors.fixedLight 
-          }]}>
-            <MaterialCommunityIcons 
-              name={investment.type === 'saving' ? 'piggy-bank' : 'lock'} 
-              size={16} 
-              color={investment.type === 'saving' ? colors.saving : colors.fixed} 
-            />
-            <Text style={[styles.typeText, { 
-              color: investment.type === 'saving' ? colors.saving : colors.fixed 
-            }]}>
-              {investment.type === 'saving' ? 'Saving' : 'Fixed'} Deposit
-            </Text>
-          </View>
-          <View style={[styles.statusPill, { backgroundColor: getStatusBg(investment.status) }]}>
-            <MaterialCommunityIcons 
-              name={getStatusIcon(investment.status)} 
-              size={12} 
-              color={getStatusColor(investment.status)} 
-            />
-            <Text style={[styles.statusText, { color: getStatusColor(investment.status) }]}>
-              {investment.status.charAt(0).toUpperCase() + investment.status.slice(1)}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.cardBody}>
-        <View style={styles.cardRow}>
-          <Text style={styles.cardLabel}>Invested Amount</Text>
-          <Text style={styles.cardValue}>{formatCurrency(investment.amount)}</Text>
-        </View>
-        <View style={styles.cardRow}>
-          <Text style={styles.cardLabel}>Interest Earned</Text>
-          <Text style={[styles.cardValue, { color: colors.success }]}>
-            +{formatCurrency(investment.interestEarned || 0)}
-          </Text>
-        </View>
-        <View style={styles.cardDivider} />
-        <View style={styles.cardRow}>
-          <Text style={styles.cardLabelBold}>Current Balance</Text>
-          <Text style={[styles.cardValueBold, { color: colors.primary }]}>
-            {formatCurrency(investment.amount + (investment.interestEarned || 0))}
-          </Text>
-        </View>
-        <View style={styles.cardRowSmall}>
-          <Text style={styles.cardLabelSmall}>Interest Rate</Text>
-          <Text style={styles.cardValueSmall}>{investment.interestRate}% p.a.</Text>
-        </View>
-        <View style={styles.cardRowSmall}>
-          <Text style={styles.cardLabelSmall}>Start Date</Text>
-          <Text style={styles.cardValueSmall}>{formatDate(investment.startDate)}</Text>
-        </View>
-        {investment.ref && (
-          <View style={styles.cardRowSmall}>
-            <Text style={styles.cardLabelSmall}>Reference</Text>
-            <Text style={styles.cardValueSmall}>{investment.ref}</Text>
-          </View>
-        )}
-      </View>
-    </View>
-  );
-
-  const renderSection = (title, items, emptyIcon, emptyText) => (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {items.length > 0 ? (
-        items.map(renderInvestmentCard)
-      ) : (
-        <View style={styles.emptyCard}>
-          <MaterialCommunityIcons name={emptyIcon} size={40} color={colors.border} />
-          <Text style={styles.emptyText}>{emptyText}</Text>
-        </View>
-      )}
-    </View>
-  );
+  const totalInvested = investments.reduce((s, i) => s + (i.amount || 0), 0);
+  const totalEarned = investments.reduce((s, i) => s + (i.interestEarned || 0), 0);
+  const activePlans = investments.filter((i) => i.status === 'approved').length;
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <View style={styles.loadingContent}>
-          <MaterialCommunityIcons name="chart-box-outline" size={40} color={colors.primaryLight} />
+      <View style={styles.container}>
+        <TopBar title="My Investments" navigation={navigation} showBack={navigation?.canGoBack?.() ?? false} />
+        <View style={styles.loadingContainer}>
+          <MaterialCommunityIcons name="chart-box-outline" size={36} color={colors.border} />
           <Text style={styles.loadingText}>Loading investments...</Text>
         </View>
       </View>
@@ -206,14 +85,7 @@ const InvestmentsScreen = () => {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.screenHeader, { paddingTop: insets.top }]}>
-        <Text style={styles.screenTitle}>My Investments</Text>
-        <Text style={styles.screenSubtitle}>
-          {investments.length > 0 
-            ? `${investments.length} active deposit${investments.length !== 1 ? 's' : ''}`
-            : 'Your investment portfolio'}
-        </Text>
-      </View>
+      <TopBar title="My Investments" navigation={navigation} showBack={navigation?.canGoBack?.() ?? false} />
 
       <ScrollView
         style={styles.scrollView}
@@ -228,195 +100,215 @@ const InvestmentsScreen = () => {
           />
         }
       >
-        {renderSection('Saving Deposits', savingInvestments, 'piggy-bank-outline', 'No active saving deposits')}
-        {renderSection('Fixed Deposits', fixedInvestments, 'lock-open-outline', 'No active fixed deposits')}
-        
-        {investments.length === 0 && (
-          <View style={styles.emptyState}>
-            <View style={styles.emptyIconContainer}>
-              <MaterialCommunityIcons name="chart-box-outline" size={56} color={colors.border} />
+        {/* Summary Banner */}
+        <View style={styles.bannerOuter}>
+          <LinearGradient
+            colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.bannerCard}
+          >
+            <View style={styles.bannerBlob} />
+            <Text style={styles.bannerLabel}>Total Invested</Text>
+            <Text style={styles.bannerAmount}>{formatCurrency(totalInvested)}</Text>
+            <View style={styles.bannerRow}>
+              <View style={styles.bannerStat}>
+                <MaterialCommunityIcons name="trending-up" size={14} color={colors.gold} />
+                <Text style={styles.bannerStatText}>+{formatCurrency(totalEarned)}</Text>
+              </View>
+              <Text style={styles.bannerStatMuted}>{activePlans} active plan{activePlans !== 1 ? 's' : ''}</Text>
             </View>
-            <Text style={styles.emptyStateTitle}>No Active Deposits</Text>
-            <Text style={styles.emptyStateSubtitle}>
-              Start investing to see your deposits here and earn competitive returns
-            </Text>
-          </View>
-        )}
-        <View style={{ height: 100 }} />
+          </LinearGradient>
+        </View>
+
+        {/* Filter Chips */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
+          style={styles.filterScroll}
+        >
+          {FILTERS.map((f) => (
+            <TouchableOpacity
+              key={f}
+              onPress={() => setActiveFilter(f)}
+              activeOpacity={0.8}
+            >
+              {activeFilter === f ? (
+                <LinearGradient
+                  colors={['#0E3D23', '#1A5C39']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.filterChipActive}
+                >
+                  <Text style={styles.filterChipTextActive}>{f}</Text>
+                </LinearGradient>
+              ) : (
+                <View style={styles.filterChip}>
+                  <Text style={styles.filterChipText}>{f}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* Investment Cards */}
+        <View style={styles.cardsList}>
+          {filteredInvestments.length > 0 ? (
+            filteredInvestments.map((inv) => {
+              const isSaving = inv.type === 'saving';
+              const statusLabel = getStatusLabel(inv.status);
+              return (
+                <View key={inv._id} style={styles.investCard}>
+                  <View style={styles.investCardTop}>
+                    <View style={[styles.investIcon, isSaving ? styles.investIconSaving : styles.investIconFixed]}>
+                      <MaterialCommunityIcons
+                        name={isSaving ? 'piggy-bank' : 'lock-outline'}
+                        size={22}
+                        color={isSaving ? colors.success : colors.primary}
+                      />
+                    </View>
+                    <View style={styles.investCardInfo}>
+                      <View style={styles.investNameRow}>
+                        <Text style={styles.investName} numberOfLines={1}>
+                          {isSaving ? 'Saving Deposit' : 'Fixed Deposit'}
+                        </Text>
+                        <StatusChip status={statusLabel} />
+                      </View>
+                      <Text style={styles.investRate}>
+                        {inv.interestRate}% p.a.{inv.ref ? ` • Ref: ${inv.ref}` : ''}
+                      </Text>
+                    </View>
+                    <Text style={styles.investAmount}>{formatCurrency(inv.amount)}</Text>
+                  </View>
+
+                  {/* Date row */}
+                  <View style={styles.investDateRow}>
+                    <View style={styles.investDateItem}>
+                      <MaterialCommunityIcons name="calendar-start" size={13} color={colors.textMuted} />
+                      <Text style={styles.investDateText}>{formatDate(inv.startDate)}</Text>
+                    </View>
+                    {inv.maturityDate && (
+                      <>
+                        <Text style={styles.investDateArrow}>→</Text>
+                        <View style={styles.investDateItem}>
+                          <MaterialCommunityIcons name="calendar-end" size={13} color={colors.textMuted} />
+                          <Text style={styles.investDateText}>{formatDate(inv.maturityDate)}</Text>
+                        </View>
+                      </>
+                    )}
+                  </View>
+
+                  {/* Earnings */}
+                  {(inv.interestEarned || 0) > 0 && (
+                    <View style={styles.investEarningsRow}>
+                      <Text style={styles.investEarningsLabel}>Interest earned</Text>
+                      <Text style={styles.investEarningsValue}>+{formatCurrency(inv.interestEarned)}</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })
+          ) : (
+            <View style={styles.emptyState}>
+              <View style={styles.emptyIconBox}>
+                <MaterialCommunityIcons name="chart-box-outline" size={48} color={colors.border} />
+              </View>
+              <Text style={styles.emptyTitle}>No Investments Found</Text>
+              <Text style={styles.emptyBody}>
+                {activeFilter !== 'All' ? `No ${activeFilter.toLowerCase()} deposits` : 'Start investing to see your deposits here'}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <View style={{ height: 110 }} />
       </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
+  container: { flex: 1, backgroundColor: colors.background },
+  scrollView: { flex: 1 },
+  scrollContent: { paddingBottom: 20 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { fontSize: 14, color: colors.textMuted, marginTop: 12 },
+
+  // Banner
+  bannerOuter: { margin: 16 },
+  bannerCard: {
+    borderRadius: 24, padding: 20, overflow: 'hidden',
+    shadowColor: '#1A5C39', shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.24, shadowRadius: 32, elevation: 16,
   },
-  scrollView: {
-    flex: 1,
+  bannerBlob: {
+    position: 'absolute', top: -30, right: -30,
+    width: 120, height: 120, borderRadius: 60,
+    backgroundColor: 'rgba(212,168,67,0.18)',
   },
-  scrollContent: {
-    paddingBottom: 20,
+  bannerLabel: { fontSize: 11, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: '600' },
+  bannerAmount: { fontSize: 30, fontWeight: '800', color: '#F8FAF9', letterSpacing: -1, marginTop: 6 },
+  bannerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12 },
+  bannerStat: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  bannerStatText: { fontSize: 13, fontWeight: '700', color: colors.gold },
+  bannerStatMuted: { fontSize: 12, color: 'rgba(255,255,255,0.6)' },
+
+  // Filters
+  filterScroll: { marginBottom: 4 },
+  filterRow: { paddingHorizontal: 16, paddingVertical: 4, gap: 8 },
+  filterChip: {
+    backgroundColor: colors.surface, borderRadius: 999,
+    paddingHorizontal: 16, paddingVertical: 9,
+    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.background,
+  filterChipActive: { borderRadius: 999, paddingHorizontal: 16, paddingVertical: 9 },
+  filterChipText: { fontSize: 13, fontWeight: '600', color: colors.text },
+  filterChipTextActive: { fontSize: 13, fontWeight: '700', color: '#F8FAF9' },
+
+  // Cards
+  cardsList: { paddingHorizontal: 16 },
+  investCard: {
+    backgroundColor: colors.surface, borderRadius: 24, padding: 16, marginBottom: 12,
+    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
-  loadingContent: {
-    alignItems: 'center',
+  investCardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  investIcon: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  investIconSaving: { backgroundColor: colors.successLight },
+  investIconFixed: { backgroundColor: colors.primaryLight },
+  investCardInfo: { flex: 1, minWidth: 0 },
+  investNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  investName: { fontSize: 14, fontWeight: '700', color: colors.text },
+  investRate: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  investAmount: { fontSize: 16, fontWeight: '800', color: colors.text, letterSpacing: -0.5 },
+  investDateRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    marginTop: 14, paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border,
   },
-  loadingText: {
-    ...typography.body1,
-    color: colors.textTertiary,
-    marginTop: 12,
+  investDateItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  investDateText: { fontSize: 12, color: colors.textMuted },
+  investDateArrow: { fontSize: 12, color: colors.textMuted, flex: 1, textAlign: 'center' },
+  investEarningsRow: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', marginTop: 8,
+    backgroundColor: colors.successLight, borderRadius: 10, padding: 8,
   },
-  screenHeader: {
-    paddingHorizontal: 24,
-    paddingBottom: 12,
-    backgroundColor: colors.background,
+  investEarningsLabel: { fontSize: 12, color: colors.success, fontWeight: '600' },
+  investEarningsValue: { fontSize: 14, fontWeight: '800', color: colors.success },
+
+  // Empty
+  emptyState: { alignItems: 'center', paddingVertical: 60 },
+  emptyIconBox: {
+    width: 96, height: 96, borderRadius: 48, backgroundColor: colors.surface,
+    justifyContent: 'center', alignItems: 'center', marginBottom: 20,
+    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
-  screenTitle: {
-    ...typography.h2,
-    marginBottom: 4,
-  },
-  screenSubtitle: {
-    ...typography.body2,
-  },
-  section: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
-  sectionTitle: {
-    ...typography.h4,
-    marginBottom: 12,
-  },
-  investmentCard: {
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    marginBottom: 12,
-    overflow: 'hidden',
-    ...colors.shadow.card,
-  },
-  cardTop: {
-    padding: 16,
-    paddingBottom: 0,
-  },
-  cardTypeSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  typeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
-  },
-  typeText: {
-    fontSize: 13,
-    fontWeight: '700',
-    marginLeft: 6,
-  },
-  statusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  cardBody: {
-    padding: 16,
-  },
-  cardRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  cardLabel: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    fontWeight: '500',
-  },
-  cardValue: {
-    fontSize: 15,
-    color: colors.text,
-    fontWeight: '600',
-  },
-  cardDivider: {
-    height: 1,
-    backgroundColor: colors.borderLight,
-    marginVertical: 8,
-  },
-  cardLabelBold: {
-    fontSize: 15,
-    color: colors.text,
-    fontWeight: '700',
-  },
-  cardValueBold: {
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  cardRowSmall: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 6,
-  },
-  cardLabelSmall: {
-    fontSize: 13,
-    color: colors.textTertiary,
-  },
-  cardValueSmall: {
-    fontSize: 13,
-    color: colors.text,
-    fontWeight: '500',
-  },
-  emptyCard: {
-    alignItems: 'center',
-    padding: 24,
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    marginBottom: 12,
-    ...colors.shadow.card,
-  },
-  emptyText: {
-    ...typography.body2,
-    marginTop: 8,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 40,
-  },
-  emptyIconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: colors.white,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-    ...colors.shadow.card,
-  },
-  emptyStateTitle: {
-    ...typography.h4,
-    marginBottom: 8,
-  },
-  emptyStateSubtitle: {
-    ...typography.body2,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: 8 },
+  emptyBody: { fontSize: 14, color: colors.textMuted, textAlign: 'center' },
 });
 
 export default InvestmentsScreen;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,9 +10,11 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, typography } from '../../theme/theme';
+import { colors } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { chitFundService } from '../../services/chitFundService';
+import TopBar from '../../components/TopBar';
+import StatusChip from '../../components/StatusChip';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -53,36 +55,11 @@ const ExploreChitsScreen = ({ navigation }) => {
 
   const formatCurrency = (amount) => `₹${amount?.toLocaleString('en-IN') || '0'}`;
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'active': return colors.success;
-      case 'upcoming': return colors.info;
-      case 'completed': return colors.textTertiary;
-      case 'closed': return colors.error;
-      default: return colors.textSecondary;
-    }
-  };
-
-  const getStatusBg = (status) => {
-    switch (status) {
-      case 'active': return colors.successLight;
-      case 'upcoming': return colors.infoLight;
-      case 'completed': return '#f3f4f6';
-      case 'closed': return '#fee2e2';
-      default: return '#f3f4f6';
-    }
-  };
-
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Explore Chits</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <TopBar title="Explore Chits" navigation={navigation} showBack />
 
+      {/* Search Bar */}
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
           <MaterialCommunityIcons name="magnify" size={20} color={colors.textTertiary} />
@@ -96,16 +73,28 @@ const ExploreChitsScreen = ({ navigation }) => {
         </View>
       </View>
 
+      {/* Filter Row */}
       <View style={styles.filterRow}>
         {filters.map((f) => (
           <TouchableOpacity
             key={f.key}
-            style={[styles.filterChip, filter === f.key && styles.filterChipActive]}
+            activeOpacity={0.8}
             onPress={() => setFilter(f.key)}
           >
-            <Text style={[styles.filterChipText, filter === f.key && styles.filterChipTextActive]}>
-              {f.label}
-            </Text>
+            {filter === f.key ? (
+              <LinearGradient
+                colors={['#0E3D23', '#1A5C39']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.filterChipActive}
+              >
+                <Text style={styles.filterChipTextActive}>{f.label}</Text>
+              </LinearGradient>
+            ) : (
+              <View style={styles.filterChip}>
+                <Text style={styles.filterChipText}>{f.label}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         ))}
       </View>
@@ -116,109 +105,104 @@ const ExploreChitsScreen = ({ navigation }) => {
         showsVerticalScrollIndicator={false}
       >
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Loading Chits...</Text>
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>Loading Chits...</Text>
           </View>
         ) : filteredChits.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No chits found.</Text>
+          <View style={styles.emptyState}>
+            <View style={styles.emptyIconBox}>
+              <MaterialCommunityIcons name="treasure-chest" size={48} color={colors.border} />
+            </View>
+            <Text style={styles.emptyTitle}>No Chits Found</Text>
+            <Text style={styles.emptyBody}>Try adjusting your filters or search.</Text>
           </View>
         ) : (
-          filteredChits.map((chit) => (
-          <TouchableOpacity
-            key={chit._id}
-            style={styles.chitCard}
-            activeOpacity={0.85}
-            onPress={() => navigation.navigate('ChitDetails', { chitId: chit._id })}
-          >
-            <LinearGradient
-              colors={['#ffffff', '#fafafa']}
-              style={styles.chitCardInner}
-            >
-              <View style={styles.chitCardHeader}>
-                <View style={styles.chitNameRow}>
-                  <View style={styles.chitIconWrap}>
-                    <MaterialCommunityIcons name="cash-multiple" size={24} color={colors.primary} />
-                  </View>
-                  <View style={styles.chitNameWrap}>
-                    <Text style={styles.chitName}>{chit.name}</Text>
-                    <Text style={styles.chitDesc} numberOfLines={1}>{chit.description}</Text>
-                  </View>
-                </View>
-                <View style={[styles.statusBadge, { backgroundColor: getStatusBg(chit.status) }]}>
-                  <Text style={[styles.statusText, { color: getStatusColor(chit.status) }]}>
-                    {chit.status.charAt(0).toUpperCase() + chit.status.slice(1)}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.chitDivider} />
-
-              <View style={styles.chitDetailsGrid}>
-                <View style={styles.chitDetailItem}>
-                  <Text style={styles.chitDetailLabel}>Monthly</Text>
-                  <Text style={styles.chitDetailValue}>{formatCurrency(chit.monthlyAmount)}</Text>
-                </View>
-                <View style={styles.chitDetailItem}>
-                  <Text style={styles.chitDetailLabel}>Duration</Text>
-                  <Text style={styles.chitDetailValue}>{chit.duration}mo</Text>
-                </View>
-                <View style={styles.chitDetailItem}>
-                  <Text style={styles.chitDetailLabel}>Members</Text>
-                  <Text style={styles.chitDetailValue}>{chit.totalMembers}</Text>
-                </View>
-                <View style={styles.chitDetailItem}>
-                  <Text style={styles.chitDetailLabel}>Slots</Text>
-                  <Text style={styles.chitDetailValue}>{chit.availableSlots}</Text>
-                </View>
-              </View>
-
-              <View style={styles.chitPotRow}>
-                <Text style={styles.chitPotLabel}>Total Pot</Text>
-                <Text style={styles.chitPotValue}>{formatCurrency(chit.totalPot)}</Text>
-              </View>
-
-              <View style={styles.chitDates}>
-                <View style={styles.chitDateItem}>
-                  <MaterialCommunityIcons name="calendar-start" size={14} color={colors.textTertiary} />
-                  <Text style={styles.chitDateText}>Start: {chit.startDate}</Text>
-                </View>
-                <View style={styles.chitDateItem}>
-                  <MaterialCommunityIcons name="calendar-end" size={14} color={colors.textTertiary} />
-                  <Text style={styles.chitDateText}>End: {chit.endDate}</Text>
-                </View>
-              </View>
-
-              {chit.features && (
-                <View style={styles.featureRow}>
-                  {chit.features.map((f, i) => (
-                    <View key={i} style={styles.featureChip}>
-                      <Text style={styles.featureChipText}>{f}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-
+          filteredChits.map((chit) => {
+            const isFull = chit.availableSlots === 0;
+            return (
               <TouchableOpacity
-                style={[styles.joinBtn, chit.availableSlots === 0 && styles.joinBtnDisabled]}
+                key={chit._id}
+                style={styles.chitCard}
                 activeOpacity={0.85}
                 onPress={() => {
-                  if (chit.availableSlots > 0) {
-                    navigation.navigate('JoinChit', { chitId: chit._id });
+                  if (!isFull) {
+                    navigation.navigate('ChitDetails', { chitId: chit._id });
                   }
                 }}
               >
-                <Text style={[styles.joinBtnText, chit.availableSlots === 0 && styles.joinBtnTextDisabled]}>
-                  {chit.availableSlots === 0 ? 'Full' : 'Join Now'}
-                </Text>
-                {chit.availableSlots > 0 && (
-                  <MaterialCommunityIcons name="arrow-right" size={18} color={colors.white} />
-                )}
+                <View style={styles.chitCardHeader}>
+                  <View style={styles.chitNameRow}>
+                    <View style={styles.chitIconWrap}>
+                      <MaterialCommunityIcons name="treasure-chest" size={24} color={colors.primary} />
+                    </View>
+                    <View style={styles.chitNameWrap}>
+                      <Text style={styles.chitName}>{chit.name}</Text>
+                      <Text style={styles.chitDesc} numberOfLines={1}>{chit.description}</Text>
+                    </View>
+                  </View>
+                  <StatusChip status={chit.status.charAt(0).toUpperCase() + chit.status.slice(1)} />
+                </View>
+
+                <View style={styles.chitPotRow}>
+                  <Text style={styles.chitPotLabel}>Total Pot</Text>
+                  <Text style={styles.chitPotValue}>{formatCurrency(chit.totalPot)}</Text>
+                </View>
+
+                <View style={styles.chitDetailsGrid}>
+                  <View style={styles.chitDetailItem}>
+                    <Text style={styles.chitDetailLabel}>Monthly</Text>
+                    <Text style={styles.chitDetailValue}>{formatCurrency(chit.monthlyAmount)}</Text>
+                  </View>
+                  <View style={styles.chitDetailItem}>
+                    <Text style={styles.chitDetailLabel}>Duration</Text>
+                    <Text style={styles.chitDetailValue}>{chit.duration} mo</Text>
+                  </View>
+                  <View style={styles.chitDetailItem}>
+                    <Text style={styles.chitDetailLabel}>Slots Left</Text>
+                    <Text style={styles.chitDetailValue}>{chit.availableSlots}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.chitDivider} />
+
+                <View style={styles.chitDates}>
+                  <View style={styles.chitDateItem}>
+                    <MaterialCommunityIcons name="calendar-start" size={14} color={colors.textTertiary} />
+                    <Text style={styles.chitDateText}>Start: {chit.startDate}</Text>
+                  </View>
+                  <View style={styles.chitDateItem}>
+                    <MaterialCommunityIcons name="calendar-end" size={14} color={colors.textTertiary} />
+                    <Text style={styles.chitDateText}>End: {chit.endDate}</Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.joinBtnOuter, isFull && styles.joinBtnDisabled]}
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    if (!isFull) {
+                      navigation.navigate('JoinChit', { chitId: chit._id });
+                    }
+                  }}
+                  disabled={isFull}
+                >
+                  <LinearGradient
+                    colors={isFull ? [colors.muted, colors.muted] : ['#0E3D23', '#1A5C39', '#2E8B5A']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.joinBtnGradient}
+                  >
+                    <Text style={[styles.joinBtnText, isFull && styles.joinBtnTextDisabled]}>
+                      {isFull ? 'Chit Full' : 'Join Chit'}
+                    </Text>
+                    {!isFull && <MaterialCommunityIcons name="arrow-right" size={20} color={colors.white} />}
+                  </LinearGradient>
+                </TouchableOpacity>
               </TouchableOpacity>
-            </LinearGradient>
-          </TouchableOpacity>
-        )))}
-        <View style={{ height: 100 }} />
+            );
+          })
+        )}
+        <View style={{ height: 40 }} />
       </ScrollView>
     </View>
   );
@@ -227,87 +211,76 @@ const ExploreChitsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
-  scrollContent: { paddingBottom: 20, paddingHorizontal: 20 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 8,
-    backgroundColor: colors.background,
-  },
-  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.white, justifyContent: 'center', alignItems: 'center', ...colors.shadow.soft },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
-  searchContainer: { paddingHorizontal: 20, marginBottom: 12 },
+  scrollContent: { paddingBottom: 20 },
+  
+  searchContainer: { paddingHorizontal: 16, marginBottom: 12 },
   searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.white,
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    height: 48,
-    ...colors.shadow.card,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface,
+    borderRadius: 16, paddingHorizontal: 16, height: 50,
+    borderWidth: 1.5, borderColor: colors.border,
   },
   searchInput: { flex: 1, marginLeft: 10, fontSize: 15, color: colors.text },
-  filterRow: { flexDirection: 'row', paddingHorizontal: 20, marginBottom: 16, gap: 10 },
+  
+  // Filters
+  filterRow: { flexDirection: 'row', paddingHorizontal: 16, marginBottom: 16, gap: 8 },
   filterChip: {
-    paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20,
-    backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.surface, borderRadius: 999,
+    paddingHorizontal: 16, paddingVertical: 9,
+    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
   },
-  filterChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  filterChipText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
-  filterChipTextActive: { color: colors.white },
-  // Card
-  chitCard: {
-    borderRadius: 20, marginBottom: 16,
-    ...colors.shadow.card,
-  },
-  chitCardInner: { borderRadius: 20, padding: 20, borderWidth: 1, borderColor: colors.borderLight },
-  chitCardHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
-  },
-  chitNameRow: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  chitIconWrap: {
-    width: 44, height: 44, borderRadius: 14, backgroundColor: colors.primaryLight,
-    justifyContent: 'center', alignItems: 'center', marginRight: 12,
-  },
-  chitNameWrap: { flex: 1 },
-  chitName: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: 2 },
-  chitDesc: { fontSize: 12, color: colors.textSecondary },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, marginLeft: 8 },
-  statusText: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3 },
-  chitDivider: { height: 1, backgroundColor: colors.borderLight, marginVertical: 16 },
-  chitDetailsGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
-  chitDetailItem: { alignItems: 'center', flex: 1 },
-  chitDetailLabel: { fontSize: 11, color: colors.textTertiary, fontWeight: '600', marginBottom: 4, textTransform: 'uppercase' },
-  chitDetailValue: { fontSize: 16, fontWeight: '700', color: colors.text },
-  chitPotRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: colors.primaryLight, padding: 12, borderRadius: 12, marginBottom: 12,
-  },
-  chitPotLabel: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
-  chitPotValue: { fontSize: 18, fontWeight: '800', color: colors.primary },
-  chitDates: { marginBottom: 12, gap: 6 },
-  chitDateItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  chitDateText: { fontSize: 12, color: colors.textSecondary },
-  featureRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 },
-  featureChip: {
-    backgroundColor: colors.background, paddingHorizontal: 10, paddingVertical: 4,
-    borderRadius: 8, borderWidth: 1, borderColor: colors.borderLight,
-  },
-  featureChipText: { fontSize: 11, color: colors.textSecondary, fontWeight: '500' },
-  joinBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: colors.primary, paddingVertical: 14, borderRadius: 14, gap: 8,
-    ...colors.shadow.button,
-  },
-  joinBtnDisabled: { backgroundColor: colors.border },
-  joinBtnText: { fontSize: 16, fontWeight: '700', color: colors.white },
-  joinBtnTextDisabled: { color: colors.textTertiary },
-  loadingContainer: { padding: 40, alignItems: 'center' },
-  loadingText: { color: colors.textSecondary, fontSize: 14 },
+  filterChipActive: { borderRadius: 999, paddingHorizontal: 16, paddingVertical: 9 },
+  filterChipText: { fontSize: 13, fontWeight: '600', color: colors.text },
+  filterChipTextActive: { fontSize: 13, fontWeight: '700', color: colors.white },
+
+  // Empty
   emptyContainer: { padding: 40, alignItems: 'center' },
   emptyText: { color: colors.textSecondary, fontSize: 14 },
+  emptyState: { alignItems: 'center', paddingVertical: 60 },
+  emptyIconBox: {
+    width: 96, height: 96, borderRadius: 48, backgroundColor: colors.surface,
+    justifyContent: 'center', alignItems: 'center', marginBottom: 20,
+    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+  },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: 8 },
+  emptyBody: { fontSize: 14, color: colors.textMuted, textAlign: 'center' },
+
+  // Card
+  chitCard: {
+    marginHorizontal: 16, marginBottom: 16, backgroundColor: colors.surface,
+    borderRadius: 24, padding: 16,
+    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+  },
+  chitCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
+  chitNameRow: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 },
+  chitIconWrap: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  chitNameWrap: { flex: 1 },
+  chitName: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 2 },
+  chitDesc: { fontSize: 13, color: colors.textMuted },
+  
+  chitPotRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: 'rgba(212,168,67,0.1)', padding: 12, borderRadius: 12, marginBottom: 16,
+    borderWidth: 1, borderColor: 'rgba(212,168,67,0.3)',
+  },
+  chitPotLabel: { fontSize: 13, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
+  chitPotValue: { fontSize: 18, fontWeight: '800', color: '#B48A28', letterSpacing: -0.5 },
+
+  chitDetailsGrid: { flexDirection: 'row', justifyContent: 'space-between' },
+  chitDetailItem: { flex: 1 },
+  chitDetailLabel: { fontSize: 11, color: colors.textMuted, fontWeight: '600', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 },
+  chitDetailValue: { fontSize: 15, fontWeight: '700', color: colors.text },
+
+  chitDivider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.borderLight, marginVertical: 16 },
+
+  chitDates: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
+  chitDateItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  chitDateText: { fontSize: 12, color: colors.textSecondary, fontWeight: '500' },
+
+  joinBtnOuter: { shadowColor: '#1A5C39', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 },
+  joinBtnGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 48, borderRadius: 14, gap: 8 },
+  joinBtnDisabled: { opacity: 0.8, elevation: 0, shadowOpacity: 0 },
+  joinBtnText: { fontSize: 15, fontWeight: '700', color: colors.white },
+  joinBtnTextDisabled: { color: colors.textMuted },
 });
 
 export default ExploreChitsScreen;

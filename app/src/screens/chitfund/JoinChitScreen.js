@@ -6,10 +6,11 @@ import {
   ScrollView,
   TouchableOpacity,
   Modal,
+  Alert,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, typography } from '../../theme/theme';
+import { colors } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { chitFundService } from '../../services/chitFundService';
 
@@ -42,10 +43,7 @@ const JoinChitScreen = ({ navigation, route }) => {
     if (!agreed) return;
     setProcessing(true);
     try {
-      // 1. Create join request (pending member & transaction on server)
       const res = await chitFundService.joinChit({ chitId });
-      
-      // 2. Navigate to Payment screen to complete UPI payment
       setShowConfirm(false);
       navigation.replace('ChitPayment', {
         chitId: chit._id,
@@ -90,7 +88,8 @@ const JoinChitScreen = ({ navigation, route }) => {
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Plan Summary */}
         <View style={styles.summaryCard}>
-          <LinearGradient colors={['#064e3b', '#065f46', '#047857']} style={styles.summaryCardInner}>
+          <LinearGradient colors={['#0E3D23', '#1A5C39', '#2E8B5A']} style={styles.summaryCardInner}>
+            <View style={styles.blobTopRight} />
             <Text style={styles.summaryTitle}>{chit.name}</Text>
             <Text style={styles.summaryDesc}>{chit.description}</Text>
             <View style={styles.summaryRow}>
@@ -156,23 +155,29 @@ const JoinChitScreen = ({ navigation, route }) => {
       {/* Proceed Button */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
         <TouchableOpacity
-          style={[styles.proceedBtn, !agreed && styles.proceedBtnDisabled]}
+          style={[styles.proceedBtnOuter, !agreed && styles.proceedBtnDisabled]}
           activeOpacity={0.85}
           disabled={!agreed}
           onPress={() => setShowConfirm(true)}
         >
-          <Text style={[styles.proceedBtnText, !agreed && styles.proceedBtnTextDisabled]}>
-            Proceed to Pay {formatCurrency(totalPayable)}
-          </Text>
+          <LinearGradient
+            colors={agreed ? ['#0E3D23', '#1A5C39', '#2E8B5A'] : [colors.muted, colors.muted]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={styles.proceedBtnGradient}
+          >
+            <Text style={[styles.proceedBtnText, !agreed && styles.proceedBtnTextDisabled]}>
+              Proceed to Pay {formatCurrency(totalPayable)}
+            </Text>
+          </LinearGradient>
         </TouchableOpacity>
       </View>
 
       {/* Confirmation Modal */}
       <Modal visible={showConfirm} transparent animationType="fade">
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowConfirm(false)}>
-          <View style={styles.modalContent}>
+          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
             <View style={styles.modalIconWrap}>
-              <MaterialCommunityIcons name="cash-check" size={48} color={colors.primary} />
+              <MaterialCommunityIcons name="cash-check" size={40} color={colors.primary} />
             </View>
             <Text style={styles.modalTitle}>Confirm Payment</Text>
             <Text style={styles.modalSubtitle}>Please verify the payment details</Text>
@@ -199,13 +204,19 @@ const JoinChitScreen = ({ navigation, route }) => {
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.payBtn, processing && { opacity: 0.7 }]}
+                style={styles.payBtnOuter}
                 disabled={processing}
                 onPress={handleJoin}
               >
-                <Text style={styles.payBtnText}>
-                  {processing ? 'Processing...' : `Pay ${formatCurrency(totalPayable)}`}
-                </Text>
+                <LinearGradient
+                  colors={processing ? [colors.muted, colors.muted] : ['#0E3D23', '#1A5C39']}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                  style={styles.payBtnGradient}
+                >
+                  <Text style={styles.payBtnText}>
+                    {processing ? 'Processing...' : `Pay ${formatCurrency(totalPayable)}`}
+                  </Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           </View>
@@ -225,60 +236,66 @@ const styles = StyleSheet.create({
   },
   backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.white, justifyContent: 'center', alignItems: 'center', ...colors.shadow.soft },
   headerTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
+  
   // Summary
-  summaryCard: { borderRadius: 20, overflow: 'hidden', marginBottom: 16, ...colors.shadow.elevated },
-  summaryCardInner: { padding: 24 },
-  summaryTitle: { fontSize: 22, fontWeight: '700', color: colors.white, marginBottom: 4 },
+  summaryCard: { borderRadius: 24, overflow: 'hidden', marginBottom: 16, shadowColor: '#1A5C39', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 8 },
+  summaryCardInner: { padding: 24, position: 'relative' },
+  blobTopRight: { position: 'absolute', top: -40, right: -40, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.06)' },
+  summaryTitle: { fontSize: 22, fontWeight: '800', color: colors.white, marginBottom: 4, letterSpacing: -0.5 },
   summaryDesc: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginBottom: 20 },
   summaryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   summaryItem: { alignItems: 'center', flex: 1 },
-  summaryLabel: { fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: '600', textTransform: 'uppercase', marginBottom: 4 },
+  summaryLabel: { fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
   summaryValue: { fontSize: 18, fontWeight: '700', color: colors.white },
   summaryDivider: { width: 1, height: 30, backgroundColor: 'rgba(255,255,255,0.2)' },
+  
   // Fee
-  feeCard: { backgroundColor: colors.white, borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: colors.borderLight, ...colors.shadow.card },
+  feeCard: { backgroundColor: colors.surface, borderRadius: 20, padding: 20, marginBottom: 16, shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
   feeTitle: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: 16 },
   feeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 },
   feeLabel: { fontSize: 14, color: colors.textSecondary },
   feeValue: { fontSize: 14, fontWeight: '600', color: colors.text },
-  feeDivider: { height: 1, backgroundColor: colors.border, marginVertical: 8 },
+  feeDivider: { height: 1, backgroundColor: colors.borderLight, marginVertical: 8 },
   feeTotalLabel: { fontSize: 16, fontWeight: '700', color: colors.text },
   feeTotalValue: { fontSize: 18, fontWeight: '800', color: colors.primary },
+  
   // Terms
-  termsCard: { backgroundColor: colors.white, borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: colors.borderLight, ...colors.shadow.card },
+  termsCard: { backgroundColor: colors.surface, borderRadius: 20, padding: 20, marginBottom: 16, shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
   termsTitle: { fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 8 },
   termsText: { fontSize: 13, color: colors.textSecondary, lineHeight: 20 },
+  
   // Declaration
   declarationRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 16 },
-  checkbox: {
-    width: 24, height: 24, borderRadius: 6, borderWidth: 2, borderColor: colors.border,
-    justifyContent: 'center', alignItems: 'center', marginTop: 2,
-  },
+  checkbox: { width: 24, height: 24, borderRadius: 6, borderWidth: 2, borderColor: colors.border, justifyContent: 'center', alignItems: 'center', marginTop: 2 },
   checkboxActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   declarationText: { fontSize: 13, color: colors.textSecondary, flex: 1, lineHeight: 20 },
   declarationLink: { color: colors.primary, fontWeight: '600' },
+  
   // Bottom
   bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.borderLight },
-  proceedBtn: { backgroundColor: colors.primary, paddingVertical: 16, borderRadius: 16, alignItems: 'center', ...colors.shadow.button },
-  proceedBtnDisabled: { backgroundColor: colors.border, ...colors.shadow.card },
-  proceedBtnText: { fontSize: 17, fontWeight: '700', color: colors.white },
+  proceedBtnOuter: { shadowColor: '#1A5C39', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 },
+  proceedBtnGradient: { height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  proceedBtnDisabled: { shadowOpacity: 0, elevation: 0 },
+  proceedBtnText: { fontSize: 16, fontWeight: '700', color: colors.white },
   proceedBtnTextDisabled: { color: colors.textTertiary },
+  
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { width: '85%', backgroundColor: colors.white, borderRadius: 24, padding: 24, ...colors.shadow.elevated },
+  modalContent: { width: '85%', backgroundColor: colors.surface, borderRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 15 },
   modalIconWrap: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center', alignSelf: 'center', marginBottom: 16 },
-  modalTitle: { fontSize: 20, fontWeight: '700', color: colors.text, textAlign: 'center', marginBottom: 4 },
-  modalSubtitle: { fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginBottom: 24 },
+  modalTitle: { fontSize: 20, fontWeight: '800', color: colors.text, textAlign: 'center', marginBottom: 4, letterSpacing: -0.4 },
+  modalSubtitle: { fontSize: 13, color: colors.textMuted, textAlign: 'center', marginBottom: 24 },
   modalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 },
   modalLabel: { fontSize: 14, color: colors.textSecondary },
   modalValue: { fontSize: 14, fontWeight: '600', color: colors.text },
-  modalDivider: { height: 1, backgroundColor: colors.border, marginVertical: 8 },
+  modalDivider: { height: 1, backgroundColor: colors.borderLight, marginVertical: 8 },
   modalTotalLabel: { fontSize: 16, fontWeight: '700', color: colors.text },
   modalTotalValue: { fontSize: 18, fontWeight: '800', color: colors.primary },
   modalButtons: { flexDirection: 'row', gap: 12, marginTop: 24 },
-  cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: colors.background, alignItems: 'center' },
+  cancelBtn: { flex: 1, height: 50, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },
   cancelBtnText: { fontSize: 15, fontWeight: '700', color: colors.textSecondary },
-  payBtn: { flex: 2, paddingVertical: 14, borderRadius: 14, backgroundColor: colors.primary, alignItems: 'center', ...colors.shadow.button },
+  payBtnOuter: { flex: 1.5 },
+  payBtnGradient: { height: 50, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
   payBtnText: { fontSize: 15, fontWeight: '700', color: colors.white },
 });
 

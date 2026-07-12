@@ -1,10 +1,12 @@
 import React from 'react';
-import { View, Text, StyleSheet, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Platform, Animated } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
-import { colors, typography } from '../theme/theme';
+import { colors } from '../theme/theme';
+import { ActivityIndicator } from 'react-native';
 
 // Auth Screens
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -22,7 +24,7 @@ import InvestmentAmountScreen from '../screens/investment/InvestmentAmountScreen
 import InvestmentPaymentScreen from '../screens/investment/InvestmentPaymentScreen';
 import InvestmentStatusScreen from '../screens/investment/InvestmentStatusScreen';
 
-// Investment List Screen (used from modal)
+// Investment List Screen
 import InvestmentsScreen from '../screens/tabs/InvestmentsScreen';
 
 // Additional Screens
@@ -49,68 +51,143 @@ import ReceiptsScreen from '../screens/chitfund/ReceiptsScreen';
 import RulesScreen from '../screens/chitfund/RulesScreen';
 import FAQScreen from '../screens/chitfund/FAQScreen';
 import SupportScreen from '../screens/chitfund/SupportScreen';
+import NotificationsScreen from '../screens/tabs/NotificationsScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
-const TabIcon = ({ name, focused, color }) => {
+// ---------- Premium Floating Tab Bar ----------
+const TAB_ICONS = {
+  Home: { active: 'home-variant', inactive: 'home-variant-outline' },
+  ChitFund: { active: 'layers', inactive: 'layers-outline' },
+  Withdraw: { active: 'bank-transfer-out', inactive: 'bank-transfer-out' },
+  Profile: { active: 'account', inactive: 'account-outline' },
+};
+
+const TAB_LABELS = {
+  Home: 'Home',
+  ChitFund: 'Chit Fund',
+  Withdraw: 'Withdraw',
+  Profile: 'Profile',
+};
+
+const PrimeTabBar = ({ state, descriptors, navigation }) => {
   return (
-    <View style={[styles.tabIconContainer, focused && styles.tabIconActive]}>
-      <MaterialCommunityIcons name={name} size={focused ? 26 : 24} color={color} />
+    <View style={tabStyles.outerContainer} pointerEvents="box-none">
+      <View style={tabStyles.pill}>
+        {state.routes.map((route, index) => {
+          const focused = state.index === index;
+          const iconSet = TAB_ICONS[route.name] || { active: 'help-circle', inactive: 'help-circle-outline' };
+          const label = TAB_LABELS[route.name] || route.name;
+
+          const onPress = () => {
+            const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+            if (!focused && !event.defaultPrevented) {
+              navigation.navigate(route.name);
+            }
+          };
+
+          if (focused) {
+            return (
+              <LinearGradient
+                key={route.key}
+                colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={tabStyles.activeTab}
+              >
+                <MaterialCommunityIcons
+                  name={iconSet.active}
+                  size={22}
+                  color={colors.primaryFg}
+                  onPress={onPress}
+                />
+                <Text style={tabStyles.activeLabel} onPress={onPress}>{label}</Text>
+              </LinearGradient>
+            );
+          }
+
+          return (
+            <View key={route.key} style={tabStyles.inactiveTab}>
+              <MaterialCommunityIcons
+                name={iconSet.inactive}
+                size={22}
+                color={colors.textMuted}
+                onPress={onPress}
+              />
+            </View>
+          );
+        })}
+      </View>
     </View>
   );
 };
 
-const getTabIconName = (routeName, focused) => {
-  const icons = {
-    Home: focused ? 'home-variant' : 'home-variant-outline',
-    ChitFund: focused ? 'cash-multiple' : 'cash-multiple',
-    Withdraw: focused ? 'cash-fast' : 'cash-fast',
-    Profile: focused ? 'account' : 'account-outline',
-  };
-  return icons[routeName] || 'help-circle';
-};
+const tabStyles = StyleSheet.create({
+  outerContainer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 16,
+    right: 16,
+    alignItems: 'center',
+  },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    width: '100%',
+    justifyContent: 'space-between',
+    shadowColor: '#0E3D23',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 24,
+    elevation: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.8)',
+  },
+  activeTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 999,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    gap: 7,
+    shadowColor: '#1A5C39',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 10,
+    flex: 1,
+    justifyContent: 'center',
+    marginHorizontal: 3,
+    maxWidth: 160,
+  },
+  activeLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#F8FAF9',
+    letterSpacing: -0.3,
+  },
+  inactiveTab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    marginHorizontal: 3,
+  },
+});
 
+// ---------- Tab Navigator ----------
 const TabNavigator = () => {
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color }) => (
-          <TabIcon 
-            name={getTabIconName(route.name, focused)} 
-            focused={focused} 
-            color={color} 
-          />
-        ),
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textTertiary,
+      tabBar={(props) => <PrimeTabBar {...props} />}
+      screenOptions={{
         headerShown: false,
-        tabBarShowLabel: true,
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '600',
-          marginTop: 0,
-          marginBottom: Platform.OS === 'ios' ? 0 : 4,
-        },
-        tabBarStyle: {
-          position: 'absolute',
-          bottom: 20,
-          left: 16,
-          right: 16,
-          height: 64,
-          borderRadius: 20,
-          backgroundColor: colors.white,
-          borderTopWidth: 0,
-          ...colors.shadow.tab,
-          paddingTop: 8,
-          paddingBottom: Platform.OS === 'ios' ? 8 : 8,
-          paddingHorizontal: 8,
-        },
-        tabBarItemStyle: {
-          padding: 4,
-          borderRadius: 12,
-        },
-      })}
+      }}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="ChitFund" component={ChitFundScreen} options={{ tabBarLabel: 'Chit Fund' }} />
@@ -120,13 +197,63 @@ const TabNavigator = () => {
   );
 };
 
+// ---------- Splash ----------
 const SplashScreen = () => (
-  <View style={styles.splashContainer}>
-    <MaterialCommunityIcons name="leaf" size={64} color="#25b053" />
-    <Text style={styles.splashTitle}>Growvest</Text>
-    <ActivityIndicator size="large" color="#25b053" style={{ marginTop: 20 }} />
-  </View>
+  <LinearGradient
+    colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+    start={{ x: 0, y: 0 }}
+    end={{ x: 1, y: 1 }}
+    style={splashStyles.container}
+  >
+    <View style={splashStyles.iconWrapper}>
+      <MaterialCommunityIcons name="leaf" size={56} color="rgba(255,255,255,0.9)" />
+    </View>
+    <Text style={splashStyles.title}>Growvest</Text>
+    <Text style={splashStyles.subtitle}>Premium Investments</Text>
+    <ActivityIndicator size="small" color="rgba(255,255,255,0.7)" style={{ marginTop: 32 }} />
+  </LinearGradient>
 );
+
+const splashStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  iconWrapper: {
+    width: 96,
+    height: 96,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 36,
+    fontWeight: '800',
+    color: '#F8FAF9',
+    letterSpacing: -1,
+  },
+  subtitle: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.65)',
+    marginTop: 6,
+    letterSpacing: 0.3,
+  },
+});
+
+// ---------- Main Navigator ----------
+const screenFadeOptions = {
+  headerShown: false,
+  cardStyle: { backgroundColor: colors.background },
+  cardStyleInterpolator: ({ current: { progress } }) => ({
+    cardStyle: {
+      opacity: progress.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }),
+    },
+  }),
+};
 
 const AppNavigator = () => {
   const { isAuthenticated, loading } = useAuth();
@@ -135,174 +262,40 @@ const AppNavigator = () => {
     return <SplashScreen />;
   }
 
-  const screenOptions = {
-    headerShown: false,
-    cardStyle: { backgroundColor: colors.background },
-    cardStyleInterpolator: ({ current: { progress } }) => ({
-      cardStyle: {
-        opacity: progress.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0, 1],
-        }),
-      },
-    }),
-  };
-
-  const stackHeaderOptions = (title) => ({
-    headerShown: true,
-    title,
-    headerTintColor: colors.primary,
-    headerTitleStyle: { 
-      color: colors.text, 
-      fontWeight: '600',
-      fontSize: 18,
-    },
-    headerStyle: {
-      backgroundColor: colors.white,
-      elevation: 0,
-      shadowOpacity: 0,
-      borderBottomWidth: 0,
-    },
-    headerBackTitleVisible: false,
-  });
-
   return (
-    <Stack.Navigator screenOptions={screenOptions}>
+    <Stack.Navigator screenOptions={screenFadeOptions}>
       {isAuthenticated ? (
         <>
           <Stack.Screen name="MainTabs" component={TabNavigator} />
-          <Stack.Screen 
-            name="Transactions" 
-            component={TransactionsScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="InvestmentAmount" 
-            component={InvestmentAmountScreen}
-            options={stackHeaderOptions('Invest Now')}
-          />
-          <Stack.Screen 
-            name="InvestmentPayment" 
-            component={InvestmentPaymentScreen}
-            options={stackHeaderOptions('Payment')}
-          />
-          <Stack.Screen 
-            name="InvestmentStatus" 
-            component={InvestmentStatusScreen}
-            options={stackHeaderOptions('Status')}
-          />
-          <Stack.Screen 
-            name="Investments" 
-            component={InvestmentsScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="AboutUs" 
-            component={AboutUsScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="Terms" 
-            component={TermsScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="Privacy" 
-            component={PrivacyScreen}
-            options={{ headerShown: false }}
-          />
+          <Stack.Screen name="Transactions" component={TransactionsScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="InvestmentAmount" component={InvestmentAmountScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="InvestmentPayment" component={InvestmentPaymentScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="InvestmentStatus" component={InvestmentStatusScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Investments" component={InvestmentsScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="AboutUs" component={AboutUsScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Terms" component={TermsScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Privacy" component={PrivacyScreen} options={{ headerShown: false }} />
 
           {/* Chit Fund Screens */}
-          <Stack.Screen 
-            name="ChitFundHome" 
-            component={ChitFundHomeScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="ExploreChits" 
-            component={ExploreChitsScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="MyChits" 
-            component={MyChitsScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="ChitDetails" 
-            component={ChitDetailsScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="JoinChit" 
-            component={JoinChitScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="ChitPayment" 
-            component={ChitPaymentScreen}
-            options={stackHeaderOptions('Payment')}
-          />
-          <Stack.Screen 
-            name="ChitPaymentStatus" 
-            component={ChitPaymentStatusScreen}
-            options={stackHeaderOptions('Status')}
-          />
-          <Stack.Screen 
-            name="PaymentSuccess" 
-            component={PaymentSuccessScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="PaymentFailed" 
-            component={PaymentFailedScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="MonthlyDue" 
-            component={MonthlyDueScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="Auction" 
-            component={AuctionScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="WinnerHistory" 
-            component={WinnerHistoryScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="DividendHistory" 
-            component={DividendHistoryScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="PaymentHistory" 
-            component={PaymentHistoryScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="Receipts" 
-            component={ReceiptsScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="ChitRules" 
-            component={RulesScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="ChitFAQ" 
-            component={FAQScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="ChitSupport" 
-            component={SupportScreen}
-            options={{ headerShown: false }}
-          />
+          <Stack.Screen name="ChitFundHome" component={ChitFundHomeScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="ExploreChits" component={ExploreChitsScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="MyChits" component={MyChitsScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="ChitDetails" component={ChitDetailsScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="JoinChit" component={JoinChitScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="ChitPayment" component={ChitPaymentScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="ChitPaymentStatus" component={ChitPaymentStatusScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="PaymentSuccess" component={PaymentSuccessScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="PaymentFailed" component={PaymentFailedScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="MonthlyDue" component={MonthlyDueScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Auction" component={AuctionScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="WinnerHistory" component={WinnerHistoryScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="DividendHistory" component={DividendHistoryScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="PaymentHistory" component={PaymentHistoryScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Receipts" component={ReceiptsScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="ChitRules" component={RulesScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="ChitFAQ" component={FAQScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="ChitSupport" component={SupportScreen} options={{ headerShown: false }} />
         </>
       ) : (
         <>
@@ -313,30 +306,5 @@ const AppNavigator = () => {
     </Stack.Navigator>
   );
 };
-
-const styles = StyleSheet.create({
-  tabIconContainer: {
-    width: 36,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  tabIconActive: {
-    backgroundColor: colors.primaryLight,
-  },
-  splashContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-  },
-  splashTitle: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#25b053',
-    marginTop: 12,
-  },
-});
 
 export default AppNavigator;

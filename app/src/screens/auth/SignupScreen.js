@@ -7,15 +7,17 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
-  Image,
   TouchableOpacity,
+  Dimensions,
 } from 'react-native';
-import { TextInput, Button } from 'react-native-paper';
+import { TextInput } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { authService } from '../../services/authService';
 import { useAuth } from '../../context/AuthContext';
-import { colors, typography } from '../../theme/theme';
-import logo from '../../../assets/growvest-logo.png';
+import { colors } from '../../theme/theme';
+
+const { width, height } = Dimensions.get('window');
 
 const SignupScreen = ({ navigation }) => {
   const [username, setUsername] = useState('');
@@ -30,9 +32,7 @@ const SignupScreen = ({ navigation }) => {
 
   const validateForm = () => {
     const newErrors = {};
-    if (!username.trim()) {
-      newErrors.username = 'Username is required';
-    }
+    if (!username.trim()) newErrors.username = 'Username is required';
     if (!mobileNumber.trim()) {
       newErrors.mobileNumber = 'Mobile number is required';
     } else if (!/^\d{10}$/.test(mobileNumber.trim())) {
@@ -72,121 +72,138 @@ const SignupScreen = ({ navigation }) => {
       style={styles.container}
     >
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Logo & Branding */}
-        <View style={styles.logoSection}>
-          <Image source={logo} style={styles.logo} resizeMode="contain" />
-          <Text style={styles.appName}>Growvest</Text>
-          <Text style={styles.tagline}>Smart Investment Platform</Text>
-        </View>
+        {/* Gradient Top Section */}
+        <LinearGradient
+          colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.headerArea}
+        >
+          <View style={styles.blobTopRight} />
+          
+          <View style={styles.logoWrapper}>
+            <MaterialCommunityIcons name="leaf" size={40} color={colors.primaryFg} />
+          </View>
+          <Text style={styles.appName}>Join Growvest</Text>
+          <Text style={styles.tagline}>Smart Wealth Creation</Text>
+        </LinearGradient>
 
-        {/* Welcome */}
-        <View style={styles.welcomeSection}>
-          <Text style={styles.welcomeTitle}>Create Account</Text>
-          <Text style={styles.welcomeSubtitle}>Start your investment journey</Text>
-        </View>
-
-        {/* Form */}
-        <View style={styles.formSection}>
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Username</Text>
-            <TextInput
-              value={username}
-              onChangeText={setUsername}
-              mode="flat"
-              style={styles.input}
-              underlineColor="transparent"
-              activeUnderlineColor="transparent"
-              placeholder="Choose a username"
-              placeholderTextColor={colors.textTertiary}
-              error={!!errors.username}
-              autoCapitalize="none"
-              left={<TextInput.Icon icon="account" color={colors.textSecondary} />}
-            />
-            {errors.username && <Text style={styles.errorText}>{errors.username}</Text>}
+        {/* Form Section (Surface Card) */}
+        <View style={styles.formCard}>
+          <View style={styles.welcomeSection}>
+            <Text style={styles.welcomeTitle}>Create Account</Text>
+            <Text style={styles.welcomeSubtitle}>Start your investment journey</Text>
           </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Mobile Number</Text>
-            <TextInput
-              value={mobileNumber}
-              onChangeText={setMobileNumber}
-              mode="flat"
-              style={styles.input}
-              underlineColor="transparent"
-              activeUnderlineColor="transparent"
-              placeholder="10-digit mobile number"
-              placeholderTextColor={colors.textTertiary}
-              error={!!errors.mobileNumber}
-              keyboardType="phone-pad"
-              maxLength={10}
-              left={<TextInput.Icon icon="phone" color={colors.textSecondary} />}
-            />
-            {errors.mobileNumber && <Text style={styles.errorText}>{errors.mobileNumber}</Text>}
-          </View>
+          <View style={styles.formSection}>
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Username</Text>
+              <TextInput
+                value={username}
+                onChangeText={setUsername}
+                mode="flat"
+                style={styles.input}
+                underlineColor="transparent"
+                activeUnderlineColor="transparent"
+                placeholder="Choose a username"
+                placeholderTextColor={colors.textTertiary}
+                error={!!errors.username}
+                autoCapitalize="none"
+                left={<TextInput.Icon icon="account-outline" color={colors.textMuted} />}
+              />
+              {errors.username && <Text style={styles.errorText}>{errors.username}</Text>}
+            </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Email (Optional)</Text>
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              mode="flat"
-              style={styles.input}
-              underlineColor="transparent"
-              activeUnderlineColor="transparent"
-              placeholder="Enter your email"
-              placeholderTextColor={colors.textTertiary}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              left={<TextInput.Icon icon="email" color={colors.textSecondary} />}
-            />
-          </View>
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Mobile Number</Text>
+              <TextInput
+                value={mobileNumber}
+                onChangeText={setMobileNumber}
+                mode="flat"
+                style={styles.input}
+                underlineColor="transparent"
+                activeUnderlineColor="transparent"
+                placeholder="10-digit mobile number"
+                placeholderTextColor={colors.textTertiary}
+                error={!!errors.mobileNumber}
+                keyboardType="phone-pad"
+                maxLength={10}
+                left={<TextInput.Icon icon="phone-outline" color={colors.textMuted} />}
+              />
+              {errors.mobileNumber && <Text style={styles.errorText}>{errors.mobileNumber}</Text>}
+            </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Password</Text>
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              mode="flat"
-              style={styles.input}
-              underlineColor="transparent"
-              activeUnderlineColor="transparent"
-              placeholder="Create a password (min 6 chars)"
-              placeholderTextColor={colors.textTertiary}
-              secureTextEntry={!showPassword}
-              error={!!errors.password}
-              left={<TextInput.Icon icon="lock" color={colors.textSecondary} />}
-              right={
-                <TextInput.Icon
-                  icon={showPassword ? 'eye-off' : 'eye'}
-                  onPress={() => setShowPassword(!showPassword)}
-                  color={colors.textSecondary}
-                />
-              }
-            />
-            {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
-          </View>
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Email (Optional)</Text>
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                mode="flat"
+                style={styles.input}
+                underlineColor="transparent"
+                activeUnderlineColor="transparent"
+                placeholder="Enter your email"
+                placeholderTextColor={colors.textTertiary}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                left={<TextInput.Icon icon="email-outline" color={colors.textMuted} />}
+              />
+            </View>
 
-          <TouchableOpacity
-            style={[styles.signupBtn, loading && styles.signupBtnDisabled]}
-            activeOpacity={0.85}
-            onPress={handleSignup}
-            disabled={loading}
-          >
-            {loading ? (
-              <Text style={styles.signupBtnText}>Creating account...</Text>
-            ) : (
-              <>
-                <Text style={styles.signupBtnText}>Create Account</Text>
-                <MaterialCommunityIcons name="arrow-right" size={20} color={colors.white} />
-              </>
-            )}
-          </TouchableOpacity>
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Password</Text>
+              <TextInput
+                value={password}
+                onChangeText={setPassword}
+                mode="flat"
+                style={styles.input}
+                underlineColor="transparent"
+                activeUnderlineColor="transparent"
+                placeholder="Create a password"
+                placeholderTextColor={colors.textTertiary}
+                secureTextEntry={!showPassword}
+                error={!!errors.password}
+                left={<TextInput.Icon icon="lock-outline" color={colors.textMuted} />}
+                right={
+                  <TextInput.Icon
+                    icon={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    onPress={() => setShowPassword(!showPassword)}
+                    color={colors.textMuted}
+                  />
+                }
+              />
+              {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+            </View>
 
-          <View style={styles.loginRow}>
-            <Text style={styles.loginText}>Already have an account? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-              <Text style={styles.loginLink}>Login</Text>
+            <TouchableOpacity
+              style={[styles.signupBtnOuter, loading && styles.signupBtnDisabled]}
+              activeOpacity={0.85}
+              onPress={handleSignup}
+              disabled={loading}
+            >
+              <LinearGradient
+                colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.signupBtnGradient}
+              >
+                {loading ? (
+                  <Text style={styles.signupBtnText}>Creating account...</Text>
+                ) : (
+                  <>
+                    <Text style={styles.signupBtnText}>Create Account</Text>
+                    <MaterialCommunityIcons name="arrow-right" size={20} color={colors.white} />
+                  </>
+                )}
+              </LinearGradient>
             </TouchableOpacity>
+
+            <View style={styles.loginRow}>
+              <Text style={styles.loginText}>Already have an account? </Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Login')} activeOpacity={0.7}>
+                <Text style={styles.loginLink}>Sign In</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -195,107 +212,66 @@ const SignupScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.white,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-  },
-  logoSection: {
-    alignItems: 'center',
+  container: { flex: 1, backgroundColor: colors.background },
+  scrollContent: { flexGrow: 1, paddingBottom: 40 },
+  
+  // Header Area
+  headerArea: {
+    height: height * 0.35,
     paddingTop: 60,
-    marginBottom: 24,
+    alignItems: 'center',
+    position: 'relative',
+    overflow: 'hidden',
   },
-  logo: {
-    width: 80,
-    height: 80,
+  blobTopRight: {
+    position: 'absolute', top: -40, right: -40,
+    width: 200, height: 200, borderRadius: 100,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+  },
+  logoWrapper: {
+    width: 64, height: 64, borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center', alignItems: 'center',
     marginBottom: 12,
   },
-  appName: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.primary,
-    letterSpacing: -0.5,
+  appName: { fontSize: 28, fontWeight: '800', color: colors.primaryFg, letterSpacing: -1 },
+  tagline: { fontSize: 13, color: 'rgba(255,255,255,0.7)', marginTop: 2, letterSpacing: 0.5 },
+
+  // Form Card
+  formCard: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 32, borderTopRightRadius: 32,
+    marginTop: -40, flex: 1,
+    paddingHorizontal: 24, paddingTop: 32,
+    shadowColor: '#000', shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.1, shadowRadius: 20, elevation: 15,
   },
-  tagline: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginTop: 4,
-    fontWeight: '500',
-  },
-  welcomeSection: {
-    marginBottom: 24,
-  },
-  welcomeTitle: {
-    ...typography.h2,
-    marginBottom: 6,
-  },
-  welcomeSubtitle: {
-    ...typography.body2,
-  },
-  formSection: {
-    gap: 0,
-  },
-  inputContainer: {
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 6,
-  },
+  welcomeSection: { marginBottom: 24 },
+  welcomeTitle: { fontSize: 24, fontWeight: '800', color: colors.text, letterSpacing: -0.5, marginBottom: 4 },
+  welcomeSubtitle: { fontSize: 14, color: colors.textMuted },
+  
+  formSection: { gap: 0 },
+  inputContainer: { marginBottom: 16 },
+  inputLabel: { fontSize: 13, fontWeight: '600', color: colors.text, marginBottom: 8 },
   input: {
     backgroundColor: colors.background,
-    borderRadius: 14,
-    height: 50,
-    paddingHorizontal: 4,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-  },
-  errorText: {
-    fontSize: 12,
-    color: colors.error,
-    marginTop: 4,
-    marginLeft: 4,
-    fontWeight: '500',
-  },
-  signupBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 52,
-    borderRadius: 14,
-    backgroundColor: colors.primary,
-    marginTop: 8,
-    gap: 8,
-    ...colors.shadow.button,
-  },
-  signupBtnDisabled: {
-    opacity: 0.6,
-  },
-  signupBtnText: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: colors.white,
-  },
-  loginRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 24,
-  },
-  loginText: {
+    borderRadius: 16, height: 56, paddingHorizontal: 4,
+    borderWidth: 1.5, borderColor: colors.border,
     fontSize: 15,
-    color: colors.textSecondary,
   },
-  loginLink: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.primary,
+  errorText: { fontSize: 12, color: colors.error, marginTop: 4, marginLeft: 4, fontWeight: '500' },
+
+  signupBtnOuter: { marginTop: 12, shadowColor: '#1A5C39', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 16, elevation: 10 },
+  signupBtnGradient: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    height: 56, borderRadius: 16, gap: 8,
   },
+  signupBtnDisabled: { opacity: 0.6 },
+  signupBtnText: { fontSize: 16, fontWeight: '700', color: colors.white },
+  
+  loginRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 32 },
+  loginText: { fontSize: 14, color: colors.textSecondary },
+  loginLink: { fontSize: 14, fontWeight: '700', color: colors.primary },
 });
 
 export default SignupScreen;

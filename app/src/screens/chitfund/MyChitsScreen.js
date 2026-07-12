@@ -1,26 +1,24 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, typography } from '../../theme/theme';
+import { colors } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { chitFundService } from '../../services/chitFundService';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+import TopBar from '../../components/TopBar';
 
 const MyChitsScreen = ({ navigation }) => {
   const insets = useScreenInsets(8);
   const [chits, setChits] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  React.useEffect(() => {
+  useEffect(() => {
     fetchMyChits();
   }, []);
 
@@ -39,19 +37,13 @@ const MyChitsScreen = ({ navigation }) => {
 
   const getProgressColor = (progress) => {
     if (progress >= 75) return colors.success;
-    if (progress >= 50) return colors.warning;
+    if (progress >= 50) return colors.gold;
     return colors.info;
   };
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Chits</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <TopBar title="My Chits" navigation={navigation} showBack />
 
       <ScrollView
         style={styles.scrollView}
@@ -59,21 +51,30 @@ const MyChitsScreen = ({ navigation }) => {
         showsVerticalScrollIndicator={false}
       >
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Loading Your Chits...</Text>
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>Loading Your Chits...</Text>
           </View>
         ) : chits.length === 0 ? (
           <View style={styles.emptyState}>
-            <View style={styles.emptyIconWrap}>
-              <MaterialCommunityIcons name="cash-remove" size={64} color={colors.textTertiary} />
+            <View style={styles.emptyIconBox}>
+              <MaterialCommunityIcons name="account-group" size={48} color={colors.border} />
             </View>
             <Text style={styles.emptyTitle}>No Chits Joined</Text>
-            <Text style={styles.emptySubtitle}>Explore available chit funds and join one!</Text>
+            <Text style={styles.emptyBody}>Explore available chit funds and join one!</Text>
+            
             <TouchableOpacity
-              style={styles.exploreBtn}
+              style={styles.exploreBtnOuter}
+              activeOpacity={0.85}
               onPress={() => navigation.navigate('ExploreChits')}
             >
-              <Text style={styles.exploreBtnText}>Explore Chits</Text>
+              <LinearGradient
+                colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.exploreBtnGradient}
+              >
+                <Text style={styles.exploreBtnText}>Explore Chits</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         ) : (
@@ -88,44 +89,47 @@ const MyChitsScreen = ({ navigation }) => {
               >
                 <View style={styles.chitCardHeader}>
                   <View style={styles.chitIconWrap}>
-                    <MaterialCommunityIcons name="account-cash" size={24} color={colors.primary} />
+                    <MaterialCommunityIcons name="account-group-outline" size={24} color={colors.primary} />
                   </View>
                   <View style={styles.chitInfo}>
                     <Text style={styles.chitName}>{chit.chitName}</Text>
                     <Text style={styles.chitMember}>Member #{chit.memberNumber} of {chit.totalMembers}</Text>
                   </View>
-                  <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textTertiary} />
+                  <MaterialCommunityIcons name="chevron-right" size={22} color={colors.textMuted} />
                 </View>
 
-                {/* Progress Bar */}
-                <View style={styles.progressContainer}>
-                  <View style={styles.progressBar}>
-                    <View style={[styles.progressFill, { width: `${chit.progress}%`, backgroundColor: progressColor }]} />
+                {/* Progress */}
+                <View style={styles.progressSection}>
+                  <View style={styles.progressRow}>
+                    <Text style={styles.progressLabel}>Payment Progress</Text>
+                    <Text style={[styles.progressVal, { color: progressColor }]}>{chit.progress}%</Text>
                   </View>
-                  <Text style={[styles.progressText, { color: progressColor }]}>{chit.progress}%</Text>
+                  <View style={styles.progressBarBg}>
+                    <View style={[styles.progressBarFill, { width: `${chit.progress}%`, backgroundColor: progressColor }]} />
+                  </View>
+                </View>
+
+                <View style={styles.chitDetailsGrid}>
+                  <View style={styles.chitDetailItem}>
+                    <Text style={styles.chitDetailLabel}>Month</Text>
+                    <Text style={styles.chitDetailValue}>{chit.currentMonth}/{chit.duration}</Text>
+                  </View>
+                  <View style={styles.chitDetailItem}>
+                    <Text style={styles.chitDetailLabel}>Paid</Text>
+                    <Text style={styles.chitDetailValue}>{formatCurrency(chit.totalPaid)}</Text>
+                  </View>
+                  <View style={styles.chitDetailItem}>
+                    <Text style={styles.chitDetailLabel}>Remaining</Text>
+                    <Text style={styles.chitDetailValue}>{formatCurrency(chit.remainingAmount)}</Text>
+                  </View>
                 </View>
 
                 <View style={styles.chitDivider} />
 
-                <View style={styles.chitStats}>
-                  <View style={styles.chitStatItem}>
-                    <Text style={styles.chitStatLabel}>Month</Text>
-                    <Text style={styles.chitStatValue}>{chit.currentMonth}/{chit.duration}</Text>
-                  </View>
-                  <View style={styles.chitStatItem}>
-                    <Text style={styles.chitStatLabel}>Paid</Text>
-                    <Text style={styles.chitStatValue}>{formatCurrency(chit.totalPaid)}</Text>
-                  </View>
-                  <View style={styles.chitStatItem}>
-                    <Text style={styles.chitStatLabel}>Remaining</Text>
-                    <Text style={styles.chitStatValue}>{formatCurrency(chit.remainingAmount)}</Text>
-                  </View>
-                </View>
-
                 <View style={styles.chitFooter}>
-                  <View style={styles.chitDueRow}>
-                    <MaterialCommunityIcons name="calendar-alert" size={16} color={colors.warning} />
-                    <Text style={styles.chitDueText}>Next Due: {chit.nextDueDate} - {formatCurrency(chit.nextDueAmount)}</Text>
+                  <View style={styles.chitDueInfo}>
+                    <MaterialCommunityIcons name="calendar-alert" size={16} color={colors.gold} />
+                    <Text style={styles.chitDueText}>Due {chit.nextDueDate}: {formatCurrency(chit.nextDueAmount)}</Text>
                   </View>
                   <View style={[styles.winBadge, chit.hasWon ? styles.wonBadge : styles.notWonBadge]}>
                     <MaterialCommunityIcons
@@ -138,20 +142,11 @@ const MyChitsScreen = ({ navigation }) => {
                     </Text>
                   </View>
                 </View>
-
-                <TouchableOpacity
-                  style={styles.detailsBtn}
-                  activeOpacity={0.85}
-                  onPress={() => navigation.navigate('ChitDetails', { chitId: chit.chitId, memberId: chit._id })}
-                >
-                  <Text style={styles.detailsBtnText}>View Details</Text>
-                  <MaterialCommunityIcons name="arrow-right" size={16} color={colors.primary} />
-                </TouchableOpacity>
               </TouchableOpacity>
             );
           })
         )}
-        <View style={{ height: 100 }} />
+        <View style={{ height: 40 }} />
       </ScrollView>
     </View>
   );
@@ -160,54 +155,58 @@ const MyChitsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
-  scrollContent: { paddingBottom: 20, paddingHorizontal: 20 },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingBottom: 8, backgroundColor: colors.background,
-  },
-  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.white, justifyContent: 'center', alignItems: 'center', ...colors.shadow.soft },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
+  scrollContent: { paddingBottom: 20 },
+  
+  emptyContainer: { padding: 40, alignItems: 'center' },
+  emptyText: { color: colors.textSecondary, fontSize: 14 },
+  
   // Empty State
-  emptyState: { alignItems: 'center', paddingTop: 80, paddingHorizontal: 40 },
-  emptyIconWrap: { width: 120, height: 120, borderRadius: 60, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center', marginBottom: 24 },
-  emptyTitle: { fontSize: 22, fontWeight: '700', color: colors.text, marginBottom: 8 },
-  emptySubtitle: { fontSize: 15, color: colors.textSecondary, textAlign: 'center', lineHeight: 22, marginBottom: 24 },
-  exploreBtn: { backgroundColor: colors.primary, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 14, ...colors.shadow.button },
+  emptyState: { alignItems: 'center', paddingVertical: 60, paddingHorizontal: 20 },
+  emptyIconBox: {
+    width: 96, height: 96, borderRadius: 48, backgroundColor: colors.surface,
+    justifyContent: 'center', alignItems: 'center', marginBottom: 20,
+    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+  },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: 8 },
+  emptyBody: { fontSize: 14, color: colors.textMuted, textAlign: 'center', marginBottom: 24 },
+  exploreBtnOuter: { shadowColor: '#1A5C39', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 },
+  exploreBtnGradient: { paddingHorizontal: 32, paddingVertical: 14, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
   exploreBtnText: { fontSize: 16, fontWeight: '700', color: colors.white },
+
   // Card
   chitCard: {
-    backgroundColor: colors.white, borderRadius: 20, padding: 20, marginBottom: 16,
-    borderWidth: 1, borderColor: colors.borderLight, ...colors.shadow.card,
+    marginHorizontal: 16, marginBottom: 16, backgroundColor: colors.surface,
+    borderRadius: 24, padding: 16,
+    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
   chitCardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  chitIconWrap: { width: 48, height: 48, borderRadius: 16, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
+  chitIconWrap: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   chitInfo: { flex: 1 },
-  chitName: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: 2 },
-  chitMember: { fontSize: 12, color: colors.textSecondary },
+  chitName: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 2 },
+  chitMember: { fontSize: 13, color: colors.textMuted },
+  
   // Progress
-  progressContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  progressBar: { flex: 1, height: 8, backgroundColor: '#f3f4f6', borderRadius: 4, marginRight: 10, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 4 },
-  progressText: { fontSize: 13, fontWeight: '700', width: 40, textAlign: 'right' },
-  chitDivider: { height: 1, backgroundColor: colors.borderLight, marginBottom: 16 },
-  chitStats: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
-  chitStatItem: { alignItems: 'center', flex: 1 },
-  chitStatLabel: { fontSize: 11, color: colors.textTertiary, fontWeight: '600', marginBottom: 4, textTransform: 'uppercase' },
-  chitStatValue: { fontSize: 15, fontWeight: '700', color: colors.text },
-  chitFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  chitDueRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 },
-  chitDueText: { fontSize: 12, color: colors.textSecondary, flex: 1 },
+  progressSection: { marginBottom: 16 },
+  progressRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  progressLabel: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  progressVal: { fontSize: 12, fontWeight: '700' },
+  progressBarBg: { height: 6, backgroundColor: colors.background, borderRadius: 3, overflow: 'hidden' },
+  progressBarFill: { height: '100%', borderRadius: 3 },
+  
+  chitDetailsGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
+  chitDetailItem: { flex: 1 },
+  chitDetailLabel: { fontSize: 11, color: colors.textMuted, fontWeight: '600', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 },
+  chitDetailValue: { fontSize: 15, fontWeight: '700', color: colors.text },
+  
+  chitDivider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.borderLight, marginBottom: 16 },
+  
+  chitFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  chitDueInfo: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 },
+  chitDueText: { fontSize: 13, color: colors.textSecondary, fontWeight: '500' },
   winBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, gap: 4 },
   wonBadge: { backgroundColor: colors.successLight },
-  notWonBadge: { backgroundColor: '#f3f4f6' },
+  notWonBadge: { backgroundColor: colors.background },
   winBadgeText: { fontSize: 11, fontWeight: '700' },
-  detailsBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: colors.primaryLight, paddingVertical: 12, borderRadius: 12, gap: 6,
-  },
-  detailsBtnText: { fontSize: 14, fontWeight: '700', color: colors.primary },
-  loadingContainer: { padding: 40, alignItems: 'center' },
-  loadingText: { color: colors.textSecondary, fontSize: 14 },
 });
 
 export default MyChitsScreen;

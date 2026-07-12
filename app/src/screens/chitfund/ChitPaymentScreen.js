@@ -11,12 +11,12 @@ import {
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { colors, typography } from '../../theme/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors } from '../../theme/theme';
 import { chitFundService } from '../../services/chitFundService';
 
 const ChitPaymentScreen = ({ navigation, route }) => {
   const { chitId, memberId, month, amount, lateFee = 0, type, chitName } = route.params;
-  const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [upiId, setUpiId] = useState('');
 
@@ -41,9 +41,8 @@ const ChitPaymentScreen = ({ navigation, route }) => {
     }
   };
 
-  const formatCurrency = (value) => {
-    return `₹${value?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`;
-  };
+  const formatCurrency = (value) =>
+    `₹${value?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`;
 
   const copyUpiId = async () => {
     try {
@@ -97,60 +96,42 @@ const ChitPaymentScreen = ({ navigation, route }) => {
   };
 
   const upiApps = [
-    { 
-      name: 'Google Pay', 
-      logo: 'https://img.icons8.com/?size=100&id=am4ltuIYDpQ5&format=png&color=000000',
-      color: '#4285F4', 
-      bg: '#e8f0fe' 
-    },
-    { 
-      name: 'PhonePe', 
-      logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/PhonePe_Logo.svg/512px-PhonePe_Logo.svg.png',
-      color: '#5F259F', 
-      bg: '#f3e8ff' 
-    },
-    { 
-      name: 'Paytm', 
-      logo: 'https://img.icons8.com/?size=100&id=68067&format=png&color=000000',
-      color: '#00BAF2', 
-      bg: '#e0f7fe' 
-    },
-    { 
-      name: 'BHIM', 
-      logo: 'https://img.icons8.com/?size=100&id=5RcHTSNy4fbL&format=png&color=000000',
-      color: '#1a73e8', 
-      bg: '#e8f0fe' 
-    },
+    { name: 'Google Pay', logo: 'https://img.icons8.com/?size=100&id=am4ltuIYDpQ5&format=png&color=000000', color: '#4285F4', bg: '#e8f0fe' },
+    { name: 'PhonePe', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/PhonePe_Logo.svg/512px-PhonePe_Logo.svg.png', color: '#5F259F', bg: '#f3e8ff' },
+    { name: 'Paytm', logo: 'https://img.icons8.com/?size=100&id=68067&format=png&color=000000', color: '#00BAF2', bg: '#e0f7fe' },
+    { name: 'BHIM', logo: 'https://img.icons8.com/?size=100&id=5RcHTSNy4fbL&format=png&color=000000', color: '#1a73e8', bg: '#e8f0fe' },
   ];
 
   return (
     <View style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        
         {/* Payment Summary */}
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryHeader}>
-            <MaterialCommunityIcons 
-              name="cash-multiple" 
-              size={24} 
-              color={colors.primary} 
-            />
-            <Text style={styles.summaryType}>
-              {type === 'join' ? `Join Chit - ${chitName}` : `Chit Payment - Month ${month}`}
-            </Text>
-          </View>
-          <View style={styles.summaryAmountRow}>
-            <Text style={styles.summaryAmountLabel}>Amount to Pay</Text>
-            <Text style={styles.summaryAmountValue}>{formatCurrency(totalAmount)}</Text>
-          </View>
+        <View style={styles.summaryOuter}>
+          <LinearGradient
+            colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={styles.summaryCard}
+          >
+            <View style={styles.blobBottomLeft} />
+            <View style={styles.summaryHeader}>
+              <View style={styles.summaryIconWrap}>
+                <MaterialCommunityIcons name="cash-multiple" size={20} color={colors.gold} />
+              </View>
+              <Text style={styles.summaryType}>
+                {type === 'join' ? `Join Chit - ${chitName}` : `Chit Payment - Month ${month}`}
+              </Text>
+            </View>
+            <View style={styles.summaryAmountRow}>
+              <Text style={styles.summaryAmountLabel}>Amount to Pay</Text>
+              <Text style={styles.summaryAmountValue}>{formatCurrency(totalAmount)}</Text>
+            </View>
+          </LinearGradient>
         </View>
 
         {/* UPI Section */}
         <View style={styles.upiSection}>
-          <Text style={styles.upiSectionTitle}>Pay via UPI</Text>
+          <Text style={styles.sectionTitle}>Pay via UPI</Text>
 
           {/* UPI ID Display */}
           <View style={styles.upiIdCard}>
@@ -166,11 +147,7 @@ const ChitPaymentScreen = ({ navigation, route }) => {
                 activeOpacity={0.8}
                 disabled={!upiId}
               >
-                <MaterialCommunityIcons 
-                  name={copied ? 'check' : 'content-copy'} 
-                  size={18} 
-                  color={copied ? colors.white : colors.primary} 
-                />
+                <MaterialCommunityIcons name={copied ? 'check' : 'content-copy'} size={18} color={copied ? colors.white : colors.primary} />
                 <Text style={[styles.copyBtnText, copied && styles.copyBtnTextActive]}>
                   {copied ? 'Copied' : 'Copy'}
                 </Text>
@@ -190,14 +167,9 @@ const ChitPaymentScreen = ({ navigation, route }) => {
                 disabled={!upiId}
               >
                 <View style={[styles.upiAppIconWrapper, { backgroundColor: app.bg }]}>
-                  <Image 
-                    source={{ uri: app.logo }} 
-                    style={styles.upiAppLogo} 
-                    resizeMode="contain"
-                  />
+                  <Image source={{ uri: app.logo }} style={styles.upiAppLogo} resizeMode="contain" />
                 </View>
                 <Text style={styles.upiAppName}>{app.name}</Text>
-                <Text style={styles.upiAppAction}>Pay with {app.name.split(' ')[0]}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -205,7 +177,7 @@ const ChitPaymentScreen = ({ navigation, route }) => {
 
         {/* Payment Instructions */}
         <View style={styles.instructionsSection}>
-          <Text style={styles.instructionsTitle}>How to Pay</Text>
+          <Text style={styles.sectionTitle}>How to Pay</Text>
           {[
             'Tap your preferred UPI app above',
             'Verify the amount and UPI ID',
@@ -223,29 +195,33 @@ const ChitPaymentScreen = ({ navigation, route }) => {
 
         {/* Warning */}
         <View style={styles.warningCard}>
-          <MaterialCommunityIcons name="shield-alert" size={22} color={colors.warning} />
+          <MaterialCommunityIcons name="shield-alert" size={22} color={colors.gold} />
           <Text style={styles.warningText}>
             Ensure you've completed the payment before confirming. Your payment will be processed after verification.
           </Text>
         </View>
 
         {/* Action Buttons */}
-        <TouchableOpacity
-          style={styles.confirmBtn}
-          activeOpacity={0.85}
-          onPress={handleConfirmPayment}
-          disabled={!upiId}
-        >
-          <MaterialCommunityIcons name="check-circle" size={22} color={colors.white} />
-          <Text style={styles.confirmBtnText}>I Have Paid</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backBtnText}>Back</Text>
-        </TouchableOpacity>
+        <View style={styles.actionRow}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Text style={styles.backBtnText}>Back</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.confirmBtnOuter, !upiId && { opacity: 0.6 }]}
+            activeOpacity={0.85}
+            onPress={handleConfirmPayment}
+            disabled={!upiId}
+          >
+            <LinearGradient
+              colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={styles.confirmBtnGradient}
+            >
+              <Text style={styles.confirmBtnText}>I Have Paid</Text>
+              <MaterialCommunityIcons name="check-circle" size={20} color={colors.white} />
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -254,246 +230,60 @@ const ChitPaymentScreen = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 20,
-  },
+  container: { flex: 1, backgroundColor: colors.background },
+  scrollView: { flex: 1 },
+  scrollContent: { padding: 20 },
+  
   // Summary
-  summaryCard: {
-    margin: 16,
-    padding: 20,
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    ...colors.shadow.card,
-  },
-  summaryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  summaryType: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-    marginLeft: 10,
-  },
-  summaryAmountRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
-  },
-  summaryAmountLabel: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    fontWeight: '500',
-  },
-  summaryAmountValue: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: colors.primary,
-    letterSpacing: -0.5,
-  },
-  // UPI Section
-  upiSection: {
-    margin: 16,
-    marginTop: 0,
-  },
-  upiSectionTitle: {
-    ...typography.h4,
-    marginBottom: 14,
-  },
-  upiIdCard: {
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    ...colors.shadow.card,
-  },
-  upiIdLabel: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    fontWeight: '500',
-    marginBottom: 10,
-  },
-  upiIdRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  upiIdValueContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    backgroundColor: colors.background,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    marginRight: 10,
-  },
-  upiIdValue: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.text,
-    marginLeft: 8,
-  },
-  copyBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    gap: 4,
-  },
-  copyBtnActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  copyBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  copyBtnTextActive: {
-    color: colors.white,
-  },
-  // UPI Apps
-  upiAppsTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 12,
-  },
-  upiAppsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  upiAppCard: {
-    width: '48%',
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-    borderWidth: 1.5,
-    ...colors.shadow.card,
-  },
-  upiAppIconWrapper: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-    overflow: 'hidden',
-  },
-  upiAppLogo: {
-    width: 40,
-    height: 40,
-  },
-  upiAppName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 2,
-  },
-  upiAppAction: {
-    fontSize: 11,
-    color: colors.textTertiary,
-    fontWeight: '500',
-  },
+  summaryOuter: { marginBottom: 24, shadowColor: '#1A5C39', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 8 },
+  summaryCard: { borderRadius: 24, padding: 24, overflow: 'hidden', position: 'relative' },
+  blobBottomLeft: { position: 'absolute', bottom: -40, left: -40, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(212,168,67,0.1)' },
+  summaryHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 24 },
+  summaryIconWrap: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  summaryType: { fontSize: 16, fontWeight: '700', color: colors.white, flex: 1 },
+  summaryAmountRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.15)', paddingTop: 16 },
+  summaryAmountLabel: { fontSize: 13, color: 'rgba(255,255,255,0.7)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  summaryAmountValue: { fontSize: 32, fontWeight: '800', color: colors.white, letterSpacing: -1 },
+
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: colors.text, marginBottom: 16, letterSpacing: -0.4 },
+
+  // UPI
+  upiSection: { marginBottom: 24 },
+  upiIdCard: { backgroundColor: colors.surface, borderRadius: 20, padding: 16, marginBottom: 20, shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
+  upiIdLabel: { fontSize: 13, color: colors.textSecondary, fontWeight: '600', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
+  upiIdRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  upiIdValueContainer: { flexDirection: 'row', alignItems: 'center', flex: 1, backgroundColor: colors.background, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 14, marginRight: 12 },
+  upiIdValue: { fontSize: 15, fontWeight: '700', color: colors.text, marginLeft: 10 },
+  copyBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 14, borderWidth: 1.5, borderColor: colors.primary, gap: 6 },
+  copyBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  copyBtnText: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  copyBtnTextActive: { color: colors.white },
+  
+  upiAppsTitle: { fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 12 },
+  upiAppsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  upiAppCard: { width: '48%', backgroundColor: colors.surface, borderRadius: 20, padding: 16, alignItems: 'center', borderWidth: 1.5, shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
+  upiAppIconWrapper: { width: 56, height: 56, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+  upiAppLogo: { width: 36, height: 36 },
+  upiAppName: { fontSize: 14, fontWeight: '700', color: colors.text },
+
   // Instructions
-  instructionsSection: {
-    margin: 16,
-    marginTop: 0,
-  },
-  instructionsTitle: {
-    ...typography.h4,
-    marginBottom: 14,
-  },
-  stepRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  stepNumber: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  stepNumberText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.white,
-  },
-  stepText: {
-    flex: 1,
-    fontSize: 14,
-    color: colors.text,
-    lineHeight: 20,
-    fontWeight: '500',
-  },
+  instructionsSection: { marginBottom: 24 },
+  stepRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, backgroundColor: colors.surface, padding: 12, borderRadius: 16, shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
+  stepNumber: { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  stepNumberText: { fontSize: 14, fontWeight: '800', color: colors.primary },
+  stepText: { flex: 1, fontSize: 14, color: colors.text, fontWeight: '600' },
+
   // Warning
-  warningCard: {
-    flexDirection: 'row',
-    margin: 16,
-    marginTop: 0,
-    padding: 16,
-    backgroundColor: colors.warningLight,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#fde68a',
-    alignItems: 'flex-start',
-  },
-  warningText: {
-    flex: 1,
-    fontSize: 14,
-    color: colors.text,
-    marginLeft: 12,
-    lineHeight: 20,
-    fontWeight: '500',
-  },
-  // Buttons
-  confirmBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 16,
-    padding: 16,
-    backgroundColor: colors.primary,
-    borderRadius: 16,
-    gap: 8,
-    ...colors.shadow.button,
-  },
-  confirmBtnText: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: colors.white,
-  },
-  backBtn: {
-    alignSelf: 'center',
-    padding: 16,
-    marginTop: 8,
-  },
-  backBtnText: {
-    fontSize: 15,
-    color: colors.textSecondary,
-    fontWeight: '600',
-  },
+  warningCard: { flexDirection: 'row', padding: 16, backgroundColor: '#fef3c7', borderRadius: 16, alignItems: 'flex-start', marginBottom: 24 },
+  warningText: { flex: 1, fontSize: 13, color: '#b45309', marginLeft: 12, lineHeight: 20, fontWeight: '600' },
+
+  // Actions
+  actionRow: { flexDirection: 'row', gap: 12 },
+  backBtn: { flex: 1, height: 56, borderRadius: 16, borderWidth: 1.5, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },
+  backBtnText: { fontSize: 16, fontWeight: '700', color: colors.textSecondary },
+  confirmBtnOuter: { flex: 2, shadowColor: '#1A5C39', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 },
+  confirmBtnGradient: { height: 56, borderRadius: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
+  confirmBtnText: { fontSize: 16, fontWeight: '700', color: colors.white },
 });
 
 export default ChitPaymentScreen;

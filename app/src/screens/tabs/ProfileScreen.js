@@ -4,18 +4,18 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   TouchableOpacity,
+  Alert,
   Modal,
   TextInput,
   Linking,
 } from 'react-native';
-import { Card, Button, Divider } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { authService } from '../../services/authService';
 import { useAuth } from '../../context/AuthContext';
-import { colors, typography } from '../../theme/theme';
+import { colors } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 
 const ProfileScreen = ({ navigation }) => {
@@ -39,41 +39,22 @@ const ProfileScreen = ({ navigation }) => {
   const fetchUserData = async () => {
     try {
       const user = await authService.refreshUserProfile();
-      if (user) {
-        await updateUser(user);
-        setUserData(user);
-        setLoading(false);
-        return;
-      }
-    } catch (error) {
-      console.error('Error fetching user profile from API:', error);
-    }
-
+      if (user) { await updateUser(user); setUserData(user); setLoading(false); return; }
+    } catch (error) { console.error('Error fetching user profile from API:', error); }
     try {
       const cachedUser = await authService.getUserData();
       setUserData(cachedUser);
-    } catch (error) {
-      console.error('Error fetching cached user data:', error);
-    } finally {
-      setLoading(false);
-    }
+    } catch (error) { console.error('Error fetching cached user data:', error); }
+    finally { setLoading(false); }
   };
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchUserData();
-    }, [])
-  );
+  useFocusEffect(useCallback(() => { fetchUserData(); }, []));
 
   const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Logout', style: 'destructive', onPress: async () => { await logout(); } },
-      ]
-    );
+    Alert.alert('Logout', 'Are you sure you want to logout?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Logout', style: 'destructive', onPress: async () => { await logout(); } },
+    ]);
   };
 
   const formatDate = (dateString) => {
@@ -82,319 +63,257 @@ const ProfileScreen = ({ navigation }) => {
     return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
   };
 
-  const handleEditUsername = () => {
-    setNewUsername(userData?.username || '');
-    setEditModalVisible(true);
-  };
-
+  const handleEditUsername = () => { setNewUsername(userData?.username || ''); setEditModalVisible(true); };
   const handleSaveUsername = async () => {
-    if (!newUsername.trim()) {
-      Alert.alert('Error', 'Username cannot be empty');
-      return;
-    }
+    if (!newUsername.trim()) { Alert.alert('Error', 'Username cannot be empty'); return; }
     setSavingUsername(true);
     try {
       const updatedUser = await authService.updateUsername(newUsername.trim());
-      await updateUser(updatedUser);
-      setUserData(updatedUser);
-      setEditModalVisible(false);
+      await updateUser(updatedUser); setUserData(updatedUser); setEditModalVisible(false);
       Alert.alert('Success', 'Username updated successfully');
-    } catch (error) {
-      Alert.alert('Error', getErrorMessage(error));
-    } finally {
-      setSavingUsername(false);
-    }
+    } catch (error) { Alert.alert('Error', getErrorMessage(error)); }
+    finally { setSavingUsername(false); }
   };
 
-  const handleEditMobileNumber = () => {
-    setNewMobileNumber(userData?.mobileNumber || '');
-    setEditMobileModalVisible(true);
-  };
-
+  const handleEditMobileNumber = () => { setNewMobileNumber(userData?.mobileNumber || ''); setEditMobileModalVisible(true); };
   const handleSaveMobileNumber = async () => {
-    if (!newMobileNumber.trim()) {
-      Alert.alert('Error', 'Mobile number cannot be empty');
-      return;
-    }
+    if (!newMobileNumber.trim()) { Alert.alert('Error', 'Mobile number cannot be empty'); return; }
     if (newMobileNumber.trim().length !== 10 || !/^\d{10}$/.test(newMobileNumber.trim())) {
-      Alert.alert('Error', 'Please enter a valid 10-digit mobile number');
-      return;
+      Alert.alert('Error', 'Please enter a valid 10-digit mobile number'); return;
     }
     setSavingMobile(true);
     try {
       const updatedUser = await authService.updateMobileNumber(newMobileNumber.trim());
-      await updateUser(updatedUser);
-      setUserData(updatedUser);
-      setEditMobileModalVisible(false);
+      await updateUser(updatedUser); setUserData(updatedUser); setEditMobileModalVisible(false);
       Alert.alert('Success', 'Mobile number updated successfully');
-    } catch (error) {
-      Alert.alert('Error', getErrorMessage(error));
-    } finally {
-      setSavingMobile(false);
-    }
+    } catch (error) { Alert.alert('Error', getErrorMessage(error)); }
+    finally { setSavingMobile(false); }
   };
 
   const handleContactSupport = () => {
     Linking.openURL('https://wa.me/918300278515?text=Hello Growvest Support, I need assistance.');
   };
 
-  const getInitial = () => {
+  const getInitials = () => {
     const name = userData?.name || userData?.username || 'U';
-    return name.charAt(0).toUpperCase();
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return name.substring(0, 2).toUpperCase();
   };
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <View style={styles.loadingContent}>
-          <MaterialCommunityIcons name="account-circle-outline" size={40} color={colors.primaryLight} />
+      <View style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <MaterialCommunityIcons name="account-circle-outline" size={40} color={colors.border} />
           <Text style={styles.loadingText}>Loading profile...</Text>
         </View>
       </View>
     );
   }
 
+  const menuGroups = [
+    {
+      title: 'Account',
+      items: [
+        { icon: 'account-edit', label: 'Edit Profile', tint: colors.primaryLight, iconColor: colors.primary, onPress: handleEditUsername },
+        { icon: 'shield-check', label: 'KYC Verification', tint: colors.successLight, iconColor: colors.success, badge: 'Verified', onPress: null },
+        { icon: 'bank-outline', label: 'Bank Details', tint: colors.primaryLight, iconColor: colors.primary, onPress: handleEditMobileNumber },
+      ],
+    },
+    {
+      title: 'General',
+      items: [
+        { icon: 'information-outline', label: 'About Us', tint: '#ede9fe', iconColor: '#7c3aed', onPress: () => navigation.navigate('AboutUs') },
+        { icon: 'headset', label: 'Support', tint: '#fef3c7', iconColor: '#d97706', onPress: handleContactSupport },
+        { icon: 'file-document-outline', label: 'Terms & Privacy', tint: colors.muted, iconColor: colors.textSecondary, onPress: () => navigation.navigate('Terms') },
+      ],
+    },
+  ];
+
   return (
     <View style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Premium Profile Header */}
-        <View style={[styles.profileHeader, { paddingTop: insets.top }]}>
-          <View style={styles.avatarWrapper}>
-            <View style={styles.avatarRing}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{getInitial()}</Text>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Hero Banner */}
+        <View style={styles.heroBannerOuter}>
+          <LinearGradient
+            colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.heroBanner, { paddingTop: insets.top + 20 }]}
+          >
+            <View style={styles.heroBlobGold} />
+          </LinearGradient>
+
+          {/* Avatar overlapping */}
+          <View style={styles.avatarOuter}>
+            <LinearGradient
+              colors={['#E8D083', '#C89A30']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.avatarRing}
+            >
+              <View style={styles.avatarInner}>
+                <Text style={styles.avatarInitials}>{getInitials()}</Text>
               </View>
-            </View>
+            </LinearGradient>
           </View>
-          <Text style={styles.profileName}>{userData?.name || userData?.username || 'User'}</Text>
-          <Text style={styles.profilePhone}>
-            {userData?.mobileNumber || 'No mobile number'}
+        </View>
+
+        {/* Name & Info */}
+        <View style={styles.nameSection}>
+          <View style={styles.nameRow}>
+            <Text style={styles.profileName}>{userData?.name || userData?.username || 'User'}</Text>
+            <MaterialCommunityIcons name="check-decagram" size={18} color={colors.primary} />
+          </View>
+          <Text style={styles.profileMeta}>
+            {userData?.email || ''}{userData?.mobileNumber ? ' • ' + userData.mobileNumber : ''}
           </Text>
-          <View style={styles.profileEmailRow}>
-            <MaterialCommunityIcons name="email-outline" size={14} color={colors.textTertiary} />
-            <Text style={styles.profileEmail}>{userData?.email || 'No email'}</Text>
-          </View>
           {userData?.createdAt && (
-            <View style={styles.joinDateRow}>
-              <MaterialCommunityIcons name="calendar-outline" size={14} color={colors.textTertiary} />
-              <Text style={styles.joinDateText}>Joined {formatDate(userData.createdAt)}</Text>
-            </View>
+            <Text style={styles.joinDate}>Member since {formatDate(userData.createdAt)}</Text>
           )}
         </View>
 
-        {/* Account Details */}
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Account Details</Text>
-          
-          <View style={styles.detailItem}>
-            <View style={styles.detailIconWrapper}>
-              <MaterialCommunityIcons name="account" size={20} color={colors.primary} />
+        {/* Stats Row */}
+        <View style={styles.statsRow}>
+          {[
+            { label: 'Active Since', value: userData?.createdAt ? new Date(userData.createdAt).getFullYear().toString() : '–' },
+            { label: 'Status', value: 'Active' },
+            { label: 'KYC', value: 'Verified' },
+          ].map((s) => (
+            <View key={s.label} style={styles.statCard}>
+              <Text style={styles.statLabel}>{s.label}</Text>
+              <Text style={styles.statValue}>{s.value}</Text>
             </View>
-            <View style={styles.detailContent}>
-              <Text style={styles.detailLabel}>Username</Text>
-              <Text style={styles.detailValue}>{userData?.username || 'N/A'}</Text>
-            </View>
-            <TouchableOpacity onPress={handleEditUsername} style={styles.editButton}>
-              <MaterialCommunityIcons name="pencil" size={18} color={colors.primary} />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.detailDivider} />
-
-          <View style={styles.detailItem}>
-            <View style={[styles.detailIconWrapper, { backgroundColor: '#dbeafe' }]}>
-              <MaterialCommunityIcons name="phone" size={20} color={colors.info} />
-            </View>
-            <View style={styles.detailContent}>
-              <Text style={styles.detailLabel}>Mobile Number</Text>
-              <Text style={styles.detailValue}>{userData?.mobileNumber || 'N/A'}</Text>
-            </View>
-            <TouchableOpacity onPress={handleEditMobileNumber} style={styles.editButton}>
-              <MaterialCommunityIcons name="pencil" size={18} color={colors.info} />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.detailDivider} />
-
-          <View style={styles.detailItem}>
-            <View style={[styles.detailIconWrapper, { backgroundColor: '#fce7f3' }]}>
-              <MaterialCommunityIcons name="email" size={20} color="#ec4899" />
-            </View>
-            <View style={styles.detailContent}>
-              <Text style={styles.detailLabel}>Email</Text>
-              <Text style={styles.detailValue}>{userData?.email || 'N/A'}</Text>
-            </View>
-          </View>
-
-          <View style={styles.detailDivider} />
-
-          <View style={styles.detailItem}>
-            <View style={[styles.detailIconWrapper, { backgroundColor: colors.successLight }]}>
-              <MaterialCommunityIcons name="shield-check" size={20} color={colors.success} />
-            </View>
-            <View style={styles.detailContent}>
-              <Text style={styles.detailLabel}>Account Status</Text>
-              <Text style={[styles.detailValue, { color: colors.success }]}>Active</Text>
-            </View>
-          </View>
+          ))}
         </View>
 
-        {/* Options */}
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>More</Text>
+        {/* Menu Groups */}
+        <View style={styles.menuSection}>
+          {menuGroups.map((group) => (
+            <View key={group.title} style={styles.menuGroup}>
+              <Text style={styles.menuGroupLabel}>{group.title}</Text>
+              <View style={styles.menuCard}>
+                {group.items.map((item, i) => (
+                  <View key={item.label}>
+                    {i > 0 && <View style={styles.menuDivider} />}
+                    <TouchableOpacity
+                      style={styles.menuRow}
+                      activeOpacity={0.7}
+                      onPress={item.onPress}
+                      disabled={!item.onPress}
+                    >
+                      <View style={[styles.menuIconBox, { backgroundColor: item.tint }]}>
+                        <MaterialCommunityIcons name={item.icon} size={18} color={item.iconColor} />
+                      </View>
+                      <Text style={styles.menuLabel}>{item.label}</Text>
+                      {item.badge ? (
+                        <View style={styles.menuBadge}>
+                          <Text style={styles.menuBadgeText}>{item.badge}</Text>
+                        </View>
+                      ) : null}
+                      <MaterialCommunityIcons name="chevron-right" size={18} color={colors.textMuted} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ))}
 
-          <TouchableOpacity style={styles.optionItem} activeOpacity={0.7} onPress={() => navigation.navigate('AboutUs')}>
-            <View style={[styles.optionIconWrapper, { backgroundColor: '#ede9fe' }]}>
-              <MaterialCommunityIcons name="information" size={20} color="#7c3aed" />
+          {/* Logout */}
+          <TouchableOpacity style={styles.logoutCard} activeOpacity={0.85} onPress={handleLogout}>
+            <View style={styles.logoutIconBox}>
+              <MaterialCommunityIcons name="logout" size={18} color={colors.error} />
             </View>
-            <View style={styles.optionContent}>
-              <Text style={styles.optionTitle}>About Us</Text>
-              <Text style={styles.optionSubtitle}>Learn more about Growvest</Text>
-            </View>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textTertiary} />
+            <Text style={styles.logoutText}>Log out</Text>
           </TouchableOpacity>
 
-          <View style={styles.optionDivider} />
-
-          <TouchableOpacity style={styles.optionItem} activeOpacity={0.7} onPress={handleContactSupport}>
-            <View style={[styles.optionIconWrapper, { backgroundColor: '#fef3c7' }]}>
-              <MaterialCommunityIcons name="headset" size={20} color="#d97706" />
-            </View>
-            <View style={styles.optionContent}>
-              <Text style={styles.optionTitle}>Contact Support</Text>
-              <Text style={styles.optionSubtitle}>Get help with your account</Text>
-            </View>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textTertiary} />
-          </TouchableOpacity>
-
-          <View style={styles.optionDivider} />
-
-          <TouchableOpacity style={styles.optionItem} activeOpacity={0.7} onPress={() => navigation.navigate('Terms')}>
-            <View style={[styles.optionIconWrapper, { backgroundColor: '#f3f4f6' }]}>
-              <MaterialCommunityIcons name="file-document" size={20} color={colors.textSecondary} />
-            </View>
-            <View style={styles.optionContent}>
-              <Text style={styles.optionTitle}>Terms & Conditions</Text>
-              <Text style={styles.optionSubtitle}>Read our terms and conditions</Text>
-            </View>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textTertiary} />
-          </TouchableOpacity>
-
-          <View style={styles.optionDivider} />
-
-          <TouchableOpacity style={styles.optionItem} activeOpacity={0.7} onPress={() => navigation.navigate('Privacy')}>
-            <View style={[styles.optionIconWrapper, { backgroundColor: '#f3f4f6' }]}>
-              <MaterialCommunityIcons name="shield-account" size={20} color={colors.textSecondary} />
-            </View>
-            <View style={styles.optionContent}>
-              <Text style={styles.optionTitle}>Privacy Policy</Text>
-              <Text style={styles.optionSubtitle}>Read our privacy policy</Text>
-            </View>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textTertiary} />
-          </TouchableOpacity>
+          <Text style={styles.versionText}>Growvest v1.0.0</Text>
         </View>
 
-        {/* Logout */}
-        <TouchableOpacity style={styles.logoutButton} activeOpacity={0.85} onPress={handleLogout}>
-          <MaterialCommunityIcons name="logout" size={22} color={colors.error} />
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.versionText}>Growvest v1.0.0</Text>
-
-        <View style={{ height: 100 }} />
+        <View style={{ height: 110 }} />
       </ScrollView>
 
       {/* Edit Username Modal */}
-      <Modal
-        visible={editModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setEditModalVisible(false)}
-      >
+      <Modal visible={editModalVisible} transparent animationType="fade" onRequestClose={() => setEditModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Edit Username</Text>
-              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
-                <MaterialCommunityIcons name="close" size={24} color={colors.textSecondary} />
+              <TouchableOpacity onPress={() => setEditModalVisible(false)} style={styles.modalCloseBtn}>
+                <MaterialCommunityIcons name="close" size={18} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
-
-            <Text style={styles.modalLabel}>Username</Text>
+            <Text style={styles.modalInputLabel}>Username</Text>
             <TextInput
               style={styles.modalInput}
               value={newUsername}
               onChangeText={setNewUsername}
               placeholder="Enter new username"
-              placeholderTextColor={colors.textTertiary}
+              placeholderTextColor={colors.textMuted}
               autoCapitalize="none"
               autoFocus
             />
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.modalCancelBtn}
-                onPress={() => setEditModalVisible(false)}
-              >
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setEditModalVisible(false)}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalSaveBtn, savingUsername && styles.modalSaveBtnDisabled]}
+                style={[styles.modalSaveBtnOuter, savingUsername && styles.disabledOpacity]}
                 onPress={handleSaveUsername}
                 disabled={savingUsername}
               >
-                <Text style={styles.modalSaveText}>{savingUsername ? 'Saving...' : 'Save'}</Text>
+                <LinearGradient
+                  colors={['#0E3D23', '#1A5C39']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.modalSaveGradient}
+                >
+                  <Text style={styles.modalSaveText}>{savingUsername ? 'Saving...' : 'Save'}</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* Edit Mobile Number Modal */}
-      <Modal
-        visible={editMobileModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setEditMobileModalVisible(false)}
-      >
+      {/* Edit Mobile Modal */}
+      <Modal visible={editMobileModalVisible} transparent animationType="fade" onRequestClose={() => setEditMobileModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Edit Mobile Number</Text>
-              <TouchableOpacity onPress={() => setEditMobileModalVisible(false)}>
-                <MaterialCommunityIcons name="close" size={24} color={colors.textSecondary} />
+              <TouchableOpacity onPress={() => setEditMobileModalVisible(false)} style={styles.modalCloseBtn}>
+                <MaterialCommunityIcons name="close" size={18} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
-
-            <Text style={styles.modalLabel}>Mobile Number</Text>
+            <Text style={styles.modalInputLabel}>Mobile Number</Text>
             <TextInput
               style={styles.modalInput}
               value={newMobileNumber}
               onChangeText={setNewMobileNumber}
               placeholder="Enter new mobile number"
-              placeholderTextColor={colors.textTertiary}
+              placeholderTextColor={colors.textMuted}
               keyboardType="phone-pad"
               autoFocus
             />
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.modalCancelBtn}
-                onPress={() => setEditMobileModalVisible(false)}
-              >
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setEditMobileModalVisible(false)}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalSaveBtn, savingMobile && styles.modalSaveBtnDisabled]}
+                style={[styles.modalSaveBtnOuter, savingMobile && styles.disabledOpacity]}
                 onPress={handleSaveMobileNumber}
                 disabled={savingMobile}
               >
-                <Text style={styles.modalSaveText}>{savingMobile ? 'Saving...' : 'Save'}</Text>
+                <LinearGradient
+                  colors={['#0E3D23', '#1A5C39']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.modalSaveGradient}
+                >
+                  <Text style={styles.modalSaveText}>{savingMobile ? 'Saving...' : 'Save'}</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           </View>
@@ -405,281 +324,109 @@ const ProfileScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
+  container: { flex: 1, backgroundColor: colors.background },
+  scrollView: { flex: 1 },
+  scrollContent: { paddingBottom: 20 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { fontSize: 14, color: colors.textMuted, marginTop: 12 },
+
+  // Hero
+  heroBannerOuter: { position: 'relative', marginBottom: 60 },
+  heroBanner: { height: 160, borderBottomLeftRadius: 40, borderBottomRightRadius: 40, overflow: 'hidden' },
+  heroBlobGold: {
+    position: 'absolute', bottom: -30, right: -30,
+    width: 160, height: 160, borderRadius: 80,
+    backgroundColor: 'rgba(212,168,67,0.22)',
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 20,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.background,
-  },
-  loadingContent: {
-    alignItems: 'center',
-  },
-  loadingText: {
-    ...typography.body1,
-    color: colors.textTertiary,
-    marginTop: 12,
-  },
-  // Profile Header
-  profileHeader: {
-    alignItems: 'center',
-    paddingBottom: 24,
-    paddingHorizontal: 24,
-  },
-  avatarWrapper: {
-    marginBottom: 16,
-  },
+  avatarOuter: { position: 'absolute', bottom: -52, alignSelf: 'center' },
   avatarRing: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: colors.primaryLight,
-    justifyContent: 'center',
+    width: 100, height: 100, borderRadius: 28, padding: 3,
+    shadowColor: '#C89A30', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3, shadowRadius: 20, elevation: 12,
+  },
+  avatarInner: {
+    flex: 1, borderRadius: 24, backgroundColor: colors.surface,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  avatarInitials: { fontSize: 28, fontWeight: '800', color: colors.primary, letterSpacing: -0.5 },
+
+  // Name
+  nameSection: { alignItems: 'center', paddingHorizontal: 24, marginTop: 12 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  profileName: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: -0.5 },
+  profileMeta: { fontSize: 13, color: colors.textMuted, marginTop: 4, textAlign: 'center' },
+  joinDate: { fontSize: 12, color: colors.textMuted, marginTop: 4 },
+
+  // Stats
+  statsRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginTop: 20 },
+  statCard: {
+    flex: 1, backgroundColor: colors.surface, borderRadius: 18, padding: 12,
     alignItems: 'center',
-    ...colors.shadow.button,
+    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
-  avatar: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
+  statLabel: { fontSize: 10, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: '600' },
+  statValue: { fontSize: 15, fontWeight: '700', color: colors.text, marginTop: 4 },
+
+  // Menu
+  menuSection: { paddingHorizontal: 16, marginTop: 20 },
+  menuGroup: { marginBottom: 16 },
+  menuGroupLabel: {
+    fontSize: 11, fontWeight: '700', color: colors.textMuted,
+    textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, paddingHorizontal: 4,
   },
-  avatarText: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: colors.white,
+  menuCard: {
+    backgroundColor: colors.surface, borderRadius: 24, overflow: 'hidden',
+    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
-  profileName: {
-    ...typography.h2,
-    marginBottom: 4,
+  menuDivider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, opacity: 0.6, marginHorizontal: 16 },
+  menuRow: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
+  menuIconBox: { width: 36, height: 36, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  menuLabel: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text },
+  menuBadge: {
+    backgroundColor: colors.successLight, borderRadius: 999,
+    paddingHorizontal: 8, paddingVertical: 3,
   },
-  profilePhone: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  profileEmailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  profileEmail: {
-    fontSize: 14,
-    color: colors.textTertiary,
-    marginLeft: 6,
-  },
-  joinDateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  joinDateText: {
-    fontSize: 13,
-    color: colors.textTertiary,
-    marginLeft: 6,
-  },
-  // Sections
-  sectionCard: {
-    marginHorizontal: 16,
-    marginBottom: 12,
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    padding: 16,
-    ...colors.shadow.card,
-  },
-  sectionTitle: {
-    ...typography.h4,
-    marginBottom: 16,
-  },
-  // Detail Items
-  detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  detailIconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: colors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
-  detailContent: {
-    flex: 1,
-  },
-  detailLabel: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    fontWeight: '500',
-    marginBottom: 2,
-  },
-  detailValue: {
-    fontSize: 15,
-    color: colors.text,
-    fontWeight: '600',
-  },
-  detailDivider: {
-    height: 1,
-    backgroundColor: colors.borderLight,
-    marginVertical: 12,
-    marginLeft: 54,
-  },
-  // Option Items
-  optionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  optionIconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
-  optionContent: {
-    flex: 1,
-  },
-  optionTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 2,
-  },
-  optionSubtitle: {
-    fontSize: 13,
-    color: colors.textTertiary,
-  },
-  optionDivider: {
-    height: 1,
-    backgroundColor: colors.borderLight,
-    marginVertical: 12,
-    marginLeft: 54,
-  },
+  menuBadgeText: { fontSize: 10, fontWeight: '700', color: colors.success },
+
   // Logout
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 16,
-    marginTop: 8,
-    padding: 16,
-    backgroundColor: '#fef2f2',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#fecaca',
-    gap: 8,
+  logoutCard: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: colors.surface, borderRadius: 24,
+    padding: 16, gap: 12, marginBottom: 12,
+    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
-  logoutText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.error,
+  logoutIconBox: {
+    width: 36, height: 36, borderRadius: 12,
+    backgroundColor: colors.errorLight, justifyContent: 'center', alignItems: 'center',
   },
-  editButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  logoutText: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.error },
+  versionText: { textAlign: 'center', fontSize: 12, color: colors.textMuted, marginTop: 8 },
+
   // Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    width: '85%',
-    backgroundColor: colors.white,
-    borderRadius: 20,
-    padding: 24,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  modalLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 8,
-  },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { width: '88%', backgroundColor: colors.surface, borderRadius: 28, padding: 24 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 19, fontWeight: '700', color: colors.text, letterSpacing: -0.4 },
+  modalCloseBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.muted, justifyContent: 'center', alignItems: 'center' },
+  modalInputLabel: { fontSize: 13, fontWeight: '600', color: colors.text, marginBottom: 8 },
   modalInput: {
-    backgroundColor: colors.background,
-    borderRadius: 14,
-    height: 50,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    color: colors.text,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    marginBottom: 20,
+    backgroundColor: colors.background, borderRadius: 14, height: 50,
+    paddingHorizontal: 16, fontSize: 15, color: colors.text,
+    borderWidth: 1.5, borderColor: colors.border, marginBottom: 20,
   },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
+  modalBtns: { flexDirection: 'row', gap: 12 },
   modalCancelBtn: {
-    flex: 1,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: colors.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
+    flex: 1, height: 48, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border,
+    justifyContent: 'center', alignItems: 'center',
   },
-  modalCancelText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  modalSaveBtn: {
-    flex: 1,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalSaveBtnDisabled: {
-    opacity: 0.6,
-  },
-  modalSaveText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.white,
-  },
-  versionText: {
-    textAlign: 'center',
-    fontSize: 13,
-    color: colors.textTertiary,
-    marginTop: 16,
-  },
+  modalCancelText: { fontSize: 15, fontWeight: '600', color: colors.textSecondary },
+  modalSaveBtnOuter: { flex: 1 },
+  modalSaveGradient: { height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  modalSaveText: { fontSize: 15, fontWeight: '700', color: colors.white },
+  disabledOpacity: { opacity: 0.6 },
 });
 
 export default ProfileScreen;

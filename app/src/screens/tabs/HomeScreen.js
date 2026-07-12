@@ -11,10 +11,9 @@ import {
   Animated,
   Modal,
 } from 'react-native';
-import { Card, Button } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from '@react-navigation/native';
 import { dashboardService } from '../../services/dashboardService';
 import { authService } from '../../services/authService';
 import { colors, typography, spacing } from '../../theme/theme';
@@ -31,7 +30,7 @@ const HomeScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [userName, setUserName] = useState('');
   const [investModalVisible, setInvestModalVisible] = useState(false);
-  
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const fetchUserAndDashboard = async () => {
@@ -54,10 +53,10 @@ const HomeScreen = ({ navigation }) => {
       } catch (profileError) {
         console.warn('Could not refresh profile for home greeting:', profileError?.message || profileError);
       }
-      
+
       const data = await dashboardService.getDashboard();
       setDashboardData(data);
-      
+
       if (data?.user?.name || data?.user?.username) {
         setUserName(data?.user?.name || data?.user?.username);
       }
@@ -78,7 +77,7 @@ const HomeScreen = ({ navigation }) => {
   useEffect(() => {
     Animated.timing(fadeAnim, {
       toValue: 1,
-      duration: 600,
+      duration: 500,
       useNativeDriver: true,
     }).start();
   }, [dashboardData]);
@@ -92,42 +91,45 @@ const HomeScreen = ({ navigation }) => {
     return `₹${amount?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`;
   };
 
+  const getInitials = (name) => {
+    if (!name) return 'GV';
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return name.substring(0, 2).toUpperCase();
+  };
+
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <View style={styles.loadingContent}>
-          <MaterialCommunityIcons name="leaf" size={48} color={colors.primaryLight} />
-          <Text style={styles.loadingText}>Growvest</Text>
+      <LinearGradient
+        colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.loadingContainer}
+      >
+        <View style={styles.loadingIconWrapper}>
+          <MaterialCommunityIcons name="leaf" size={48} color="rgba(255,255,255,0.9)" />
         </View>
-      </View>
+        <Text style={styles.loadingTitle}>Growvest</Text>
+        <Text style={styles.loadingSubtitle}>Loading your dashboard...</Text>
+      </LinearGradient>
     );
   }
 
   const userData = dashboardData?.user;
   const balances = dashboardData?.balances;
   const pendingRequests = dashboardData?.stats?.pendingRequests || 0;
+  const displayName = userName || userData?.username || 'Investor';
+  const initials = getInitials(displayName);
+
+  const quickActions = [
+    { label: 'New Investment', icon: 'plus-circle', onPress: () => setInvestModalVisible(true) },
+    { label: 'My Investments', icon: 'briefcase', onPress: () => navigation.navigate('Investments') },
+    { label: 'Withdraw', icon: 'bank-transfer-out', onPress: () => navigation.navigate('Withdraw') },
+    { label: 'History', icon: 'receipt', onPress: () => navigation.navigate('Transactions') },
+  ];
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.greetingLabel}>Good Morning,</Text>
-          <Text style={styles.username} numberOfLines={1}>
-            {userName || userData?.username || 'Investor'}
-          </Text>
-        </View>
-        <TouchableOpacity
-          onPress={() => navigation.navigate('Profile')}
-          style={styles.avatarButton}
-        >
-          <View style={[styles.avatar, styles.avatarWithShadow]}>
-            <Text style={styles.avatarText}>
-              {(userName || userData?.username || 'U').charAt(0).toUpperCase()}
-            </Text>
-          </View>
-        </TouchableOpacity>
-      </View>
-
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -142,175 +144,179 @@ const HomeScreen = ({ navigation }) => {
         }
       >
         <Animated.View style={{ opacity: fadeAnim }}>
-          {/* Current Balance - Premium Hero Card */}
-          <View style={styles.balanceHeroContainer}>
+          {/* ── Header ── */}
+          <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+            <View style={styles.headerLeft}>
+              <LinearGradient
+                colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.avatarCircle}
+              >
+                <Text style={styles.avatarInitials}>{initials}</Text>
+              </LinearGradient>
+              <View style={styles.greetingStack}>
+                <Text style={styles.greetingLabel}>Good morning</Text>
+                <Text style={styles.greetingName} numberOfLines={1}>{displayName}</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.notifBtn}
+              onPress={() => navigation.navigate('Notifications')}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons name="bell-outline" size={22} color={colors.text} />
+              {pendingRequests > 0 && <View style={styles.notifDot} />}
+            </TouchableOpacity>
+          </View>
+
+          {/* ── Balance Card ── */}
+          <View style={styles.balanceCardOuter}>
             <LinearGradient
-              colors={['#064e3b', '#065f46', '#047857']}
+              colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.balanceHero}
+              style={styles.balanceCard}
             >
-              <View style={styles.balanceHeroInner}>
-                <View style={styles.balanceHeaderRow}>
-                  <Text style={styles.balanceLabel}>Total Balance</Text>
-                  <View style={styles.balanceBadge}>
-                    <MaterialCommunityIcons name="shield-check" size={12} color="rgba(255,255,255,0.9)" />
-                    <Text style={styles.balanceBadgeText}>Secure</Text>
+              {/* Ambient blobs */}
+              <View style={styles.blobTopRight} />
+              <View style={styles.blobBottomGold} />
+
+              <View style={styles.balanceCardInner}>
+                <View style={styles.balanceTopRow}>
+                  <Text style={styles.balanceLabelText}>Total Balance</Text>
+                  <View style={styles.eyeBtn}>
+                    <MaterialCommunityIcons name="eye-outline" size={16} color="rgba(255,255,255,0.9)" />
                   </View>
                 </View>
+
                 <Text style={styles.balanceAmount}>
                   {formatCurrency(balances?.totalBalance)}
                 </Text>
-                <View style={styles.balanceDivider} />
-                <View style={styles.balanceRow}>
-                  <View style={styles.balanceItem}>
-                    <View style={styles.balanceItemIcon}>
-                      <MaterialCommunityIcons name="piggy-bank-outline" size={20} color="rgba(255,255,255,0.9)" />
+                <View style={styles.balanceTrend}>
+                  <MaterialCommunityIcons name="trending-up" size={14} color={colors.gold} />
+                  <Text style={styles.balanceTrendText}>Growing your wealth</Text>
+                </View>
+
+                {/* Stats grid */}
+                <View style={styles.statsRow}>
+                  {[
+                    { icon: 'piggy-bank-outline', label: 'Savings', value: formatCurrency(balances?.savingBalance) },
+                    { icon: 'lock-outline', label: 'Fixed', value: formatCurrency(balances?.fixedBalance) },
+                    { icon: 'cash-multiple', label: 'Earnings', value: formatCurrency(balances?.totalInterest) },
+                  ].map((s) => (
+                    <View key={s.label} style={styles.statPill}>
+                      <MaterialCommunityIcons name={s.icon} size={16} color={colors.gold} />
+                      <Text style={styles.statLabel}>{s.label}</Text>
+                      <Text style={styles.statValue}>{s.value}</Text>
                     </View>
-                    <View style={styles.balanceItemText}>
-                      <Text style={styles.balanceItemLabel}>Saving</Text>
-                      <Text style={styles.balanceItemValue}>
-                        {formatCurrency(balances?.savingBalance)}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.balanceDividerVertical} />
-                  <View style={styles.balanceItem}>
-                    <View style={styles.balanceItemIcon}>
-                      <MaterialCommunityIcons name="lock-open-outline" size={20} color="rgba(255,255,255,0.9)" />
-                    </View>
-                    <View style={styles.balanceItemText}>
-                      <Text style={styles.balanceItemLabel}>Fixed</Text>
-                      <Text style={styles.balanceItemValue}>
-                        {formatCurrency(balances?.fixedBalance)}
-                      </Text>
-                    </View>
-                  </View>
+                  ))}
                 </View>
               </View>
             </LinearGradient>
           </View>
 
-          {/* Summary Cards */}
-          <View style={styles.summaryGrid}>
-            <View style={styles.summaryRow}>
-              <View style={[styles.summaryCard, styles.summaryCardPremium, { marginRight: 6 }]}>
-                <View style={[styles.summaryIconWrapper, { backgroundColor: '#dcfce7' }]}>
-                  <MaterialCommunityIcons name="cash-fast" size={24} color="#16a34a" />
-                </View>
-                <Text style={styles.summaryLabel}>Available to Withdraw</Text>
-                <Text style={[styles.summaryValue, { color: '#16a34a' }]}>
-                  {formatCurrency(balances?.availableToWithdraw)}
-                </Text>
-                <View style={styles.summaryTrend}>
-                  <MaterialCommunityIcons name="arrow-up-right" size={12} color="#16a34a" />
-                  <Text style={styles.summaryTrendText}>Ready</Text>
-                </View>
-              </View>
-              <View style={[styles.summaryCard, styles.summaryCardPremium, { marginLeft: 6 }]}>
-                <View style={[styles.summaryIconWrapper, { backgroundColor: '#dbeafe' }]}>
-                  <MaterialCommunityIcons name="chart-line-variant" size={24} color="#2563eb" />
-                </View>
-                <Text style={styles.summaryLabel}>Total Earnings</Text>
-                <Text style={[styles.summaryValue, { color: '#2563eb' }]}>
-                  {formatCurrency(balances?.totalInterest)}
-                </Text>
-                <View style={styles.summaryTrend}>
-                  <MaterialCommunityIcons name="trending-up" size={12} color="#2563eb" />
-                  <Text style={styles.summaryTrendText}>Growing</Text>
-                </View>
+          {/* ── Quick Actions ── */}
+          <View style={styles.section}>
+            <View style={styles.quickActionsGrid}>
+              {quickActions.map((a) => (
+                <TouchableOpacity
+                  key={a.label}
+                  style={styles.quickAction}
+                  onPress={a.onPress}
+                  activeOpacity={0.85}
+                >
+                  <View style={[styles.qaIconBox, a.label === 'New Investment' && styles.qaIconBoxPrimary]}>
+                    {a.label === 'New Investment' ? (
+                      <LinearGradient
+                        colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.qaIconGradient}
+                      >
+                        <MaterialCommunityIcons name={a.icon} size={22} color="#F8FAF9" />
+                      </LinearGradient>
+                    ) : (
+                      <View style={styles.qaIconSurface}>
+                        <MaterialCommunityIcons name={a.icon} size={22} color={colors.primary} />
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.qaLabel}>{a.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* ── Investment Summary ── */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Investment Summary</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Investments')} style={styles.viewAllBtn}>
+                <Text style={styles.viewAllText}>View all</Text>
+                <MaterialCommunityIcons name="chevron-right" size={15} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.summaryGrid}>
+              <LinearGradient
+                colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.summaryCard, styles.summaryCardAccent]}
+              >
+                <Text style={styles.summaryCardLabelLight}>Available</Text>
+                <Text style={styles.summaryCardValueLight}>{formatCurrency(balances?.availableToWithdraw)}</Text>
+                <Text style={styles.summaryCardTrendGold}>Ready to withdraw</Text>
+              </LinearGradient>
+              <View style={[styles.summaryCard, styles.summaryCardSurface]}>
+                <Text style={styles.summaryCardLabel}>Total Earned</Text>
+                <Text style={styles.summaryCardValue}>{formatCurrency(balances?.totalInterest)}</Text>
+                <Text style={styles.summaryCardTrend}>Interest & returns</Text>
               </View>
             </View>
-            
             {pendingRequests > 0 && (
-              <View style={[styles.pendingCard, styles.pendingCardPremium]}>
-                <View style={styles.pendingIconWrapper}>
-                  <MaterialCommunityIcons name="clock-outline" size={20} color={colors.warning} />
+              <View style={styles.pendingBanner}>
+                <View style={styles.pendingIconBox}>
+                  <MaterialCommunityIcons name="clock-outline" size={18} color={colors.warning} />
                 </View>
-                <View style={styles.pendingText}>
+                <View style={styles.pendingContent}>
                   <Text style={styles.pendingLabel}>Pending Requests</Text>
-                  <Text style={styles.pendingCount}>{pendingRequests}</Text>
+                  <Text style={styles.pendingCount}>{pendingRequests} awaiting</Text>
                 </View>
-                <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textTertiary} />
+                <MaterialCommunityIcons name="chevron-right" size={18} color={colors.textMuted} />
               </View>
             )}
           </View>
 
-          {/* Badges */}
-          <View style={styles.badgesContainer}>
-            <View style={[styles.badge, { backgroundColor: colors.savingLight }]}>
-              <MaterialCommunityIcons name="piggy-bank" size={18} color={colors.saving} />
-              <Text style={[styles.badgeText, { color: colors.saving }]}>Saving - 12% p.a.</Text>
-            </View>
-            <View style={[styles.badge, { backgroundColor: colors.fixedLight }]}>
-              <MaterialCommunityIcons name="lock" size={18} color={colors.fixed} />
-              <Text style={[styles.badgeText, { color: colors.fixed }]}>Fixed - 24% p.a.</Text>
-            </View>
-          </View>
-
-          {/* Quick Actions */}
-          <View style={styles.quickActionsSection}>
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
-            <View style={styles.quickActionsGrid}>
-              <TouchableOpacity
-                style={styles.quickAction}
-                activeOpacity={0.85}
-                onPress={() => setInvestModalVisible(true)}
-              >
+          {/* ── Tip Card ── */}
+          <View style={[styles.section, { marginBottom: 4 }]}>
+            <View style={styles.tipCard}>
+              <View style={styles.tipAmbient} />
+              <View style={styles.tipInner}>
                 <LinearGradient
-                  colors={['#064e3b', '#065f46']}
+                  colors={['#E8D083', '#C89A30']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={styles.quickActionGradient}
+                  style={styles.tipIconBox}
                 >
-                  <MaterialCommunityIcons name="chart-line-variant" size={28} color={colors.white} />
+                  <MaterialCommunityIcons name="lightbulb-on-outline" size={20} color={colors.goldFg} />
                 </LinearGradient>
-                <Text style={styles.quickActionTitle}>Invest Now</Text>
-                <Text style={styles.quickActionSub}>Start earning</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.quickAction}
-                activeOpacity={0.85}
-                onPress={() => navigation.navigate('Withdraw')}
-              >
-                <LinearGradient
-                  colors={['#047857', '#059669']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.quickActionGradient}
-                >
-                  <MaterialCommunityIcons name="cash-fast" size={28} color={colors.white} />
-                </LinearGradient>
-                <Text style={styles.quickActionTitle}>Withdraw</Text>
-                <Text style={styles.quickActionSub}>Access funds</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.quickAction}
-                activeOpacity={0.85}
-                onPress={() => navigation.navigate('Transactions')}
-              >
-                <LinearGradient
-                  colors={['#1e40af', '#2563eb']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.quickActionGradient}
-                >
-                  <MaterialCommunityIcons name="history" size={28} color={colors.white} />
-                </LinearGradient>
-                <Text style={styles.quickActionTitle}>History</Text>
-                <Text style={styles.quickActionSub}>Transactions</Text>
-              </TouchableOpacity>
+                <View style={styles.tipText}>
+                  <Text style={styles.tipCategory}>Tip of the day</Text>
+                  <Text style={styles.tipTitle}>Ladder your Fixed Deposits</Text>
+                  <Text style={styles.tipBody}>
+                    Split your FD into multiple tenures to balance liquidity and higher yields.
+                  </Text>
+                </View>
+              </View>
             </View>
           </View>
 
-          {/* Bottom spacer for tab bar */}
-          <View style={{ height: 100 }} />
+          <View style={{ height: 110 }} />
         </Animated.View>
       </ScrollView>
 
-      {/* Invest Now Modal */}
+      {/* ── Invest Now Modal ── */}
       <Modal
         visible={investModalVisible}
         transparent
@@ -322,88 +328,43 @@ const HomeScreen = ({ navigation }) => {
           activeOpacity={1}
           onPress={() => setInvestModalVisible(false)}
         >
-          <View style={styles.modalContent} activeOpacity={1}>
+          <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Invest Now</Text>
-              <TouchableOpacity onPress={() => setInvestModalVisible(false)}>
-                <MaterialCommunityIcons name="close" size={24} color={colors.textSecondary} />
+              <TouchableOpacity onPress={() => setInvestModalVisible(false)} style={styles.modalCloseBtn}>
+                <MaterialCommunityIcons name="close" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity
-              style={styles.modalOption}
-              activeOpacity={0.85}
-              onPress={() => {
-                setInvestModalVisible(false);
-                navigation.navigate('InvestmentAmount');
-              }}
-            >
-              <LinearGradient
-                colors={['#064e3b', '#065f46']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.modalOptionGradient}
+            {[
+              { icon: 'chart-line-variant', label: 'New Investment', sub: 'Start a new deposit', colors: ['#0E3D23', '#1A5C39'], screen: 'InvestmentAmount' },
+              { icon: 'account-cash', label: 'My Investments', sub: 'View your deposits', colors: ['#1A5C39', '#2E8B5A'], screen: 'Investments' },
+              { icon: 'cash-multiple', label: 'Chit Fund', sub: 'Join a savings community', colors: ['#0E3D23', '#1A5C39'], screen: 'ChitFundHome' },
+            ].map((opt) => (
+              <TouchableOpacity
+                key={opt.label}
+                style={styles.modalOption}
+                activeOpacity={0.85}
+                onPress={() => {
+                  setInvestModalVisible(false);
+                  navigation.navigate(opt.screen);
+                }}
               >
-                <MaterialCommunityIcons name="chart-line-variant" size={32} color={colors.white} />
-              </LinearGradient>
-              <View style={styles.modalOptionText}>
-                <Text style={styles.modalOptionTitle}>New Investment</Text>
-                <Text style={styles.modalOptionSub}>Start a new deposit</Text>
-              </View>
-              <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.modalOption}
-              activeOpacity={0.85}
-              onPress={() => {
-                setInvestModalVisible(false);
-                navigation.navigate('Investments');
-              }}
-            >
-              <LinearGradient
-                colors={['#047857', '#059669']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.modalOptionGradient}
-              >
-                <MaterialCommunityIcons name="account-cash" size={32} color={colors.white} />
-              </LinearGradient>
-              <View style={styles.modalOptionText}>
-                <Text style={styles.modalOptionTitle}>My Investments</Text>
-                <Text style={styles.modalOptionSub}>View your deposits</Text>
-              </View>
-              <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
-            </TouchableOpacity>
-
-            <View style={styles.modalDivider}>
-              <View style={styles.modalDividerLine} />
-              <Text style={styles.modalDividerText}>New</Text>
-              <View style={styles.modalDividerLine} />
-            </View>
-
-            <TouchableOpacity
-              style={styles.modalOption}
-              activeOpacity={0.85}
-              onPress={() => {
-                setInvestModalVisible(false);
-                navigation.navigate('ChitFundHome');
-              }}
-            >
-              <LinearGradient
-                colors={['#7c3aed', '#8b5cf6']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.modalOptionGradient}
-              >
-                <MaterialCommunityIcons name="cash-multiple" size={32} color={colors.white} />
-              </LinearGradient>
-              <View style={styles.modalOptionText}>
-                <Text style={styles.modalOptionTitle}>Chit Fund</Text>
-                <Text style={styles.modalOptionSub}>Join a savings community</Text>
-              </View>
-              <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
-            </TouchableOpacity>
+                <LinearGradient
+                  colors={opt.colors}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.modalOptionGradient}
+                >
+                  <MaterialCommunityIcons name={opt.icon} size={26} color={colors.white} />
+                </LinearGradient>
+                <View style={styles.modalOptionText}>
+                  <Text style={styles.modalOptionTitle}>{opt.label}</Text>
+                  <Text style={styles.modalOptionSub}>{opt.sub}</Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textMuted} />
+              </TouchableOpacity>
+            ))}
           </View>
         </TouchableOpacity>
       </Modal>
@@ -412,397 +373,211 @@ const HomeScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
+  container: { flex: 1, backgroundColor: colors.background },
+  scrollView: { flex: 1 },
+  scrollContent: { paddingBottom: 20 },
+
+  // Loading
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingIconWrapper: {
+    width: 96, height: 96, borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center', alignItems: 'center', marginBottom: 20,
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 20,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.background,
-  },
-  loadingContent: {
-    alignItems: 'center',
-  },
-  loadingText: {
-    ...typography.h2,
-    color: colors.primary,
-    marginTop: 12,
-  },
+  loadingTitle: { fontSize: 36, fontWeight: '800', color: '#F8FAF9', letterSpacing: -1 },
+  loadingSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.6)', marginTop: 8 },
+
+  // Header
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingBottom: 8,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
     backgroundColor: colors.background,
-    zIndex: 1,
   },
-  headerLeft: {
-    flex: 1,
-    marginRight: 16,
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  avatarCircle: {
+    width: 44, height: 44, borderRadius: 22,
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#1A5C39', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3, shadowRadius: 10, elevation: 8,
   },
-  greetingLabel: {
-    fontSize: 15,
-    color: colors.textSecondary,
-    marginBottom: 2,
+  avatarInitials: { fontSize: 16, fontWeight: '700', color: '#F8FAF9' },
+  greetingStack: { flex: 1 },
+  greetingLabel: { fontSize: 12, color: colors.textMuted, fontWeight: '500' },
+  greetingName: { fontSize: 15, fontWeight: '700', color: colors.text, letterSpacing: -0.3 },
+  notifBtn: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: colors.surface,
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
-  username: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: colors.text,
-    letterSpacing: -0.3,
+  notifDot: {
+    position: 'absolute', top: 10, right: 10,
+    width: 8, height: 8, borderRadius: 4,
+    backgroundColor: colors.error,
+    borderWidth: 2, borderColor: colors.surface,
   },
-  avatarButton: {
-    padding: 2,
+
+  // Balance Card
+  balanceCardOuter: { marginHorizontal: 20, marginBottom: 8 },
+  balanceCard: {
+    borderRadius: 28, overflow: 'hidden',
+    shadowColor: '#1A5C39', shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.28, shadowRadius: 40, elevation: 20,
   },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...colors.shadow.button,
+  blobTopRight: {
+    position: 'absolute', top: -40, right: -40,
+    width: 160, height: 160, borderRadius: 80,
+    backgroundColor: 'rgba(255,255,255,0.07)',
   },
-  avatarWithShadow: {
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+  blobBottomGold: {
+    position: 'absolute', bottom: -20, right: 20,
+    width: 120, height: 120, borderRadius: 60,
+    backgroundColor: 'rgba(212,168,67,0.18)',
   },
-  avatarText: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.white,
-  },
-  // Balance Hero Card
-  balanceHeroContainer: {
-    paddingHorizontal: 20,
-    marginTop: 16,
-    marginBottom: 4,
-  },
-  balanceHero: {
-    borderRadius: 24,
-    overflow: 'hidden',
-    ...colors.shadow.elevated,
-  },
-  balanceHeroInner: {
-    padding: 24,
-  },
-  balanceLabel: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.85)',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  balanceHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  balanceBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  balanceCardInner: { padding: 24 },
+  balanceTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  balanceLabelText: { fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
+  eyeBtn: {
+    width: 32, height: 32, borderRadius: 16,
     backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
+    justifyContent: 'center', alignItems: 'center',
   },
-  balanceBadgeText: {
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.9)',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+  balanceAmount: { fontSize: 38, fontWeight: '800', color: '#F8FAF9', letterSpacing: -1.5, marginTop: 12 },
+  balanceTrend: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  balanceTrendText: { fontSize: 12, color: colors.gold, fontWeight: '600' },
+  statsRow: { flexDirection: 'row', gap: 8, marginTop: 20 },
+  statPill: {
+    flex: 1, backgroundColor: 'rgba(255,255,255,0.10)',
+    borderRadius: 16, padding: 12, gap: 4,
   },
-  balanceAmount: {
-    fontSize: 42,
-    fontWeight: '800',
-    color: colors.white,
-    letterSpacing: -1.5,
-    marginBottom: 24,
-  },
-  balanceDivider: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    marginBottom: 20,
-  },
-  balanceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  balanceItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  balanceItemIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  balanceItemText: {
-    flex: 1,
-  },
-  balanceItemLabel: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.75)',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginBottom: 2,
-  },
-  balanceItemValue: {
-    fontSize: 18,
-    color: colors.white,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-  },
-  balanceDividerVertical: {
-    width: 1,
-    height: 40,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    marginHorizontal: 16,
-  },
-  // Summary Cards
-  summaryGrid: {
-    paddingHorizontal: 20,
-    marginTop: 8,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    marginBottom: 4,
-  },
-  summaryCard: {
-    flex: 1,
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    padding: 16,
-    ...colors.shadow.card,
-  },
-  summaryCardPremium: {
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-  },
-  summaryIconWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  summaryLabel: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    fontWeight: '600',
-    marginBottom: 6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  summaryValue: {
-    fontSize: 22,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-    marginBottom: 8,
-  },
-  summaryTrend: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  summaryTrendText: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  pendingCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.warningLight,
-    borderRadius: 16,
-    padding: 16,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: '#fde68a',
-  },
-  pendingCardPremium: {
-    backgroundColor: '#fffbeb',
-    borderColor: '#fcd34d',
-  },
-  pendingIconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#fef3c7',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  pendingText: {
-    flex: 1,
-  },
-  pendingLabel: {
-    fontSize: 14,
-    color: colors.warning,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  pendingCount: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: colors.warning,
-  },
-  // Badges
-  badgesContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginTop: 12,
-    gap: 10,
-  },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-    flex: 1,
-  },
-  badgeText: {
-    marginLeft: 8,
-    fontSize: 12,
-    fontWeight: '700',
-  },
+  statLabel: { fontSize: 10, color: 'rgba(255,255,255,0.65)', textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: '600' },
+  statValue: { fontSize: 13, fontWeight: '700', color: '#F8FAF9', letterSpacing: -0.3 },
+
+  // Section
+  section: { paddingHorizontal: 20, marginTop: 24 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text, letterSpacing: -0.3 },
+  viewAllBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  viewAllText: { fontSize: 13, fontWeight: '600', color: colors.primary },
+
   // Quick Actions
-  quickActionsSection: {
-    paddingHorizontal: 20,
-    marginTop: 24,
+  quickActionsGrid: { flexDirection: 'row', justifyContent: 'space-between' },
+  quickAction: { alignItems: 'center', gap: 8, flex: 1 },
+  qaIconBox: { width: 56, height: 56 },
+  qaIconBoxPrimary: {},
+  qaIconGradient: {
+    width: 56, height: 56, borderRadius: 18,
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#1A5C39', shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25, shadowRadius: 12, elevation: 8,
   },
-  sectionTitle: {
-    ...typography.h4,
-    marginBottom: 16,
+  qaIconSurface: {
+    width: 56, height: 56, borderRadius: 18,
+    backgroundColor: colors.surface,
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
+  qaLabel: { fontSize: 11, fontWeight: '600', color: colors.text, textAlign: 'center', lineHeight: 14 },
+
+  // Summary Cards
+  summaryGrid: { flexDirection: 'row', gap: 12 },
+  summaryCard: { flex: 1, borderRadius: 20, padding: 16 },
+  summaryCardAccent: {
+    shadowColor: '#1A5C39', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2, shadowRadius: 20, elevation: 10,
   },
-  quickAction: {
-    flex: 1,
-    alignItems: 'center',
+  summaryCardSurface: {
+    backgroundColor: colors.surface,
+    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
-  quickActionGradient: {
-    width: 60,
-    height: 60,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-    ...colors.shadow.button,
+  summaryCardLabelLight: { fontSize: 10, color: 'rgba(255,255,255,0.7)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8 },
+  summaryCardValueLight: { fontSize: 20, fontWeight: '800', color: '#F8FAF9', letterSpacing: -0.5, marginTop: 6 },
+  summaryCardTrendGold: { fontSize: 10, color: colors.gold, fontWeight: '600', marginTop: 4 },
+  summaryCardLabel: { fontSize: 10, color: colors.textMuted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8 },
+  summaryCardValue: { fontSize: 20, fontWeight: '800', color: colors.text, letterSpacing: -0.5, marginTop: 6 },
+  summaryCardTrend: { fontSize: 10, color: colors.success, fontWeight: '600', marginTop: 4 },
+
+  // Pending Banner
+  pendingBanner: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: colors.warningLight, borderRadius: 16,
+    padding: 14, marginTop: 12,
+    borderWidth: 1, borderColor: '#FDEBC4',
   },
-  quickActionTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 2,
+  pendingIconBox: {
+    width: 36, height: 36, borderRadius: 12,
+    backgroundColor: '#FEF3C2', justifyContent: 'center', alignItems: 'center',
+    marginRight: 12,
   },
-  quickActionSub: {
-    fontSize: 11,
-    color: colors.textTertiary,
-    fontWeight: '500',
+  pendingContent: { flex: 1 },
+  pendingLabel: { fontSize: 13, fontWeight: '600', color: colors.warning },
+  pendingCount: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+
+  // Tip Card
+  tipCard: {
+    backgroundColor: colors.surface, borderRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
+  tipAmbient: {
+    position: 'absolute', top: -20, right: -20,
+    width: 100, height: 100, borderRadius: 50,
+    backgroundColor: 'rgba(212,168,67,0.12)',
+  },
+  tipInner: { flexDirection: 'row', alignItems: 'flex-start', padding: 20, gap: 14 },
+  tipIconBox: {
+    width: 44, height: 44, borderRadius: 14,
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#C89A30', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2, shadowRadius: 8, elevation: 6,
+  },
+  tipText: { flex: 1 },
+  tipCategory: { fontSize: 10, color: colors.gold, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
+  tipTitle: { fontSize: 15, fontWeight: '700', color: colors.text, letterSpacing: -0.3, marginTop: 4 },
+  tipBody: { fontSize: 13, color: colors.textMuted, lineHeight: 18, marginTop: 4 },
+
   // Modal
   modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.52)',
+    justifyContent: 'center', alignItems: 'center',
   },
   modalContent: {
-    width: '85%',
-    backgroundColor: colors.white,
-    borderRadius: 24,
-    padding: 24,
-    ...colors.shadow.elevated,
+    width: '88%', backgroundColor: colors.surface,
+    borderRadius: 28, padding: 24,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 24 },
+    shadowOpacity: 0.2, shadowRadius: 48, elevation: 30,
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', marginBottom: 20,
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.text,
+  modalTitle: { fontSize: 20, fontWeight: '700', color: colors.text, letterSpacing: -0.5 },
+  modalCloseBtn: {
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: colors.muted,
+    justifyContent: 'center', alignItems: 'center',
   },
   modalOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.background,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: colors.background, borderRadius: 18,
+    padding: 14, marginBottom: 10,
+    borderWidth: 1, borderColor: colors.borderLight,
+    gap: 14,
   },
   modalOptionGradient: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
+    width: 52, height: 52, borderRadius: 16,
+    justifyContent: 'center', alignItems: 'center',
   },
-  modalOptionText: {
-    flex: 1,
-  },
-  modalOptionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 2,
-  },
-  modalOptionSub: {
-    fontSize: 13,
-    color: colors.textTertiary,
-  },
-  modalDivider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 16,
-    gap: 12,
-  },
-  modalDividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.borderLight,
-  },
-  modalDividerText: {
-    fontSize: 11,
-    color: colors.textTertiary,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
+  modalOptionText: { flex: 1 },
+  modalOptionTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
+  modalOptionSub: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
 });
 
 export default HomeScreen;
