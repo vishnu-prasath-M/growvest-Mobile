@@ -55,6 +55,15 @@ router.patch('/join/:id/status', protect, admin, chitAdminController.updateJoinS
 // Admin: create chit
 router.post('/', protect, admin, chitAdminController.createChit);
 
+// Admin: update chit
+router.put('/:id', protect, admin, chitAdminController.updateChit);
+
+// Admin: change chit status (pause, resume, close, archive)
+router.patch('/:id/status', protect, admin, chitAdminController.changeChitStatus);
+
+// Admin: delete chit
+router.delete('/:id', protect, admin, chitAdminController.deleteChit);
+
 // ─────────────────────────────────────────────
 // PUBLIC / GENERAL ROUTES
 // ─────────────────────────────────────────────

@@ -2,6 +2,7 @@ const Chit = require('../models/Chit');
 const ChitMember = require('../models/ChitMember');
 const ChitPayment = require('../models/ChitPayment');
 const Transaction = require('../models/Transaction');
+const User = require('../models/User');
 const { sendToUser } = require('../services/pushNotificationService');
 
 // @desc    Get pending chit payments for admin approval
@@ -121,13 +122,13 @@ const updatePaymentStatus = async (req, res) => {
       if (status === 'paid') {
         await sendToUser(payment.userId, {
           title: '\uD83C\uDF89 Good News!',
-          body: 'Your Chit Fund payment has been approved successfully.',
+          body: 'Your Chit payment has been approved successfully.',
           data: { type: 'chit_payment_approved', screen: 'ChitFundHome' },
         });
       } else if (status === 'rejected') {
         await sendToUser(payment.userId, {
-          title: 'Payment Update',
-          body: 'Your Chit Fund payment could not be verified. Please contact support.',
+          title: '\u274C Payment Rejected',
+          body: 'Your payment could not be verified. Please upload a clearer payment screenshot.',
           data: { type: 'chit_payment_rejected', screen: 'ChitFundHome' },
         });
       }
@@ -199,8 +200,8 @@ const updateJoinStatus = async (req, res) => {
     try {
       if (status === 'approved') {
         await sendToUser(member.userId, {
-          title: '\uD83C\uDF89 Welcome to the Chit!',
-          body: `You have been approved to join ${member.chitId?.name || 'the chit fund'}. Your membership is now active.`,
+          title: '\uD83C\uDF89 Congratulations!',
+          body: 'Your Chit membership has been approved.',
           data: { type: 'chit_join_approved', screen: 'MyChits' },
         });
       } else {
@@ -240,12 +241,77 @@ const getAllChits = async (req, res) => {
 const createChit = async (req, res) => {
   try {
     const chit = await Chit.create(req.body);
+    // Notify all users about new chit
+    try {
+      const users = await User.find({ role: 'user' });
+      for (const u of users) {
+        await sendToUser(u._id, {
+          title: '🆕 New Chit Available',
+          body: 'A new Chit Plan has been added. Explore and join now!',
+          data: { type: 'new_chit', screen: 'ExploreChits' },
+        });
+      }
+    } catch (notifErr) {
+      console.warn('Push notification failed (non-fatal):', notifErr.message);
+    }
     res.status(201).json(chit);
   } catch (error) {
     console.error('Error creating chit:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+// @desc    Update a chit
+// @route   PUT /api/chits/:id
+// @access  Private/Admin
+const updateChit = async (req, res) => {
+  try {
+    const chit = await Chit.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!chit) return res.status(404).json({ message: 'Chit not found' });
+    res.json(chit);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Delete a chit
+// @route   DELETE /api/chits/:id
+// @access  Private/Admin
+const deleteChit = async (req, res) => {
+  try {
+    const chit = await Chit.findById(req.params.id);
+    if (!chit) return res.status(404).json({ message: 'Chit not found' });
+    
+    // Check if it has members
+    const members = await ChitMember.countDocuments({ chitId: chit._id });
+    if (members > 0) {
+      return res.status(400).json({ message: 'Cannot delete chit with existing members' });
+    }
+
+    await chit.deleteOne();
+    res.json({ message: 'Chit deleted' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Change chit status (pause, resume, close, archive)
+// @route   PATCH /api/chits/:id/status
+// @access  Private/Admin
+const changeChitStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!['upcoming', 'active', 'completed', 'closed', 'paused', 'archived'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status' });
+    }
+    const chit = await Chit.findByIdAndUpdate(req.params.id, { status }, { new: true });
+    if (!chit) return res.status(404).json({ message: 'Chit not found' });
+    res.json(chit);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 
 // @desc    Get chit dashboard overview for admin
 // @route   GET /api/chits/overview
@@ -286,5 +352,8 @@ module.exports = {
   updateJoinStatus,
   getAllChits,
   createChit,
+  updateChit,
+  deleteChit,
+  changeChitStatus,
   getOverview,
 };

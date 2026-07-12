@@ -32,7 +32,7 @@ const ExploreChitsScreen = ({ navigation }) => {
 
   const fetchChits = async () => {
     try {
-      const data = await chitFundService.getAllChits();
+      const data = await chitFundService.getChits();
       setChits(data);
     } catch (error) {
       console.error('Error fetching chits:', error);
