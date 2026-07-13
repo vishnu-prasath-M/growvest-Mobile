@@ -32,7 +32,7 @@ const chitSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['upcoming', 'active', 'completed', 'closed'],
+    enum: ['upcoming', 'active', 'completed', 'closed', 'paused', 'archived'],
     default: 'upcoming',
   },
   processingFee: {

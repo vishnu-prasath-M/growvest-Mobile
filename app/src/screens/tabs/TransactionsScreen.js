@@ -76,10 +76,24 @@ const TransactionsScreen = ({ navigation }) => {
     return map[status] || 'Pending';
   };
 
+  const getTransactionLabel = (type) => {
+    const map = {
+      investment: 'Investment Deposit',
+      chit_join: 'Chit Fund Join',
+      chit_payment: 'Chit Fund Payment',
+      withdrawal: 'Withdrawal',
+    };
+    return map[type] || type;
+  };
+
+  const isInvestmentType = (type) => {
+    return ['investment', 'chit_join', 'chit_payment'].includes(type);
+  };
+
   const filteredTxns = transactions.filter((tx) => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
-    const label = tx.type === 'investment' ? 'investment deposit' : 'withdrawal';
+    const label = getTransactionLabel(tx.type);
     return label.includes(q) || formatDate(tx.createdAt).toLowerCase().includes(q);
   });
 
@@ -151,8 +165,9 @@ const TransactionsScreen = ({ navigation }) => {
                 <Text style={styles.groupLabel}>{group.date}</Text>
                 <View style={styles.groupCard}>
                   {group.items.map((tx, i) => {
-                    const isInvestment = tx.type === 'investment';
+                    const isInvestment = isInvestmentType(tx.type);
                     const statusLabel = getStatusLabel(tx.status);
+                    const txLabel = getTransactionLabel(tx.type);
                     return (
                       <View key={tx._id}>
                         {i > 0 && <View style={styles.rowDivider} />}
@@ -166,7 +181,7 @@ const TransactionsScreen = ({ navigation }) => {
                           </View>
                           <View style={styles.txInfo}>
                             <Text style={styles.txTitle} numberOfLines={1}>
-                              {isInvestment ? 'Investment Deposit' : 'Withdrawal'}
+                              {txLabel}
                             </Text>
                             <Text style={styles.txSub}>{formatDate(tx.createdAt)}</Text>
                           </View>

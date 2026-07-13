@@ -32,9 +32,11 @@ const kycRoutes = require('./routes/kycRoutes');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+// FIX 1: Increase JSON body limit to 50mb to handle base64 image uploads for KYC
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/zenvest-dummy';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://vishnuprasath:8925699005@grow-clust.bynj9dx.mongodb.net/growvest?appName=Grow-Clust';
 
 // Fix for Node.js DNS SRV lookup issues on Windows
 const dns = require('dns');

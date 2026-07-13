@@ -36,6 +36,7 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     console.error('[apiService] Response error:', error?.message || error, 'Status:', error.response?.status);
+    console.error('[apiService] Error response data:', error.response?.data);
     
     if (error.response?.status === 401) {
       // Token expired or invalid, clear storage

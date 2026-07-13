@@ -56,7 +56,8 @@ const JoinChitScreen = ({ navigation, route }) => {
       });
     } catch (error) {
       console.error('Error joining chit:', error);
-      Alert.alert('Error', error.message || 'Failed to join chit fund');
+      console.error('Error response:', error.response?.data);
+      Alert.alert('Error', error.response?.data?.message || error.message || 'Failed to join chit fund');
       setShowConfirm(false);
     } finally {
       setProcessing(false);

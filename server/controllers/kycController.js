@@ -10,44 +10,55 @@ exports.submitKYC = async (req, res) => {
   try {
     const userId = req.user._id || req.user.id;
     
+    console.log('[KYC Submit] User ID:', userId);
+    console.log('[KYC Submit] Request body keys:', Object.keys(req.body));
+    console.log('[KYC Submit] Body size:', JSON.stringify(req.body).length, 'bytes');
+    
     // Check if KYC already exists
     const existingKYC = await KYC.findOne({ userId });
     if (existingKYC && existingKYC.status === 'approved') {
       return res.status(400).json({ message: 'KYC already approved' });
     }
     
+    // Validate required text fields
+    if (!req.body.fullName || !req.body.aadhaarNumber || !req.body.panNumber) {
+      return res.status(400).json({ message: 'Missing required fields: fullName, aadhaarNumber, panNumber' });
+    }
+    
     const kycData = {
       userId,
-      fullName: req.body.fullName,
-      fatherOrHusbandName: req.body.fatherOrHusbandName,
-      dob: req.body.dob,
-      gender: req.body.gender,
-      address: req.body.address,
-      city: req.body.city,
-      district: req.body.district,
-      state: req.body.state,
-      pincode: req.body.pincode,
-      aadhaarNumber: req.body.aadhaarNumber,
-      panNumber: req.body.panNumber,
-      occupation: req.body.occupation,
-      nomineeName: req.body.nomineeName,
-      nomineeRelationship: req.body.nomineeRelationship,
-      nomineeMobileNumber: req.body.nomineeMobileNumber,
-      accountHolderName: req.body.accountHolderName,
-      bankName: req.body.bankName,
-      accountNumber: req.body.accountNumber,
-      confirmAccountNumber: req.body.confirmAccountNumber,
-      ifscCode: req.body.ifscCode,
-      branchName: req.body.branchName,
-      upiId: req.body.upiId,
-      aadhaarFrontImage: req.body.aadhaarFrontImage,
-      aadhaarBackImage: req.body.aadhaarBackImage,
-      panImage: req.body.panImage,
-      profilePhoto: req.body.profilePhoto,
+      fullName: req.body.fullName || '',
+      fatherOrHusbandName: req.body.fatherOrHusbandName || '',
+      dob: req.body.dob ? new Date(req.body.dob) : null,
+      gender: req.body.gender || '',
+      address: req.body.address || '',
+      city: req.body.city || '',
+      district: req.body.district || '',
+      state: req.body.state || '',
+      pincode: req.body.pincode || '',
+      aadhaarNumber: req.body.aadhaarNumber || '',
+      panNumber: req.body.panNumber || '',
+      occupation: req.body.occupation || '',
+      nomineeName: req.body.nomineeName || '',
+      nomineeRelationship: req.body.nomineeRelationship || '',
+      nomineeMobileNumber: req.body.nomineeMobileNumber || '',
+      accountHolderName: req.body.accountHolderName || '',
+      bankName: req.body.bankName || '',
+      accountNumber: req.body.accountNumber || '',
+      confirmAccountNumber: req.body.confirmAccountNumber || '',
+      ifscCode: req.body.ifscCode || '',
+      branchName: req.body.branchName || '',
+      upiId: req.body.upiId || '',
+      // Store base64 images directly (they are already base64 strings from the app)
+      aadhaarFrontImage: req.body.aadhaarFrontImage || '',
+      aadhaarBackImage: req.body.aadhaarBackImage || '',
+      panImage: req.body.panImage || '',
+      profilePhoto: req.body.profilePhoto || '',
       status: 'pending',
       submittedAt: new Date(),
     };
     
+    console.log('[KYC Submit] Creating/updating KYC record...');
     let kyc;
     if (existingKYC) {
       kyc = await KYC.findOneAndUpdate({ userId }, kycData, { new: true });
@@ -55,20 +66,32 @@ exports.submitKYC = async (req, res) => {
       kyc = await KYC.create(kycData);
     }
     
-    // Create notification for user
-    const Notification = require('../models/Notification');
-    await Notification.create({
-      userId,
-      title: 'KYC Submitted',
-      description: 'Your KYC documents have been submitted successfully. We will review them shortly.',
-      type: 'general',
-      icon: 'shield-check',
-    });
+    console.log('[KYC Submit] KYC saved successfully:', kyc._id);
+    
+    // Create notification for user (non-critical)
+    try {
+      const Notification = require('../models/Notification');
+      await Notification.create({
+        userId,
+        title: 'KYC Submitted',
+        description: 'Your KYC documents have been submitted successfully. We will review them shortly.',
+        type: 'general',
+        icon: 'shield-check',
+      });
+    } catch (notifError) {
+      console.warn('[KYC Submit] Failed to create notification:', notifError.message);
+    }
     
     res.status(201).json(kyc);
   } catch (error) {
-    console.error('Error submitting KYC:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('[KYC Submit] Error:', error.message);
+    console.error('[KYC Submit] Full error:', error);
+    console.error('[KYC Submit] Stack:', error.stack);
+    // Check for specific errors
+    if (error.name === 'PayloadTooLargeError') {
+      return res.status(413).json({ message: 'Request too large. Please reduce image sizes.' });
+    }
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 

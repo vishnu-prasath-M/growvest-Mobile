@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import ZenvestLogo from "@/components/ZenvestLogo";
 import { useAuth } from "@/context/AuthContext";
 
-const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === "localhost" ? "http://localhost:5000" : "https://growvest-mobile.onrender.com");
+const API_URL = import.meta.env.VITE_API_URL || "https://growvest-mobile.onrender.com";
 
 const Login = () => {
   const { login } = useAuth();
@@ -21,12 +21,20 @@ const Login = () => {
     setError("");
     setLoading(true);
     try {
+      console.log('[Website Login] Attempting login to:', `${API_URL}/api/auth/login`);
+      console.log('[Website Login] Email:', email);
+      
       const res = await fetch(`${API_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
+      
+      console.log('[Website Login] Response status:', res.status);
+      
       const data = await res.json();
+      console.log('[Website Login] Response data:', data);
+      
       if (!res.ok) {
         setError(data.message || "Login failed");
       } else {
@@ -40,6 +48,7 @@ const Login = () => {
         }
       }
     } catch (err) {
+      console.error('[Website Login] Error:', err);
       setError("Server error. Please try again later.");
     } finally {
       setLoading(false);

@@ -10,6 +10,9 @@ import {
   Dimensions,
   Animated,
   Modal,
+  SafeAreaView,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,6 +24,31 @@ import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { useAuth } from '../../context/AuthContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const TIPS = [
+  { title: 'Invest consistently', body: 'Regular investments in small amounts can build significant wealth over time.' },
+  { title: 'Diversify your portfolio', body: 'Spread your investments across different assets to reduce risk.' },
+  { title: 'Avoid emotional investing', body: 'Make investment decisions based on research, not emotions or market hype.' },
+  { title: 'Save before spending', body: 'Pay yourself first by saving a portion of your income before expenses.' },
+  { title: 'Review your investments monthly', body: 'Regular reviews help you stay on track with your financial goals.' },
+  { title: 'Build emergency savings', body: 'Keep 3-6 months of expenses in a liquid savings account for emergencies.' },
+  { title: 'Think long term', body: 'Successful investing is about patience and long-term perspective.' },
+  { title: 'Keep your KYC updated', body: 'Complete KYC verification to unlock all investment features.' },
+  { title: 'Start early', body: 'The power of compound interest works best when you start early.' },
+  { title: 'Set clear goals', body: 'Define your financial goals to create a focused investment strategy.' },
+  { title: 'Monitor fees', body: 'Be aware of investment fees and choose cost-effective options.' },
+  { title: 'Stay informed', body: 'Keep learning about personal finance and investment options.' },
+];
+
+const getTipOfTheDay = () => {
+  const now = new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 0);
+  const diff = now - startOfYear;
+  const oneDay = 1000 * 60 * 60 * 24;
+  const dayOfYear = Math.floor(diff / oneDay);
+  const tipIndex = dayOfYear % TIPS.length;
+  return TIPS[tipIndex];
+};
 
 const HomeScreen = ({ navigation }) => {
   const insets = useScreenInsets(8);
@@ -120,6 +148,7 @@ const HomeScreen = ({ navigation }) => {
   const pendingRequests = dashboardData?.stats?.pendingRequests || 0;
   const displayName = userName || userData?.username || 'Investor';
   const initials = getInitials(displayName);
+  const tipOfTheDay = getTipOfTheDay();
 
   const quickActions = [
     { label: 'New Investment', icon: 'plus-circle', onPress: () => setInvestModalVisible(true) },
@@ -129,7 +158,8 @@ const HomeScreen = ({ navigation }) => {
   ];
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar barStyle="light-content" backgroundColor="#0E3D23" />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -145,7 +175,7 @@ const HomeScreen = ({ navigation }) => {
       >
         <Animated.View style={{ opacity: fadeAnim }}>
           {/* ── Header ── */}
-          <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+          <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
             <View style={styles.headerLeft}>
               <LinearGradient
                 colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
@@ -156,7 +186,7 @@ const HomeScreen = ({ navigation }) => {
                 <Text style={styles.avatarInitials}>{initials}</Text>
               </LinearGradient>
               <View style={styles.greetingStack}>
-                <Text style={styles.greetingLabel}>Good morning</Text>
+                <Text style={styles.greetingLabel}>Hello!</Text>
                 <Text style={styles.greetingName} numberOfLines={1}>{displayName}</Text>
               </View>
             </View>
@@ -303,9 +333,9 @@ const HomeScreen = ({ navigation }) => {
                 </LinearGradient>
                 <View style={styles.tipText}>
                   <Text style={styles.tipCategory}>Tip of the day</Text>
-                  <Text style={styles.tipTitle}>Ladder your Fixed Deposits</Text>
+                  <Text style={styles.tipTitle}>{tipOfTheDay.title}</Text>
                   <Text style={styles.tipBody}>
-                    Split your FD into multiple tenures to balance liquidity and higher yields.
+                    {tipOfTheDay.body}
                   </Text>
                 </View>
               </View>
@@ -368,7 +398,7 @@ const HomeScreen = ({ navigation }) => {
           </View>
         </TouchableOpacity>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 };
 

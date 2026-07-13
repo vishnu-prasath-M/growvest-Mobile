@@ -64,8 +64,10 @@ const KYCScreen = ({ navigation, route }) => {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7,
+      quality: 0.4,
       base64: true,
+      allowsEditing: true,
+      aspect: [4, 3],
     });
     if (!result.canceled && result.assets[0]) {
       setForm((prev) => ({ ...prev, [field]: result.assets[0].base64 }));
@@ -79,8 +81,10 @@ const KYCScreen = ({ navigation, route }) => {
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
-      quality: 0.7,
+      quality: 0.4,
       base64: true,
+      allowsEditing: true,
+      aspect: [4, 3],
     });
     if (!result.canceled && result.assets[0]) {
       setForm((prev) => ({ ...prev, [field]: result.assets[0].base64 }));
@@ -172,7 +176,13 @@ const KYCScreen = ({ navigation, route }) => {
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);
     } catch (error) {
-      Alert.alert('Error', error.response?.data?.message || 'Failed to submit KYC');
+      let errorMessage = 'Failed to submit KYC';
+      if (error.response?.data?.includes('Payload Too Large')) {
+        errorMessage = 'Images are too large. Please try uploading smaller images or use lower quality photos.';
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      Alert.alert('Error', errorMessage);
     } finally {
       setSaving(false);
     }
