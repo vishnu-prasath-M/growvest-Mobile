@@ -35,20 +35,29 @@ const getDashboard = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    const myMemberships = await ChitMember.find({ userId, status: 'active' })
+    const myMemberships = await ChitMember.find({ userId })
       .populate('chitId', 'name monthlyAmount totalPot duration availableSlots status');
 
-    const activeChits = myMemberships.length;
+    const activeMemberships = myMemberships.filter(m => m.status === 'active');
+    const activeChits = activeMemberships.length;
+    // myJoinedChits = all memberships including pending (shows immediately after joining)
+    const myJoinedChits = myMemberships.filter(m => m.status !== 'cancelled').length;
 
     let totalPaid = 0;
     let totalDividend = 0;
     let upcomingDue = 0;
+    let pendingDueCount = 0;
     let nextDueDate = null;
     let winningStatus = 'Not Won Yet';
 
     myMemberships.forEach((m) => {
       totalPaid += m.totalPaid || 0;
-      upcomingDue += m.chitId?.monthlyAmount || 0;
+
+      // Count active memberships with remaining installments as dues
+      if (m.status === 'active' && m.currentMonth < (m.chitId?.duration || 0)) {
+        upcomingDue += m.chitId?.monthlyAmount || 0;
+        pendingDueCount += 1;
+      }
 
       if (m.hasWon) winningStatus = 'Won';
 
@@ -69,10 +78,11 @@ const getDashboard = async (req, res) => {
 
     res.json({
       activeChits: activeChits || 0,
-      myJoinedChits: activeChits || 0,
+      myJoinedChits: myJoinedChits || 0,
       totalPaid: totalPaid || 0,
       totalDividend: totalDividend || 0,
       upcomingDue: upcomingDue || 0,
+      pendingDueCount: pendingDueCount || 0,
       nextDueDate: nextDueDate ? nextDueDate.toISOString().split('T')[0] : null,
       nextAuctionDate: null, // Placeholder for auction date
       winningStatus,
@@ -87,6 +97,7 @@ const getDashboard = async (req, res) => {
       totalPaid: 0,
       totalDividend: 0,
       upcomingDue: 0,
+      pendingDueCount: 0,
       nextDueDate: null,
       nextAuctionDate: null,
       winningStatus: 'Not Won Yet',

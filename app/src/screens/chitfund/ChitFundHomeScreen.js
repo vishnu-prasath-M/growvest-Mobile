@@ -9,6 +9,7 @@ import {
   Dimensions,
   Animated,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/theme';
@@ -44,6 +45,14 @@ const ChitFundHomeScreen = ({ navigation }) => {
       useNativeDriver: true,
     }).start();
   }, [fetchDashboard]);
+
+  // Refresh dashboard whenever this screen comes into focus
+  // (e.g., after joining a chit and navigating back)
+  useFocusEffect(
+    useCallback(() => {
+      fetchDashboard();
+    }, [fetchDashboard])
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -169,7 +178,12 @@ const ChitFundHomeScreen = ({ navigation }) => {
             <View style={styles.quickActionsGrid}>
               <QuickAction icon="compass-outline" label="Explore" onPress={() => navigation.navigate('ExploreChits')} />
               <QuickAction icon="account-group-outline" label="My Chits" onPress={() => navigation.navigate('MyChits')} />
-              <QuickAction icon="cash-check" label="Pay Due" onPress={() => navigation.navigate('MonthlyDue')} badge="1" />
+              <QuickAction
+                icon="cash-check"
+                label="Pay Due"
+                onPress={() => navigation.navigate('MonthlyDue')}
+                badge={dashboard.upcomingDue > 0 ? dashboard.pendingDueCount || '!' : null}
+              />
               <QuickAction icon="gavel" label="Auction" onPress={() => navigation.navigate('Auction')} />
             </View>
 

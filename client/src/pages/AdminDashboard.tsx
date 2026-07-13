@@ -26,8 +26,9 @@ import { Button } from "@/components/ui/button";
 import { generateUPILink } from "@/utils/upi";
 import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "@/context/AuthContext";
+import ChitFundAdmin from "@/components/admin/ChitFundAdmin";
 
-const API_URL = import.meta.env.VITE_API_URL || "https://growvest-mobile.onrender.com";
+const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" ? "http://localhost:5000" : "https://growvest-mobile.onrender.com");
 
 /* ─── Mock Data & Types ─────────────────────────── */
 
@@ -1410,142 +1411,9 @@ const AdminDashboard = () => {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4 }}
+              className="w-full"
             >
-              <div className="mb-6 flex items-center justify-between">
-                <div>
-                  <h2 className="font-heading text-2xl text-foreground">Chit Fund Management</h2>
-                  <p className="text-sm font-body text-muted-foreground mt-0.5">
-                    Create and manage chit fund schemes
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  className="rounded-xl font-body"
-                  onClick={() => {
-                    setEditingChit(null);
-                    setChitForm({
-                      name: '',
-                      description: '',
-                      monthlyAmount: '',
-                      totalMembers: '',
-                      duration: '',
-                      prizeAmount: '',
-                      startDate: '',
-                      processingFee: '2',
-                    });
-                    setChitModalOpen(true);
-                  }}
-                >
-                  <Plus className="mr-1.5 h-3.5 w-3.5" />
-                  Create Chit
-                </Button>
-              </div>
-
-              {/* Chit Stats Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
-                {[
-                  { label: "Total Chits", value: chits.length, icon: TrendingUp, color: "bg-blue-50", iconColor: "text-blue-600" },
-                  { label: "Active", value: chits.filter(c => c.status === 'active').length, icon: CheckCircle, color: "bg-green-50", iconColor: "text-green-600" },
-                  { label: "Upcoming", value: chits.filter(c => c.status === 'upcoming').length, icon: Clock, color: "bg-amber-50", iconColor: "text-amber-600" },
-                  { label: "Closed", value: chits.filter(c => c.status === 'closed').length, icon: XCircle, color: "bg-red-50", iconColor: "text-red-600" },
-                ].map((stat, i) => (
-                  <div key={i} className={`card-premium p-4 ${stat.color}`}>
-                    <div className="flex items-center gap-3">
-                      <stat.icon className={`h-5 w-5 ${stat.iconColor}`} />
-                      <div>
-                        <p className="text-[10px] font-body text-muted-foreground uppercase">{stat.label}</p>
-                        <p className="text-lg font-heading font-bold text-foreground">{stat.value}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Chit List */}
-              <div className="space-y-4">
-                {chits.map((chit) => (
-                  <motion.div
-                    key={chit._id}
-                    layout
-                    className="card-premium p-5"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div className="flex items-start gap-4">
-                        <div
-                          className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${
-                            chit.status === 'active' ? 'bg-accent' : 
-                            chit.status === 'upcoming' ? 'bg-amber-50' : 'bg-red-50'
-                          }`}
-                        >
-                          {chit.status === 'active' && <CheckCircle className="h-5 w-5 text-secondary" />}
-                          {chit.status === 'upcoming' && <Clock className="h-5 w-5 text-amber-600" />}
-                          {chit.status === 'closed' && <XCircle className="h-5 w-5 text-red-500" />}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-3 flex-wrap">
-                            <p className="text-sm font-body font-bold text-foreground">{chit.name}</p>
-                            <span className={`text-[10px] font-body font-semibold px-2 py-0.5 rounded-full border ${statusStyle[chit.status]}`}>
-                              {chit.status.charAt(0).toUpperCase() + chit.status.slice(1)}
-                            </span>
-                          </div>
-                          <p className="text-xs font-body text-muted-foreground mt-0.5">
-                            ₹{chit.monthlyAmount?.toLocaleString("en-IN")}/mo • {chit.totalMembers} members • {chit.duration} months
-                          </p>
-                          <p className="text-xs font-body text-muted-foreground">
-                            Prize: ₹{chit.prizeAmount?.toLocaleString("en-IN")}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2 shrink-0">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="rounded-xl font-body h-10 px-4"
-                          onClick={() => handleEditChit(chit)}
-                        >
-                          <Edit className="mr-1.5 h-3.5 w-3.5" />
-                          Edit
-                        </Button>
-                        {chit.status === 'upcoming' && (
-                          <Button
-                            size="sm"
-                            className="rounded-xl font-body h-10 px-4"
-                            onClick={() => handleActivateChit(chit._id)}
-                          >
-                            <CheckCircle className="mr-1.5 h-3.5 w-3.5" />
-                            Activate
-                          </Button>
-                        )}
-                        {chit.status === 'active' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="rounded-xl font-body border-red-200 text-red-600 hover:bg-red-50 h-10 px-4"
-                            onClick={() => handleCloseChit(chit._id)}
-                          >
-                            <XCircle className="mr-1.5 h-3.5 w-3.5" />
-                            Close
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="rounded-xl font-body border-red-200 text-red-600 hover:bg-red-50 h-10 px-4"
-                          onClick={() => handleDeleteChit(chit._id)}
-                        >
-                          <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                          Delete
-                        </Button>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-                {chits.length === 0 && (
-                  <div className="text-center py-12">
-                    <p className="text-sm font-body text-muted-foreground">No chit funds found. Create one to get started.</p>
-                  </div>
-                )}
-              </div>
+              <ChitFundAdmin token={token} />
             </motion.div>
           )}
 

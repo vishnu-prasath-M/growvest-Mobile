@@ -3,6 +3,7 @@ const ChitMember = require('../models/ChitMember');
 const ChitPayment = require('../models/ChitPayment');
 const Transaction = require('../models/Transaction');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
 const { sendToUser } = require('../services/pushNotificationService');
 
 // @desc    Get pending chit payments for admin approval
@@ -117,6 +118,31 @@ const updatePaymentStatus = async (req, res) => {
       },
     );
 
+    // Create in-app notification
+    try {
+      if (status === 'paid') {
+        await Notification.create({
+          userId: payment.userId,
+          title: '\uD83C\uDF89 Good News!',
+          description: 'Your Chit payment has been approved successfully.',
+          type: 'chit_payment_approved',
+          icon: 'check-circle',
+          metadata: { paymentId: payment._id },
+        });
+      } else if (status === 'rejected') {
+        await Notification.create({
+          userId: payment.userId,
+          title: '\u274C Payment Rejected',
+          description: 'Your payment could not be verified. Please upload a clearer payment screenshot.',
+          type: 'chit_payment_rejected',
+          icon: 'close-circle',
+          metadata: { paymentId: payment._id },
+        });
+      }
+    } catch (notifErr) {
+      console.warn('In-app notification failed (non-fatal):', notifErr.message);
+    }
+
     // Send push notification to user
     try {
       if (status === 'paid') {
@@ -157,31 +183,59 @@ const updateJoinStatus = async (req, res) => {
 
     if (status === 'approved') {
       member.status = 'active';
-      member.totalPaid = member.chitId?.monthlyAmount || 0;
-      member.remainingAmount = (member.chitId?.totalPot || 0) - member.totalPaid;
-      member.currentMonth = 1;
+      // totalPaid & currentMonth are updated by the ChitPayment approval — do NOT set here
+      // to avoid double-counting. They are already handled by updatePaymentStatus.
       await member.save();
 
-      // Create first month payment as paid
-      await ChitPayment.create({
-        chitId: member.chitId,
-        userId: member.userId,
+      // Find the existing pending ChitPayment for month 1 (created when user confirmed payment)
+      const existingPayment = await ChitPayment.findOne({
         memberId: member._id,
         month: 1,
-        amount: member.chitId?.monthlyAmount || 0,
-        status: 'paid',
-        dueDate: new Date(),
-        paidDate: new Date(),
-        receiptId: 'RCP' + Date.now().toString().slice(-8),
+        status: 'pending',
       });
+
+      if (existingPayment) {
+        // Approve the existing payment instead of creating a new one
+        existingPayment.status = 'paid';
+        existingPayment.paidDate = new Date();
+        existingPayment.receiptId = 'RCP' + Date.now().toString().slice(-8);
+        await existingPayment.save();
+
+        // Update member totals
+        member.totalPaid = existingPayment.amount;
+        member.remainingAmount = (member.chitId?.totalPot || 0) - existingPayment.amount;
+        member.currentMonth = 1;
+        await member.save();
+      } else {
+        // No pending payment found (edge case) — create one as paid
+        const monthlyAmount = member.chitId?.monthlyAmount || 0;
+        await ChitPayment.create({
+          chitId: member.chitId?._id || member.chitId,
+          userId: member.userId,
+          memberId: member._id,
+          month: 1,
+          amount: monthlyAmount,
+          status: 'paid',
+          dueDate: new Date(),
+          paidDate: new Date(),
+          receiptId: 'RCP' + Date.now().toString().slice(-8),
+        });
+        member.totalPaid = monthlyAmount;
+        member.remainingAmount = (member.chitId?.totalPot || 0) - monthlyAmount;
+        member.currentMonth = 1;
+        await member.save();
+      }
     } else {
       member.status = 'cancelled';
       await member.save();
 
       // Restore available slot
       if (member.chitId) {
-        member.chitId.availableSlots += 1;
-        await member.chitId.save();
+        const chitDoc = await require('../models/Chit').findById(member.chitId._id || member.chitId);
+        if (chitDoc) {
+          chitDoc.availableSlots += 1;
+          await chitDoc.save();
+        }
       }
     }
 
@@ -195,6 +249,31 @@ const updateJoinStatus = async (req, res) => {
           : `Chit Fund join rejected - ${member.chitId?.name || 'Chit'}`,
       },
     );
+
+    // Create in-app notification using existing Notification model
+    try {
+      if (status === 'approved') {
+        await Notification.create({
+          userId: member.userId,
+          title: '\uD83C\uDF89 Great News!',
+          description: 'Your Chit Investment has been approved. Welcome to your Chit Group.',
+          type: 'chit_joined',
+          icon: 'handshake',
+          metadata: { memberId: member._id, chitName: member.chitId?.name },
+        });
+      } else {
+        await Notification.create({
+          userId: member.userId,
+          title: 'Join Request Update',
+          description: `Your request to join ${member.chitId?.name || 'the chit fund'} was not approved. Contact support for details.`,
+          type: 'general',
+          icon: 'information-outline',
+          metadata: { memberId: member._id },
+        });
+      }
+    } catch (notifErr) {
+      console.warn('In-app notification failed (non-fatal):', notifErr.message);
+    }
 
     // Send push notification to user
     try {
