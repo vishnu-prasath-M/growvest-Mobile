@@ -35,13 +35,19 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    console.error('[apiService] Response error:', error?.message || error, 'Status:', error.response?.status);
+    const status = error.response?.status;
+    const url = error.config?.url || '';
+    console.error('[apiService] Response error:', error?.message || error, 'Status:', status, 'URL:', url);
+    console.error('[apiService] Error response data:', error.response?.data);
     
-    if (error.response?.status === 401) {
-      // Token expired or invalid, clear storage
+    // Only clear auth tokens when the /auth/me endpoint returns 401
+    // (meaning the stored token is truly invalid / expired).
+    // Do NOT clear for payment/investment endpoints — that would cascade
+    // and break the entire payment flow.
+    if (status === 401 && (url.includes('/auth/me') || url.includes('/auth/login'))) {
       try {
         await AsyncStorage.multiRemove(['userToken', 'userData']);
-        console.log('[apiService] Cleared auth tokens due to 401');
+        console.log('[apiService] Cleared auth tokens due to 401 on auth endpoint');
       } catch (clearError) {
         console.error('[apiService] Error clearing storage:', clearError?.message || clearError);
       }

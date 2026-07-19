@@ -18,6 +18,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ChitDetailsScreen = ({ navigation, route }) => {
   const insets = useScreenInsets(8);
   const { chitId } = route.params || {};
+  const { memberId } = route.params || {};
   const [activeTab, setActiveTab] = useState('overview');
 
   const [chit, setChit] = useState(null);
@@ -26,6 +27,7 @@ const ChitDetailsScreen = ({ navigation, route }) => {
   const [auction, setAuction] = useState(null);
   const [winners, setWinners] = useState([]);
   const [dividends, setDividends] = useState([]);
+  const [myChits, setMyChits] = useState([]);
   const [loading, setLoading] = useState(true);
 
   React.useEffect(() => {
@@ -35,13 +37,14 @@ const ChitDetailsScreen = ({ navigation, route }) => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [chitData, membersData, paymentsData, auctionData, winnersData, dividendsData] = await Promise.all([
+      const [chitData, membersData, paymentsData, auctionData, winnersData, dividendsData, myChitsData] = await Promise.all([
         chitFundService.getChitById(chitId),
         chitFundService.getChitMembers(chitId).catch(() => []),
         chitFundService.getPaymentHistory(chitId).catch(() => []),
         chitFundService.getAuction(chitId).catch(() => null),
         chitFundService.getWinners(chitId).catch(() => []),
-        chitFundService.getDividends().catch(() => []) // or getDividends(chitId) if supported
+        chitFundService.getDividends().catch(() => []), // or getDividends(chitId) if supported
+        chitFundService.getMyChits().catch(() => []),
       ]);
       setChit(chitData);
       setMembers(membersData);
@@ -49,6 +52,7 @@ const ChitDetailsScreen = ({ navigation, route }) => {
       setAuction(auctionData);
       setWinners(winnersData);
       setDividends(dividendsData);
+      setMyChits(myChitsData);
     } catch (error) {
       console.error('Error fetching chit details:', error);
     } finally {
@@ -141,16 +145,20 @@ const ChitDetailsScreen = ({ navigation, route }) => {
         </View>
       )}
 
-      {chit.availableSlots > 0 && (
-        <TouchableOpacity
-          style={styles.joinNowBtn}
-          activeOpacity={0.85}
-          onPress={() => navigation.navigate('JoinChit', { chitId: chit._id })}
-        >
-          <Text style={styles.joinNowBtnText}>Join This Chit</Text>
-          <MaterialCommunityIcons name="arrow-right" size={20} color={colors.white} />
-        </TouchableOpacity>
-      )}
+      {chit.availableSlots > 0 && (() => {
+        const hasJoined = myChits.some(m => m.chitId === chit._id);
+        return (
+          <TouchableOpacity
+            style={[styles.joinNowBtn, hasJoined && styles.joinNowBtnDisabled]}
+            activeOpacity={0.85}
+            onPress={() => !hasJoined && navigation.navigate('JoinChit', { chitId: chit._id })}
+            disabled={hasJoined}
+          >
+            <Text style={styles.joinNowBtnText}>{hasJoined ? 'Already Joined' : 'Join This Chit'}</Text>
+            {!hasJoined && <MaterialCommunityIcons name="arrow-right" size={20} color={colors.white} />}
+          </TouchableOpacity>
+        );
+      })()}
     </View>
   );
 
@@ -473,6 +481,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     backgroundColor: colors.primary, paddingVertical: 16, borderRadius: 16, gap: 8,
     ...colors.shadow.button, marginBottom: 16,
+  },
+  joinNowBtnDisabled: {
+    backgroundColor: colors.muted,
   },
   joinNowBtnText: { fontSize: 17, fontWeight: '700', color: colors.white },
   // Members

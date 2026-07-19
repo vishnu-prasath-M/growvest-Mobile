@@ -71,10 +71,17 @@ router.delete('/:id', protect, admin, chitAdminController.deleteChit);
 // Get all chits (public listing — active & upcoming plans)
 router.get('/', protect, chitController.getAllChits);
 
-// Get single chit with user membership status
-router.get('/:id', protect, chitController.getChitById);
+// IMPORTANT: Routes with `/:id` prefix must come LAST,
+// otherwise Express treats /:id as a catch-all.
+// Specific resource routes come BEFORE /:id
 
 // Get members of a chit
 router.get('/:id/members', protect, chitController.getChitMembers);
+
+// Get auction info for a chit
+router.get('/:id/auction', protect, chitController.getChitById);
+
+// Get single chit with user membership status — keep LAST
+router.get('/:id', protect, chitController.getChitById);
 
 module.exports = router;

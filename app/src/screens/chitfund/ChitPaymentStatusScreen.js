@@ -23,16 +23,19 @@ const ChitPaymentStatusScreen = ({ navigation, route }) => {
     setLoading(true);
     try {
       const payload = { chitId, memberId, month, amount, lateFee };
+      console.log('[ChitPaymentStatus] Submitting payment payload:', payload);
       if (type === 'join') {
         // The member was already created in JoinChit, now we create a payment record
-        await chitFundService.makePayment(payload);
+        const result = await chitFundService.makePayment(payload);
+        console.log('[ChitPaymentStatus] Payment result:', result);
         navigation.replace('PaymentSuccess', {
           title: 'Join Request Submitted!',
           message: 'Your payment and join request are pending admin verification.',
           nextScreen: 'ChitFund',
         });
       } else {
-        await chitFundService.makePayment(payload);
+        const result = await chitFundService.makePayment(payload);
+        console.log('[ChitPaymentStatus] Payment result:', result);
         navigation.replace('PaymentSuccess', {
           title: 'Payment Submitted!',
           message: 'Your chit payment has been recorded and is pending verification.',
@@ -40,10 +43,14 @@ const ChitPaymentStatusScreen = ({ navigation, route }) => {
         });
       }
     } catch (error) {
-      console.error('Error submitting payment:', error);
+      const status = error.response?.status;
+      const serverMessage = error.response?.data?.message;
+      console.error('[ChitPaymentStatus] Error submitting payment. Status:', status, 'Message:', serverMessage, 'Error:', error.message);
+      // Show the real server error message, not just a generic one
+      const displayMessage = serverMessage || error.message || 'We could not record your payment.';
       navigation.replace('PaymentFailed', {
         title: 'Submission Failed',
-        message: error.message || 'We could not record your payment.',
+        message: `${displayMessage}${status ? ` (Status: ${status})` : ''}`,
         nextScreen: 'ChitFund',
       });
     } finally {

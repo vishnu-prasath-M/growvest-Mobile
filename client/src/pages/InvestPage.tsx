@@ -23,7 +23,7 @@ interface Investment {
   userEmail?: string;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" ? "http://localhost:5000" : "https://growvest-mobile.onrender.com");
+const API_URL = import.meta.env.VITE_API_URL || "https://growvest-mobile.onrender.com";
 
 const statusConfig = {
   pending: { label: "Waiting for Approval", color: "bg-amber-50 text-amber-700 border-amber-200", icon: Clock },

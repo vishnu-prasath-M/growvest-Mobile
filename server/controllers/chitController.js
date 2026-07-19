@@ -35,20 +35,29 @@ const getDashboard = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    const myMemberships = await ChitMember.find({ userId, status: 'active' })
+    const myMemberships = await ChitMember.find({ userId })
       .populate('chitId', 'name monthlyAmount totalPot duration availableSlots status');
 
-    const activeChits = myMemberships.length;
+    const activeMemberships = myMemberships.filter(m => m.status === 'active');
+    const activeChits = activeMemberships.length;
+    // myJoinedChits = all memberships including pending (shows immediately after joining)
+    const myJoinedChits = myMemberships.filter(m => m.status !== 'cancelled').length;
 
     let totalPaid = 0;
     let totalDividend = 0;
     let upcomingDue = 0;
+    let pendingDueCount = 0;
     let nextDueDate = null;
     let winningStatus = 'Not Won Yet';
 
     myMemberships.forEach((m) => {
       totalPaid += m.totalPaid || 0;
-      upcomingDue += m.chitId?.monthlyAmount || 0;
+
+      // Count active memberships with remaining installments as dues
+      if (m.status === 'active' && m.currentMonth < (m.chitId?.duration || 0)) {
+        upcomingDue += m.chitId?.monthlyAmount || 0;
+        pendingDueCount += 1;
+      }
 
       if (m.hasWon) winningStatus = 'Won';
 
@@ -69,10 +78,11 @@ const getDashboard = async (req, res) => {
 
     res.json({
       activeChits: activeChits || 0,
-      myJoinedChits: activeChits || 0,
+      myJoinedChits: myJoinedChits || 0,
       totalPaid: totalPaid || 0,
       totalDividend: totalDividend || 0,
       upcomingDue: upcomingDue || 0,
+      pendingDueCount: pendingDueCount || 0,
       nextDueDate: nextDueDate ? nextDueDate.toISOString().split('T')[0] : null,
       nextAuctionDate: null, // Placeholder for auction date
       winningStatus,
@@ -87,6 +97,7 @@ const getDashboard = async (req, res) => {
       totalPaid: 0,
       totalDividend: 0,
       upcomingDue: 0,
+      pendingDueCount: 0,
       nextDueDate: null,
       nextAuctionDate: null,
       winningStatus: 'Not Won Yet',
@@ -206,26 +217,41 @@ const joinChit = async (req, res) => {
     const { chitId } = req.body;
     const userId = req.user._id;
 
+    console.log('[Chit Join] User ID:', userId);
+    console.log('[Chit Join] Chit ID:', chitId);
+
     const chit = await Chit.findById(chitId);
-    if (!chit) return res.status(404).json({ message: 'Chit not found' });
+    if (!chit) {
+      console.log('[Chit Join] Chit not found');
+      return res.status(404).json({ message: 'Chit not found' });
+    }
+
+    console.log('[Chit Join] Chit found:', chit.name);
+    console.log('[Chit Join] Available slots:', chit.availableSlots);
+    console.log('[Chit Join] Chit status:', chit.status);
 
     if (chit.availableSlots <= 0) {
+      console.log('[Chit Join] No available slots');
       return res.status(400).json({ message: 'No available slots in this chit' });
     }
 
     if (!['active', 'upcoming'].includes(chit.status)) {
+      console.log('[Chit Join] Chit not accepting new members');
       return res.status(400).json({ message: 'This chit is not accepting new members' });
     }
 
     // Check if already a member
     const existing = await ChitMember.findOne({ chitId, userId });
     if (existing && existing.status !== 'cancelled') {
+      console.log('[Chit Join] User already a member');
       return res.status(400).json({ message: 'You are already a member of this chit' });
     }
 
     // Assign next member number
     const memberCount = await ChitMember.countDocuments({ chitId, status: { $ne: 'cancelled' } });
     const memberNumber = memberCount + 1;
+
+    console.log('[Chit Join] Creating member with number:', memberNumber);
 
     // Decrement available slots
     chit.availableSlots -= 1;
@@ -244,6 +270,8 @@ const joinChit = async (req, res) => {
       joinedAt: new Date(),
     });
 
+    console.log('[Chit Join] Member created:', member._id);
+
     // Create transaction record (pending)
     const processingFeeAmount = (chit.monthlyAmount * (chit.processingFee || 0)) / 100;
     const totalPayable = chit.monthlyAmount + processingFeeAmount;
@@ -259,6 +287,8 @@ const joinChit = async (req, res) => {
       description: `Chit Fund join request - ${chit.name} (Month 1 + processing fee)`,
     });
 
+    console.log('[Chit Join] Transaction created:', transaction._id);
+
     res.status(201).json({
       member,
       transaction,
@@ -271,7 +301,7 @@ const joinChit = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error joining chit:', error);
+    console.error('[Chit Join] Error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };

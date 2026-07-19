@@ -56,6 +56,8 @@ exports.loginUser = async (req, res) => {
   try {
     const { email, password } = req.body; // 'email' can be email or mobileNumber
 
+    console.log('[Login] Attempting login with identifier:', email);
+
     if (!email || !password) {
       return res.status(400).json({ message: 'Please provide all fields' });
     }
@@ -65,17 +67,21 @@ exports.loginUser = async (req, res) => {
     // Allow login via email OR mobileNumber OR username (case-insensitive for email/username)
     const user = await User.findOne({ 
       $or: [
-        { email: { $regex: new RegExp(`^${identifier}$`, 'i') } }, 
+        { email: { $regex: new RegExp(`^${identifier}$`, 'i') } },
         { mobileNumber: identifier },
         { username: { $regex: new RegExp(`^${identifier}$`, 'i') } }
-      ] 
+      ]
     });
+
+    console.log('[Login] User found:', user ? user.username : 'No');
 
     if (!user) {
       return res.status(404).json({ message: 'User not found. Please sign up.' });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
+
+    console.log('[Login] Password match:', isMatch);
 
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid credentials' });
@@ -91,8 +97,8 @@ exports.loginUser = async (req, res) => {
       token: generateToken(user._id),
     });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('[Login] Error:', error);
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 

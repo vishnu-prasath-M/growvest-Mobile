@@ -58,7 +58,9 @@ export const chitFundService = {
    * @returns {Promise<Object>} Join confirmation
    */
   joinChit: async (data) => {
+    console.log('[ChitFundService] Joining chit with data:', data);
     const response = await api.post(CHIT_FUND_ENDPOINTS.JOIN_CHIT, data);
+    console.log('[ChitFundService] Join response:', response.data);
     return response.data;
   },
 

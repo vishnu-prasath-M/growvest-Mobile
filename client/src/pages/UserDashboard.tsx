@@ -63,7 +63,7 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 
 type NavTab = "overview" | "investments" | "history" | "withdraw";
 
-const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" ? "http://localhost:5000" : "https://growvest-mobile.onrender.com");
+const API_URL = import.meta.env.VITE_API_URL || "https://growvest-mobile.onrender.com";
 
 const safeCurrency = (val: any) => {
   const num = typeof val === 'number' ? val : parseFloat(val);

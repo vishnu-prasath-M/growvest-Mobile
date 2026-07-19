@@ -56,7 +56,9 @@ const JoinChitScreen = ({ navigation, route }) => {
       });
     } catch (error) {
       console.error('Error joining chit:', error);
-      Alert.alert('Error', error.message || 'Failed to join chit fund');
+      console.error('Error response:', error.response?.data);
+      const serverMsg = error.response?.data?.message || error.message || 'Failed to join chit fund';
+      Alert.alert('Unable to Join', serverMsg);
       setShowConfirm(false);
     } finally {
       setProcessing(false);
@@ -70,6 +72,9 @@ const JoinChitScreen = ({ navigation, route }) => {
       </View>
     );
   }
+
+  // Check if user already has a membership (pending or active)
+  const alreadyJoined = chit.myMembership && chit.myMembership.status !== 'cancelled';
 
   const formatCurrency = (amount) => `₹${amount?.toLocaleString('en-IN') || '0'}`;
   const processingFeeAmount = (chit.monthlyAmount * (chit.processingFee || 2)) / 100;
@@ -154,22 +159,32 @@ const JoinChitScreen = ({ navigation, route }) => {
 
       {/* Proceed Button */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
-        <TouchableOpacity
-          style={[styles.proceedBtnOuter, !agreed && styles.proceedBtnDisabled]}
-          activeOpacity={0.85}
-          disabled={!agreed}
-          onPress={() => setShowConfirm(true)}
-        >
-          <LinearGradient
-            colors={agreed ? ['#0E3D23', '#1A5C39', '#2E8B5A'] : [colors.muted, colors.muted]}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={styles.proceedBtnGradient}
+        {alreadyJoined ? (
+          <View style={[styles.proceedBtnOuter, styles.proceedBtnDisabled]}>
+            <View style={[styles.proceedBtnGradient, { backgroundColor: colors.muted, borderRadius: 16, justifyContent: 'center', alignItems: 'center' }]}>
+              <Text style={[styles.proceedBtnText, { color: colors.textTertiary }]}>
+                ✓ Already Joined
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={[styles.proceedBtnOuter, !agreed && styles.proceedBtnDisabled]}
+            activeOpacity={0.85}
+            disabled={!agreed}
+            onPress={() => setShowConfirm(true)}
           >
-            <Text style={[styles.proceedBtnText, !agreed && styles.proceedBtnTextDisabled]}>
-              Proceed to Pay {formatCurrency(totalPayable)}
-            </Text>
-          </LinearGradient>
-        </TouchableOpacity>
+            <LinearGradient
+              colors={agreed ? ['#0E3D23', '#1A5C39', '#2E8B5A'] : [colors.muted, colors.muted]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={styles.proceedBtnGradient}
+            >
+              <Text style={[styles.proceedBtnText, !agreed && styles.proceedBtnTextDisabled]}>
+                Proceed to Pay {formatCurrency(totalPayable)}
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Confirmation Modal */}
