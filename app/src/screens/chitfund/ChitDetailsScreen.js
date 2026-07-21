@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -145,17 +146,28 @@ const ChitDetailsScreen = ({ navigation, route }) => {
         </View>
       )}
 
-      {chit.availableSlots > 0 && (() => {
+      {(() => {
+        const isFull = chit.availableSlots <= 0;
         const hasJoined = myChits.some(m => m.chitId === chit._id);
+        const isClosed = chit.status === 'closed' || chit.status === 'completed' || chit.status === 'archived';
+        const isDisabled = isFull || hasJoined || isClosed;
         return (
           <TouchableOpacity
-            style={[styles.joinNowBtn, hasJoined && styles.joinNowBtnDisabled]}
+            style={[styles.joinNowBtn, isDisabled && styles.joinNowBtnDisabled]}
             activeOpacity={0.85}
-            onPress={() => !hasJoined && navigation.navigate('JoinChit', { chitId: chit._id })}
-            disabled={hasJoined}
+            onPress={() => {
+              if (isFull) {
+                Alert.alert('Slot Full', 'This Chit is already full.');
+              } else if (!hasJoined && !isClosed) {
+                navigation.navigate('JoinChit', { chitId: chit._id });
+              }
+            }}
+            disabled={isDisabled}
           >
-            <Text style={styles.joinNowBtnText}>{hasJoined ? 'Already Joined' : 'Join This Chit'}</Text>
-            {!hasJoined && <MaterialCommunityIcons name="arrow-right" size={20} color={colors.white} />}
+            <Text style={styles.joinNowBtnText}>
+              {isFull ? 'Slot Full' : isClosed ? 'Closed' : hasJoined ? 'Already Joined' : 'Join This Chit'}
+            </Text>
+            {!isDisabled && <MaterialCommunityIcons name="arrow-right" size={20} color={colors.white} />}
           </TouchableOpacity>
         );
       })()}
@@ -168,22 +180,31 @@ const ChitDetailsScreen = ({ navigation, route }) => {
       {members.length === 0 ? (
         <Text style={{color: colors.textSecondary}}>No members found.</Text>
       ) : (
-        members.map((member, index) => (
-          <View key={member._id} style={[styles.memberRow, index < members.length - 1 && styles.memberRowBorder]}>
-            <View style={styles.memberAvatar}>
-              <Text style={styles.memberAvatarText}>{member.user?.username?.charAt(0) || 'U'}</Text>
+        members.map((member, index) => {
+          const displayName = member.isMe ? 'You' : (member.name || member.user?.name || member.user?.username || 'Unknown');
+          const initial = member.avatarInitial || (displayName === 'You' ? member.user?.name?.charAt(0) || 'Y' : displayName.charAt(0).toUpperCase());
+          const joinDate = member.joinedAt ? new Date(member.joinedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+          return (
+            <View key={member._id} style={[styles.memberRow, index < members.length - 1 && styles.memberRowBorder]}>
+              <View style={[styles.memberAvatar, member.isMe && { backgroundColor: colors.primary }]}>
+                <Text style={[styles.memberAvatarText, member.isMe && { color: colors.white }]}>{initial}</Text>
+              </View>
+              <View style={styles.memberInfo}>
+                <Text style={styles.memberName}>
+                  {displayName}
+                  {member.isMe && <Text style={{color: colors.primary, fontSize: 12, fontWeight: '600'}}> (You)</Text>}
+                </Text>
+                <Text style={styles.memberNumber}>Member #{member.memberNumber || index + 1}</Text>
+                {joinDate ? <Text style={styles.memberJoinDate}>Joined {joinDate}</Text> : null}
+              </View>
+              <View style={[styles.memberStatus, member.hasWon ? styles.memberWon : styles.memberNotWon]}>
+                <Text style={[styles.memberStatusText, { color: member.hasWon ? colors.success : colors.textTertiary }]}>
+                  {member.hasWon ? 'Won' : member.status === 'active' ? 'Active' : member.status}
+                </Text>
+              </View>
             </View>
-            <View style={styles.memberInfo}>
-              <Text style={styles.memberName}>{member.user?.username || 'Unknown'}</Text>
-              <Text style={styles.memberNumber}>Member #{member.memberNumber || index + 1}</Text>
-            </View>
-            <View style={[styles.memberStatus, member.hasWon ? styles.memberWon : styles.memberNotWon]}>
-              <Text style={[styles.memberStatusText, { color: member.hasWon ? colors.success : colors.textTertiary }]}>
-                {member.hasWon ? 'Won' : 'Active'}
-              </Text>
-            </View>
-          </View>
-        ))
+          );
+        })
       )}
     </View>
   );
@@ -494,6 +515,7 @@ const styles = StyleSheet.create({
   memberInfo: { flex: 1 },
   memberName: { fontSize: 15, fontWeight: '600', color: colors.text, marginBottom: 2 },
   memberNumber: { fontSize: 12, color: colors.textSecondary },
+  memberJoinDate: { fontSize: 11, color: colors.textTertiary, marginTop: 2 },
   memberStatus: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   memberWon: { backgroundColor: colors.successLight },
   memberNotWon: { backgroundColor: '#f3f4f6' },

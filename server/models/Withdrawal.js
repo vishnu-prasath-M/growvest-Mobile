@@ -1,6 +1,12 @@
 const mongoose = require('mongoose');
 
 const withdrawalSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: false,
+    index: true,
+  },
   userEmail: {
     type: String,
     required: true,
@@ -41,5 +47,8 @@ const withdrawalSchema = new mongoose.Schema({
     type: String, // String for easier display on frontend matching previous logic
   }
 }, { timestamps: true });
+
+// Index for fast user-based queries
+withdrawalSchema.index({ userId: 1, status: 1 });
 
 module.exports = mongoose.model('Withdrawal', withdrawalSchema);

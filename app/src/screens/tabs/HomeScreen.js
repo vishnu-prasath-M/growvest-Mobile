@@ -22,6 +22,8 @@ import { authService } from '../../services/authService';
 import { colors, typography, spacing } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { useAuth } from '../../context/AuthContext';
+import api from '../../services/apiService';
+import { API_ENDPOINTS } from '../../config/api';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -58,6 +60,7 @@ const HomeScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [userName, setUserName] = useState('');
   const [investModalVisible, setInvestModalVisible] = useState(false);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -96,9 +99,20 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
+  // Fetch unread notification count from MongoDB — dynamic badge
+  const fetchUnreadCount = async () => {
+    try {
+      const response = await api.get(API_ENDPOINTS.NOTIFICATION_UNREAD_COUNT);
+      setUnreadNotifCount(response.data?.unreadCount ?? 0);
+    } catch (err) {
+      // Non-fatal — badge just stays at last known value
+    }
+  };
+
   useFocusEffect(
     useCallback(() => {
       fetchUserAndDashboard();
+      fetchUnreadCount(); // Refresh badge on every screen focus
     }, [authUser?.username, authUser?.name, authUser?.mobileNumber])
   );
 
@@ -113,7 +127,22 @@ const HomeScreen = ({ navigation }) => {
   const onRefresh = () => {
     setRefreshing(true);
     fetchUserAndDashboard();
+    fetchUnreadCount();
   };
+
+  // Poll dashboard every 10s; poll unread count every 30s
+  useEffect(() => {
+    const dashInterval = setInterval(() => {
+      fetchUserAndDashboard();
+    }, 10000);
+    const notifInterval = setInterval(() => {
+      fetchUnreadCount();
+    }, 30000);
+    return () => {
+      clearInterval(dashInterval);
+      clearInterval(notifInterval);
+    };
+  }, []);
 
   const formatCurrency = (amount) => {
     return `₹${amount?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`;
@@ -196,7 +225,13 @@ const HomeScreen = ({ navigation }) => {
               activeOpacity={0.8}
             >
               <MaterialCommunityIcons name="bell-outline" size={22} color={colors.text} />
-              {pendingRequests > 0 && <View style={styles.notifDot} />}
+              {unreadNotifCount > 0 && (
+                <View style={styles.notifBadge}>
+                  <Text style={styles.notifBadgeText}>
+                    {unreadNotifCount > 99 ? '99+' : unreadNotifCount}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
 
@@ -449,6 +484,17 @@ const styles = StyleSheet.create({
     width: 8, height: 8, borderRadius: 4,
     backgroundColor: colors.error,
     borderWidth: 2, borderColor: colors.surface,
+  },
+  notifBadge: {
+    position: 'absolute', top: 5, right: 5,
+    minWidth: 18, height: 18, borderRadius: 9,
+    backgroundColor: colors.error,
+    justifyContent: 'center', alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 2, borderColor: colors.surface,
+  },
+  notifBadgeText: {
+    fontSize: 9, fontWeight: '800', color: '#FFFFFF', lineHeight: 13,
   },
 
   // Balance Card

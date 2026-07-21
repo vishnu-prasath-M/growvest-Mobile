@@ -60,6 +60,14 @@ const ChitFundHomeScreen = ({ navigation }) => {
     setRefreshing(false);
   }, [fetchDashboard]);
 
+  // Polling for auto-updating UI (every 10 seconds)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchDashboard();
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [fetchDashboard]);
+
   const formatCurrency = (amount) => `₹${amount?.toLocaleString('en-IN') || '0'}`;
 
   const StatCard = ({ icon, label, value, tint, iconColor }) => (

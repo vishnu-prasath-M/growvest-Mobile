@@ -44,6 +44,14 @@ const InvestmentsScreen = ({ navigation }) => {
 
   useFocusEffect(useCallback(() => { fetchInvestments(); }, []));
 
+  // Polling for auto-updating UI
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      fetchInvestments();
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
   const onRefresh = () => { setRefreshing(true); fetchInvestments(); };
 
   const formatCurrency = (amount) =>

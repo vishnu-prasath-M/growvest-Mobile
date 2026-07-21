@@ -4,6 +4,7 @@ const ChitPayment = require('../models/ChitPayment');
 const Transaction = require('../models/Transaction');
 const User = require('../models/User');
 const Settings = require('../models/Settings');
+const mongoose = require('mongoose');
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
 
@@ -53,16 +54,38 @@ const getDashboard = async (req, res) => {
     myMemberships.forEach((m) => {
       totalPaid += m.totalPaid || 0;
 
+      // Calculate how many months have elapsed since joinedAt
+      const joinedDate = new Date(m.joinedAt);
+      const currentDate = new Date();
+      // Month difference
+      const monthsElapsed = (currentDate.getFullYear() - joinedDate.getFullYear()) * 12 + 
+                            (currentDate.getMonth() - joinedDate.getMonth());
+      // Adjust if current day is before the join day of month
+      const fullMonthsElapsed = currentDate.getDate() >= joinedDate.getDate() ? monthsElapsed : monthsElapsed - 1;
+      
+      // Expected paid months = fullMonthsElapsed + 1 (since first month is paid on join, or next month is due)
+      // Actually, if joined Jan 15, on Jan 16: elapsed=0. Month 1 was paid. So expected = 1.
+      // On Feb 15, elapsed = 1. Month 2 is due. So expected = 2.
+      const expectedMonths = Math.max(0, fullMonthsElapsed + 1);
+      
+      const pendingInstallments = Math.max(0, expectedMonths - m.currentMonth);
+
+      // Cap at chit duration
+      const chitDuration = m.chitId?.duration || 0;
+      const actualPending = Math.min(pendingInstallments, Math.max(0, chitDuration - m.currentMonth));
+
       // Count active memberships with remaining installments as dues
-      if (m.status === 'active' && m.currentMonth < (m.chitId?.duration || 0)) {
-        upcomingDue += m.chitId?.monthlyAmount || 0;
-        pendingDueCount += 1;
+      if (m.status === 'active' && actualPending > 0) {
+        upcomingDue += (m.chitId?.monthlyAmount || 0) * actualPending;
+        pendingDueCount += actualPending;
       }
 
       if (m.hasWon) winningStatus = 'Won';
 
       const due = calcNextDueDate(m.joinedAt, m.currentMonth);
-      if (!nextDueDate || due < nextDueDate) nextDueDate = due;
+      if (m.status === 'active' && m.currentMonth < chitDuration) {
+        if (!nextDueDate || due < nextDueDate) nextDueDate = due;
+      }
     });
 
     // Count dividends credited for this user from winner history
@@ -117,15 +140,50 @@ const getMyChits = async (req, res) => {
       .populate('chitId', 'name monthlyAmount duration totalMembers totalPot status startDate endDate features processingFee')
       .sort({ createdAt: -1 });
 
+    // Fetch all payments for this user to check which months are paid
+    const allPayments = await ChitPayment.find({ userId }).lean();
+    const paidMonthsByMember = {};
+    allPayments.forEach(p => {
+      const memberId = p.memberId?.toString();
+      if (memberId) {
+        if (!paidMonthsByMember[memberId]) paidMonthsByMember[memberId] = new Set();
+        if (p.status === 'paid') {
+          paidMonthsByMember[memberId].add(p.month);
+        }
+      }
+    });
+
     const result = memberships.map((m) => {
       const chit = m.chitId;
       const progress = chit?.duration
         ? Math.round((m.currentMonth / chit.duration) * 100)
         : 0;
 
+      const joinedDate = new Date(m.joinedAt);
+      const currentDate = new Date();
+      const monthsElapsed = (currentDate.getFullYear() - joinedDate.getFullYear()) * 12 + 
+                            (currentDate.getMonth() - joinedDate.getMonth());
+      const fullMonthsElapsed = currentDate.getDate() >= joinedDate.getDate() ? monthsElapsed : monthsElapsed - 1;
+      const expectedMonths = Math.max(0, fullMonthsElapsed + 1);
+      
+      // Calculate pending installments excluding already paid months
+      const paidMonths = paidMonthsByMember[m._id.toString()] || new Set();
+      let pendingInstallments = 0;
+      for (let i = m.currentMonth + 1; i <= Math.min(expectedMonths, chit?.duration || 0); i++) {
+        if (!paidMonths.has(i)) {
+          pendingInstallments++;
+        }
+      }
+      const actualPending = pendingInstallments;
+
       const nextDueDate = m.currentMonth < (chit?.duration || 0)
         ? calcNextDueDate(m.joinedAt, m.currentMonth)
         : null;
+
+      // Calculate due amount WITH processing fee (2% of monthly amount)
+      const processingFeeAmount = (chit?.monthlyAmount || 0) * (chit?.processingFee || 0) / 100;
+      const monthlyWithFee = (chit?.monthlyAmount || 0) + processingFeeAmount;
+      const nextDueAmount = actualPending > 0 ? monthlyWithFee * actualPending : monthlyWithFee;
 
       return {
         _id: m._id,
@@ -142,7 +200,8 @@ const getMyChits = async (req, res) => {
         currentMonth: m.currentMonth,
         hasWon: m.hasWon,
         nextDueDate: nextDueDate ? nextDueDate.toISOString().split('T')[0] : null,
-        nextDueAmount: chit?.monthlyAmount || 0,
+        nextDueAmount,
+        pendingInstallments: actualPending,
         progress,
         joinedAt: m.joinedAt,
       };
@@ -180,25 +239,37 @@ const getChitById = async (req, res) => {
 };
 
 // ─── GET /api/chits/:id/members ──────────────────────────────────────────────
-// @desc  Get members of a chit (masked names for privacy)
+// @desc  Get members of a chit (with real user details)
 // @access Private
 const getChitMembers = async (req, res) => {
   try {
     const members = await ChitMember.find({ chitId: req.params.id })
-      .populate('userId', 'name username')
+      .populate('userId', 'name username mobileNumber')
       .sort({ memberNumber: 1 });
 
     const userId = req.user._id.toString();
 
     const result = members.map((m) => {
       const isMe = m.userId?._id?.toString() === userId;
+      const displayName = isMe ? 'You' : (m.userId?.name || m.userId?.username || 'Unknown');
+      const avatarInitial = displayName.charAt(0).toUpperCase();
+      
       return {
         _id: m._id,
         memberNumber: m.memberNumber,
         status: m.status,
         hasWon: m.hasWon,
-        username: isMe ? 'You' : (m.userId?.name || m.userId?.username || `Member ${m.memberNumber}`),
         isMe,
+        user: {
+          _id: m.userId?._id,
+          username: m.userId?.username || 'Unknown',
+          name: m.userId?.name || m.userId?.username || 'Unknown',
+          mobileNumber: m.userId?.mobileNumber,
+        },
+        username: displayName,
+        name: displayName,
+        avatarInitial,
+        joinedAt: m.joinedAt,
       };
     });
 
@@ -240,6 +311,12 @@ const joinChit = async (req, res) => {
       return res.status(400).json({ message: 'This chit is not accepting new members' });
     }
 
+    // Prevent joining closed, completed, or archived chits
+    if (['closed', 'completed', 'archived'].includes(chit.status)) {
+      console.log('[Chit Join] Chit is closed or completed');
+      return res.status(400).json({ message: 'This chit is closed and no longer accepting new members' });
+    }
+
     // Check if already a member
     const existing = await ChitMember.findOne({ chitId, userId });
     if (existing && existing.status !== 'cancelled') {
@@ -253,53 +330,68 @@ const joinChit = async (req, res) => {
 
     console.log('[Chit Join] Creating member with number:', memberNumber);
 
-    // Decrement available slots
-    chit.availableSlots -= 1;
-    await chit.save();
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    // Create pending membership
-    const member = await ChitMember.create({
-      chitId,
-      userId,
-      memberNumber,
-      status: 'pending',
-      totalPaid: 0,
-      remainingAmount: chit.totalPot,
-      currentMonth: 0,
-      hasWon: false,
-      joinedAt: new Date(),
-    });
+    let member, transaction;
+    try {
+      // Decrement available slots
+      chit.availableSlots -= 1;
+      await chit.save({ session });
 
-    console.log('[Chit Join] Member created:', member._id);
+      // Create pending membership
+      member = new ChitMember({
+        chitId,
+        userId,
+        memberNumber,
+        status: 'pending',
+        totalPaid: 0,
+        remainingAmount: chit.totalPot,
+        currentMonth: 0,
+        hasWon: false,
+        joinedAt: new Date(),
+      });
+      await member.save({ session });
 
-    // Create transaction record (pending)
-    const processingFeeAmount = (chit.monthlyAmount * (chit.processingFee || 0)) / 100;
-    const totalPayable = chit.monthlyAmount + processingFeeAmount;
+      console.log('[Chit Join] Member created:', member._id);
 
-    const transaction = await Transaction.create({
-      userId,
-      userEmail: req.user.email || '',
-      type: 'chit_join',
-      amount: totalPayable,
-      status: 'pending',
-      referenceId: member._id,
-      referenceType: 'ChitMember',
-      description: `Chit Fund join request - ${chit.name} (Month 1 + processing fee)`,
-    });
+      // Create transaction record (pending)
+      const processingFeeAmount = (chit.monthlyAmount * (chit.processingFee || 0)) / 100;
+      const totalPayable = chit.monthlyAmount + processingFeeAmount;
 
-    console.log('[Chit Join] Transaction created:', transaction._id);
+      transaction = new Transaction({
+        userId,
+        userEmail: req.user.email || 'no-email@growvest.com',
+        type: 'chit_join',
+        amount: totalPayable,
+        status: 'pending',
+        referenceId: member._id,
+        referenceType: 'ChitMember',
+        description: `Chit Fund join request - ${chit.name} (Month 1 + processing fee)`,
+      });
+      await transaction.save({ session });
 
-    res.status(201).json({
-      member,
-      transaction,
-      chit: {
-        _id: chit._id,
-        name: chit.name,
-        monthlyAmount: chit.monthlyAmount,
-        processingFee: chit.processingFee,
-        totalPayable,
-      },
-    });
+      await session.commitTransaction();
+      session.endSession();
+
+      console.log('[Chit Join] Transaction created:', transaction._id);
+
+      res.status(201).json({
+        member,
+        transaction,
+        chit: {
+          _id: chit._id,
+          name: chit.name,
+          monthlyAmount: chit.monthlyAmount,
+          processingFee: chit.processingFee,
+          totalPayable,
+        },
+      });
+    } catch (err) {
+      await session.abortTransaction();
+      session.endSession();
+      throw err;
+    }
   } catch (error) {
     console.error('[Chit Join] Error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -316,6 +408,11 @@ const makePayment = async (req, res) => {
 
     const chit = await Chit.findById(chitId);
     if (!chit) return res.status(404).json({ message: 'Chit not found' });
+
+    // Prevent payments for closed, completed, or archived chits
+    if (['closed', 'completed', 'archived'].includes(chit.status)) {
+      return res.status(400).json({ message: 'This chit is closed and no longer accepts payments' });
+    }
 
     const member = await ChitMember.findOne({ _id: memberId, userId });
     if (!member) return res.status(404).json({ message: 'Membership not found' });
@@ -341,31 +438,45 @@ const makePayment = async (req, res) => {
     // Calculate due date (1st of current month)
     const dueDate = calcNextDueDate(member.joinedAt, member.currentMonth);
 
-    // Create pending payment
-    const payment = await ChitPayment.create({
-      chitId,
-      userId,
-      memberId,
-      month,
-      amount: totalAmount,
-      lateFee: fee,
-      status: 'pending',
-      dueDate,
-    });
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    // Create transaction record (pending)
-    const transaction = await Transaction.create({
-      userId,
-      userEmail: req.user.email || '',
-      type: 'chit_payment',
-      amount: totalAmount,
-      status: 'pending',
-      referenceId: payment._id,
-      referenceType: 'ChitPayment',
-      description: `Chit Fund payment - ${chit.name} Month ${month}`,
-    });
+    try {
+      // Create pending payment
+      const payment = new ChitPayment({
+        chitId,
+        userId,
+        memberId,
+        month,
+        amount: totalAmount,
+        lateFee: fee,
+        status: 'pending',
+        dueDate,
+      });
+      await payment.save({ session });
 
-    res.status(201).json({ payment, transaction });
+      // Create transaction record (pending)
+      const transaction = new Transaction({
+        userId,
+        userEmail: req.user.email || 'no-email@growvest.com',
+        type: 'chit_payment',
+        amount: totalAmount,
+        status: 'pending',
+        referenceId: payment._id,
+        referenceType: 'ChitPayment',
+        description: `Chit Fund payment - ${chit.name} Month ${month}`,
+      });
+      await transaction.save({ session });
+
+      await session.commitTransaction();
+      session.endSession();
+
+      res.status(201).json({ payment, transaction });
+    } catch (err) {
+      await session.abortTransaction();
+      session.endSession();
+      throw err;
+    }
   } catch (error) {
     console.error('Error submitting chit payment:', error);
     res.status(500).json({ message: 'Server error', error: error.message });

@@ -13,7 +13,7 @@ import { colors } from '../../theme/theme';
 import { chitFundService } from '../../services/chitFundService';
 
 const ChitPaymentStatusScreen = ({ navigation, route }) => {
-  const { chitId, memberId, month, amount, lateFee, type, chitName } = route.params;
+  const { chitId, memberId, month, amount, lateFee, type, chitName, returnScreen } = route.params;
   const [loading, setLoading] = useState(false);
 
   const formatCurrency = (value) =>
@@ -36,10 +36,14 @@ const ChitPaymentStatusScreen = ({ navigation, route }) => {
       } else {
         const result = await chitFundService.makePayment(payload);
         console.log('[ChitPaymentStatus] Payment result:', result);
+        // If returnScreen is specified, go back there; otherwise go to MyChits
+        const nextScreen = returnScreen || 'MyChits';
         navigation.replace('PaymentSuccess', {
           title: 'Payment Submitted!',
           message: 'Your chit payment has been recorded and is pending verification.',
-          nextScreen: 'MyChits',
+          nextScreen,
+          amount,
+          type: 'due',
         });
       }
     } catch (error) {

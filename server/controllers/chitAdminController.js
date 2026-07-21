@@ -320,10 +320,20 @@ const getAllChits = async (req, res) => {
 const createChit = async (req, res) => {
   try {
     const chit = await Chit.create(req.body);
-    // Notify all users about new chit
+    // Notify all users about new chit (DB notification + push)
     try {
       const users = await User.find({ role: 'user' });
       for (const u of users) {
+        // In-app DB notification
+        await Notification.create({
+          userId: u._id,
+          title: '🆕 New Chit Available',
+          description: `A new Chit Plan "${chit.name}" has been added. Explore and join now!`,
+          type: 'new_chit_available',
+          icon: 'bell-ring',
+          metadata: { chitId: chit._id, chitName: chit.name },
+        });
+        // Push notification
         await sendToUser(u._id, {
           title: '🆕 New Chit Available',
           body: 'A new Chit Plan has been added. Explore and join now!',
@@ -331,7 +341,7 @@ const createChit = async (req, res) => {
         });
       }
     } catch (notifErr) {
-      console.warn('Push notification failed (non-fatal):', notifErr.message);
+      console.warn('Notification failed (non-fatal):', notifErr.message);
     }
     res.status(201).json(chit);
   } catch (error) {
@@ -385,6 +395,35 @@ const changeChitStatus = async (req, res) => {
     }
     const chit = await Chit.findByIdAndUpdate(req.params.id, { status }, { new: true });
     if (!chit) return res.status(404).json({ message: 'Chit not found' });
+
+    // If chit is closed, notify all members (DB + push)
+    if (status === 'closed') {
+      try {
+        const members = await ChitMember.find({ chitId: chit._id }).populate('userId');
+        for (const m of members) {
+          if (m.userId) {
+            // In-app DB notification
+            await Notification.create({
+              userId: m.userId._id,
+              title: '🔒 Chit Closed',
+              description: `The chit "${chit.name}" has been closed by admin. Thank you for participating.`,
+              type: 'chit_closed',
+              icon: 'lock',
+              metadata: { chitId: chit._id, chitName: chit.name },
+            });
+            // Push notification
+            await sendToUser(m.userId._id, {
+              title: '🔒 Chit Closed',
+              body: `The chit "${chit.name}" has been closed by admin.`,
+              data: { type: 'chit_closed', screen: 'MyChits' },
+            });
+          }
+        }
+      } catch (notifErr) {
+        console.warn('Notification failed (non-fatal):', notifErr.message);
+      }
+    }
+
     res.json(chit);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -399,6 +438,8 @@ const getOverview = async (req, res) => {
   try {
     const totalChits = await Chit.countDocuments();
     const activeChits = await Chit.countDocuments({ status: 'active' });
+    const closedChits = await Chit.countDocuments({ status: 'closed' });
+    const completedChits = await Chit.countDocuments({ status: 'completed' });
     const totalMembers = await ChitMember.countDocuments({ status: 'active' });
     const pendingPayments = await ChitPayment.countDocuments({ status: 'pending' });
     const pendingJoins = await Transaction.countDocuments({
@@ -413,6 +454,8 @@ const getOverview = async (req, res) => {
     res.json({
       totalChits,
       activeChits,
+      closedChits,
+      completedChits,
       totalMembers,
       pendingPayments,
       pendingJoins,

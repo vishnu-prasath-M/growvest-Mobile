@@ -6,6 +6,7 @@ import {
   ScrollView,
   Alert,
   TouchableOpacity,
+  Modal,
 } from 'react-native';
 import { TextInput, Button } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -18,6 +19,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
   const [amount, setAmount] = useState('');
   const [investmentType, setInvestmentType] = useState('saving');
   const [userData, setUserData] = useState(null);
+  const [showEmailModal, setShowEmailModal] = useState(false);
 
   useEffect(() => {
     loadUserData();
@@ -51,6 +53,11 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
 
     if (parseFloat(amount) < 1000) {
       Alert.alert('Error', 'Minimum investment amount is ₹1,000');
+      return;
+    }
+
+    if (!userData?.email) {
+      setShowEmailModal(true);
       return;
     }
 
@@ -219,6 +226,44 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Email Required Modal */}
+      <Modal visible={showEmailModal} transparent animationType="fade" onRequestClose={() => setShowEmailModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Email Required</Text>
+              <TouchableOpacity onPress={() => setShowEmailModal(false)} style={styles.modalCloseBtn}>
+                <MaterialCommunityIcons name="close" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.modalText}>
+              Your email address is required before making investments or payments. Please update your email in your Profile.
+            </Text>
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowEmailModal(false)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalSaveBtnOuter}
+                onPress={() => {
+                  setShowEmailModal(false);
+                  navigation.navigate('Profile');
+                }}
+              >
+                <LinearGradient
+                  colors={['#0E3D23', '#1A5C39']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.modalSaveGradient}
+                >
+                  <Text style={styles.modalSaveText}>Update Profile</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -429,6 +474,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.white,
   },
+  // Modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { width: '88%', backgroundColor: colors.surface, borderRadius: 28, padding: 24 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  modalTitle: { fontSize: 19, fontWeight: '700', color: colors.text, letterSpacing: -0.4 },
+  modalCloseBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },
+  modalText: { fontSize: 15, color: colors.textSecondary, marginBottom: 24, lineHeight: 22 },
+  modalBtns: { flexDirection: 'row', gap: 12 },
+  modalCancelBtn: {
+    flex: 1, height: 48, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  modalCancelText: { fontSize: 15, fontWeight: '600', color: colors.textSecondary },
+  modalSaveBtnOuter: { flex: 1 },
+  modalSaveGradient: { height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  modalSaveText: { fontSize: 15, fontWeight: '700', color: colors.white },
 });
 
 export default InvestmentAmountScreen;

@@ -9,6 +9,7 @@ import {
   Alert,
   TouchableOpacity,
   Dimensions,
+  SafeAreaView,
 } from 'react-native';
 import { TextInput } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -67,11 +68,12 @@ const SignupScreen = ({ navigation }) => {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Gradient Top Section */}
         <LinearGradient
           colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
@@ -206,19 +208,21 @@ const SignupScreen = ({ navigation }) => {
             </View>
           </View>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#0E3D23' }, // match gradient top
   container: { flex: 1, backgroundColor: colors.background },
-  scrollContent: { flexGrow: 1, paddingBottom: 40 },
+  scrollContent: { flexGrow: 1, minHeight: height },
   
   // Header Area
   headerArea: {
-    height: height * 0.35,
-    paddingTop: 60,
+    height: height * 0.32,
+    paddingTop: Platform.OS === 'android' ? 36 : 52,
     alignItems: 'center',
     position: 'relative',
     overflow: 'hidden',

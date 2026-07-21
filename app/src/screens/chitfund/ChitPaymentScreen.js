@@ -16,7 +16,7 @@ import { colors } from '../../theme/theme';
 import { chitFundService } from '../../services/chitFundService';
 
 const ChitPaymentScreen = ({ navigation, route }) => {
-  const { chitId, memberId, month, amount, lateFee = 0, type, chitName } = route.params;
+  const { chitId, memberId, month, amount, lateFee = 0, type, chitName, returnScreen } = route.params;
   const [copied, setCopied] = useState(false);
   const [upiId, setUpiId] = useState('');
 
@@ -87,7 +87,8 @@ const ChitPaymentScreen = ({ navigation, route }) => {
               amount,
               lateFee,
               type,
-              chitName
+              chitName,
+              returnScreen,
             });
           },
         },
@@ -230,7 +231,7 @@ const ChitPaymentScreen = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: colors.background, paddingTop: 50 },
   scrollView: { flex: 1 },
   scrollContent: { padding: 20 },
   

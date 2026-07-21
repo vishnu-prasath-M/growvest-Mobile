@@ -96,7 +96,7 @@ const AdminDashboard = () => {
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [userDetails, setUserDetails] = useState<Record<string, any>>({});
-  
+
   // Navigation items with state for badges
   const [navItems, setNavItems] = useState<{ label: string; tab: AdminTab; icon: React.ElementType; badge?: number }[]>([
     { label: "Overview", tab: "overview", icon: LayoutDashboard },
@@ -107,13 +107,13 @@ const AdminDashboard = () => {
     { label: "Chit Funds", tab: "chits", icon: TrendingUp },
     { label: "Settings", tab: "settings", icon: Settings },
   ]);
-  
+
   // KYC State
   const [kycList, setKycList] = useState<any[]>([]);
   const [kycFilter, setKycFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
   const [selectedKYC, setSelectedKYC] = useState<any>(null);
   const [kycModalOpen, setKycModalOpen] = useState(false);
-  
+
   // Chit Fund State
   const [chits, setChits] = useState<any[]>([]);
   const [chitModalOpen, setChitModalOpen] = useState(false);
@@ -128,7 +128,7 @@ const AdminDashboard = () => {
     startDate: '',
     processingFee: '2',
   });
-  
+
   // Dashboard Stats State
   const [dashboardStats, setDashboardStats] = useState<any>(null);
 
@@ -227,7 +227,7 @@ const AdminDashboard = () => {
             setKycList(data);
             // Update badge for KYC tab
             const pendingCount = data.filter((k: any) => k.status === 'pending').length;
-            setNavItems(prev => prev.map(item => 
+            setNavItems(prev => prev.map(item =>
               item.tab === 'kyc' ? { ...item, badge: pendingCount } : item
             ));
           }
@@ -259,7 +259,7 @@ const AdminDashboard = () => {
       const res = await fetch(`${API_URL}/api/investments/${id}/status`, {
 
         method: "PATCH",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
@@ -282,7 +282,7 @@ const AdminDashboard = () => {
       const res = await fetch(`${API_URL}/api/withdrawals/${id}/status`, {
 
         method: "PATCH",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
@@ -305,14 +305,14 @@ const AdminDashboard = () => {
     try {
       const res = await fetch(`${API_URL}/api/kyc/${kycId}/review`, {
         method: "PUT",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({ status: action, rejectionReason: reason }),
       });
       if (res.ok) {
-        setKycList(prev => prev.map(k => 
+        setKycList(prev => prev.map(k =>
           k._id === kycId ? { ...k, status: action, rejectionReason: reason } : k
         ));
         setKycModalOpen(false);
@@ -326,7 +326,7 @@ const AdminDashboard = () => {
             if (Array.isArray(data)) {
               setKycList(data);
               const pendingCount = data.filter((k: any) => k.status === 'pending').length;
-              setNavItems(prev => prev.map(item => 
+              setNavItems(prev => prev.map(item =>
                 item.tab === 'kyc' ? { ...item, badge: pendingCount } : item
               ));
             }
@@ -349,7 +349,7 @@ const AdminDashboard = () => {
     try {
       const res = await fetch(`${API_URL}/api/chits`, {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
@@ -405,7 +405,7 @@ const AdminDashboard = () => {
     try {
       const res = await fetch(`${API_URL}/api/chits/${editingChit._id}`, {
         method: "PUT",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
@@ -446,15 +446,21 @@ const AdminDashboard = () => {
     try {
       const res = await fetch(`${API_URL}/api/chits/${chitId}`, {
         method: "DELETE",
-        headers: { 
+        headers: {
           "Authorization": `Bearer ${token}`
         },
       });
+      const data = await res.json();
+      
       if (res.ok) {
         setChits(prev => prev.filter(c => c._id !== chitId));
+        alert("Chit deleted successfully.");
+      } else {
+        alert(data.message || "Failed to delete chit.");
       }
     } catch (error) {
       console.error("Error deleting chit:", error);
+      alert("Error deleting chit. Please try again.");
     }
   };
 
@@ -464,7 +470,7 @@ const AdminDashboard = () => {
     try {
       const res = await fetch(`${API_URL}/api/chits/${chitId}/status`, {
         method: "PATCH",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
@@ -485,7 +491,7 @@ const AdminDashboard = () => {
     try {
       const res = await fetch(`${API_URL}/api/chits/${chitId}/status`, {
         method: "PATCH",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
@@ -592,9 +598,8 @@ const AdminDashboard = () => {
     <div className="min-h-screen flex bg-background overflow-x-hidden">
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-card border-r border-border transform transition-transform duration-300 flex flex-col lg:translate-x-0 lg:static lg:flex ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-        }`}
+        className={`fixed inset-y-0 left-0 z-40 w-64 bg-card border-r border-border transform transition-transform duration-300 flex flex-col lg:translate-x-0 lg:static lg:flex ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          }`}
       >
         <div className="flex items-center justify-between p-5 border-b border-border">
           <div className="max-w-[140px] overflow-hidden">
@@ -621,11 +626,10 @@ const AdminDashboard = () => {
               <button
                 key={item.tab}
                 onClick={() => { setActiveTab(item.tab); setSidebarOpen(false); }}
-                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-body font-medium transition-colors ${
-                  activeTab === item.tab
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                }`}
+                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-body font-medium transition-colors ${activeTab === item.tab
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
               >
                 <div className="flex items-center gap-3">
                   <item.icon className="h-4 w-4" />
@@ -633,9 +637,8 @@ const AdminDashboard = () => {
                 </div>
                 {badge > 0 && (
                   <span
-                    className={`h-5 min-w-5 px-1.5 rounded-full text-[10px] font-bold flex items-center justify-center ${
-                      activeTab === item.tab ? "bg-white/20 text-white" : "bg-amber-100 text-amber-700"
-                    }`}
+                    className={`h-5 min-w-5 px-1.5 rounded-full text-[10px] font-bold flex items-center justify-center ${activeTab === item.tab ? "bg-white/20 text-white" : "bg-amber-100 text-amber-700"
+                      }`}
                   >
                     {badge}
                   </span>
@@ -651,9 +654,9 @@ const AdminDashboard = () => {
               Back to Site
             </Button>
           </Link>
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             className="w-full rounded-xl font-body text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center justify-center gap-2"
             onClick={() => {
               logout();
@@ -737,25 +740,25 @@ const AdminDashboard = () => {
 
               {/* Pending actions alert */}
               {pendingCount > 0 && (
-                  <div
-                    className="rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-5 mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-amber-100 transition-colors"
-                    onClick={() => setActiveTab("pending")}
-                  >
-                    <div className="flex items-center gap-3">
-                      <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0" />
-                      <div>
-                        <p className="text-sm font-body font-semibold text-amber-800">
-                          {pendingCount} investment{pendingCount > 1 ? "s" : ""} awaiting your approval
-                        </p>
-                        <p className="text-xs font-body text-amber-600 mt-0.5">
-                          Click to review and approve or reject
-                        </p>
-                      </div>
+                <div
+                  className="rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-5 mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-amber-100 transition-colors"
+                  onClick={() => setActiveTab("pending")}
+                >
+                  <div className="flex items-center gap-3">
+                    <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-body font-semibold text-amber-800">
+                        {pendingCount} investment{pendingCount > 1 ? "s" : ""} awaiting your approval
+                      </p>
+                      <p className="text-xs font-body text-amber-600 mt-0.5">
+                        Click to review and approve or reject
+                      </p>
                     </div>
-                    <Button size="sm" className="rounded-xl font-body bg-amber-600 hover:bg-amber-700 w-full sm:w-auto">
-                      Review Now
-                    </Button>
                   </div>
+                  <Button size="sm" className="rounded-xl font-body bg-amber-600 hover:bg-amber-700 w-full sm:w-auto">
+                    Review Now
+                  </Button>
+                </div>
               )}
 
               {/* Recent activity */}
@@ -768,9 +771,8 @@ const AdminDashboard = () => {
                     <div key={inv._id} className="px-4 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
                         <div
-                          className={`h-8 w-8 sm:h-9 sm:w-9 rounded-xl flex items-center justify-center ${
-                            inv.status === "approved" ? "bg-accent" : inv.status === "pending" ? "bg-amber-50" : "bg-red-50"
-                          }`}
+                          className={`h-8 w-8 sm:h-9 sm:w-9 rounded-xl flex items-center justify-center ${inv.status === "approved" ? "bg-accent" : inv.status === "pending" ? "bg-amber-50" : "bg-red-50"
+                            }`}
                         >
                           {inv.status === "approved" && <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-secondary" />}
                           {inv.status === "pending" && <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600" />}
@@ -819,9 +821,8 @@ const AdminDashboard = () => {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="flex items-start gap-4">
                         <div
-                          className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${
-                            inv.status === "approved" ? "bg-accent" : inv.status === "pending" ? "bg-amber-50" : "bg-red-50"
-                          }`}
+                          className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${inv.status === "approved" ? "bg-accent" : inv.status === "pending" ? "bg-amber-50" : "bg-red-50"
+                            }`}
                         >
                           {inv.status === "approved" && <CheckCircle className="h-5 w-5 text-secondary" />}
                           {inv.status === "pending" && <Clock className="h-5 w-5 text-amber-600" />}
@@ -1057,9 +1058,8 @@ const AdminDashboard = () => {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="flex items-center gap-4">
                         <div
-                          className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${
-                            w.status === "approved" ? "bg-accent" : w.status === "pending" ? "bg-amber-50" : "bg-red-50"
-                          }`}
+                          className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${w.status === "approved" ? "bg-accent" : w.status === "pending" ? "bg-amber-50" : "bg-red-50"
+                            }`}
                         >
                           {w.status === "approved" && <CheckCircle className="h-5 w-5 text-secondary" />}
                           {w.status === "pending" && <ArrowDownToLine className="h-5 w-5 text-amber-600" />}
@@ -1113,7 +1113,7 @@ const AdminDashboard = () => {
                       ) : (
                         <div className="flex gap-3 items-center">
                           <span className="text-xs font-body font-bold text-green-600 px-3 py-1.5 bg-green-50 rounded-xl border border-green-200">
-                             Paid
+                            Paid
                           </span>
                         </div>
                       )}
@@ -1123,172 +1123,6 @@ const AdminDashboard = () => {
               </div>
             </motion.div>
           )}
-        </main>
-      </div>
-
-      {/* Pay Modal */}
-      {payModalData && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-card border border-border rounded-2xl w-full max-w-sm p-6 shadow-xl relative animate-in fade-in zoom-in duration-200 my-auto max-h-[90vh] overflow-y-auto">
-            <button
-              onClick={() => setPayModalData(null)}
-              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground"
-            >
-              <X size={20} />
-            </button>
-            <div className="mb-6">
-              <h2 className="text-xl font-heading font-bold text-foreground">Complete Payment</h2>
-              <p className="text-sm font-body text-muted-foreground mt-2">
-                Send the requested amount to the user's UPI below.
-              </p>
-            </div>
-            
-            <div className="flex flex-col items-center justify-center mb-6 gap-4">
-              {(() => {
-                try {
-                  // Validate data before generating QR
-                  if (!payModalData.upi || !payModalData.rawAmount || payModalData.rawAmount <= 0) {
-                    return (
-                      <div className="w-[150px] h-[150px] rounded-xl border border-border bg-muted flex items-center justify-center">
-                        <p className="text-xs font-body text-muted-foreground text-center px-2">
-                          Invalid payment data
-                        </p>
-                      </div>
-                    );
-                  }
-                  
-                  // Generate UPI link using utility function
-                  const upiLink = generateUPILink(
-                    payModalData.upi,
-                    payModalData.rawAmount,
-                    `WD-${payModalData.id}`,
-                    'Zenvest'
-                  );
-                  
-                  return (
-                    <div className="flex flex-col items-center gap-4">
-                      <div id="qr-download-area" className="rounded-2xl border-2 border-border p-4 bg-white shadow-card">
-                        <QRCodeSVG
-                          value={upiLink}
-                          size={180}
-                          bgColor="#ffffff"
-                          fgColor="#000000"
-                          level="H"
-                        />
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-9 px-4 rounded-xl font-body text-xs flex items-center gap-2 border-primary/20 text-primary hover:bg-primary/5"
-                        onClick={() => {
-                          const svg = document.querySelector("#qr-download-area svg") as SVGElement;
-                          if (!svg) return;
-                          
-                          const svgData = new XMLSerializer().serializeToString(svg);
-                          const canvas = document.createElement("canvas");
-                          const ctx = canvas.getContext("2d");
-                          const img = new Image();
-                          
-                          img.onload = () => {
-                            canvas.width = img.width * 2; // Higher quality
-                            canvas.height = img.height * 2;
-                            if (ctx) {
-                              ctx.fillStyle = "#ffffff";
-                              ctx.fillRect(0, 0, canvas.width, canvas.height);
-                              ctx.scale(2, 2);
-                              ctx.drawImage(img, 0, 0);
-                            }
-                            
-                            const pngFile = canvas.toDataURL("image/png");
-                            const downloadLink = document.createElement("a");
-                            downloadLink.download = `Zenvest-QR-${payModalData.id}.png`;
-                            downloadLink.href = pngFile;
-                            downloadLink.click();
-                          };
-                          
-                          img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
-                        }}
-                      >
-                        <ArrowDownToLine className="h-3.5 w-3.5" />
-                        Download QR
-                      </Button>
-                      <p className="text-sm font-body font-medium text-primary">
-                        Scan this QR using any UPI app to pay
-                      </p>
-                      <p className="text-xs font-body text-muted-foreground">
-                        Amount: ₹{payModalData.rawAmount.toLocaleString("en-IN")} · Ref: WD-{payModalData.id}
-                      </p>
-                    </div>
-                  );
-                } catch (error) {
-                  return (
-                    <div className="w-[150px] h-[150px] rounded-xl border border-border bg-muted flex items-center justify-center">
-                      <p className="text-xs font-body text-muted-foreground text-center px-2">
-                        Error generating QR
-                      </p>
-                    </div>
-                  );
-                }
-              })()}
-            </div>
-
-            <div className="space-y-4 mb-6">
-              <div>
-                <label className="text-xs font-body font-semibold text-muted-foreground">UPI ID</label>
-                <div className="p-3 bg-muted rounded-xl text-sm font-body text-foreground font-medium flex items-center justify-between">
-                  {payModalData.upi || "None provided"}
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-body font-semibold text-muted-foreground">Amount</label>
-                <div className="p-3 bg-muted rounded-xl text-lg font-heading text-destructive font-bold">
-                  {payModalData.amount.startsWith('₹') ? payModalData.amount : `₹${payModalData.amount}`}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                className="w-full rounded-xl font-body"
-                onClick={() => setPayModalData(null)}
-              >
-                Cancel
-              </Button>
-              <Button
-                className="w-full rounded-xl font-body bg-green-600 hover:bg-green-700"
-                onClick={async () => {
-                  // Update withdrawal status to 'paid' with timestamp
-                  try {
-                    const res = await fetch(`${API_URL}/api/withdrawals/${payModalData.id}/status`, {
-                      method: 'PATCH',
-                      headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                      },
-                      body: JSON.stringify({ 
-                        status: 'paid',
-                        paidAt: new Date().toISOString()
-                      })
-                    });
-                    if (res.ok) {
-                      setWithdrawList(prev =>
-                        prev.map((w) => (w.id === payModalData.id ? { ...w, status: 'paid' } : w))
-                      );
-                      setPayModalData(null);
-                    }
-                  } catch (error) {
-                    console.error('Error updating withdrawal status:', error);
-                  }
-                  setPayModalData(null);
-                }}
-              >
-                Mark as Paid
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
           {/* ── KYC VERIFICATION ── */}
           {activeTab === "kyc" && (
@@ -1310,11 +1144,10 @@ const AdminDashboard = () => {
                   <button
                     key={filter}
                     onClick={() => setKycFilter(filter)}
-                    className={`px-4 py-2 rounded-xl text-sm font-body font-medium transition-colors ${
-                      kycFilter === filter
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80"
-                    }`}
+                    className={`px-4 py-2 rounded-xl text-sm font-body font-medium transition-colors ${kycFilter === filter
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                      }`}
                   >
                     {filter.charAt(0).toUpperCase() + filter.slice(1)}
                   </button>
@@ -1334,10 +1167,9 @@ const AdminDashboard = () => {
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="flex items-start gap-4">
                           <div
-                            className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${
-                              kyc.status === 'approved' ? 'bg-accent' : 
+                            className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${kyc.status === 'approved' ? 'bg-accent' :
                               kyc.status === 'pending' ? 'bg-amber-50' : 'bg-red-50'
-                            }`}
+                              }`}
                           >
                             {kyc.status === 'approved' && <CheckCircle className="h-5 w-5 text-secondary" />}
                             {kyc.status === 'pending' && <Clock className="h-5 w-5 text-amber-600" />}
@@ -1431,7 +1263,7 @@ const AdminDashboard = () => {
                   Manage your security preferences and payment details
                 </p>
               </div>
-              
+
               <div className="w-full flex flex-col md:flex-row justify-center gap-6">
                 {/* Password Change Section */}
                 <div className="card-premium p-6 sm:p-8 flex flex-col h-full w-full">
@@ -1442,7 +1274,7 @@ const AdminDashboard = () => {
                     <h3 className="font-heading text-xl font-bold text-foreground">Security</h3>
                     <p className="text-xs font-body text-muted-foreground mt-1">Update your admin password</p>
                   </div>
-                  
+
                   <div className="space-y-4 flex-1">
                     <div className="space-y-2">
                       <label className="text-sm font-body font-semibold text-foreground">Current Password</label>
@@ -1461,12 +1293,12 @@ const AdminDashboard = () => {
                       />
                     </div>
                   </div>
-                  
+
                   <Button className="w-full rounded-xl font-body font-medium h-12 mt-6">
                     Update Password
                   </Button>
                 </div>
-                
+
                 {/* UPI ID Update Section */}
                 <div className="card-premium p-6 sm:p-8 flex flex-col h-full w-full">
                   <div className="mb-6">
@@ -1476,7 +1308,7 @@ const AdminDashboard = () => {
                     <h3 className="font-heading text-xl font-bold text-foreground">Payment Details</h3>
                     <p className="text-xs font-body text-muted-foreground mt-1">Update your receiving UPI ID</p>
                   </div>
-                  
+
                   <div className="space-y-4 flex-1">
                     <div className="space-y-2">
                       <label className="text-sm font-body font-semibold text-foreground">Active UPI ID</label>
@@ -1491,7 +1323,7 @@ const AdminDashboard = () => {
                       </p>
                     </div>
                   </div>
-                  
+
                   <Button className="w-full rounded-xl font-body font-medium h-12 mt-6">
                     Save UPI ID
                   </Button>
@@ -1499,6 +1331,176 @@ const AdminDashboard = () => {
               </div>
             </motion.div>
           )}
+        </main>
+      </div>
+
+      {/* Pay Modal */}
+      {payModalData && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-card border border-border rounded-2xl w-full max-w-sm p-6 shadow-xl relative animate-in fade-in zoom-in duration-200 my-auto max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={() => setPayModalData(null)}
+              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground"
+            >
+              <X size={20} />
+            </button>
+            <div className="mb-6">
+              <h2 className="text-xl font-heading font-bold text-foreground">Complete Payment</h2>
+              <p className="text-sm font-body text-muted-foreground mt-2">
+                Send the requested amount to the user's UPI below.
+              </p>
+            </div>
+
+            <div className="flex flex-col items-center justify-center mb-6 gap-4">
+              {(() => {
+                try {
+                  // Validate data before generating QR
+                  if (!payModalData.upi || !payModalData.rawAmount || payModalData.rawAmount <= 0) {
+                    return (
+                      <div className="w-[150px] h-[150px] rounded-xl border border-border bg-muted flex items-center justify-center">
+                        <p className="text-xs font-body text-muted-foreground text-center px-2">
+                          Invalid payment data
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  // Generate UPI link using utility function
+                  const upiLink = generateUPILink(
+                    payModalData.upi,
+                    payModalData.rawAmount,
+                    `WD-${payModalData.id}`,
+                    'Zenvest'
+                  );
+
+                  return (
+                    <div className="flex flex-col items-center gap-4">
+                      <div id="qr-download-area" className="rounded-2xl border-2 border-border p-4 bg-white shadow-card">
+                        <QRCodeSVG
+                          value={upiLink}
+                          size={180}
+                          bgColor="#ffffff"
+                          fgColor="#000000"
+                          level="H"
+                        />
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-9 px-4 rounded-xl font-body text-xs flex items-center gap-2 border-primary/20 text-primary hover:bg-primary/5"
+                        onClick={() => {
+                          const svg = document.querySelector("#qr-download-area svg") as SVGElement;
+                          if (!svg) return;
+
+                          const svgData = new XMLSerializer().serializeToString(svg);
+                          const canvas = document.createElement("canvas");
+                          const ctx = canvas.getContext("2d");
+                          const img = new Image();
+
+                          img.onload = () => {
+                            canvas.width = img.width * 2; // Higher quality
+                            canvas.height = img.height * 2;
+                            if (ctx) {
+                              ctx.fillStyle = "#ffffff";
+                              ctx.fillRect(0, 0, canvas.width, canvas.height);
+                              ctx.scale(2, 2);
+                              ctx.drawImage(img, 0, 0);
+                            }
+
+                            const pngFile = canvas.toDataURL("image/png");
+                            const downloadLink = document.createElement("a");
+                            downloadLink.download = `Zenvest-QR-${payModalData.id}.png`;
+                            downloadLink.href = pngFile;
+                            downloadLink.click();
+                          };
+
+                          img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
+                        }}
+                      >
+                        <ArrowDownToLine className="h-3.5 w-3.5" />
+                        Download QR
+                      </Button>
+                      <p className="text-sm font-body font-medium text-primary">
+                        Scan this QR using any UPI app to pay
+                      </p>
+                      <p className="text-xs font-body text-muted-foreground">
+                        Amount: ₹{payModalData.rawAmount.toLocaleString("en-IN")} · Ref: WD-{payModalData.id}
+                      </p>
+                    </div>
+                  );
+                } catch (error) {
+                  return (
+                    <div className="w-[150px] h-[150px] rounded-xl border border-border bg-muted flex items-center justify-center">
+                      <p className="text-xs font-body text-muted-foreground text-center px-2">
+                        Error generating QR
+                      </p>
+                    </div>
+                  );
+                }
+              })()}
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="text-xs font-body font-semibold text-muted-foreground">UPI ID</label>
+                <div className="p-3 bg-muted rounded-xl text-sm font-body text-foreground font-medium flex items-center justify-between">
+                  {payModalData.upi || "None provided"}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-body font-semibold text-muted-foreground">Amount</label>
+                <div className="p-3 bg-muted rounded-xl text-lg font-heading text-destructive font-bold">
+                  {payModalData.amount.startsWith('₹') ? payModalData.amount : `₹${payModalData.amount}`}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="w-full rounded-xl font-body"
+                onClick={() => setPayModalData(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="w-full rounded-xl font-body bg-green-600 hover:bg-green-700"
+                onClick={async () => {
+                  // Update withdrawal status to 'paid' with timestamp
+                  try {
+                    const res = await fetch(`${API_URL}/api/withdrawals/${payModalData.id}/status`, {
+                      method: 'PATCH',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                      },
+                      body: JSON.stringify({
+                        status: 'paid',
+                        paidAt: new Date().toISOString()
+                      })
+                    });
+                    if (res.ok) {
+                      setWithdrawList(prev =>
+                        prev.map((w) => (w.id === payModalData.id ? { ...w, status: 'paid' } : w))
+                      );
+                      setPayModalData(null);
+                    }
+                  } catch (error) {
+                    console.error('Error updating withdrawal status:', error);
+                  }
+                  setPayModalData(null);
+                }}
+              >
+                Mark as Paid
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+
+
 
       {/* KYC Detail Modal */}
       {kycModalOpen && selectedKYC && (
