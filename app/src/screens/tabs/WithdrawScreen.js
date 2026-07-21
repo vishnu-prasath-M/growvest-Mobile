@@ -24,7 +24,7 @@ import { Portal } from 'react-native-paper';
 
 const QUICK_AMOUNTS = [1000, 5000, 10000, 25000];
 
-const WithdrawScreen = () => {
+const WithdrawScreen = ({ navigation }) => {
   const insets = useScreenInsets(8);
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -34,6 +34,7 @@ const WithdrawScreen = () => {
   const [amount, setAmount] = useState('');
   const [upiId, setUpiId] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
+  const [emailRequiredModalVisible, setEmailRequiredModalVisible] = useState(false);
 
   const fetchUserData = async () => {
     try {
@@ -52,6 +53,14 @@ const WithdrawScreen = () => {
       fetchUserData();
     }, [])
   );
+
+  // Polling for auto-updating UI
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      fetchUserData();
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -83,6 +92,14 @@ const WithdrawScreen = () => {
       Alert.alert('Error', 'Please enter your UPI ID');
       return;
     }
+    
+    // Check if user has email before proceeding
+    if (!userData?.email || !userData.email.trim()) {
+      setWithdrawModalVisible(false);
+      setEmailRequiredModalVisible(true);
+      return;
+    }
+    
     setWithdrawing(true);
     try {
       await withdrawalService.createWithdrawal({
@@ -347,6 +364,55 @@ const WithdrawScreen = () => {
           </KeyboardAvoidingView>
         </Modal>
       </Portal>
+
+      {/* Email Required Modal */}
+      <Modal
+        visible={emailRequiredModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEmailRequiredModalVisible(false)}
+      >
+        <View style={styles.modalWrapper}>
+          <View style={styles.modalOverlay} onTouchStart={() => setEmailRequiredModalVisible(false)} />
+          <View style={styles.emailModalSheet}>
+            <View style={styles.modalHandle} />
+            <View style={styles.emailModalContent}>
+              <MaterialCommunityIcons name="email-alert" size={48} color={colors.warning} style={styles.emailModalIcon} />
+              <Text style={styles.emailModalTitle}>Email Required</Text>
+              <Text style={styles.emailModalText}>
+                An email address is required to submit a withdrawal request.
+              </Text>
+              <Text style={styles.emailModalSubText}>
+                Please update your email in your Profile before continuing.
+              </Text>
+              <View style={styles.emailModalActions}>
+                <TouchableOpacity
+                  style={styles.emailModalCancelBtn}
+                  onPress={() => setEmailRequiredModalVisible(false)}
+                >
+                  <Text style={styles.emailModalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.emailModalUpdateBtn}
+                  onPress={() => {
+                    setEmailRequiredModalVisible(false);
+                    navigation.navigate('Profile');
+                  }}
+                >
+                  <LinearGradient
+                    colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.emailModalUpdateBtnGradient}
+                  >
+                    <Text style={styles.emailModalUpdateText}>Update Profile</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -497,6 +563,33 @@ const styles = StyleSheet.create({
   },
   submitBtnDisabled: { opacity: 0.6 },
   submitBtnText: { fontSize: 15, fontWeight: '700', color: colors.white },
+
+  // Email Required Modal
+  emailModalSheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+  },
+  emailModalContent: { alignItems: 'center', paddingTop: 10 },
+  emailModalIcon: { marginBottom: 16 },
+  emailModalTitle: { fontSize: 20, fontWeight: '700', color: colors.text, marginBottom: 12 },
+  emailModalText: { fontSize: 15, color: colors.textSecondary, textAlign: 'center', lineHeight: 22, marginBottom: 8 },
+  emailModalSubText: { fontSize: 13, color: colors.textMuted, textAlign: 'center', marginBottom: 24 },
+  emailModalActions: { flexDirection: 'row', gap: 12, width: '100%' },
+  emailModalCancelBtn: {
+    flex: 1, height: 50, borderRadius: 14,
+    borderWidth: 1.5, borderColor: colors.border,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  emailModalCancelText: { fontSize: 15, fontWeight: '600', color: colors.textSecondary },
+  emailModalUpdateBtn: { flex: 1.5 },
+  emailModalUpdateBtnGradient: {
+    height: 50, borderRadius: 14,
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#1A5C39', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2, shadowRadius: 8, elevation: 6,
+  },
+  emailModalUpdateText: { fontSize: 15, fontWeight: '700', color: colors.white },
 });
 
 export default WithdrawScreen;

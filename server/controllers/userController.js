@@ -101,8 +101,8 @@ const getEnrichedUserData = async (query) => {
 
   const availableToWithdraw = savingBalance + availableFixed;
 
-  // Total balance - use user.balance if available, otherwise calculate from investments
-  let totalBalance = user.balance !== undefined ? user.balance : (savingBalance + fixedBalance);
+  // Total balance - ALWAYS calculate from investments (user.balance is not the source of truth)
+  let totalBalance = savingBalance + fixedBalance;
   if (totalBalance < 0) totalBalance = 0;
 
   // Total calculations
@@ -458,6 +458,7 @@ exports.registerDevice = async (req, res) => {
 
     const normalizedPlatform = ['android', 'ios', 'web'].includes(platform) ? platform : 'android';
 
+    // Save to DeviceToken collection (legacy)
     const existingToken = await DeviceToken.findOne({ deviceToken });
 
     if (existingToken) {
@@ -472,6 +473,43 @@ exports.registerDevice = async (req, res) => {
         deviceToken,
         platform: normalizedPlatform
       });
+    }
+
+    // CRITICAL FIX: Also save to User.fcmTokens so sendToUser() can find it
+    // This is the root cause of push notifications not being delivered
+    const user = await User.findById(userId);
+    if (user) {
+      const now = new Date();
+      const tokens = Array.isArray(user.fcmTokens) ? [...user.fcmTokens] : [];
+      
+      const existingIndex = tokens.findIndex((entry) => entry.token === deviceToken);
+      const tokenEntry = {
+        token: deviceToken.trim(),
+        platform: normalizedPlatform,
+        deviceId: null,
+        updatedAt: now,
+      };
+
+      if (existingIndex >= 0) {
+        tokens[existingIndex] = tokenEntry;
+      } else {
+        tokens.push(tokenEntry);
+      }
+
+      // Deduplicate
+      const dedupedTokens = [];
+      const seen = new Set();
+      for (let i = tokens.length - 1; i >= 0; i -= 1) {
+        const key = tokens[i].token;
+        if (!seen.has(key)) {
+          seen.add(key);
+          dedupedTokens.unshift(tokens[i]);
+        }
+      }
+
+      user.fcmTokens = dedupedTokens.slice(-10);
+      await user.save();
+      console.log(`[PushNotification] Device token saved to User.fcmTokens for user ${userId}`);
     }
 
     res.status(200).json({ message: 'Device registered successfully' });

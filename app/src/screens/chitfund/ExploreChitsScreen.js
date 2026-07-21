@@ -130,6 +130,7 @@ const ExploreChitsScreen = ({ navigation }) => {
         ) : (
           filteredChits.map((chit) => {
             const isFull = chit.availableSlots === 0;
+            const isClosed = chit.status === 'closed' || chit.status === 'completed' || chit.status === 'archived';
             const hasJoined = myChits.some(m => m.chitId === chit._id);
             return (
               <TouchableOpacity
@@ -137,7 +138,7 @@ const ExploreChitsScreen = ({ navigation }) => {
                 style={styles.chitCard}
                 activeOpacity={0.85}
                 onPress={() => {
-                  if (!isFull && !hasJoined) {
+                  if (!isFull && !hasJoined && !isClosed) {
                     navigation.navigate('ChitDetails', { chitId: chit._id });
                   }
                 }}
@@ -189,25 +190,25 @@ const ExploreChitsScreen = ({ navigation }) => {
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.joinBtnOuter, (isFull || hasJoined) && styles.joinBtnDisabled]}
+                  style={[styles.joinBtnOuter, (isFull || hasJoined || isClosed) && styles.joinBtnDisabled]}
                   activeOpacity={0.85}
                   onPress={() => {
-                    if (!isFull && !hasJoined) {
+                    if (!isFull && !hasJoined && !isClosed) {
                       navigation.navigate('JoinChit', { chitId: chit._id });
                     }
                   }}
-                  disabled={isFull || hasJoined}
+                  disabled={isFull || hasJoined || isClosed}
                 >
                   <LinearGradient
-                    colors={(isFull || hasJoined) ? [colors.muted, colors.muted] : ['#0E3D23', '#1A5C39', '#2E8B5A']}
+                    colors={(isFull || hasJoined || isClosed) ? [colors.muted, colors.muted] : ['#0E3D23', '#1A5C39', '#2E8B5A']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.joinBtnGradient}
                   >
-                    <Text style={[styles.joinBtnText, (isFull || hasJoined) && styles.joinBtnTextDisabled]}>
-                      {isFull ? 'Chit Full' : hasJoined ? 'Already Joined' : 'Join Chit'}
+                    <Text style={[styles.joinBtnText, (isFull || hasJoined || isClosed) && styles.joinBtnTextDisabled]}>
+                      {isFull ? 'Chit Full' : isClosed ? 'Closed' : hasJoined ? 'Already Joined' : 'Join Chit'}
                     </Text>
-                    {!(isFull || hasJoined) && <MaterialCommunityIcons name="arrow-right" size={20} color={colors.white} />}
+                    {!(isFull || hasJoined || isClosed) && <MaterialCommunityIcons name="arrow-right" size={20} color={colors.white} />}
                   </LinearGradient>
                 </TouchableOpacity>
               </TouchableOpacity>

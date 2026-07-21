@@ -22,6 +22,7 @@ export const API_ENDPOINTS = {
   LOGIN: '/auth/login',
   ME: '/auth/me',
   UPDATE_USERNAME: '/auth/username',
+  UPDATE_EMAIL: '/auth/email',
   UPDATE_MOBILE: '/auth/mobile',
   UPDATE_PROFILE: '/auth/update-profile',
 

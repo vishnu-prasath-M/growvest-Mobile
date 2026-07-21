@@ -20,6 +20,12 @@ const investmentSchema = new mongoose.Schema({
     enum: ['saving', 'fixed'],
     required: true,
   },
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: false,
+    index: true,
+  },
   userName: {
     type: String,
     required: true,
@@ -58,5 +64,9 @@ const investmentSchema = new mongoose.Schema({
     default: 1, // 1 is old/wrong, 2 is correct (Feature 2)
   }
 }, { timestamps: true });
+
+// Index for fast user-based queries
+investmentSchema.index({ userId: 1, status: 1 });
+investmentSchema.index({ userEmail: 1 });
 
 module.exports = mongoose.model('Investment', investmentSchema);

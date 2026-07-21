@@ -127,6 +127,16 @@ export const authService = {
     }
   },
 
+  // Update email address
+  updateEmail: async (email) => {
+    try {
+      await api.put(API_ENDPOINTS.UPDATE_EMAIL, { email });
+      return await refreshUserProfile();
+    } catch (error) {
+      throw normalizeError(error);
+    }
+  },
+
   // Update user profile (username, mobileNumber, name)
   updateProfile: async (profileData) => {
     try {

@@ -1,12 +1,19 @@
 const Withdrawal = require('../models/Withdrawal');
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
+const { sendNotification } = require('../services/notificationHelper');
 
 exports.createWithdrawal = async (req, res) => {
   try {
     const { amount, upiId, userName, userEmail, withdrawType } = req.body;
     
+    // Find user to store userId
+    const user = await User.findOne({ 
+      $or: [{ email: userEmail }, { mobileNumber: userEmail }] 
+    });
+
     const newWithdrawal = new Withdrawal({
+      userId: user?._id || null,
       amount,
       upiId,
       userName,
@@ -18,10 +25,7 @@ exports.createWithdrawal = async (req, res) => {
 
     await newWithdrawal.save();
 
-    // Create transaction record
-    const user = await User.findOne({ 
-      $or: [{ email: userEmail }, { mobileNumber: userEmail }] 
-    });
+    // Create transaction record (user already found above)
     if (user) {
       const transaction = new Transaction({
         userId: user._id,
@@ -88,41 +92,36 @@ async function processWithdrawalDeductions(withdrawal) {
   }).sort({ startDate: 1 });
 
   let remainingWithdrawAmount = withdrawal.amount;
+  
+  // Pass 1: Deduct from interest first across ALL investments
   for (const inv of approvedInvestments) {
     if (remainingWithdrawAmount <= 0) break;
-
     let updatedInterestEarned = inv.interestEarned || 0;
-    let updatedAmount = inv.amount || 0;
-    let updatedStatus = inv.status;
-
-    // 1. Deduct from interest first
-    if (remainingWithdrawAmount >= updatedInterestEarned) {
-      remainingWithdrawAmount -= updatedInterestEarned;
-      updatedInterestEarned = 0;
-    } else {
-      updatedInterestEarned -= remainingWithdrawAmount;
-      remainingWithdrawAmount = 0;
-    }
-
-    // 2. Deduct from amount/principal next
-    if (remainingWithdrawAmount > 0) {
-      if (remainingWithdrawAmount >= updatedAmount) {
-        remainingWithdrawAmount -= updatedAmount;
-        updatedAmount = 0;
-        updatedStatus = 'withdrawn';
+    
+    if (updatedInterestEarned > 0) {
+      if (remainingWithdrawAmount >= updatedInterestEarned) {
+        remainingWithdrawAmount -= updatedInterestEarned;
+        inv.interestEarned = 0;
       } else {
-        updatedAmount -= remainingWithdrawAmount;
+        inv.interestEarned -= remainingWithdrawAmount;
         remainingWithdrawAmount = 0;
       }
     }
+  }
 
+  // Pass 2: DO NOT deduct from principal - withdrawals should only come from interest
+  // If remaining amount after interest deduction, it means insufficient interest
+  // Leave principal intact as per business rules
+
+  // Save all updated investments
+  for (const inv of approvedInvestments) {
     await Investment.updateOne(
       { _id: inv._id },
       {
         $set: {
-          amount: updatedAmount,
-          interestEarned: updatedInterestEarned,
-          status: updatedStatus
+          amount: inv.amount,
+          interestEarned: inv.interestEarned,
+          status: inv.status
         }
       }
     );
@@ -177,32 +176,30 @@ exports.updateWithdrawalStatus = async (req, res) => {
 
     // If marking as approved or paid, run the complete deduction process
     if (status === 'approved' || status === 'paid') {
-      // Check if already processed to avoid double deductions
-      if (withdrawal.processed) {
-        console.log(`Withdrawal ${withdrawal._id} already processed, skipping deduction.`);
-        // Just update status and return
-        const updateData = { status };
-        if (paidAt) updateData.paidAt = paidAt;
-        if (paidBy) updateData.paidBy = paidBy;
-        const updatedWithdrawal = await Withdrawal.findByIdAndUpdate(id, updateData, { new: true });
-        return res.status(200).json(updatedWithdrawal);
-      }
-
-      // Update status and paidAt/paidBy first
+      // ATOMIC check: only process if not already processed
+      // Use findOneAndUpdate with a filter on processed=false to prevent race conditions
       const updateData = { status };
       if (paidAt) updateData.paidAt = paidAt;
       if (paidBy) updateData.paidBy = paidBy;
-      // If status is approved, set paidAt to current time
       if (status === 'approved' && !paidAt) {
         updateData.paidAt = new Date();
       }
 
-      await Withdrawal.findByIdAndUpdate(id, updateData, { new: true });
+      // Atomically mark as processed while updating status (only if not already processed)
+      const updatedWithdrawal = await Withdrawal.findOneAndUpdate(
+        { _id: id, processed: { $ne: true } },
+        { $set: { ...updateData, processed: true } },
+        { new: true }
+      );
 
-      // Refresh withdrawal to get updated state
-      const updatedWithdrawal = await Withdrawal.findById(id);
+      if (!updatedWithdrawal) {
+        // Already processed by another request - just return current state
+        const existing = await Withdrawal.findById(id);
+        console.log(`Withdrawal ${id} already processed (atomic check prevented double deduction).`);
+        return res.status(200).json(existing);
+      }
 
-      // Process deductions (checks processed flag internally)
+      // Process deductions (now guaranteed to run only once)
       const result = await processWithdrawalDeductions(updatedWithdrawal);
 
       if (result.error) {
@@ -221,6 +218,26 @@ exports.updateWithdrawalStatus = async (req, res) => {
         },
         { new: true }
       );
+
+      // Send unified notification (DB + Push) using the same implementation
+      try {
+        const userToNotify = await User.findOne({
+          $or: [{ email: withdrawal.userEmail }, { mobileNumber: withdrawal.userEmail }]
+        });
+        
+        if (userToNotify) {
+          await sendNotification({
+            userId: userToNotify._id,
+            title: '✅ Withdrawal Approved',
+            description: `Your withdrawal request of ₹${withdrawal.amount} has been approved and processed successfully.`,
+            type: 'withdrawal_approved',
+            metadata: { withdrawalId: withdrawal._id, amount: withdrawal.amount },
+            pushData: { screen: 'Withdrawals' },
+          });
+        }
+      } catch (notifErr) {
+        console.warn('Notification failed (non-fatal):', notifErr.message);
+      }
 
       return res.status(200).json(updatedWithdrawal);
     }
@@ -241,6 +258,25 @@ exports.updateWithdrawalStatus = async (req, res) => {
       },
       { new: true }
     );
+
+    // Send unified notification (DB + Push) for rejection
+    try {
+      const userToNotify = await User.findOne({
+        $or: [{ email: withdrawal.userEmail }, { mobileNumber: withdrawal.userEmail }]
+      });
+      if (userToNotify) {
+        await sendNotification({
+          userId: userToNotify._id,
+          title: '❌ Withdrawal Rejected',
+          description: `Your withdrawal request of ₹${withdrawal.amount} could not be processed. Please contact support.`,
+          type: 'withdrawal_rejected',
+          metadata: { withdrawalId: withdrawal._id, amount: withdrawal.amount },
+          pushData: { screen: 'Withdrawals' },
+        });
+      }
+    } catch (notifErr) {
+      console.warn('Notification failed (non-fatal):', notifErr.message);
+    }
 
     res.status(200).json(updatedWithdrawal);
   } catch (error) {

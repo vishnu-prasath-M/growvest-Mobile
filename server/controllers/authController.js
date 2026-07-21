@@ -18,7 +18,17 @@ exports.registerUser = async (req, res) => {
       return res.status(400).json({ message: 'Please provide all fields' });
     }
 
-    const userExists = await User.findOne({ $or: [{ username }, { mobileNumber }, { email: email || 'never_match_this_random_string' }] });
+    if (!email || !email.trim()) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      return res.status(400).json({ message: 'Please provide a valid email address' });
+    }
+
+    const userExists = await User.findOne({ $or: [{ username }, { mobileNumber }, { email: email.trim().toLowerCase() }] });
 
     if (userExists) {
       return res.status(400).json({ message: 'User with this username, mobile number or email already exists' });
@@ -40,6 +50,7 @@ exports.registerUser = async (req, res) => {
         _id: user._id,
         username: user.username,
         name: user.name,
+        email: user.email,
         mobileNumber: user.mobileNumber,
         token: generateToken(user._id),
       });
@@ -124,6 +135,63 @@ exports.getMe = async (req, res) => {
   }
 };
 
+// @desc    Update email address
+// @route   PUT /api/auth/email
+// @access  Private
+exports.updateEmail = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const trimmedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+
+    if (!trimmedEmail) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      return res.status(400).json({ message: 'Please provide a valid email address' });
+    }
+
+    const userId = req.user._id || req.user.id;
+
+    // Exclude current user so updating to the same email is allowed
+    const existingUser = await User.findOne({
+      email: trimmedEmail,
+      _id: { $ne: userId },
+    });
+
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email address already in use' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { email: trimmedEmail },
+      { new: true, runValidators: false }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({
+      _id: user._id,
+      name: user.name,
+      username: user.username,
+      email: user.email,
+      mobileNumber: user.mobileNumber,
+      role: user.role,
+      balance: user.balance,
+    });
+  } catch (error) {
+    console.error('Update email error:', error);
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'Email address already in use' });
+    }
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 exports.updateUsername = async (req, res) => {
   try {
     const { username } = req.body;
@@ -172,14 +240,23 @@ exports.updateUsername = async (req, res) => {
   }
 };
 
-// @desc    Update user profile (username, mobileNumber, name)
+// @desc    Update user profile (username, mobileNumber, name, email)
 // @route   PUT /api/auth/update-profile
 // @access  Private
 exports.updateProfile = async (req, res) => {
   try {
-    const { username, mobileNumber, name } = req.body;
+    const { username, mobileNumber, name, email } = req.body;
     const updateFields = {};
     const userId = req.user._id || req.user.id;
+
+    console.log('[updateProfile] Request body:', { username, mobileNumber, name, email });
+    console.log('[updateProfile] User ID:', userId);
+
+    // Fetch current user from MongoDB to determine state for branching logic
+    const currentUser = await User.findById(userId).select('email username mobileNumber');
+    if (!currentUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
 
     if (username && typeof username === 'string' && username.trim()) {
       const trimmedUsername = username.trim();
@@ -214,6 +291,47 @@ exports.updateProfile = async (req, res) => {
       updateFields.name = name.trim();
     }
 
+    // Email handling — branching based on MongoDB state (NOT frontend state)
+    if (email && typeof email === 'string' && email.trim()) {
+      const trimmedEmail = email.trim().toLowerCase();
+
+      if (!currentUser.email) {
+        // ============================================================
+        // CASE 1: First-time email save
+        // MongoDB has NO email → This is a FIRST SAVE, not an update.
+        // Reuse signup-style email uniqueness check:
+        // During signup (registerUser), we check:
+        //   User.findOne({ $or: [..., { email }] })
+        // Here we check if ANY user has this email.
+        // ============================================================
+        console.log('[updateProfile] CASE 1: First-time email save for user', userId);
+        const existingEmail = await User.findOne({ email: trimmedEmail });
+        if (existingEmail) {
+          return res.status(400).json({ message: 'Email address already in use' });
+        }
+      } else {
+        // ============================================================
+        // CASE 2: Update existing email
+        // MongoDB already has email → This is an UPDATE.
+        // Reuse profile update uniqueness check (exclude current user).
+        // ============================================================
+        console.log('[updateProfile] CASE 2: Update existing email for user', userId, 'current email:', currentUser.email);
+        const existingEmail = await User.findOne({
+          email: trimmedEmail,
+          _id: { $ne: userId },
+        });
+        if (existingEmail) {
+          return res.status(400).json({ message: 'Email address already in use' });
+        }
+      }
+
+      // Both cases save/update the email on the User document via $set
+      updateFields.email = trimmedEmail;
+      console.log('[updateProfile] Email set on updateFields:', trimmedEmail);
+    }
+
+    console.log('[updateProfile] Update fields:', updateFields);
+
     if (Object.keys(updateFields).length === 0) {
       return res.status(400).json({ message: 'No fields to update' });
     }
@@ -240,7 +358,7 @@ exports.updateProfile = async (req, res) => {
   } catch (error) {
     console.error('Update profile error:', error);
     if (error.code === 11000) {
-      return res.status(400).json({ message: 'Username or mobile number already in use' });
+      return res.status(400).json({ message: 'Username, mobile number or email already in use' });
     }
     res.status(500).json({ message: 'Server error' });
   }

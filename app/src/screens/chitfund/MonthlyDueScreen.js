@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,9 +9,11 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from '@react-navigation/native';
 import { colors, typography } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { chitFundService } from '../../services/chitFundService';
+import { authService } from '../../services/authService';
 
 const MonthlyDueScreen = ({ navigation }) => {
   const insets = useScreenInsets(8);
@@ -19,17 +21,64 @@ const MonthlyDueScreen = ({ navigation }) => {
   const [selectedChit, setSelectedChit] = useState(null);
   const [chits, setChits] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  React.useEffect(() => {
-    fetchMyChits();
-  }, []);
+  const [userData, setUserData] = useState(null);
+  const [showEmailModal, setShowEmailModal] = useState(false);
 
   const fetchMyChits = async () => {
     try {
       const data = await chitFundService.getMyChits();
-      // Filter out completed ones or those without nextDueAmount
-      const activeDues = data.filter(c => c.status === 'active' && c.currentMonth < c.duration);
-      setChits(activeDues);
+      // Get payment history to check which months are paid
+      const allPayments = await chitFundService.getPaymentHistory();
+      
+      // Build a map of paid months per chit
+      const paidMonthsMap = {};
+      allPayments.forEach(p => {
+        const chitId = p.chitId;
+        if (!paidMonthsMap[chitId]) paidMonthsMap[chitId] = new Set();
+        if (p.status === 'paid' || p.status === 'approved') {
+          paidMonthsMap[chitId].add(p.month);
+        }
+      });
+
+      // Enrich chits with payment status
+      const enriched = data.map(c => {
+        const paidMonths = paidMonthsMap[c.chitId] || new Set();
+        const currentMonthDue = c.currentMonth + 1;
+        const isCurrentPaid = paidMonths.has(currentMonthDue);
+        
+        // Calculate next unpaid month
+        let nextUnpaidMonth = currentMonthDue;
+        while (paidMonths.has(nextUnpaidMonth) && nextUnpaidMonth <= c.duration) {
+          nextUnpaidMonth++;
+        }
+        
+        const isFullyPaid = nextUnpaidMonth > c.duration;
+        const isClosed = c.status === 'closed' || c.status === 'completed' || c.status === 'archived';
+        
+        // Calculate next due date
+        const joinedDate = new Date(c.joinedAt);
+        const nextDue = new Date(joinedDate);
+        nextDue.setMonth(joinedDate.getMonth() + (nextUnpaidMonth - 1));
+        nextDue.setDate(1);
+        
+        // Calculate remaining days
+        const today = new Date();
+        const diffTime = nextDue.getTime() - today.getTime();
+        const remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        return {
+          ...c,
+          isCurrentPaid,
+          isFullyPaid,
+          isClosed,
+          nextUnpaidMonth,
+          nextDueDateFormatted: nextDue.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+          remainingDays: remainingDays > 0 ? remainingDays : 0,
+          isOverdue: remainingDays < 0,
+        };
+      });
+
+      setChits(enriched);
     } catch (error) {
       console.error('Error fetching chits for dues:', error);
     } finally {
@@ -37,11 +86,210 @@ const MonthlyDueScreen = ({ navigation }) => {
     }
   };
 
+  useFocusEffect(
+    useCallback(() => {
+      fetchMyChits();
+      loadUserData();
+    }, [])
+  );
+
+  const loadUserData = async () => {
+    try {
+      const user = await authService.getUserData();
+      setUserData(user);
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    }
+  };
+
   const formatCurrency = (amount) => `₹${amount?.toLocaleString('en-IN') || '0'}`;
 
   const handlePayNow = (chit) => {
+    if (!userData?.email) {
+      setShowEmailModal(true);
+      return;
+    }
     setSelectedChit(chit);
     setShowConfirm(true);
+  };
+
+  const handlePaymentSuccess = () => {
+    setShowConfirm(false);
+    // Navigate to MyChits -> ChitDetails -> MonthlyDue
+    navigation.navigate('ChitPayment', {
+      chitId: selectedChit?.chitId,
+      memberId: selectedChit?._id,
+      month: selectedChit?.nextUnpaidMonth || (selectedChit?.currentMonth || 0) + 1,
+      amount: selectedChit?.nextDueAmount,
+      lateFee: 0,
+      type: 'due',
+      chitName: selectedChit?.chitName,
+      returnScreen: 'MonthlyDue',
+    });
+  };
+
+  const renderChitCard = (chit) => {
+    const isPaid = chit.isCurrentPaid || chit.isFullyPaid;
+    const isClosed = chit.isClosed;
+    
+    // Determine whether the NEXT installment is actually due today or overdue
+    // (so we only show Pay Now when the due date has arrived)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Parse nextDueDateFormatted back to a Date for comparison
+    // nextUnpaidMonth is already calculated in fetchMyChits
+    const joinedDate = new Date(chit.joinedAt);
+    const nextDueDate = new Date(joinedDate);
+    nextDueDate.setMonth(joinedDate.getMonth() + (chit.nextUnpaidMonth - 1));
+    nextDueDate.setDate(1);
+    nextDueDate.setHours(0, 0, 0, 0);
+    
+    // Can pay only if: not already paid, not closed, not fully paid AND next due date has arrived
+    const nextInstallmentIsDue = today >= nextDueDate;
+    const canPay = !isPaid && !isClosed && !chit.isFullyPaid && nextInstallmentIsDue;
+    // Next installment is available but not yet due (current paid, waiting for next cycle)
+    const nextInstallmentPending = isPaid && !chit.isFullyPaid && chit.nextUnpaidMonth <= chit.duration && !nextInstallmentIsDue;
+    const nextInstallmentDueNow = isPaid && !chit.isFullyPaid && chit.nextUnpaidMonth <= chit.duration && nextInstallmentIsDue;
+
+    return (
+      <View key={chit._id} style={styles.dueCard}>
+        <View style={styles.dueCardHeader}>
+          <View style={[styles.dueIconWrap, isPaid && { backgroundColor: colors.successLight }]}>
+            <MaterialCommunityIcons 
+              name={isPaid ? "check-circle" : isClosed ? "lock" : "calendar-clock"} 
+              size={24} 
+              color={isPaid ? colors.success : isClosed ? colors.textTertiary : colors.primary} 
+            />
+          </View>
+          <View style={styles.dueInfo}>
+            <Text style={styles.dueChitName}>{chit.chitName}</Text>
+            <Text style={styles.dueChitDetail}>
+              {isClosed ? 'Chit Closed' : `Month ${chit.currentMonth} of ${chit.duration}`}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.dueDivider} />
+
+        {isPaid ? (
+          <>
+            <View style={styles.paidSection}>
+              <View style={styles.paidBadge}>
+                <MaterialCommunityIcons name="check-circle" size={20} color={colors.success} />
+                <Text style={styles.paidText}>✓ Paid</Text>
+              </View>
+
+              {chit.isFullyPaid ? (
+                <View style={styles.fullyPaidBanner}>
+                  <MaterialCommunityIcons name="trophy" size={20} color={colors.gold} />
+                  <Text style={styles.fullyPaidText}>All installments completed!</Text>
+                </View>
+              ) : chit.nextUnpaidMonth <= chit.duration ? (
+                // Show next due info (next installment is scheduled but not yet payable)
+                <>
+                  <View style={styles.dueAmountRow}>
+                    <View>
+                      <Text style={styles.dueLabel}>Next Due Date</Text>
+                      <Text style={styles.dueDate}>{chit.nextDueDateFormatted}</Text>
+                    </View>
+                    <View style={styles.dueDateWrap}>
+                      <Text style={styles.dueLabel}>Remaining Days</Text>
+                      <Text style={[styles.remainingDays, chit.isOverdue && { color: colors.error }]}>
+                        {chit.isOverdue ? 'Overdue' : `${chit.remainingDays} days`}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.dueAmountRow}>
+                    <View>
+                      <Text style={styles.dueLabel}>Next Installment</Text>
+                      <Text style={styles.dueAmount}>{formatCurrency(chit.nextDueAmount)}</Text>
+                    </View>
+                  </View>
+                </>
+              ) : null}
+            </View>
+
+            {/* Show Pay Now ONLY when next installment due date has arrived */}
+            {nextInstallmentDueNow && (
+              <View style={styles.dueActions}>
+                <TouchableOpacity
+                  style={styles.payNowBtnEnabled}
+                  activeOpacity={0.85}
+                  onPress={() => handlePayNow(chit)}
+                >
+                  <Text style={styles.payNowBtnText}>Pay Now</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Waiting for next cycle — show disabled state */}
+            {nextInstallmentPending && (
+              <View style={styles.dueActions}>
+                <View style={[styles.payNowBtnEnabled, { backgroundColor: colors.muted }]}>
+                  <Text style={[styles.payNowBtnText, { color: colors.textMuted }]}>
+                    Next due in {chit.remainingDays} days
+                  </Text>
+                </View>
+              </View>
+            )}
+          </>
+        ) : isClosed ? (
+          <View style={styles.closedSection}>
+            <View style={styles.closedBadge}>
+              <MaterialCommunityIcons name="lock" size={20} color={colors.textTertiary} />
+              <Text style={styles.closedText}>Chit Closed</Text>
+            </View>
+            <TouchableOpacity style={styles.closedBtn} disabled>
+              <Text style={styles.closedBtnText}>Chit Closed</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            <View style={styles.dueAmountRow}>
+              <View>
+                <Text style={styles.dueLabel}>
+                  {chit.pendingInstallments > 1 ? `Due (${chit.pendingInstallments} months)` : 'Current Due'}
+                </Text>
+                <Text style={styles.dueAmount}>{formatCurrency(chit.nextDueAmount)}</Text>
+              </View>
+              <View style={styles.dueDateWrap}>
+                <Text style={styles.dueLabel}>Due Date</Text>
+                <Text style={styles.dueDate}>{chit.nextDueDateFormatted}</Text>
+              </View>
+            </View>
+
+            <View style={styles.dueAmountRow}>
+              <View>
+                <Text style={styles.dueLabel}>Remaining Days</Text>
+                <Text style={[styles.remainingDays, chit.isOverdue && { color: colors.error }]}>
+                  {chit.isOverdue ? 'Overdue' : `${chit.remainingDays} days`}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.lateFeeRow}>
+              <MaterialCommunityIcons name="alert-circle-outline" size={16} color={colors.warning} />
+              <Text style={styles.lateFeeText}>Late fee of ₹10/day applies after due date</Text>
+            </View>
+
+            <View style={styles.dueActions}>
+              <TouchableOpacity
+                style={styles.payNowBtnEnabled}
+                activeOpacity={0.85}
+                onPress={() => handlePayNow(chit)}
+              >
+                <Text style={styles.payNowBtnText}>Pay Now</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.reminderBtn} activeOpacity={0.85}>
+                <MaterialCommunityIcons name="bell-outline" size={20} color={colors.primary} />
+                <Text style={styles.reminderBtnText}>Remind</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+      </View>
+    );
   };
 
   return (
@@ -64,51 +312,7 @@ const MonthlyDueScreen = ({ navigation }) => {
             <Text style={styles.emptyText}>You have no upcoming dues!</Text>
           </View>
         ) : (
-          chits.map((chit) => (
-          <View key={chit._id} style={styles.dueCard}>
-            <View style={styles.dueCardHeader}>
-              <View style={styles.dueIconWrap}>
-                <MaterialCommunityIcons name="calendar-clock" size={24} color={colors.primary} />
-              </View>
-              <View style={styles.dueInfo}>
-                <Text style={styles.dueChitName}>{chit.chitName}</Text>
-                <Text style={styles.dueChitDetail}>Month {chit.currentMonth} of {chit.duration}</Text>
-              </View>
-            </View>
-
-            <View style={styles.dueDivider} />
-
-            <View style={styles.dueAmountRow}>
-              <View>
-                <Text style={styles.dueLabel}>Current Due</Text>
-                <Text style={styles.dueAmount}>{formatCurrency(chit.nextDueAmount)}</Text>
-              </View>
-              <View style={styles.dueDateWrap}>
-                <Text style={styles.dueLabel}>Due Date</Text>
-                <Text style={styles.dueDate}>{chit.nextDueDate}</Text>
-              </View>
-            </View>
-
-            <View style={styles.lateFeeRow}>
-              <MaterialCommunityIcons name="alert-circle-outline" size={16} color={colors.warning} />
-              <Text style={styles.lateFeeText}>Late fee of ₹10/day applies after due date</Text>
-            </View>
-
-            <View style={styles.dueActions}>
-              <TouchableOpacity
-                style={styles.payNowBtn}
-                activeOpacity={0.85}
-                onPress={() => handlePayNow(chit)}
-              >
-                <Text style={styles.payNowBtnText}>Pay Now</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.reminderBtn} activeOpacity={0.85}>
-                <MaterialCommunityIcons name="bell-outline" size={20} color={colors.primary} />
-                <Text style={styles.reminderBtnText}>Remind</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-          ))
+          chits.map(renderChitCard)
         )}
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -139,24 +343,51 @@ const MonthlyDueScreen = ({ navigation }) => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.payBtn}
-                onPress={() => {
-                  setShowConfirm(false);
-                  navigation.navigate('ChitPayment', {
-                    chitId: selectedChit?.chitId,
-                    memberId: selectedChit?._id,
-                    month: (selectedChit?.currentMonth || 0) + 1,
-                    amount: selectedChit?.nextDueAmount,
-                    lateFee: 0,
-                    type: 'due',
-                    chitName: selectedChit?.chitName,
-                  });
-                }}
+                onPress={handlePaymentSuccess}
               >
                 <Text style={styles.payBtnText}>Pay {formatCurrency(selectedChit?.nextDueAmount)}</Text>
               </TouchableOpacity>
             </View>
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      {/* Email Required Modal */}
+      <Modal visible={showEmailModal} transparent animationType="fade" onRequestClose={() => setShowEmailModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitleEmail}>Email Required</Text>
+              <TouchableOpacity onPress={() => setShowEmailModal(false)} style={styles.modalCloseBtn}>
+                <MaterialCommunityIcons name="close" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.modalTextEmail}>
+              Your email address is required before making payments. Please update your email in your Profile.
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.cancelBtnEmail} onPress={() => setShowEmailModal(false)}>
+                <Text style={styles.cancelBtnTextEmail}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.payBtnOuterEmail}
+                onPress={() => {
+                  setShowEmailModal(false);
+                  navigation.navigate('Profile');
+                }}
+              >
+                <LinearGradient
+                  colors={['#0E3D23', '#1A5C39']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.payBtnGradientEmail}
+                >
+                  <Text style={styles.payBtnTextEmail}>Update Profile</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -184,13 +415,26 @@ const styles = StyleSheet.create({
   dueAmount: { fontSize: 28, fontWeight: '800', color: colors.text },
   dueDate: { fontSize: 16, fontWeight: '600', color: colors.text, textAlign: 'right' },
   dueDateWrap: { alignItems: 'flex-end' },
+  remainingDays: { fontSize: 16, fontWeight: '700', color: colors.primary, textAlign: 'right' },
   lateFeeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16, padding: 10, backgroundColor: '#fef9c3', borderRadius: 10 },
   lateFeeText: { fontSize: 12, color: colors.warning, fontWeight: '500', flex: 1 },
   dueActions: { flexDirection: 'row', gap: 12 },
-  payNowBtn: { flex: 2, backgroundColor: colors.primary, paddingVertical: 14, borderRadius: 14, alignItems: 'center', ...colors.shadow.button },
+  payNowBtnEnabled: { flex: 2, backgroundColor: colors.primary, paddingVertical: 14, borderRadius: 14, alignItems: 'center', ...colors.shadow.button },
   payNowBtnText: { fontSize: 16, fontWeight: '700', color: colors.white },
   reminderBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: colors.primaryLight, paddingVertical: 14, borderRadius: 14 },
   reminderBtnText: { fontSize: 13, fontWeight: '700', color: colors.primary },
+  // Paid section
+  paidSection: { marginBottom: 16 },
+  paidBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12, backgroundColor: colors.successLight, borderRadius: 12, marginBottom: 16 },
+  paidText: { fontSize: 18, fontWeight: '800', color: colors.success },
+  fullyPaidBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12, backgroundColor: '#fef3c7', borderRadius: 12 },
+  fullyPaidText: { fontSize: 14, fontWeight: '700', color: '#d97706' },
+  // Closed section
+  closedSection: { alignItems: 'center', marginBottom: 16 },
+  closedBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, backgroundColor: '#f3f4f6', borderRadius: 12, marginBottom: 16 },
+  closedText: { fontSize: 16, fontWeight: '700', color: colors.textTertiary },
+  closedBtn: { backgroundColor: colors.muted, paddingVertical: 14, borderRadius: 14, alignItems: 'center', width: '100%' },
+  closedBtnText: { fontSize: 16, fontWeight: '700', color: colors.textTertiary },
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { width: '85%', backgroundColor: colors.white, borderRadius: 24, padding: 24, ...colors.shadow.elevated },
@@ -211,6 +455,16 @@ const styles = StyleSheet.create({
   loadingText: { color: colors.textSecondary, fontSize: 14 },
   emptyContainer: { padding: 40, alignItems: 'center' },
   emptyText: { color: colors.textSecondary, fontSize: 14 },
+  // Email Modal
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  modalTitleEmail: { fontSize: 19, fontWeight: '700', color: colors.text, letterSpacing: -0.4 },
+  modalCloseBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },
+  modalTextEmail: { fontSize: 15, color: colors.textSecondary, marginBottom: 24, lineHeight: 22 },
+  cancelBtnEmail: { flex: 1, height: 48, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },
+  cancelBtnTextEmail: { fontSize: 15, fontWeight: '600', color: colors.textSecondary },
+  payBtnOuterEmail: { flex: 1 },
+  payBtnGradientEmail: { height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  payBtnTextEmail: { fontSize: 15, fontWeight: '700', color: colors.white },
 });
 
 export default MonthlyDueScreen;

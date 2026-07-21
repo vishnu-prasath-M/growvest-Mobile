@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from '@react-navigation/native';
 import { colors } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { chitFundService } from '../../services/chitFundService';
@@ -17,10 +18,6 @@ const MyChitsScreen = ({ navigation }) => {
   const insets = useScreenInsets(8);
   const [chits, setChits] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchMyChits();
-  }, []);
 
   const fetchMyChits = async () => {
     try {
@@ -32,6 +29,12 @@ const MyChitsScreen = ({ navigation }) => {
       setLoading(false);
     }
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchMyChits();
+    }, [])
+  );
 
   const formatCurrency = (amount) => `₹${amount?.toLocaleString('en-IN') || '0'}`;
 

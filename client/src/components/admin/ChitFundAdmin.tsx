@@ -148,16 +148,22 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
   };
 
   const handleDeleteChit = async (id: string) => {
-    if (!token || !window.confirm("Are you sure you want to delete this chit? This cannot be undone.")) return;
+    if (!token) return;
     try {
       setLoading(true);
-      await fetch(`${API_URL}/api/chits/${id}`, {
+      const res = await fetch(`${API_URL}/api/chits/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.message || "Failed to delete chit");
+        return;
+      }
       fetchChits();
     } catch (err) {
       console.error(err);
+      alert("An error occurred while deleting the chit");
     } finally {
       setLoading(false);
     }
@@ -346,10 +352,28 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
             </div>
             <div className="card-premium p-5">
               <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 rounded-lg bg-red-50">
+                  <XCircle className="w-5 h-5 text-red-600" />
+                </div>
+                <p className="text-sm text-muted-foreground">Closed Chits</p>
+              </div>
+              <p className="text-3xl font-bold text-red-600">{overview.closedChits || 0}</p>
+            </div>
+            <div className="card-premium p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 rounded-lg bg-gray-50">
+                  <CheckCircle className="w-5 h-5 text-gray-600" />
+                </div>
+                <p className="text-sm text-muted-foreground">Completed Chits</p>
+              </div>
+              <p className="text-3xl font-bold text-gray-600">{overview.completedChits || 0}</p>
+            </div>
+            <div className="card-premium p-5">
+              <div className="flex items-center gap-3 mb-3">
                 <div className="p-2 rounded-lg bg-purple-50">
                   <Users className="w-5 h-5 text-purple-600" />
                 </div>
-                <p className="text-sm text-muted-foreground">Active Members</p>
+                <p className="text-sm text-muted-foreground">Total Members</p>
               </div>
               <p className="text-3xl font-bold">{overview.totalMembers || 0}</p>
             </div>

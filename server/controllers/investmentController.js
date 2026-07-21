@@ -2,6 +2,7 @@ const Investment = require('../models/Investment');
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
 const { syncInvestmentInterest } = require('./userController');
+const { sendNotification } = require('../services/notificationHelper');
 
 exports.createInvestment = async (req, res) => {
   try {
@@ -9,11 +10,20 @@ exports.createInvestment = async (req, res) => {
     const refCode = `INV-${Date.now().toString().slice(-6)}`;
     const interestRate = type === 'fixed' ? 24 : 12;
 
+    // Find user to store userId
+    const user = await User.findOne({ 
+      $or: [
+        ...(userEmail ? [{ email: userEmail }] : []),
+        ...(mobileNumber ? [{ mobileNumber: mobileNumber }] : [])
+      ]
+    });
+
     const newInvestment = new Investment({
       amount,
       ref: refCode,
       status: 'pending',
       type,
+      userId: user?._id || null,
       userName,
       userEmail,
       mobileNumber,
@@ -23,14 +33,7 @@ exports.createInvestment = async (req, res) => {
 
     await newInvestment.save();
 
-    // Create transaction record
-    // Support old users (email-only) and new users (mobile number)
-    const user = await User.findOne({ 
-      $or: [
-        ...(userEmail ? [{ email: userEmail }] : []),
-        ...(mobileNumber ? [{ mobileNumber: mobileNumber }] : [])
-      ]
-    });
+    // Create transaction record (user already found above)
     if (user) {
       const transaction = new Transaction({
         userId: user._id,
@@ -130,6 +133,16 @@ exports.updateInvestmentStatus = async (req, res) => {
         // Add to user balance
         user.balance += investment.amount;
         await user.save();
+
+        // Send unified notification (DB + Push) using the same implementation as sendWelcomeNotification
+        await sendNotification({
+          userId: user._id,
+          title: '✅ Investment Approved',
+          description: `Your ₹${investment.amount} ${investment.type} deposit investment has been approved. Your balance has been updated.`,
+          type: 'investment_approved',
+          metadata: { investmentId: investment._id, amount: investment.amount },
+          pushData: { screen: 'Investments' },
+        });
       }
     }
 

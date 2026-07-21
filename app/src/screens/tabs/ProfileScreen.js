@@ -24,10 +24,13 @@ const ProfileScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editMobileModalVisible, setEditMobileModalVisible] = useState(false);
+  const [editEmailModalVisible, setEditEmailModalVisible] = useState(false);
   const [newUsername, setNewUsername] = useState('');
   const [newMobileNumber, setNewMobileNumber] = useState('');
+  const [newEmail, setNewEmail] = useState('');
   const [savingUsername, setSavingUsername] = useState(false);
   const [savingMobile, setSavingMobile] = useState(false);
+  const [savingEmail, setSavingEmail] = useState(false);
   const [kycStatus, setKycStatus] = useState(null);
   const { logout, updateUser, user: authUser } = useAuth();
 
@@ -103,6 +106,19 @@ const ProfileScreen = ({ navigation }) => {
     finally { setSavingMobile(false); }
   };
 
+  const handleEditEmail = () => { setNewEmail(userData?.email || ''); setEditEmailModalVisible(true); };
+  const handleSaveEmail = async () => {
+    if (!newEmail.trim()) { Alert.alert('Error', 'Email cannot be empty'); return; }
+    if (!/\S+@\S+\.\S+/.test(newEmail)) { Alert.alert('Error', 'Please enter a valid email address'); return; }
+    setSavingEmail(true);
+    try {
+      const updatedUser = await authService.updateEmail(newEmail.trim());
+      await updateUser(updatedUser); setUserData(updatedUser); setEditEmailModalVisible(false);
+      Alert.alert('Success', 'Email updated successfully');
+    } catch (error) { Alert.alert('Error', getErrorMessage(error)); }
+    finally { setSavingEmail(false); }
+  };
+
   const handleContactSupport = () => {
     Linking.openURL('https://wa.me/918300278515?text=Hello Growvest Support, I need assistance.');
   };
@@ -148,6 +164,7 @@ const ProfileScreen = ({ navigation }) => {
       title: 'Account',
       items: [
         { icon: 'account-edit', label: 'Edit Profile', tint: colors.primaryLight, iconColor: colors.primary, onPress: handleEditUsername },
+        { icon: 'email-edit', label: 'Edit Email', tint: '#e0f2fe', iconColor: '#0284c7', onPress: handleEditEmail },
         { icon: kycInfo.icon, label: 'KYC Verification', tint: kycInfo.tint, iconColor: kycInfo.iconColor, badge: kycInfo.badge, onPress: () => navigation.navigate('KYC') },
         { icon: 'bank-outline', label: 'Bank Details', tint: colors.primaryLight, iconColor: colors.primary, onPress: () => navigation.navigate('BankDetails') },
       ],
@@ -210,7 +227,7 @@ const ProfileScreen = ({ navigation }) => {
           {[
             { label: 'Active Since', value: userData?.createdAt ? new Date(userData.createdAt).getFullYear().toString() : '–' },
             { label: 'Status', value: 'Active' },
-            { label: 'KYC', value: 'Verified' },
+            { label: 'KYC', value: kycInfo.label },
           ].map((s) => (
             <View key={s.label} style={styles.statCard}>
               <Text style={styles.statLabel}>{s.label}</Text>
@@ -344,6 +361,50 @@ const ProfileScreen = ({ navigation }) => {
                   style={styles.modalSaveGradient}
                 >
                   <Text style={styles.modalSaveText}>{savingMobile ? 'Saving...' : 'Save'}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Email Modal */}
+      <Modal visible={editEmailModalVisible} transparent animationType="fade" onRequestClose={() => setEditEmailModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Email</Text>
+              <TouchableOpacity onPress={() => setEditEmailModalVisible(false)} style={styles.modalCloseBtn}>
+                <MaterialCommunityIcons name="close" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.modalInputLabel}>Email Address</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={newEmail}
+              onChangeText={setNewEmail}
+              placeholder="Enter new email address"
+              placeholderTextColor={colors.textMuted}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoFocus
+            />
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setEditEmailModalVisible(false)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSaveBtnOuter, savingEmail && styles.disabledOpacity]}
+                onPress={handleSaveEmail}
+                disabled={savingEmail}
+              >
+                <LinearGradient
+                  colors={['#0E3D23', '#1A5C39']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.modalSaveGradient}
+                >
+                  <Text style={styles.modalSaveText}>{savingEmail ? 'Saving...' : 'Save'}</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>

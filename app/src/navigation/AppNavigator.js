@@ -247,14 +247,36 @@ const splashStyles = StyleSheet.create({
 });
 
 // ---------- Main Navigator ----------
-const screenFadeOptions = {
+const screenTransitionOptions = {
   headerShown: false,
   cardStyle: { backgroundColor: colors.background },
-  cardStyleInterpolator: ({ current: { progress } }) => ({
+  // Smooth slide-from-right animation for stack screens
+  cardStyleInterpolator: ({ current: { progress }, layouts: { screen } }) => ({
     cardStyle: {
-      opacity: progress.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }),
+      transform: [
+        {
+          translateX: progress.interpolate({
+            inputRange: [0, 1],
+            outputRange: [screen.width * 0.3, 0],
+          }),
+        },
+      ],
+      opacity: progress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0.5, 1],
+      }),
     },
   }),
+  transitionSpec: {
+    open: {
+      animation: 'timing',
+      config: { duration: 280, useNativeDriver: true },
+    },
+    close: {
+      animation: 'timing',
+      config: { duration: 200, useNativeDriver: true },
+    },
+  },
 };
 
 const AppNavigator = () => {
@@ -265,7 +287,7 @@ const AppNavigator = () => {
   }
 
   return (
-    <Stack.Navigator screenOptions={screenFadeOptions}>
+    <Stack.Navigator screenOptions={screenTransitionOptions}>
       {isAuthenticated ? (
         <>
           <Stack.Screen name="MainTabs" component={TabNavigator} />

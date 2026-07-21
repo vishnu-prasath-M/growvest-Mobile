@@ -9,6 +9,7 @@ import {
   Alert,
   TouchableOpacity,
   Dimensions,
+  SafeAreaView,
 } from 'react-native';
 import { TextInput } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -38,6 +39,11 @@ const SignupScreen = ({ navigation }) => {
     } else if (!/^\d{10}$/.test(mobileNumber.trim())) {
       newErrors.mobileNumber = 'Invalid mobile number (10 digits required)';
     }
+    if (!email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      newErrors.email = 'Please enter a valid email address';
+    }
     if (!password) {
       newErrors.password = 'Password is required';
     } else if (password.length < 6) {
@@ -55,7 +61,7 @@ const SignupScreen = ({ navigation }) => {
       const res = await authService.register({
         username,
         mobileNumber,
-        email: email || undefined,
+        email: email.trim(),
         password,
       });
       await login(res.token, res);
@@ -67,11 +73,12 @@ const SignupScreen = ({ navigation }) => {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Gradient Top Section */}
         <LinearGradient
           colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
@@ -134,7 +141,7 @@ const SignupScreen = ({ navigation }) => {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Email (Optional)</Text>
+              <Text style={styles.inputLabel}>Email</Text>
               <TextInput
                 value={email}
                 onChangeText={setEmail}
@@ -146,8 +153,10 @@ const SignupScreen = ({ navigation }) => {
                 placeholderTextColor={colors.textTertiary}
                 autoCapitalize="none"
                 keyboardType="email-address"
+                error={!!errors.email}
                 left={<TextInput.Icon icon="email-outline" color={colors.textMuted} />}
               />
+              {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
             </View>
 
             <View style={styles.inputContainer}>
@@ -206,19 +215,21 @@ const SignupScreen = ({ navigation }) => {
             </View>
           </View>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#0E3D23' }, // match gradient top
   container: { flex: 1, backgroundColor: colors.background },
-  scrollContent: { flexGrow: 1, paddingBottom: 40 },
+  scrollContent: { flexGrow: 1, minHeight: height },
   
   // Header Area
   headerArea: {
-    height: height * 0.35,
-    paddingTop: 60,
+    height: height * 0.32,
+    paddingTop: Platform.OS === 'android' ? 36 : 52,
     alignItems: 'center',
     position: 'relative',
     overflow: 'hidden',

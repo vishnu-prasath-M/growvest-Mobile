@@ -14,6 +14,61 @@ Notifications.setNotificationHandler({
 });
 
 const DEVICE_TOKEN_KEY = 'deviceToken';
+const LAST_SEEN_NOTIF_KEY = 'lastSeenNotificationId';
+const POLL_INTERVAL_MS = 30000; // Poll every 30 seconds
+
+let pollingInterval = null;
+let currentUserId = null;
+
+async function showLocalNotification(title, body) {
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: title || 'Growvest',
+        body: body || 'You have a new update.',
+        sound: 'default',
+      },
+      trigger: null,
+    });
+  } catch (error) {
+    console.error('[NotificationService] Error showing local notification:', error);
+  }
+}
+
+async function pollForNotifications() {
+  if (!currentUserId) return;
+
+  try {
+    const lastSeenId = await AsyncStorage.getItem(LAST_SEEN_NOTIF_KEY);
+    
+    const response = await api.get('/notifications');
+    const allNotifications = response.data?.notifications || [];
+
+    if (allNotifications.length === 0) return;
+
+    // Filter only notifications created after lastSeenId (notifications sorted newest first)
+    let newNotifications = allNotifications;
+    if (lastSeenId) {
+      const lastSeenIndex = allNotifications.findIndex(n => n._id === lastSeenId);
+      if (lastSeenIndex >= 0) {
+        // Found the last seen notification - everything before it in the array is newer
+        newNotifications = allNotifications.slice(0, lastSeenIndex);
+      }
+    }
+
+    // Show all new notifications as local notifications (reverse so oldest new shows first)
+    for (const notif of newNotifications.reverse()) {
+      await showLocalNotification(notif.title, notif.description);
+    }
+
+    // Update last seen notification ID to the newest one
+    if (allNotifications.length > 0) {
+      await AsyncStorage.setItem(LAST_SEEN_NOTIF_KEY, allNotifications[0]._id);
+    }
+  } catch (error) {
+    // Silently fail - polling is best-effort
+  }
+}
 
 export const notificationService = {
   async requestPermission() {
@@ -79,10 +134,41 @@ export const notificationService = {
 
       await AsyncStorage.setItem(DEVICE_TOKEN_KEY, deviceToken);
       console.log('[NotificationService] Device registered successfully');
+      
+      // Start polling for server-side notifications
+      this.startPolling(userId);
+      
       return deviceToken;
     } catch (error) {
       console.error('[NotificationService] Error registering device:', error);
       return null;
+    }
+  },
+
+  /**
+   * Start polling for new server-side notifications.
+   * This bridges the gap between admin actions (which create in-app DB notifications)
+   * and the app by showing them as local notifications using the same pattern
+   * as sendWelcomeNotification().
+   */
+  startPolling(userId) {
+    this.stopPolling();
+    currentUserId = userId;
+    
+    // Poll immediately on start
+    pollForNotifications();
+    
+    // Then poll at regular intervals
+    pollingInterval = setInterval(pollForNotifications, POLL_INTERVAL_MS);
+    console.log('[NotificationService] Started polling for notifications');
+  },
+
+  stopPolling() {
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      pollingInterval = null;
+      currentUserId = null;
+      console.log('[NotificationService] Stopped polling for notifications');
     }
   },
 

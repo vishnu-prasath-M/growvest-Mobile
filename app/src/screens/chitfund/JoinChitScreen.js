@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { chitFundService } from '../../services/chitFundService';
+import { authService } from '../../services/authService';
 
 const JoinChitScreen = ({ navigation, route }) => {
   const insets = useScreenInsets(8);
@@ -21,11 +22,23 @@ const JoinChitScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(true);
   const [agreed, setAgreed] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [userData, setUserData] = useState(null);
 
   React.useEffect(() => {
     fetchChitDetails();
+    loadUserData();
   }, []);
+
+  const loadUserData = async () => {
+    try {
+      const user = await authService.getUserData();
+      setUserData(user);
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    }
+  };
 
   const fetchChitDetails = async () => {
     try {
@@ -172,7 +185,13 @@ const JoinChitScreen = ({ navigation, route }) => {
             style={[styles.proceedBtnOuter, !agreed && styles.proceedBtnDisabled]}
             activeOpacity={0.85}
             disabled={!agreed}
-            onPress={() => setShowConfirm(true)}
+            onPress={() => {
+              if (!userData?.email) {
+                setShowEmailModal(true);
+              } else {
+                setShowConfirm(true);
+              }
+            }}
           >
             <LinearGradient
               colors={agreed ? ['#0E3D23', '#1A5C39', '#2E8B5A'] : [colors.muted, colors.muted]}
@@ -236,6 +255,44 @@ const JoinChitScreen = ({ navigation, route }) => {
             </View>
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      {/* Email Required Modal */}
+      <Modal visible={showEmailModal} transparent animationType="fade" onRequestClose={() => setShowEmailModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Email Required</Text>
+              <TouchableOpacity onPress={() => setShowEmailModal(false)} style={styles.modalCloseBtn}>
+                <MaterialCommunityIcons name="close" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.modalText}>
+              Your email address is required before joining a chit fund. Please update your email in your Profile.
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowEmailModal(false)}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.payBtnOuter}
+                onPress={() => {
+                  setShowEmailModal(false);
+                  navigation.navigate('Profile');
+                }}
+              >
+                <LinearGradient
+                  colors={['#0E3D23', '#1A5C39']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.payBtnGradient}
+                >
+                  <Text style={styles.payBtnText}>Update Profile</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -312,6 +369,9 @@ const styles = StyleSheet.create({
   payBtnOuter: { flex: 1.5 },
   payBtnGradient: { height: 50, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
   payBtnText: { fontSize: 15, fontWeight: '700', color: colors.white },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  modalCloseBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },
+  modalText: { fontSize: 15, color: colors.textSecondary, marginBottom: 24, lineHeight: 22 },
 });
 
 export default JoinChitScreen;

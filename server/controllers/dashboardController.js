@@ -15,9 +15,10 @@ exports.getDashboard = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
 
-    // Get user's investments using userId, email, or mobileNumber
+    // Get user's investments using userId (primary), fallback to email/mobile
     const investments = await Investment.find({
       $or: [
+        { userId: user._id },
         { userEmail: user.email },
         { mobileNumber: user.mobileNumber },
       ]
