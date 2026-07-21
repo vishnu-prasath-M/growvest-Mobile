@@ -68,15 +68,14 @@ exports.submitKYC = async (req, res) => {
     
     console.log('[KYC Submit] KYC saved successfully:', kyc._id);
     
-    // Create notification for user (non-critical)
+    // Send notification using unified helper
     try {
-      const Notification = require('../models/Notification');
-      await Notification.create({
+      const { sendNotification } = require('../services/notificationHelper');
+      await sendNotification({
         userId,
         title: 'KYC Submitted',
         description: 'Your KYC documents have been submitted successfully. We will review them shortly.',
         type: 'general',
-        icon: 'shield-check',
       });
     } catch (notifError) {
       console.warn('[KYC Submit] Failed to create notification:', notifError.message);
@@ -201,23 +200,23 @@ exports.reviewKYC = async (req, res) => {
       return res.status(404).json({ message: 'KYC not found' });
     }
     
-    // Create notification for user
-    const Notification = require('../models/Notification');
+    // Send notification using unified helper
+    const { sendNotification } = require('../services/notificationHelper');
     if (status === 'approved') {
-      await Notification.create({
+      await sendNotification({
         userId: kyc.userId._id || kyc.userId,
         title: 'KYC Approved',
         description: 'Your KYC has been approved successfully. You can now access all features.',
         type: 'kyc_approved',
-        icon: 'shield-check',
+        pushData: { screen: 'KYC' },
       });
     } else {
-      await Notification.create({
+      await sendNotification({
         userId: kyc.userId._id || kyc.userId,
         title: 'KYC Rejected',
         description: `Your KYC has been rejected. Reason: ${rejectionReason || 'Please resubmit with correct documents'}`,
         type: 'kyc_rejected',
-        icon: 'shield-off',
+        pushData: { screen: 'KYC' },
       });
     }
     

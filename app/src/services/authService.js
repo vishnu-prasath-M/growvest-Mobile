@@ -130,11 +130,9 @@ export const authService = {
   // Update email address
   updateEmail: async (email) => {
     try {
-      console.log('[authService.updateEmail] Sending email:', email);
-      await api.put(API_ENDPOINTS.UPDATE_PROFILE, { email });
+      await api.put(API_ENDPOINTS.UPDATE_EMAIL, { email });
       return await refreshUserProfile();
     } catch (error) {
-      console.error('[authService.updateEmail] Error:', error);
       throw normalizeError(error);
     }
   },

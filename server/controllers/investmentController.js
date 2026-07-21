@@ -1,9 +1,8 @@
 const Investment = require('../models/Investment');
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
-const Notification = require('../models/Notification');
 const { syncInvestmentInterest } = require('./userController');
-const { sendToUser } = require('../services/pushNotificationService');
+const { sendNotification } = require('../services/notificationHelper');
 
 exports.createInvestment = async (req, res) => {
   try {
@@ -135,30 +134,15 @@ exports.updateInvestmentStatus = async (req, res) => {
         user.balance += investment.amount;
         await user.save();
 
-        // Create in-app DB notification (same as chitAdminController pattern)
-        try {
-          await Notification.create({
-            userId: user._id,
-            title: '✅ Investment Approved',
-            description: `Your ₹${investment.amount} ${investment.type} deposit investment has been approved. Your balance has been updated.`,
-            type: 'investment_approved',
-            icon: 'check-decagram',
-            metadata: { investmentId: investment._id, amount: investment.amount },
-          });
-        } catch (notifErr) {
-          console.warn('In-app notification failed (non-fatal):', notifErr.message);
-        }
-
-        // Send push notification using the same service as Welcome notification
-        try {
-          await sendToUser(user._id, {
-            title: '✅ Investment Approved',
-            body: `Your ₹${investment.amount} ${investment.type} investment has been approved.`,
-            data: { type: 'investment_approved', screen: 'Investments' },
-          });
-        } catch (notifErr) {
-          console.warn('Push notification failed (non-fatal):', notifErr.message);
-        }
+        // Send unified notification (DB + Push) using the same implementation as sendWelcomeNotification
+        await sendNotification({
+          userId: user._id,
+          title: '✅ Investment Approved',
+          description: `Your ₹${investment.amount} ${investment.type} deposit investment has been approved. Your balance has been updated.`,
+          type: 'investment_approved',
+          metadata: { investmentId: investment._id, amount: investment.amount },
+          pushData: { screen: 'Investments' },
+        });
       }
     }
 

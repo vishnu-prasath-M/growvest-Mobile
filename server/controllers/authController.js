@@ -18,7 +18,17 @@ exports.registerUser = async (req, res) => {
       return res.status(400).json({ message: 'Please provide all fields' });
     }
 
-    const userExists = await User.findOne({ $or: [{ username }, { mobileNumber }, { email: email || 'never_match_this_random_string' }] });
+    if (!email || !email.trim()) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      return res.status(400).json({ message: 'Please provide a valid email address' });
+    }
+
+    const userExists = await User.findOne({ $or: [{ username }, { mobileNumber }, { email: email.trim().toLowerCase() }] });
 
     if (userExists) {
       return res.status(400).json({ message: 'User with this username, mobile number or email already exists' });
@@ -40,6 +50,7 @@ exports.registerUser = async (req, res) => {
         _id: user._id,
         username: user.username,
         name: user.name,
+        email: user.email,
         mobileNumber: user.mobileNumber,
         token: generateToken(user._id),
       });
@@ -120,6 +131,63 @@ exports.getMe = async (req, res) => {
     }
   } catch (error) {
     console.error('GetMe error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Update email address
+// @route   PUT /api/auth/email
+// @access  Private
+exports.updateEmail = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const trimmedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+
+    if (!trimmedEmail) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      return res.status(400).json({ message: 'Please provide a valid email address' });
+    }
+
+    const userId = req.user._id || req.user.id;
+
+    // Exclude current user so updating to the same email is allowed
+    const existingUser = await User.findOne({
+      email: trimmedEmail,
+      _id: { $ne: userId },
+    });
+
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email address already in use' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { email: trimmedEmail },
+      { new: true, runValidators: false }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({
+      _id: user._id,
+      name: user.name,
+      username: user.username,
+      email: user.email,
+      mobileNumber: user.mobileNumber,
+      role: user.role,
+      balance: user.balance,
+    });
+  } catch (error) {
+    console.error('Update email error:', error);
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'Email address already in use' });
+    }
     res.status(500).json({ message: 'Server error' });
   }
 };

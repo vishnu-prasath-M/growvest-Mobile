@@ -1,8 +1,7 @@
 const Withdrawal = require('../models/Withdrawal');
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
-const Notification = require('../models/Notification');
-const pushNotificationService = require('../services/pushNotificationService');
+const { sendNotification } = require('../services/notificationHelper');
 
 exports.createWithdrawal = async (req, res) => {
   try {
@@ -220,28 +219,20 @@ exports.updateWithdrawalStatus = async (req, res) => {
         { new: true }
       );
 
-      // Create in-app DB notification + Send Push Notification (same service as Welcome notification)
+      // Send unified notification (DB + Push) using the same implementation
       try {
         const userToNotify = await User.findOne({
           $or: [{ email: withdrawal.userEmail }, { mobileNumber: withdrawal.userEmail }]
         });
         
         if (userToNotify) {
-          // In-app DB notification (same pattern as chitAdminController)
-          await Notification.create({
+          await sendNotification({
             userId: userToNotify._id,
             title: '✅ Withdrawal Approved',
             description: `Your withdrawal request of ₹${withdrawal.amount} has been approved and processed successfully.`,
             type: 'withdrawal_approved',
-            icon: 'bank-transfer-out',
             metadata: { withdrawalId: withdrawal._id, amount: withdrawal.amount },
-          });
-
-          // Push notification using the same pushNotificationService
-          await pushNotificationService.sendToUser(userToNotify._id, {
-            title: '✅ Withdrawal Approved',
-            body: `Your withdrawal request of ₹${withdrawal.amount} has been approved successfully.`,
-            data: { type: 'withdrawal_approved', screen: 'Withdrawals' }
+            pushData: { screen: 'Withdrawals' },
           });
         }
       } catch (notifErr) {
@@ -268,24 +259,19 @@ exports.updateWithdrawalStatus = async (req, res) => {
       { new: true }
     );
 
-    // Create in-app DB notification for rejection
+    // Send unified notification (DB + Push) for rejection
     try {
       const userToNotify = await User.findOne({
         $or: [{ email: withdrawal.userEmail }, { mobileNumber: withdrawal.userEmail }]
       });
       if (userToNotify) {
-        await Notification.create({
+        await sendNotification({
           userId: userToNotify._id,
           title: '❌ Withdrawal Rejected',
           description: `Your withdrawal request of ₹${withdrawal.amount} could not be processed. Please contact support.`,
           type: 'withdrawal_rejected',
-          icon: 'close-circle',
           metadata: { withdrawalId: withdrawal._id, amount: withdrawal.amount },
-        });
-        await pushNotificationService.sendToUser(userToNotify._id, {
-          title: '❌ Withdrawal Rejected',
-          body: `Your withdrawal request of ₹${withdrawal.amount} was rejected.`,
-          data: { type: 'withdrawal_rejected', screen: 'Withdrawals' }
+          pushData: { screen: 'Withdrawals' },
         });
       }
     } catch (notifErr) {

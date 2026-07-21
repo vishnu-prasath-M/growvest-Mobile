@@ -3,8 +3,7 @@ const ChitMember = require('../models/ChitMember');
 const ChitPayment = require('../models/ChitPayment');
 const Transaction = require('../models/Transaction');
 const User = require('../models/User');
-const Notification = require('../models/Notification');
-const { sendToUser } = require('../services/pushNotificationService');
+const { sendNotification } = require('../services/notificationHelper');
 
 // @desc    Get pending chit payments for admin approval
 // @route   GET /api/chits/pending-payments
@@ -118,48 +117,25 @@ const updatePaymentStatus = async (req, res) => {
       },
     );
 
-    // Create in-app notification
-    try {
-      if (status === 'paid') {
-        await Notification.create({
-          userId: payment.userId,
-          title: '\uD83C\uDF89 Good News!',
-          description: 'Your Chit payment has been approved successfully.',
-          type: 'chit_payment_approved',
-          icon: 'check-circle',
-          metadata: { paymentId: payment._id },
-        });
-      } else if (status === 'rejected') {
-        await Notification.create({
-          userId: payment.userId,
-          title: '\u274C Payment Rejected',
-          description: 'Your payment could not be verified. Please upload a clearer payment screenshot.',
-          type: 'chit_payment_rejected',
-          icon: 'close-circle',
-          metadata: { paymentId: payment._id },
-        });
-      }
-    } catch (notifErr) {
-      console.warn('In-app notification failed (non-fatal):', notifErr.message);
-    }
-
-    // Send push notification to user
-    try {
-      if (status === 'paid') {
-        await sendToUser(payment.userId, {
-          title: '\uD83C\uDF89 Good News!',
-          body: 'Your Chit payment has been approved successfully.',
-          data: { type: 'chit_payment_approved', screen: 'ChitFundHome' },
-        });
-      } else if (status === 'rejected') {
-        await sendToUser(payment.userId, {
-          title: '\u274C Payment Rejected',
-          body: 'Your payment could not be verified. Please upload a clearer payment screenshot.',
-          data: { type: 'chit_payment_rejected', screen: 'ChitFundHome' },
-        });
-      }
-    } catch (notifErr) {
-      console.warn('Push notification failed (non-fatal):', notifErr.message);
+    // Send unified notification (DB + Push) using the same implementation
+    if (status === 'paid') {
+      await sendNotification({
+        userId: payment.userId,
+        title: '🎉 Good News!',
+        description: 'Your Chit payment has been approved successfully.',
+        type: 'chit_payment_approved',
+        metadata: { paymentId: payment._id },
+        pushData: { screen: 'ChitFundHome' },
+      });
+    } else if (status === 'rejected') {
+      await sendNotification({
+        userId: payment.userId,
+        title: '❌ Payment Rejected',
+        description: 'Your payment could not be verified. Please upload a clearer payment screenshot.',
+        type: 'chit_payment_rejected',
+        metadata: { paymentId: payment._id },
+        pushData: { screen: 'ChitFundHome' },
+      });
     }
 
     res.json({ message: `Payment ${status} successfully`, payment });
@@ -250,48 +226,25 @@ const updateJoinStatus = async (req, res) => {
       },
     );
 
-    // Create in-app notification using existing Notification model
-    try {
-      if (status === 'approved') {
-        await Notification.create({
-          userId: member.userId,
-          title: '\uD83C\uDF89 Great News!',
-          description: 'Your Chit Investment has been approved. Welcome to your Chit Group.',
-          type: 'chit_joined',
-          icon: 'handshake',
-          metadata: { memberId: member._id, chitName: member.chitId?.name },
-        });
-      } else {
-        await Notification.create({
-          userId: member.userId,
-          title: 'Join Request Update',
-          description: `Your request to join ${member.chitId?.name || 'the chit fund'} was not approved. Contact support for details.`,
-          type: 'general',
-          icon: 'information-outline',
-          metadata: { memberId: member._id },
-        });
-      }
-    } catch (notifErr) {
-      console.warn('In-app notification failed (non-fatal):', notifErr.message);
-    }
-
-    // Send push notification to user
-    try {
-      if (status === 'approved') {
-        await sendToUser(member.userId, {
-          title: '\uD83C\uDF89 Congratulations!',
-          body: 'Your Chit membership has been approved.',
-          data: { type: 'chit_join_approved', screen: 'MyChits' },
-        });
-      } else {
-        await sendToUser(member.userId, {
-          title: 'Join Request Update',
-          body: `Your request to join ${member.chitId?.name || 'the chit fund'} was not approved. Contact support for details.`,
-          data: { type: 'chit_join_rejected', screen: 'ChitFundHome' },
-        });
-      }
-    } catch (notifErr) {
-      console.warn('Push notification failed (non-fatal):', notifErr.message);
+    // Send unified notification (DB + Push) using the same implementation
+    if (status === 'approved') {
+      await sendNotification({
+        userId: member.userId,
+        title: '🎉 Great News!',
+        description: 'Your Chit Investment has been approved. Welcome to your Chit Group.',
+        type: 'chit_joined',
+        metadata: { memberId: member._id, chitName: member.chitId?.name },
+        pushData: { screen: 'MyChits' },
+      });
+    } else {
+      await sendNotification({
+        userId: member.userId,
+        title: 'Join Request Update',
+        description: `Your request to join ${member.chitId?.name || 'the chit fund'} was not approved. Contact support for details.`,
+        type: 'general',
+        metadata: { memberId: member._id },
+        pushData: { screen: 'ChitFundHome' },
+      });
     }
 
     res.json({ message: `Join request ${status} successfully`, member });
@@ -320,24 +273,17 @@ const getAllChits = async (req, res) => {
 const createChit = async (req, res) => {
   try {
     const chit = await Chit.create(req.body);
-    // Notify all users about new chit (DB notification + push)
+    // Notify all users about new chit (DB notification + push) using unified helper
     try {
       const users = await User.find({ role: 'user' });
       for (const u of users) {
-        // In-app DB notification
-        await Notification.create({
+        await sendNotification({
           userId: u._id,
           title: '🆕 New Chit Available',
           description: `A new Chit Plan "${chit.name}" has been added. Explore and join now!`,
           type: 'new_chit_available',
-          icon: 'bell-ring',
           metadata: { chitId: chit._id, chitName: chit.name },
-        });
-        // Push notification
-        await sendToUser(u._id, {
-          title: '🆕 New Chit Available',
-          body: 'A new Chit Plan has been added. Explore and join now!',
-          data: { type: 'new_chit', screen: 'ExploreChits' },
+          pushData: { screen: 'ExploreChits' },
         });
       }
     } catch (notifErr) {
@@ -396,26 +342,19 @@ const changeChitStatus = async (req, res) => {
     const chit = await Chit.findByIdAndUpdate(req.params.id, { status }, { new: true });
     if (!chit) return res.status(404).json({ message: 'Chit not found' });
 
-    // If chit is closed, notify all members (DB + push)
+    // If chit is closed, notify all members using unified helper
     if (status === 'closed') {
       try {
         const members = await ChitMember.find({ chitId: chit._id }).populate('userId');
         for (const m of members) {
           if (m.userId) {
-            // In-app DB notification
-            await Notification.create({
+            await sendNotification({
               userId: m.userId._id,
               title: '🔒 Chit Closed',
               description: `The chit "${chit.name}" has been closed by admin. Thank you for participating.`,
               type: 'chit_closed',
-              icon: 'lock',
               metadata: { chitId: chit._id, chitName: chit.name },
-            });
-            // Push notification
-            await sendToUser(m.userId._id, {
-              title: '🔒 Chit Closed',
-              body: `The chit "${chit.name}" has been closed by admin.`,
-              data: { type: 'chit_closed', screen: 'MyChits' },
+              pushData: { screen: 'MyChits' },
             });
           }
         }
@@ -431,11 +370,62 @@ const changeChitStatus = async (req, res) => {
 };
 
 
+// @desc    Declare auction winner for a chit month
+// @route   POST /api/chits/:id/auction-winner
+// @access  Private/Admin
+const declareAuctionWinner = async (req, res) => {
+  try {
+    const { memberId, month, winningAmount } = req.body;
+
+    if (!memberId || !month) {
+      return res.status(400).json({ message: 'memberId and month are required' });
+    }
+
+    const chit = await Chit.findById(req.params.id);
+    if (!chit) {
+      return res.status(404).json({ message: 'Chit not found' });
+    }
+
+    const member = await ChitMember.findById(memberId).populate('userId');
+    if (!member) {
+      return res.status(404).json({ message: 'Member not found' });
+    }
+
+    if (member.chitId.toString() !== chit._id.toString()) {
+      return res.status(400).json({ message: 'Member does not belong to this chit' });
+    }
+
+    if (member.hasWon) {
+      return res.status(400).json({ message: 'This member has already won an auction' });
+    }
+
+    // Mark the member as winner
+    member.hasWon = true;
+    await member.save();
+
+    // Send unified notification (DB + Push) using the same implementation
+    if (member.userId) {
+      await sendNotification({
+        userId: member.userId._id || member.userId,
+        title: '🏆 Auction Winner!',
+        description: `Congratulations! You have won the auction for "${chit.name}" in month ${month}. The winning amount of ₹${winningAmount || chit.totalPot} will be credited to your account.`,
+        type: 'auction_winner',
+        metadata: { chitId: chit._id, chitName: chit.name, memberId: member._id, month, winningAmount: winningAmount || chit.totalPot },
+        pushData: { screen: 'MyChits' },
+      });
+    }
+
+    res.json({ message: 'Auction winner declared successfully', member });
+  } catch (error) {
+    console.error('Error declaring auction winner:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 // @desc    Get chit dashboard overview for admin
 // @route   GET /api/chits/overview
 // @access  Private/Admin
-const getOverview = async (req, res) => {
-  try {
+const getOverview = async (req, res) => {  try {
     const totalChits = await Chit.countDocuments();
     const activeChits = await Chit.countDocuments({ status: 'active' });
     const closedChits = await Chit.countDocuments({ status: 'closed' });
@@ -477,5 +467,6 @@ module.exports = {
   updateChit,
   deleteChit,
   changeChitStatus,
+  declareAuctionWinner,
   getOverview,
 };

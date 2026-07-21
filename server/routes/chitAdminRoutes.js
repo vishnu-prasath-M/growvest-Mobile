@@ -4,7 +4,6 @@ const { protect, admin } = require('../middleware/authMiddleware');
 
 // Admin controller (existing)
 const chitAdminController = require('../controllers/chitAdminController');
-
 // User-facing controller (new)
 const chitController = require('../controllers/chitController');
 
@@ -60,6 +59,9 @@ router.put('/:id', protect, admin, chitAdminController.updateChit);
 
 // Admin: change chit status (pause, resume, close, archive)
 router.patch('/:id/status', protect, admin, chitAdminController.changeChitStatus);
+
+// Admin: declare auction winner for a chit
+router.post('/:id/auction-winner', protect, admin, chitAdminController.declareAuctionWinner);
 
 // Admin: delete chit
 router.delete('/:id', protect, admin, chitAdminController.deleteChit);

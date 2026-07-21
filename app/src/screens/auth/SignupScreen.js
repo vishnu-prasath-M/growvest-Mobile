@@ -39,6 +39,11 @@ const SignupScreen = ({ navigation }) => {
     } else if (!/^\d{10}$/.test(mobileNumber.trim())) {
       newErrors.mobileNumber = 'Invalid mobile number (10 digits required)';
     }
+    if (!email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      newErrors.email = 'Please enter a valid email address';
+    }
     if (!password) {
       newErrors.password = 'Password is required';
     } else if (password.length < 6) {
@@ -56,7 +61,7 @@ const SignupScreen = ({ navigation }) => {
       const res = await authService.register({
         username,
         mobileNumber,
-        email: email || undefined,
+        email: email.trim(),
         password,
       });
       await login(res.token, res);
@@ -136,7 +141,7 @@ const SignupScreen = ({ navigation }) => {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Email (Optional)</Text>
+              <Text style={styles.inputLabel}>Email</Text>
               <TextInput
                 value={email}
                 onChangeText={setEmail}
@@ -148,8 +153,10 @@ const SignupScreen = ({ navigation }) => {
                 placeholderTextColor={colors.textTertiary}
                 autoCapitalize="none"
                 keyboardType="email-address"
+                error={!!errors.email}
                 left={<TextInput.Icon icon="email-outline" color={colors.textMuted} />}
               />
+              {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
             </View>
 
             <View style={styles.inputContainer}>

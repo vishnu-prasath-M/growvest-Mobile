@@ -11,8 +11,7 @@ const { initializeSettings } = require('./controllers/settingsController');
 const { seedChits } = require('./utils/seedChits');
 const ChitMember = require('./models/ChitMember');
 const Chit = require('./models/Chit');
-const Notification = require('./models/Notification');
-const { sendToUser } = require('./services/pushNotificationService');
+const { sendNotification } = require('./services/notificationHelper');
 
 // Feature 7: Daily Interest Cron Setup (12:00 AM)
 cron.schedule("0 0 * * *", async () => {
@@ -66,26 +65,15 @@ cron.schedule("0 8 * * *", async () => {
       if (diffDays >= 0 && diffDays <= 3) {
         const dueDateStr = nextDue.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
         
-        // Create in-app notification
-        await Notification.create({
+        // Send unified notification (DB + Push) using the same implementation
+        await sendNotification({
           userId: member.userId._id,
           title: '📅 Monthly Due Reminder',
           description: `Your monthly installment for "${member.chitId.name}" is due on ${dueDateStr}. Please complete your payment before the due date.`,
           type: 'due_reminder',
-          icon: 'bell-alert',
           metadata: { chitId: member.chitId._id, memberId: member._id, dueDate: nextDue },
+          pushData: { screen: 'MonthlyDue' },
         });
-        
-        // Send push notification
-        try {
-          await sendToUser(member.userId._id, {
-            title: '📅 Monthly Due Reminder',
-            body: `Your monthly installment for "${member.chitId.name}" is due on ${dueDateStr}. Please complete your payment before the due date.`,
-            data: { type: 'due_reminder', screen: 'MonthlyDue' },
-          });
-        } catch (notifErr) {
-          console.warn('Due reminder push notification failed:', notifErr.message);
-        }
         
         reminderCount++;
       }
