@@ -88,6 +88,12 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
     setUser(null);
     await AsyncStorage.multiRemove(['userToken', 'userData']);
+    try {
+      const { notificationService } = await import('../services/notificationService');
+      notificationService.stopPolling();
+    } catch (error) {
+      console.warn('[AuthContext] Failed to stop notification polling:', error?.message || error);
+    }
   };
 
   const updateUser = async (newUserData) => {
