@@ -134,7 +134,7 @@ export const notificationService = {
         return null;
       }
 
-      const response = await api.post('/api/users/register-device', {
+      const response = await api.post('/users/register-device', {
         userId,
         username,
         deviceToken,
