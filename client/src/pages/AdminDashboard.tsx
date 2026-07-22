@@ -234,17 +234,25 @@ const AdminDashboard = () => {
         })
         .catch(err => console.error("Error fetching KYC list:", err));
 
-      // Fetch Chits
-      fetch(`${API_URL}/api/chits`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data)) {
-            setChits(data);
+      // Fetch Chits & Pending Chit Actions for badge
+      Promise.all([
+        fetch(`${API_URL}/api/chits`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
+        fetch(`${API_URL}/api/chits/join-requests`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()).catch(() => []),
+        fetch(`${API_URL}/api/chits/pending-payments`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()).catch(() => []),
+      ])
+        .then(([chitsData, joinReqs, payReqs]) => {
+          if (Array.isArray(chitsData)) {
+            setChits(chitsData);
           }
+          const pendingJoinsCount = Array.isArray(joinReqs) ? joinReqs.filter((r: any) => r.status === 'pending').length : 0;
+          const pendingPaysCount = Array.isArray(payReqs) ? payReqs.filter((r: any) => r.status === 'pending').length : 0;
+          const totalChitPending = pendingJoinsCount + pendingPaysCount;
+
+          setNavItems(prev => prev.map(item =>
+            item.tab === 'chits' ? { ...item, badge: totalChitPending } : item
+          ));
         })
-        .catch(err => console.error("Error fetching chits:", err));
+        .catch(err => console.error("Error fetching chits data:", err));
     };
 
     fetchAll();

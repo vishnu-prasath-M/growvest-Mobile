@@ -72,6 +72,15 @@ async function pollForNotifications() {
 
 export const notificationService = {
   async requestPermission() {
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'Default',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#085428',
+      });
+    }
+
     if (!Device.isDevice) {
       console.log('[NotificationService] Must use physical device for push notifications');
       return false;
@@ -193,5 +202,23 @@ export const notificationService = {
 
   async clearStoredToken() {
     await AsyncStorage.removeItem(DEVICE_TOKEN_KEY);
+  },
+
+  /**
+   * Listen for user tapping a push notification and navigate accordingly.
+   */
+  setupNotificationListeners(navigateFn) {
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      try {
+        const data = response?.notification?.request?.content?.data;
+        if (data?.screen && typeof navigateFn === 'function') {
+          navigateFn(data.screen, data.params || {});
+        }
+      } catch (err) {
+        console.warn('[NotificationService] Error handling notification response:', err);
+      }
+    });
+
+    return () => subscription.remove();
   },
 };

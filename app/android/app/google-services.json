@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "70508991607",
-    "project_id": "growest-online",
-    "storage_bucket": "growest-online.firebasestorage.app"
+    "project_number": "1056976972225",
+    "project_id": "growest-app",
+    "storage_bucket": "growest-app.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:70508991607:android:bf546ce0b93f9e886a6272",
+        "mobilesdk_app_id": "1:1056976972225:android:b63d9c5c555dc7e6222740",
         "android_client_info": {
           "package_name": "com.growvest.mobile"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyB9aVcIaBBII3H1E8SkCangeRhJB17ONjM"
+          "current_key": "AIzaSyDlNkRDtftIaMzuq6QMRKv6fKWDuIwkDgI"
         }
       ],
       "services": {

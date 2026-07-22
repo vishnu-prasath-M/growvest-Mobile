@@ -60,9 +60,18 @@ class ErrorBoundary extends Component {
 }
 
 function AppContent() {
-  // Hide the native splash screen once the React tree is mounted
+  // Hide the native splash screen once the React tree is mounted and attach notification tap listener
   useEffect(() => {
     SplashScreen.hideAsync().catch(() => {});
+
+    // Attach listener for tapping on push notifications
+    const { notificationService } = require('./src/services/notificationService');
+    const { navigate } = require('./src/navigation/navigationRef');
+    const cleanup = notificationService.setupNotificationListeners(navigate);
+
+    return () => {
+      if (typeof cleanup === 'function') cleanup();
+    };
   }, []);
 
   return (

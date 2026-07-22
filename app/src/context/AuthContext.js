@@ -46,6 +46,14 @@ export const AuthProvider = ({ children }) => {
               setUser(userToStore);
               await AsyncStorage.setItem('userData', JSON.stringify(userToStore));
               console.log('[AuthContext] Token verified, user data updated');
+
+              // Register/refresh push token on app start/restart
+              try {
+                const { notificationService } = await import('../services/notificationService');
+                await notificationService.registerDevice(userToStore._id || userToStore.id, userToStore.username);
+              } catch (notifErr) {
+                console.warn('[AuthContext] Notification re-registration failed:', notifErr?.message || notifErr);
+              }
             }
           } catch (err) {
             console.error('[AuthContext] Verify token failed:', err?.message || err);
