@@ -112,6 +112,20 @@ exports.deleteNotification = async (req, res) => {
   }
 };
 
+// @desc    Get unread notification count
+// @route   GET /api/notifications/unread-count
+// @access  Private
+exports.getUnreadCount = async (req, res) => {
+  try {
+    const userId = req.user._id || req.user.id;
+    const unreadCount = await Notification.countDocuments({ userId, read: false });
+    res.json({ unreadCount });
+  } catch (error) {
+    console.error('Error getting unread count:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 // Helper to get icon based on type
 function getIconForType(type) {
   const iconMap = {
