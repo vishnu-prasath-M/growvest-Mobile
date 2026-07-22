@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Swipeable } from 'react-native-gesture-handler';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
@@ -144,6 +145,33 @@ const NotificationsScreen = ({ navigation }) => {
     }
   };
 
+  const handleDelete = async (id, isRead) => {
+    // Immediately remove from UI and update unread count
+    setNotifications((prev) => prev.filter((n) => n._id !== id));
+    if (!isRead) {
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    }
+
+    try {
+      await api.delete(`${API_ENDPOINTS.NOTIFICATIONS}/${id}`);
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      // Fallback: re-fetch if API call failed
+      fetchNotifications();
+    }
+  };
+
+  const renderRightActions = (id, isRead) => (
+    <TouchableOpacity
+      style={styles.deleteSwipeAction}
+      activeOpacity={0.85}
+      onPress={() => handleDelete(id, isRead)}
+    >
+      <MaterialCommunityIcons name="trash-can-outline" size={24} color={colors.white} />
+      <Text style={styles.deleteSwipeText}>Delete</Text>
+    </TouchableOpacity>
+  );
+
   const notificationGroups = groupNotifications(notifications);
 
   if (loading) {
@@ -207,30 +235,36 @@ const NotificationsScreen = ({ navigation }) => {
                   const iconColor = getIconColor(n.type);
                   const iconBg = getIconBg(n.type);
                   return (
-                    <TouchableOpacity
+                    <Swipeable
                       key={n._id}
-                      activeOpacity={0.8}
-                      onPress={() => !n.read && handleMarkAsRead(n._id)}
+                      renderRightActions={() => renderRightActions(n._id, n.read)}
+                      friction={2}
+                      overshootRight={false}
                     >
-                      <View
-                        style={[
-                          styles.notifCard,
-                          !n.read && styles.notifCardUnread,
-                        ]}
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={() => !n.read && handleMarkAsRead(n._id)}
                       >
-                        <View style={[styles.notifIcon, { backgroundColor: iconBg }]}>
-                          <MaterialCommunityIcons name={iconName} size={18} color={iconColor} />
-                        </View>
-                        <View style={styles.notifBody}>
-                          <View style={styles.notifTitleRow}>
-                            <Text style={styles.notifTitle} numberOfLines={1}>{n.title}</Text>
-                            {!n.read && <View style={styles.unreadDot} />}
+                        <View
+                          style={[
+                            styles.notifCard,
+                            !n.read && styles.notifCardUnread,
+                          ]}
+                        >
+                          <View style={[styles.notifIcon, { backgroundColor: iconBg }]}>
+                            <MaterialCommunityIcons name={iconName} size={18} color={iconColor} />
                           </View>
-                          <Text style={styles.notifSub} numberOfLines={2}>{n.description}</Text>
+                          <View style={styles.notifBody}>
+                            <View style={styles.notifTitleRow}>
+                              <Text style={styles.notifTitle} numberOfLines={1}>{n.title}</Text>
+                              {!n.read && <View style={styles.unreadDot} />}
+                            </View>
+                            <Text style={styles.notifSub} numberOfLines={2}>{n.description}</Text>
+                          </View>
+                          <Text style={styles.notifTime}>{formatTime(n.createdAt)}</Text>
                         </View>
-                        <Text style={styles.notifTime}>{formatTime(n.createdAt)}</Text>
-                      </View>
-                    </TouchableOpacity>
+                      </TouchableOpacity>
+                    </Swipeable>
                   );
                 })}
               </View>
@@ -300,6 +334,21 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: 8 },
   emptyBody: { fontSize: 14, color: colors.textMuted, textAlign: 'center', paddingHorizontal: 40 },
+
+  deleteSwipeAction: {
+    backgroundColor: colors.error,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    borderRadius: 24,
+    marginBottom: 0,
+    gap: 4,
+  },
+  deleteSwipeText: {
+    color: colors.white,
+    fontSize: 11,
+    fontWeight: '700',
+  },
 });
 
 export default NotificationsScreen;

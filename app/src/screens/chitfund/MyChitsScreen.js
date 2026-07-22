@@ -82,69 +82,89 @@ const MyChitsScreen = ({ navigation }) => {
           </View>
         ) : (
           chits.map((chit) => {
+            const isPending = chit.status === 'pending';
             const progressColor = getProgressColor(chit.progress);
             return (
               <TouchableOpacity
                 key={chit._id}
-                style={styles.chitCard}
+                style={[styles.chitCard, isPending && { borderLeftWidth: 4, borderLeftColor: colors.warning }]}
                 activeOpacity={0.85}
-                onPress={() => navigation.navigate('ChitDetails', { chitId: chit.chitId, memberId: chit._id })}
+                onPress={() => navigation.navigate('ChitDetails', { chitId: chit.chitId, memberId: chit._id, memberStatus: chit.status })}
               >
                 <View style={styles.chitCardHeader}>
-                  <View style={styles.chitIconWrap}>
-                    <MaterialCommunityIcons name="account-group-outline" size={24} color={colors.primary} />
+                  <View style={[styles.chitIconWrap, isPending && { backgroundColor: '#fef3c7' }]}>
+                    <MaterialCommunityIcons name={isPending ? "clock-outline" : "account-group-outline"} size={24} color={isPending ? colors.warning : colors.primary} />
                   </View>
                   <View style={styles.chitInfo}>
                     <Text style={styles.chitName}>{chit.chitName}</Text>
-                    <Text style={styles.chitMember}>Member #{chit.memberNumber} of {chit.totalMembers}</Text>
+                    <Text style={styles.chitMember}>
+                      {isPending ? 'Joining Request Submitted' : `Member #${chit.memberNumber} of ${chit.totalMembers}`}
+                    </Text>
                   </View>
-                  <MaterialCommunityIcons name="chevron-right" size={22} color={colors.textMuted} />
-                </View>
-
-                {/* Progress */}
-                <View style={styles.progressSection}>
-                  <View style={styles.progressRow}>
-                    <Text style={styles.progressLabel}>Payment Progress</Text>
-                    <Text style={[styles.progressVal, { color: progressColor }]}>{chit.progress}%</Text>
-                  </View>
-                  <View style={styles.progressBarBg}>
-                    <View style={[styles.progressBarFill, { width: `${chit.progress}%`, backgroundColor: progressColor }]} />
-                  </View>
-                </View>
-
-                <View style={styles.chitDetailsGrid}>
-                  <View style={styles.chitDetailItem}>
-                    <Text style={styles.chitDetailLabel}>Month</Text>
-                    <Text style={styles.chitDetailValue}>{chit.currentMonth}/{chit.duration}</Text>
-                  </View>
-                  <View style={styles.chitDetailItem}>
-                    <Text style={styles.chitDetailLabel}>Paid</Text>
-                    <Text style={styles.chitDetailValue}>{formatCurrency(chit.totalPaid)}</Text>
-                  </View>
-                  <View style={styles.chitDetailItem}>
-                    <Text style={styles.chitDetailLabel}>Remaining</Text>
-                    <Text style={styles.chitDetailValue}>{formatCurrency(chit.remainingAmount)}</Text>
-                  </View>
-                </View>
-
-                <View style={styles.chitDivider} />
-
-                <View style={styles.chitFooter}>
-                  <View style={styles.chitDueInfo}>
-                    <MaterialCommunityIcons name="calendar-alert" size={16} color={colors.gold} />
-                    <Text style={styles.chitDueText}>Due {chit.nextDueDate}: {formatCurrency(chit.nextDueAmount)}</Text>
-                  </View>
-                  <View style={[styles.winBadge, chit.hasWon ? styles.wonBadge : styles.notWonBadge]}>
-                    <MaterialCommunityIcons
-                      name={chit.hasWon ? 'trophy' : 'clock-outline'}
-                      size={14}
-                      color={chit.hasWon ? colors.success : colors.textTertiary}
-                    />
-                    <Text style={[styles.winBadgeText, { color: chit.hasWon ? colors.success : colors.textTertiary }]}>
-                      {chit.hasWon ? 'Won' : 'Not Won'}
+                  <View style={[styles.winBadge, isPending ? { backgroundColor: '#fef3c7' } : chit.hasWon ? styles.wonBadge : styles.notWonBadge]}>
+                    <Text style={[styles.winBadgeText, { color: isPending ? colors.warning : chit.hasWon ? colors.success : colors.textTertiary }]}>
+                      {isPending ? 'Pending Approval' : chit.hasWon ? 'Won' : 'Active'}
                     </Text>
                   </View>
                 </View>
+
+                {isPending ? (
+                  <View style={{ backgroundColor: '#fffbeb', padding: 12, borderRadius: 12, marginTop: 4 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.warning, marginBottom: 4 }}>
+                      Waiting for Admin Approval
+                    </Text>
+                    <Text style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 18 }}>
+                      Your Chit Fund joining request has been submitted successfully. Please wait until the administrator approves your request.
+                    </Text>
+                  </View>
+                ) : (
+                  <>
+                    {/* Progress */}
+                    <View style={styles.progressSection}>
+                      <View style={styles.progressRow}>
+                        <Text style={styles.progressLabel}>Payment Progress</Text>
+                        <Text style={[styles.progressVal, { color: progressColor }]}>{chit.progress}%</Text>
+                      </View>
+                      <View style={styles.progressBarBg}>
+                        <View style={[styles.progressBarFill, { width: `${chit.progress}%`, backgroundColor: progressColor }]} />
+                      </View>
+                    </View>
+
+                    <View style={styles.chitDetailsGrid}>
+                      <View style={styles.chitDetailItem}>
+                        <Text style={styles.chitDetailLabel}>Month</Text>
+                        <Text style={styles.chitDetailValue}>{chit.currentMonth}/{chit.duration}</Text>
+                      </View>
+                      <View style={styles.chitDetailItem}>
+                        <Text style={styles.chitDetailLabel}>Paid</Text>
+                        <Text style={styles.chitDetailValue}>{formatCurrency(chit.totalPaid)}</Text>
+                      </View>
+                      <View style={styles.chitDetailItem}>
+                        <Text style={styles.chitDetailLabel}>Remaining</Text>
+                        <Text style={styles.chitDetailValue}>{formatCurrency(chit.remainingAmount)}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.chitDivider} />
+
+                    <View style={styles.chitFooter}>
+                      <View style={styles.chitDueInfo}>
+                        <MaterialCommunityIcons name="calendar-alert" size={16} color={colors.gold} />
+                        <Text style={styles.chitDueText}>Due {chit.nextDueDate}: {formatCurrency(chit.nextDueAmount)}</Text>
+                      </View>
+                      <View style={[styles.winBadge, chit.hasWon ? styles.wonBadge : styles.notWonBadge]}>
+                        <MaterialCommunityIcons
+                          name={chit.hasWon ? 'trophy' : 'clock-outline'}
+                          size={14}
+                          color={chit.hasWon ? colors.success : colors.textTertiary}
+                        />
+                        <Text style={[styles.winBadgeText, { color: chit.hasWon ? colors.success : colors.textTertiary }]}>
+                          {chit.hasWon ? 'Won' : 'Not Won'}
+                        </Text>
+                      </View>
+                    </View>
+                  </>
+                )}
               </TouchableOpacity>
             );
           })

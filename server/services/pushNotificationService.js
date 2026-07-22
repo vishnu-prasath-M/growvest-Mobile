@@ -13,6 +13,7 @@ const buildMessage = (token, { title, body, data = {} }) => ({
   body,
   data,
   priority: 'high',
+  channelId: 'default',
 });
 
 /**

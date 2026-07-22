@@ -39,8 +39,37 @@ async function sendNotification({ userId, title, description, type, icon, metada
   }
 
   const results = { db: false, push: false };
+  const payload = {
+    title,
+    body: description,
+    data: { type, ...(pushData || {}) },
+  };
 
-  // Step 1: Create in-app DB notification (same pattern as used across all controllers)
+  // STEP 1: Send Push Notification IMMEDIATELY (Do NOT wait for MongoDB)
+  try {
+    console.log(`[NotificationHelper] Executing immediate push delivery to user: ${userId}`);
+    const pushResult = await sendToUser(userId, payload);
+    results.push = pushResult.success === true;
+    
+    if (!results.push) {
+      console.error(`[NotificationHelper] PUSH DELIVERY FAILURE FOR USER ${userId}:`, {
+        reason: pushResult.reason || 'Unknown failure',
+        error: pushResult.error || null,
+        payload,
+        resultData: pushResult.data || null,
+      });
+    } else {
+      console.log(`[NotificationHelper] Push notification successfully dispatched to user ${userId}`);
+    }
+  } catch (pushErr) {
+    console.error(`[NotificationHelper] EXCEPTION DURING PUSH DELIVERY FOR USER ${userId}:`, {
+      message: pushErr.message,
+      stack: pushErr.stack,
+      payload,
+    });
+  }
+
+  // STEP 2: Save notification to MongoDB afterward
   try {
     await Notification.create({
       userId,
@@ -52,22 +81,7 @@ async function sendNotification({ userId, title, description, type, icon, metada
     });
     results.db = true;
   } catch (notifErr) {
-    console.warn('[NotificationHelper] DB notification failed (non-fatal):', notifErr.message);
-  }
-
-  // Step 2: Send push notification via Expo Push API
-  try {
-    const pushResult = await sendToUser(userId, {
-      title,
-      body: description,
-      data: { type, ...(pushData || {}) },
-    });
-    results.push = pushResult.success === true;
-    if (!results.push) {
-      console.warn(`[NotificationHelper] Push delivery failed for user ${userId} (type: ${type}):`, pushResult.reason || pushResult.error || 'unknown');
-    }
-  } catch (notifErr) {
-    console.warn('[NotificationHelper] Push notification threw (non-fatal):', notifErr.message);
+    console.warn('[NotificationHelper] DB notification save failed (non-fatal):', notifErr.message);
   }
 
   return { success: results.db || results.push, results };

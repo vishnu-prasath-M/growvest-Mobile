@@ -299,14 +299,14 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
 
   return (
     <div className="w-full">
-      {/* Tab Navigation */}
+      {/* Tab Navigation with Live Counts */}
       <div className="flex space-x-2 mb-6 overflow-x-auto pb-2">
         {[
           { key: "dashboard", label: "Dashboard" },
-          { key: "chits", label: "All Chits" },
+          { key: "chits", label: `All Chits (${chits.length || overview.totalChits || 0})` },
           { key: "create", label: editingChit ? "Edit Chit" : "Create Chit" },
-          { key: "joins", label: "Join Requests" },
-          { key: "payments", label: "Pending Payments" },
+          { key: "joins", label: `Join Requests (${joins.filter((j: any) => j.status === 'pending').length || overview.pendingJoins || 0})` },
+          { key: "payments", label: `Pending Payments (${payments.filter((p: any) => p.status === 'pending').length || overview.pendingPayments || 0})` },
           { key: "analytics", label: "Analytics" },
         ].map(tab => (
           <Button 
@@ -331,16 +331,47 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
       {/* ─── DASHBOARD ──────────────────────────────────────────────── */}
       {subTab === "dashboard" && (
         <div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="card-premium p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 rounded-lg bg-amber-50">
+                  <Users className="w-5 h-5 text-amber-600" />
+                </div>
+                <p className="text-sm text-muted-foreground">Pending Join Requests</p>
+              </div>
+              <p className="text-3xl font-bold text-amber-600">{overview.pendingJoins || 0}</p>
+            </div>
+
+            <div className="card-premium p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 rounded-lg bg-amber-50">
+                  <Clock className="w-5 h-5 text-amber-600" />
+                </div>
+                <p className="text-sm text-muted-foreground">Pending Monthly Payments</p>
+              </div>
+              <p className="text-3xl font-bold text-amber-600">{overview.pendingPayments || 0}</p>
+            </div>
+
             <div className="card-premium p-5">
               <div className="flex items-center gap-3 mb-3">
                 <div className="p-2 rounded-lg bg-green-50">
-                  <TrendingUp className="w-5 h-5 text-green-600" />
+                  <Users className="w-5 h-5 text-green-600" />
                 </div>
-                <p className="text-sm text-muted-foreground">Total Chits</p>
+                <p className="text-sm text-muted-foreground">Approved Members</p>
               </div>
-              <p className="text-3xl font-bold">{overview.totalChits || 0}</p>
+              <p className="text-3xl font-bold text-green-600">{overview.approvedMembers || overview.totalMembers || 0}</p>
             </div>
+
+            <div className="card-premium p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 rounded-lg bg-red-50">
+                  <XCircle className="w-5 h-5 text-red-600" />
+                </div>
+                <p className="text-sm text-muted-foreground">Rejected Requests</p>
+              </div>
+              <p className="text-3xl font-bold text-red-600">{overview.rejectedRequests || 0}</p>
+            </div>
+
             <div className="card-premium p-5">
               <div className="flex items-center gap-3 mb-3">
                 <div className="p-2 rounded-lg bg-blue-50">
@@ -348,8 +379,9 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
                 </div>
                 <p className="text-sm text-muted-foreground">Active Chits</p>
               </div>
-              <p className="text-3xl font-bold">{overview.activeChits || 0}</p>
+              <p className="text-3xl font-bold text-blue-600">{overview.activeChits || 0}</p>
             </div>
+
             <div className="card-premium p-5">
               <div className="flex items-center gap-3 mb-3">
                 <div className="p-2 rounded-lg bg-red-50">
@@ -359,6 +391,7 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
               </div>
               <p className="text-3xl font-bold text-red-600">{overview.closedChits || 0}</p>
             </div>
+
             <div className="card-premium p-5">
               <div className="flex items-center gap-3 mb-3">
                 <div className="p-2 rounded-lg bg-gray-50">
@@ -368,33 +401,7 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
               </div>
               <p className="text-3xl font-bold text-gray-600">{overview.completedChits || 0}</p>
             </div>
-            <div className="card-premium p-5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="p-2 rounded-lg bg-purple-50">
-                  <Users className="w-5 h-5 text-purple-600" />
-                </div>
-                <p className="text-sm text-muted-foreground">Total Members</p>
-              </div>
-              <p className="text-3xl font-bold">{overview.totalMembers || 0}</p>
-            </div>
-            <div className="card-premium p-5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="p-2 rounded-lg bg-amber-50">
-                  <Clock className="w-5 h-5 text-amber-600" />
-                </div>
-                <p className="text-sm text-muted-foreground">Pending Payments</p>
-              </div>
-              <p className="text-3xl font-bold text-amber-600">{overview.pendingPayments || 0}</p>
-            </div>
-            <div className="card-premium p-5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="p-2 rounded-lg bg-amber-50">
-                  <Users className="w-5 h-5 text-amber-600" />
-                </div>
-                <p className="text-sm text-muted-foreground">Pending Joins</p>
-              </div>
-              <p className="text-3xl font-bold text-amber-600">{overview.pendingJoins || 0}</p>
-            </div>
+
             <div className="card-premium p-5">
               <div className="flex items-center gap-3 mb-3">
                 <div className="p-2 rounded-lg bg-green-50">

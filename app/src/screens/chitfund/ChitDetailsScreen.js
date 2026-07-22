@@ -391,9 +391,48 @@ const ChitDetailsScreen = ({ navigation, route }) => {
     </View>
   );
 
+  const myMembership = myChits.find(m => m.chitId === chitId);
+  const isPendingApproval = myMembership?.status === 'pending';
+
+  // Filter available tabs based on approval status
+  const visibleTabs = isPendingApproval
+    ? [
+        { key: 'overview', label: 'Overview', icon: 'view-dashboard' },
+        { key: 'rules', label: 'Rules', icon: 'book-open-variant' },
+        { key: 'faq', label: 'FAQ', icon: 'frequently-asked-questions' },
+        { key: 'support', label: 'Support', icon: 'headset' },
+      ]
+    : tabs;
+
+  const renderPendingApprovalCard = () => (
+    <View style={{ backgroundColor: '#fffbeb', borderColor: colors.warning, borderWidth: 1, padding: 18, borderRadius: 16, marginBottom: 16 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <MaterialCommunityIcons name="clock-outline" size={24} color={colors.warning} />
+        <Text style={{ fontSize: 16, fontWeight: '700', color: colors.warning }}>Waiting for Admin Approval</Text>
+      </View>
+      <Text style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 20 }}>
+        Your Chit Fund joining request has been submitted successfully. Please wait until the administrator approves your request. You will be notified once your membership becomes active.
+      </Text>
+    </View>
+  );
+
   const renderTabContent = () => {
+    if (isPendingApproval && ['members', 'payments', 'auction', 'winners', 'dividends'].includes(activeTab)) {
+      return (
+        <View style={styles.sectionCard}>
+          {renderPendingApprovalCard()}
+        </View>
+      );
+    }
+
     switch (activeTab) {
-      case 'overview': return renderOverview();
+      case 'overview':
+        return (
+          <View>
+            {isPendingApproval && renderPendingApprovalCard()}
+            {renderOverview()}
+          </View>
+        );
       case 'members': return renderMembers();
       case 'payments': return renderPayments();
       case 'auction': return renderAuction();
@@ -424,7 +463,7 @@ const ChitDetailsScreen = ({ navigation, route }) => {
         <>
           {/* Tab Bar */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabBar} contentContainerStyle={styles.tabBarContent}>
-        {tabs.map((tab) => (
+        {visibleTabs.map((tab) => (
           <TouchableOpacity
             key={tab.key}
             style={[styles.tab, activeTab === tab.key && styles.tabActive]}
