@@ -7,14 +7,16 @@ const {
   getKYCDetail,
   reviewKYC,
   getKYCStats,
+  updateBankDetails,
 } = require('../controllers/kycController');
 const { protect, admin } = require('../middleware/authMiddleware');
 
 router.post('/submit', protect, submitKYC);
 router.get('/status', protect, getKYCStatus);
+router.put('/bank-details', protect, updateBankDetails);
 router.get('/stats', protect, admin, getKYCStats);
 router.get('/all', protect, admin, getAllKYC);
 router.get('/:id', protect, admin, getKYCDetail);
 router.put('/:id/review', protect, admin, reviewKYC);
 
-module.exports = router;
+module.exports = router;

@@ -1,6 +1,8 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const { sendPasswordResetEmail } = require('../services/emailService');
 
 // Helper to generate token
 const generateToken = (id) => {
@@ -361,5 +363,147 @@ exports.updateProfile = async (req, res) => {
       return res.status(400).json({ message: 'Username, mobile number or email already in use' });
     }
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ─── Token expiry config ──────────────────────────────────────────────────────
+const RESET_TOKEN_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
+
+// ─── Hash a plain token with SHA-256 ─────────────────────────────────────────
+const hashToken = (token) =>
+  crypto.createHash('sha256').update(token).digest('hex');
+
+// @desc    Forgot Password — generate token and send reset email
+// @route   POST /api/auth/forgot-password
+// @access  Public
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const trimmedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+
+    if (!trimmedEmail) {
+      return res.status(400).json({ message: 'Email address is required' });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      return res.status(400).json({ message: 'Please enter a valid email address' });
+    }
+
+    // Find user
+    const user = await User.findOne({ email: { $regex: new RegExp(`^${trimmedEmail}$`, 'i') } });
+
+    if (!user) {
+      // Return a generic 404 to confirm the email doesn't exist in our system
+      return res.status(404).json({ message: 'No account found with this email address.' });
+    }
+
+    // Generate a secure random token (plain text — sent in link)
+    const plainToken = crypto.randomBytes(32).toString('hex');
+
+    // Store only the hashed version — NEVER the plain token
+    user.passwordResetToken = hashToken(plainToken);
+    user.passwordResetExpires = new Date(Date.now() + RESET_TOKEN_EXPIRY_MS);
+    await user.save({ validateBeforeSave: false });
+
+    // Build reset URL
+    // Deep link: growvest://reset-password?token=<plain>
+    // Web fallback: https://<host>/reset-password?token=<plain>
+    const webHost = process.env.APP_URL || 'https://growvest-mobile.onrender.com';
+    const resetWebUrl = `${webHost}/reset-password?token=${plainToken}`;
+
+    try {
+      await sendPasswordResetEmail(user.email, resetWebUrl, 15);
+      console.log(`[ForgotPassword] Reset email sent to ${user.email}`);
+      res.json({
+        message: 'Password reset link has been sent to your email address.',
+      });
+    } catch (emailError) {
+      // Clean up the token if email fails — don't leave a dangling token
+      user.passwordResetToken = null;
+      user.passwordResetExpires = null;
+      await user.save({ validateBeforeSave: false });
+      console.error('[ForgotPassword] Email send error:', emailError.message);
+      res.status(500).json({ message: 'Failed to send reset email. Please try again later.' });
+    }
+  } catch (error) {
+    console.error('[ForgotPassword] Error:', error);
+    res.status(500).json({ message: 'Server error. Please try again.' });
+  }
+};
+
+// @desc    Reset Password — validate token and set new password
+// @route   POST /api/auth/reset-password
+// @access  Public
+exports.resetPassword = async (req, res) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res.status(400).json({ message: 'Token and new password are required' });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+    }
+
+    // Hash the incoming plain token to compare with the stored hash
+    const hashedToken = hashToken(token);
+
+    // Find user with matching hashed token that has not expired
+    const user = await User.findOne({
+      passwordResetToken: hashedToken,
+      passwordResetExpires: { $gt: new Date() }, // must still be valid
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        message: 'This password reset link is invalid or has expired. Please request a new one.',
+      });
+    }
+
+    // Hash the new password
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(password, salt);
+
+    // Invalidate the reset token — single-use enforcement
+    user.passwordResetToken = null;
+    user.passwordResetExpires = null;
+
+    await user.save();
+
+    console.log(`[ResetPassword] Password reset successfully for user ${user._id}`);
+    res.json({ message: 'Password has been reset successfully. You can now log in.' });
+  } catch (error) {
+    console.error('[ResetPassword] Error:', error);
+    res.status(500).json({ message: 'Server error. Please try again.' });
+  }
+};
+
+// @desc    Verify reset token validity (used by the mobile app before showing form)
+// @route   GET /api/auth/verify-reset-token/:token
+// @access  Public
+exports.verifyResetToken = async (req, res) => {
+  try {
+    const { token } = req.params;
+    if (!token) {
+      return res.status(400).json({ valid: false, message: 'Token is required' });
+    }
+
+    const hashedToken = hashToken(token);
+    const user = await User.findOne({
+      passwordResetToken: hashedToken,
+      passwordResetExpires: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return res.json({ valid: false, message: 'This link is invalid or has expired.' });
+    }
+
+    res.json({ valid: true, email: user.email });
+  } catch (error) {
+    console.error('[VerifyResetToken] Error:', error);
+    res.status(500).json({ valid: false, message: 'Server error' });
   }
 };

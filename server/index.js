@@ -90,9 +90,16 @@ const kycRoutes = require('./routes/kycRoutes');
 
 const app = express();
 app.use(cors());
+// Serve static files (web reset-password page)
+app.use(express.static(require('path').join(__dirname, 'public')));
 // FIX 1: Increase JSON body limit to 50mb to handle base64 image uploads for KYC
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Web reset-password page route — serves the HTML file
+app.get('/reset-password', (req, res) => {
+  res.sendFile(require('path').join(__dirname, 'public', 'reset-password.html'));
+});
 
 const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://vishnuprasath:8925699005@grow-clust.bynj9dx.mongodb.net/growvest?appName=Grow-Clust';
 

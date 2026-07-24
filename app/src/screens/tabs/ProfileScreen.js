@@ -79,6 +79,18 @@ const ProfileScreen = ({ navigation }) => {
     return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
   };
 
+  // Format registration date as "24 Jul 2026" for the Active Since stat
+  const formatActiveSince = (dateString) => {
+    if (!dateString) return '–';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '–';
+      return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    } catch {
+      return '–';
+    }
+  };
+
   const handleEditUsername = () => { setNewUsername(userData?.username || ''); setEditModalVisible(true); };
   const handleSaveUsername = async () => {
     if (!newUsername.trim()) { Alert.alert('Error', 'Username cannot be empty'); return; }
@@ -159,15 +171,24 @@ const ProfileScreen = ({ navigation }) => {
 
   const kycInfo = getKYCStatusInfo();
 
+  // Bank Details is only shown when the user has submitted KYC (real bank data exists)
+  const hasBankDetails = kycStatus && kycStatus.hasKYC === true;
+
+  const accountItems = [
+    { icon: 'account-edit', label: 'Edit Profile', tint: colors.primaryLight, iconColor: colors.primary, onPress: handleEditUsername },
+    { icon: 'email-edit', label: 'Edit Email', tint: '#e0f2fe', iconColor: '#0284c7', onPress: handleEditEmail },
+    { icon: kycInfo.icon, label: 'KYC Verification', tint: kycInfo.tint, iconColor: kycInfo.iconColor, badge: kycInfo.badge, onPress: () => navigation.navigate('KYC') },
+  ];
+
+  // Only add Bank Details when KYC bank data exists in MongoDB
+  if (hasBankDetails) {
+    accountItems.push({ icon: 'bank-outline', label: 'Bank Details', tint: colors.primaryLight, iconColor: colors.primary, onPress: () => navigation.navigate('BankDetails') });
+  }
+
   const menuGroups = [
     {
       title: 'Account',
-      items: [
-        { icon: 'account-edit', label: 'Edit Profile', tint: colors.primaryLight, iconColor: colors.primary, onPress: handleEditUsername },
-        { icon: 'email-edit', label: 'Edit Email', tint: '#e0f2fe', iconColor: '#0284c7', onPress: handleEditEmail },
-        { icon: kycInfo.icon, label: 'KYC Verification', tint: kycInfo.tint, iconColor: kycInfo.iconColor, badge: kycInfo.badge, onPress: () => navigation.navigate('KYC') },
-        { icon: 'bank-outline', label: 'Bank Details', tint: colors.primaryLight, iconColor: colors.primary, onPress: () => navigation.navigate('BankDetails') },
-      ],
+      items: accountItems,
     },
     {
       title: 'General',
@@ -211,27 +232,27 @@ const ProfileScreen = ({ navigation }) => {
         {/* Name & Info */}
         <View style={styles.nameSection}>
           <View style={styles.nameRow}>
-            <Text style={styles.profileName}>{userData?.name || userData?.username || 'User'}</Text>
+            <Text style={styles.profileName}>{(userData || authUser)?.name || (userData || authUser)?.username || 'User'}</Text>
             <MaterialCommunityIcons name="check-decagram" size={18} color={colors.primary} />
           </View>
           <Text style={styles.profileMeta}>
-            {userData?.email || ''}{userData?.mobileNumber ? ' • ' + userData.mobileNumber : ''}
+            {(userData || authUser)?.email || ''}{(userData || authUser)?.mobileNumber ? ' • ' + (userData || authUser).mobileNumber : ''}
           </Text>
-          {userData?.createdAt && (
-            <Text style={styles.joinDate}>Member since {formatDate(userData.createdAt)}</Text>
+          {(userData || authUser)?.createdAt && (
+            <Text style={styles.joinDate}>Member since {formatDate((userData || authUser).createdAt)}</Text>
           )}
         </View>
 
         {/* Stats Row */}
         <View style={styles.statsRow}>
           {[
-            { label: 'Active Since', value: userData?.createdAt ? new Date(userData.createdAt).getFullYear().toString() : '–' },
+            { label: 'Active Since', value: formatActiveSince((userData || authUser)?.createdAt) },
             { label: 'Status', value: 'Active' },
             { label: 'KYC', value: kycInfo.label },
           ].map((s) => (
             <View key={s.label} style={styles.statCard}>
               <Text style={styles.statLabel}>{s.label}</Text>
-              <Text style={styles.statValue}>{s.value}</Text>
+              <Text style={[styles.statValue, s.label === 'Active Since' && styles.statValueSmall]}>{s.value}</Text>
             </View>
           ))}
         </View>
@@ -459,6 +480,8 @@ const styles = StyleSheet.create({
   },
   statLabel: { fontSize: 10, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: '600' },
   statValue: { fontSize: 15, fontWeight: '700', color: colors.text, marginTop: 4 },
+  // Slightly smaller font for longer date strings
+  statValueSmall: { fontSize: 12 },
 
   // Menu
   menuSection: { paddingHorizontal: 16, marginTop: 20 },

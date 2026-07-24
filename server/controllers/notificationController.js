@@ -92,6 +92,26 @@ exports.createNotification = async (req, res) => {
   }
 };
 
+// @desc    Delete notification
+// @route   DELETE /api/notifications/:id
+// @access  Private
+exports.deleteNotification = async (req, res) => {
+  try {
+    const userId = req.user._id || req.user.id;
+    const notification = await Notification.findOneAndDelete({ _id: req.params.id, userId });
+
+    if (!notification) {
+      return res.status(404).json({ message: 'Notification not found' });
+    }
+
+    const unreadCount = await Notification.countDocuments({ userId, read: false });
+    res.json({ message: 'Notification deleted', unreadCount });
+  } catch (error) {
+    console.error('Error deleting notification:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 // @desc    Get unread notification count
 // @route   GET /api/notifications/unread-count
 // @access  Private

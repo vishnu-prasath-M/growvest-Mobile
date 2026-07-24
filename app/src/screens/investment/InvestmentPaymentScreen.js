@@ -93,7 +93,7 @@ const InvestmentPaymentScreen = ({ navigation, route }) => {
     },
     { 
       name: 'PhonePe', 
-      logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/PhonePe_Logo.svg/512px-PhonePe_Logo.svg.png',
+      logo: 'https://w7.pngwing.com/pngs/332/615/png-transparent-phonepe-india-unified-payments-interface-india-purple-violet-text-thumbnail.png',
       color: '#5F259F', 
       bg: '#f3e8ff' 
     },
@@ -242,6 +242,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+    paddingTop:50,
   },
   scrollView: {
     flex: 1,

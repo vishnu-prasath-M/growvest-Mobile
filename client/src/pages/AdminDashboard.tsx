@@ -97,14 +97,14 @@ const AdminDashboard = () => {
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [userDetails, setUserDetails] = useState<Record<string, any>>({});
 
-  // Navigation items with state for badges
+  // Navigation items with state for badges (all dynamic from MongoDB)
   const [navItems, setNavItems] = useState<{ label: string; tab: AdminTab; icon: React.ElementType; badge?: number }[]>([
     { label: "Overview", tab: "overview", icon: LayoutDashboard },
-    { label: "Pending Investments", tab: "pending", icon: Clock, badge: 3 },
+    { label: "Pending Investments", tab: "pending", icon: Clock, badge: 0 },
     { label: "Users", tab: "users", icon: Users },
-    { label: "Withdrawals", tab: "withdrawals", icon: ArrowDownToLine, badge: 2 },
+    { label: "Withdrawals", tab: "withdrawals", icon: ArrowDownToLine, badge: 0 },
     { label: "KYC Verification", tab: "kyc", icon: Shield, badge: 0 },
-    { label: "Chit Funds", tab: "chits", icon: TrendingUp },
+    { label: "Chit Funds", tab: "chits", icon: TrendingUp, badge: 0 },
     { label: "Settings", tab: "settings", icon: Settings },
   ]);
 
@@ -179,6 +179,10 @@ const AdminDashboard = () => {
               status: w?.status || "pending",
               upi: w?.upiId || ""
             })));
+            const pendingWithdrawCount = data.filter((w: any) => w.status === 'pending').length;
+            setNavItems(prev => prev.map(item =>
+              item.tab === 'withdrawals' ? { ...item, badge: pendingWithdrawCount } : item
+            ));
           }
         })
         .catch(err => console.error("Error fetching withdrawals:", err));
@@ -201,6 +205,10 @@ const AdminDashboard = () => {
               type: inv?.type || "saving",
               interestEarned: inv?.interestEarned || 0
             })));
+            const pendingInvCount = data.filter((inv: any) => inv.status === 'pending').length;
+            setNavItems(prev => prev.map(item =>
+              item.tab === 'pending' ? { ...item, badge: pendingInvCount } : item
+            ));
           }
         })
         .catch(err => console.error("Error fetching investments:", err));
@@ -234,17 +242,25 @@ const AdminDashboard = () => {
         })
         .catch(err => console.error("Error fetching KYC list:", err));
 
-      // Fetch Chits
-      fetch(`${API_URL}/api/chits`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data)) {
-            setChits(data);
+      // Fetch Chits & Pending Chit Actions for badge
+      Promise.all([
+        fetch(`${API_URL}/api/chits`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
+        fetch(`${API_URL}/api/chits/join-requests`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()).catch(() => []),
+        fetch(`${API_URL}/api/chits/pending-payments`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()).catch(() => []),
+      ])
+        .then(([chitsData, joinReqs, payReqs]) => {
+          if (Array.isArray(chitsData)) {
+            setChits(chitsData);
           }
+          const pendingJoinsCount = Array.isArray(joinReqs) ? joinReqs.filter((r: any) => r.status === 'pending').length : 0;
+          const pendingPaysCount = Array.isArray(payReqs) ? payReqs.filter((r: any) => r.status === 'pending').length : 0;
+          const totalChitPending = pendingJoinsCount + pendingPaysCount;
+
+          setNavItems(prev => prev.map(item =>
+            item.tab === 'chits' ? { ...item, badge: totalChitPending } : item
+          ));
         })
-        .catch(err => console.error("Error fetching chits:", err));
+        .catch(err => console.error("Error fetching chits data:", err));
     };
 
     fetchAll();

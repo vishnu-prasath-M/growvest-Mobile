@@ -40,8 +40,9 @@ const MonthlyDueScreen = ({ navigation }) => {
         }
       });
 
-      // Enrich chits with payment status
-      const enriched = data.map(c => {
+      // Enrich chits with payment status (filter ONLY active memberships)
+      const activeOnly = data.filter(c => c.status === 'active');
+      const enriched = activeOnly.map(c => {
         const paidMonths = paidMonthsMap[c.chitId] || new Set();
         const currentMonthDue = c.currentMonth + 1;
         const isCurrentPaid = paidMonths.has(currentMonthDue);
@@ -145,12 +146,19 @@ const MonthlyDueScreen = ({ navigation }) => {
     nextDueDate.setDate(1);
     nextDueDate.setHours(0, 0, 0, 0);
     
-    // Can pay only if: not already paid, not closed, not fully paid AND next due date has arrived
-    const nextInstallmentIsDue = today >= nextDueDate;
-    const canPay = !isPaid && !isClosed && !chit.isFullyPaid && nextInstallmentIsDue;
-    // Next installment is available but not yet due (current paid, waiting for next cycle)
-    const nextInstallmentPending = isPaid && !chit.isFullyPaid && chit.nextUnpaidMonth <= chit.duration && !nextInstallmentIsDue;
-    const nextInstallmentDueNow = isPaid && !chit.isFullyPaid && chit.nextUnpaidMonth <= chit.duration && nextInstallmentIsDue;
+    // Can pay ONLY if:
+    // 1. Not already fully paid / closed
+    // 2. The next unpaid month has NOT already been paid
+    // 3. Today is within 5 days of nextDueDate (or overdue)
+    const diffTime = nextDueDate.getTime() - today.getTime();
+    const daysUntilDue = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    // Enable Pay Now only when within 5 days of due date (daysUntilDue <= 5)
+    const isWithin5DaysWindow = daysUntilDue <= 5;
+    const canPay = !isPaid && !isClosed && !chit.isFullyPaid && isWithin5DaysWindow;
+    
+    // Next installment is pending (future cycle beyond 5 days)
+    const nextInstallmentPending = !isPaid && !isClosed && !chit.isFullyPaid && !isWithin5DaysWindow;
 
     return (
       <View key={chit._id} style={styles.dueCard}>
@@ -177,7 +185,7 @@ const MonthlyDueScreen = ({ navigation }) => {
             <View style={styles.paidSection}>
               <View style={styles.paidBadge}>
                 <MaterialCommunityIcons name="check-circle" size={20} color={colors.success} />
-                <Text style={styles.paidText}>✓ Paid</Text>
+                <Text style={styles.paidText}>✓ Month {chit.currentMonth} Paid</Text>
               </View>
 
               {chit.isFullyPaid ? (
@@ -274,17 +282,27 @@ const MonthlyDueScreen = ({ navigation }) => {
             </View>
 
             <View style={styles.dueActions}>
-              <TouchableOpacity
-                style={styles.payNowBtnEnabled}
-                activeOpacity={0.85}
-                onPress={() => handlePayNow(chit)}
-              >
-                <Text style={styles.payNowBtnText}>Pay Now</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.reminderBtn} activeOpacity={0.85}>
-                <MaterialCommunityIcons name="bell-outline" size={20} color={colors.primary} />
-                <Text style={styles.reminderBtnText}>Remind</Text>
-              </TouchableOpacity>
+              {canPay ? (
+                <>
+                  <TouchableOpacity
+                    style={styles.payNowBtnEnabled}
+                    activeOpacity={0.85}
+                    onPress={() => handlePayNow(chit)}
+                  >
+                    <Text style={styles.payNowBtnText}>Pay Now</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.reminderBtn} activeOpacity={0.85}>
+                    <MaterialCommunityIcons name="bell-outline" size={20} color={colors.primary} />
+                    <Text style={styles.reminderBtnText}>Remind</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <View style={[styles.payNowBtnEnabled, { backgroundColor: colors.muted, flex: 1 }]}>
+                  <Text style={[styles.payNowBtnText, { color: colors.textMuted }]}>
+                    🔒 Next due in {chit.remainingDays} days
+                  </Text>
+                </View>
+              )}
             </View>
           </>
         )}

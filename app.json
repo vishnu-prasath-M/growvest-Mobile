@@ -33,7 +33,25 @@
       "adaptiveIcon": {
         "foregroundImage": "./app/assets/growvest-logo.png",
         "backgroundColor": "#085428"
-      }
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "growvest",
+              "host": "reset-password"
+            },
+            {
+              "scheme": "https",
+              "host": "growvest-mobile.onrender.com",
+              "pathPrefix": "/reset-password"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "favicon": "./app/assets/icon.png"

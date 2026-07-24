@@ -1,18 +1,25 @@
-import React from 'react';
-import { View, Text, StyleSheet, Platform, Animated } from 'react-native';
+import React, { useRef, useCallback, useEffect } from 'react';
+import { View, Text, StyleSheet, Pressable, Dimensions, ActivityIndicator } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
 import { colors } from '../theme/theme';
-import { ActivityIndicator } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 
 // Auth Screens
 import LoginScreen from '../screens/auth/LoginScreen';
 import SignupScreen from '../screens/auth/SignupScreen';
 import KYCScreen from '../screens/auth/KYCScreen';
 import BankDetailsScreen from '../screens/auth/BankDetailsScreen';
+import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
+import ResetPasswordScreen from '../screens/auth/ResetPasswordScreen';
 
 // Tab Screens
 import HomeScreen from '../screens/tabs/HomeScreen';
@@ -58,66 +65,179 @@ import NotificationsScreen from '../screens/tabs/NotificationsScreen';
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
+const SCREEN_WIDTH = Dimensions.get('window').width;
+
+// ---------- Tab Configuration ----------
+const TABS = [
+  {
+    name: 'Home',
+    label: 'Home',
+    activeIcon: 'home',
+    inactiveIcon: 'home-outline',
+  },
+  {
+    name: 'ChitFund',
+    label: 'Chit Fund',
+    activeIcon: 'layers',
+    inactiveIcon: 'layers-outline',
+  },
+  {
+    name: 'Withdraw',
+    label: 'Withdraw',
+    activeIcon: 'arrow-up-circle',
+    inactiveIcon: 'arrow-up-circle-outline',
+  },
+  {
+    name: 'Profile',
+    label: 'Profile',
+    activeIcon: 'person',
+    inactiveIcon: 'person-outline',
+  },
+];
+
+// ---------- Spring Config ----------
+const SPRING_CONFIG = {
+  damping: 20,
+  stiffness: 280,
+  mass: 0.8,
+  overshootClamping: false,
+};
+
+const LABEL_SPRING = {
+  damping: 22,
+  stiffness: 320,
+  mass: 0.6,
+};
+
+// ---------- Individual Tab Item ----------
+const TabItem = React.memo(({ tab, index, focused, onPress }) => {
+  const scale = useSharedValue(focused ? 1 : 0.88);
+  const iconOpacity = useSharedValue(focused ? 1 : 0.5);
+  const labelOpacity = useSharedValue(focused ? 1 : 0);
+  const labelScale = useSharedValue(focused ? 1 : 0.8);
+
+  useEffect(() => {
+    if (focused) {
+      scale.value = withSpring(1, LABEL_SPRING);
+      iconOpacity.value = withTiming(1, { duration: 200 });
+      labelOpacity.value = withTiming(1, { duration: 220 });
+      labelScale.value = withSpring(1, LABEL_SPRING);
+    } else {
+      scale.value = withSpring(0.92, LABEL_SPRING);
+      iconOpacity.value = withTiming(1, { duration: 180 });
+      labelOpacity.value = withTiming(0, { duration: 150 });
+      labelScale.value = withSpring(0.9, LABEL_SPRING);
+    }
+  }, [focused]);
+
+  const containerStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: iconOpacity.value,
+  }));
+
+  const labelStyle = useAnimatedStyle(() => ({
+    opacity: labelOpacity.value,
+    transform: [{ scale: labelScale.value }],
+  }));
+
+  const handlePress = useCallback(() => {
+    scale.value = withSpring(0.82, { damping: 15, stiffness: 500 }, () => {
+      scale.value = withSpring(focused ? 1 : 0.88, LABEL_SPRING);
+    });
+    onPress();
+  }, [focused, onPress]);
+
+  return (
+    <Pressable
+      onPress={handlePress}
+      style={tabStyles.tabItem}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+    >
+      <Animated.View style={[tabStyles.tabItemInner, containerStyle]}>
+        <Ionicons
+          name={focused ? tab.activeIcon : tab.inactiveIcon}
+          size={22}
+          color={focused ? colors.primaryFg : colors.textSecondary}
+        />
+        {focused && (
+          <Animated.Text style={[tabStyles.activeLabel, labelStyle]}>
+            {tab.label}
+          </Animated.Text>
+        )}
+      </Animated.View>
+    </Pressable>
+  );
+});
+
 // ---------- Premium Floating Tab Bar ----------
-const TAB_ICONS = {
-  Home: { active: 'home-variant', inactive: 'home-variant-outline' },
-  ChitFund: { active: 'layers', inactive: 'layers-outline' },
-  Withdraw: { active: 'bank-transfer-out', inactive: 'bank-transfer-out' },
-  Profile: { active: 'account', inactive: 'account-outline' },
-};
-
-const TAB_LABELS = {
-  Home: 'Home',
-  ChitFund: 'Chit Fund',
-  Withdraw: 'Withdraw',
-  Profile: 'Profile',
-};
-
 const PrimeTabBar = ({ state, descriptors, navigation }) => {
+  const tabCount = TABS.length;
+  const containerWidth = useSharedValue(0);
+
+  const pillPosition = useSharedValue(state.index);
+  const prevIndex = useRef(state.index);
+
+  useEffect(() => {
+    if (prevIndex.current !== state.index) {
+      pillPosition.value = withSpring(state.index, SPRING_CONFIG);
+      prevIndex.current = state.index;
+    }
+  }, [state.index]);
+
+  const onContainerLayout = useCallback((e) => {
+    containerWidth.value = e.nativeEvent.layout.width;
+  }, []);
+
+  // FIXED: Adjusted size to remain strictly inside its slot container without clipping
+  const pillStyle = useAnimatedStyle(() => {
+    const horizontalMargin = 4;
+    const slotWidth = containerWidth.value / tabCount;
+    const pillWidth = slotWidth - horizontalMargin * 2;
+    const translateX = pillPosition.value * slotWidth + horizontalMargin;
+
+    return {
+      transform: [{ translateX }],
+      width: pillWidth,
+    };
+  });
+
   return (
     <View style={tabStyles.outerContainer} pointerEvents="box-none">
-      <View style={tabStyles.pill}>
+      <View style={tabStyles.pill} onLayout={onContainerLayout}>
+        {/* Sliding gradient pill indicator */}
+        <Animated.View style={[tabStyles.slidingPillWrapper, pillStyle]} pointerEvents="none">
+          <LinearGradient
+            colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={tabStyles.slidingPill}
+          />
+        </Animated.View>
+
+        {/* Tab items rendered on top */}
         {state.routes.map((route, index) => {
           const focused = state.index === index;
-          const iconSet = TAB_ICONS[route.name] || { active: 'help-circle', inactive: 'help-circle-outline' };
-          const label = TAB_LABELS[route.name] || route.name;
+          const tab = TABS.find(t => t.name === route.name) || TABS[0];
 
           const onPress = () => {
-            const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
             if (!focused && !event.defaultPrevented) {
               navigation.navigate(route.name);
             }
           };
 
-          if (focused) {
-            return (
-              <LinearGradient
-                key={route.key}
-                colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={tabStyles.activeTab}
-              >
-                <MaterialCommunityIcons
-                  name={iconSet.active}
-                  size={22}
-                  color={colors.primaryFg}
-                  onPress={onPress}
-                />
-                <Text style={tabStyles.activeLabel} onPress={onPress}>{label}</Text>
-              </LinearGradient>
-            );
-          }
-
           return (
-            <View key={route.key} style={tabStyles.inactiveTab}>
-              <MaterialCommunityIcons
-                name={iconSet.inactive}
-                size={22}
-                color={colors.textMuted}
-                onPress={onPress}
-              />
-            </View>
+            <TabItem
+              key={route.key}
+              tab={tab}
+              index={index}
+              focused={focused}
+              onPress={onPress}
+            />
           );
         })}
       </View>
@@ -125,10 +245,11 @@ const PrimeTabBar = ({ state, descriptors, navigation }) => {
   );
 };
 
+// ---------- Updated Styles ----------
 const tabStyles = StyleSheet.create({
   outerContainer: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 24,
     left: 16,
     right: 16,
     alignItems: 'center',
@@ -136,12 +257,10 @@ const tabStyles = StyleSheet.create({
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.92)',
+    backgroundColor: 'rgba(255,255,255,0.95)',
     borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
+    height: 64,
     width: '100%',
-    justifyContent: 'space-between',
     shadowColor: '#0E3D23',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.14,
@@ -149,50 +268,60 @@ const tabStyles = StyleSheet.create({
     elevation: 20,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.8)',
+    position: 'relative',
+    overflow: 'hidden',
+    paddingHorizontal: 4,
   },
-  activeTab: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  slidingPillWrapper: {
+    position: 'absolute',
+    top: 6,
+    bottom: 6,
+    left: 0,
     borderRadius: 999,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    gap: 7,
-    shadowColor: '#1A5C39',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 10,
+  },
+  slidingPill: {
     flex: 1,
+    borderRadius: 999,
+  },
+  tabItem: {
+    flex: 1,
+    height: '100%',
+    alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 3,
-    maxWidth: 160,
+    zIndex: 2,
+  },
+  tabItemInner: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    gap: 2,
   },
   activeLabel: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: '#F8FAF9',
-    letterSpacing: -0.3,
-  },
-  inactiveTab: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    marginHorizontal: 3,
+    letterSpacing: -0.2,
   },
 });
 
-// ---------- Tab Navigator ----------
+// ---------- Tab Navigator with cross-fade between screens ----------
 const TabNavigator = () => {
   return (
     <Tab.Navigator
       tabBar={(props) => <PrimeTabBar {...props} />}
       screenOptions={{
         headerShown: false,
+        lazy: true,
       }}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="ChitFund" component={ChitFundScreen} options={{ tabBarLabel: 'Chit Fund' }} />
+      <Tab.Screen
+        name="ChitFund"
+        component={ChitFundScreen}
+        options={{ tabBarLabel: 'Chit Fund' }}
+      />
       <Tab.Screen name="Withdraw" component={WithdrawScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
@@ -208,7 +337,7 @@ const SplashScreen = () => (
     style={splashStyles.container}
   >
     <View style={splashStyles.iconWrapper}>
-      <MaterialCommunityIcons name="leaf" size={56} color="rgba(255,255,255,0.9)" />
+      <Ionicons name="leaf-outline" size={56} color="rgba(255,255,255,0.9)" />
     </View>
     <Text style={splashStyles.title}>Growvest</Text>
     <Text style={splashStyles.subtitle}>Premium Investments</Text>
@@ -246,39 +375,62 @@ const splashStyles = StyleSheet.create({
   },
 });
 
-// ---------- Main Navigator ----------
+// ---------- iOS-style spring screen transition ----------
 const screenTransitionOptions = {
   headerShown: false,
   cardStyle: { backgroundColor: colors.background },
-  // Smooth slide-from-right animation for stack screens
-  cardStyleInterpolator: ({ current: { progress }, layouts: { screen } }) => ({
-    cardStyle: {
-      transform: [
-        {
-          translateX: progress.interpolate({
-            inputRange: [0, 1],
-            outputRange: [screen.width * 0.3, 0],
-          }),
-        },
-      ],
-      opacity: progress.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0.5, 1],
-      }),
-    },
-  }),
+  cardStyleInterpolator: ({ current, next, layouts }) => {
+    const { progress } = current;
+    const { screen } = layouts;
+
+    return {
+      cardStyle: {
+        transform: [
+          {
+            translateX: progress.interpolate({
+              inputRange: [0, 1],
+              outputRange: [screen.width, 0],
+              extrapolate: 'clamp',
+            }),
+          },
+        ],
+      },
+      overlayStyle: {
+        opacity: progress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, 0.15],
+          extrapolate: 'clamp',
+        }),
+      },
+    };
+  },
   transitionSpec: {
     open: {
-      animation: 'timing',
-      config: { duration: 280, useNativeDriver: true },
+      animation: 'spring',
+      config: {
+        stiffness: 300,
+        damping: 36,
+        mass: 0.9,
+        overshootClamping: false,
+        restDisplacementThreshold: 0.01,
+        restSpeedThreshold: 0.01,
+      },
     },
     close: {
-      animation: 'timing',
-      config: { duration: 200, useNativeDriver: true },
+      animation: 'spring',
+      config: {
+        stiffness: 320,
+        damping: 38,
+        mass: 0.8,
+        overshootClamping: false,
+        restDisplacementThreshold: 0.01,
+        restSpeedThreshold: 0.01,
+      },
     },
   },
 };
 
+// ---------- Main Navigator ----------
 const AppNavigator = () => {
   const { isAuthenticated, loading } = useAuth();
 
@@ -327,6 +479,8 @@ const AppNavigator = () => {
         <>
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Signup" component={SignupScreen} />
+          <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} options={{ headerShown: false }} />
         </>
       )}
     </Stack.Navigator>

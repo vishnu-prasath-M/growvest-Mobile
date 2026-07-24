@@ -21,6 +21,24 @@ import { API_ENDPOINTS } from '../../config/api';
 
 const STEPS = ['Personal', 'Address & ID', 'Nominee', 'Documents'];
 
+// Maximum allowed image size (in MB) — validates before upload starts
+const MAX_IMAGE_SIZE_MB = 5;
+
+const checkImageSize = (base64String, field) => {
+  // base64 encodes 3 bytes as 4 chars; approximate original size
+  const estimatedBytes = (base64String.length * 3) / 4;
+  const estimatedMB = estimatedBytes / (1024 * 1024);
+  if (estimatedMB > MAX_IMAGE_SIZE_MB) {
+    Alert.alert(
+      'Image Too Large',
+      `Please upload an image smaller than ${MAX_IMAGE_SIZE_MB} MB.\n\nThe selected image is approximately ${estimatedMB.toFixed(1)} MB.`,
+      [{ text: 'OK', style: 'default' }]
+    );
+    return false;
+  }
+  return true;
+};
+
 const KYCScreen = ({ navigation, route }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -70,7 +88,9 @@ const KYCScreen = ({ navigation, route }) => {
       aspect: [4, 3],
     });
     if (!result.canceled && result.assets[0]) {
-      setForm((prev) => ({ ...prev, [field]: result.assets[0].base64 }));
+      const base64 = result.assets[0].base64;
+      if (!checkImageSize(base64, field)) return;  // size guard
+      setForm((prev) => ({ ...prev, [field]: base64 }));
     }
   };
 
@@ -87,7 +107,9 @@ const KYCScreen = ({ navigation, route }) => {
       aspect: [4, 3],
     });
     if (!result.canceled && result.assets[0]) {
-      setForm((prev) => ({ ...prev, [field]: result.assets[0].base64 }));
+      const base64 = result.assets[0].base64;
+      if (!checkImageSize(base64, field)) return;  // size guard
+      setForm((prev) => ({ ...prev, [field]: base64 }));
     }
   };
 

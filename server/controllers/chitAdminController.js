@@ -426,16 +426,25 @@ const declareAuctionWinner = async (req, res) => {
 // @route   GET /api/chits/overview
 // @access  Private/Admin
 const getOverview = async (req, res) => {  try {
-    const totalChits = await Chit.countDocuments();
-    const activeChits = await Chit.countDocuments({ status: 'active' });
-    const closedChits = await Chit.countDocuments({ status: 'closed' });
-    const completedChits = await Chit.countDocuments({ status: 'completed' });
-    const totalMembers = await ChitMember.countDocuments({ status: 'active' });
-    const pendingPayments = await ChitPayment.countDocuments({ status: 'pending' });
     const pendingJoins = await Transaction.countDocuments({
       referenceType: 'ChitMember',
       status: 'pending',
     });
+    const pendingPayments = await ChitPayment.countDocuments({ status: 'pending' });
+    const approvedMembers = await ChitMember.countDocuments({ status: 'active' });
+    const rejectedJoins = await Transaction.countDocuments({
+      referenceType: 'ChitMember',
+      status: 'rejected',
+    });
+    const rejectedPayments = await ChitPayment.countDocuments({ status: 'rejected' });
+    const rejectedRequests = rejectedJoins + rejectedPayments;
+
+    const totalChits = await Chit.countDocuments();
+    const activeChits = await Chit.countDocuments({ status: 'active' });
+    const closedChits = await Chit.countDocuments({ status: 'closed' });
+    const completedChits = await Chit.countDocuments({ status: 'completed' });
+    const totalMembers = approvedMembers;
+
     const totalCollected = await ChitPayment.aggregate([
       { $match: { status: 'paid' } },
       { $group: { _id: null, total: { $sum: '$amount' } } },
@@ -447,8 +456,10 @@ const getOverview = async (req, res) => {  try {
       closedChits,
       completedChits,
       totalMembers,
+      approvedMembers,
       pendingPayments,
       pendingJoins,
+      rejectedRequests,
       totalCollected: totalCollected[0]?.total || 0,
     });
   } catch (error) {

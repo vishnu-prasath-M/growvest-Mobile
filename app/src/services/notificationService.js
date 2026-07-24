@@ -46,25 +46,36 @@ async function pollForNotifications() {
 
     if (allNotifications.length === 0) return;
 
-    // Filter only notifications created after lastSeenId (notifications sorted newest first)
-    let newNotifications = allNotifications;
-    if (lastSeenId) {
-      const lastSeenIndex = allNotifications.findIndex(n => n._id === lastSeenId);
-      if (lastSeenIndex >= 0) {
-        // Found the last seen notification - everything before it in the array is newer
-        newNotifications = allNotifications.slice(0, lastSeenIndex);
-      }
+    // On FIRST poll (no lastSeenId stored), silently set the baseline to the
+    // current latest notification and return WITHOUT showing any alerts.
+    // This prevents all historical notifications from firing at once on login.
+    if (!lastSeenId) {
+      await AsyncStorage.setItem(LAST_SEEN_NOTIF_KEY, allNotifications[0]._id);
+      console.log('[NotificationService] Baseline set to latest notification, no alerts fired on first poll.');
+      return;
     }
 
-    // Show all new notifications as local notifications (reverse so oldest new shows first)
+    // Find which notifications are NEW since last seen
+    const lastSeenIndex = allNotifications.findIndex(n => n._id === lastSeenId);
+    if (lastSeenIndex <= 0) {
+      // lastSeenId not found (pruned) or is already the latest — nothing new
+      if (lastSeenIndex < 0) {
+        // ID no longer in last 100 — update baseline to current latest
+        await AsyncStorage.setItem(LAST_SEEN_NOTIF_KEY, allNotifications[0]._id);
+      }
+      return;
+    }
+
+    // Everything BEFORE lastSeenIndex is newer than what we last saw
+    const newNotifications = allNotifications.slice(0, lastSeenIndex);
+
+    // Show notifications oldest-first so they appear in order
     for (const notif of newNotifications.reverse()) {
       await showLocalNotification(notif.title, notif.description);
     }
 
-    // Update last seen notification ID to the newest one
-    if (allNotifications.length > 0) {
-      await AsyncStorage.setItem(LAST_SEEN_NOTIF_KEY, allNotifications[0]._id);
-    }
+    // Update last seen to the newest notification
+    await AsyncStorage.setItem(LAST_SEEN_NOTIF_KEY, allNotifications[0]._id);
   } catch (error) {
     // Silently fail - polling is best-effort
   }
@@ -72,6 +83,15 @@ async function pollForNotifications() {
 
 export const notificationService = {
   async requestPermission() {
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'Default',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#085428',
+      });
+    }
+
     if (!Device.isDevice) {
       console.log('[NotificationService] Must use physical device for push notifications');
       return false;
@@ -125,7 +145,7 @@ export const notificationService = {
         return null;
       }
 
-      const response = await api.post('/api/users/register-device', {
+      const response = await api.post('/users/register-device', {
         userId,
         username,
         deviceToken,
@@ -193,5 +213,23 @@ export const notificationService = {
 
   async clearStoredToken() {
     await AsyncStorage.removeItem(DEVICE_TOKEN_KEY);
+  },
+
+  /**
+   * Listen for user tapping a push notification and navigate accordingly.
+   */
+  setupNotificationListeners(navigateFn) {
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      try {
+        const data = response?.notification?.request?.content?.data;
+        if (data?.screen && typeof navigateFn === 'function') {
+          navigateFn(data.screen, data.params || {});
+        }
+      } catch (err) {
+        console.warn('[NotificationService] Error handling notification response:', err);
+      }
+    });
+
+    return () => subscription.remove();
   },
 };
