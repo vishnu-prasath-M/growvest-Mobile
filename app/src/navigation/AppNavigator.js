@@ -289,12 +289,12 @@ const tabStyles = StyleSheet.create({
     zIndex: 2,
   },
   tabItemInner: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 6,
-    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    gap: 2,
   },
   activeLabel: {
     fontSize: 12,
