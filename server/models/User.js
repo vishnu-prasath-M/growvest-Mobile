@@ -14,8 +14,12 @@ const userSchema = new mongoose.Schema({
     deviceId: { type: String },
     updatedAt: { type: Date, default: Date.now },
   }],
+  // Password reset — token stored as SHA-256 hash, never plain text
+  passwordResetToken: { type: String, default: null },
+  passwordResetExpires: { type: Date, default: null },
 }, {
   timestamps: true
 });
 
 module.exports = mongoose.model('User', userSchema);
+

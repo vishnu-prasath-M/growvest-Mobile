@@ -244,3 +244,62 @@ exports.getKYCStats = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+// @desc    Update bank details inside existing KYC record (single source of truth)
+// @route   PUT /api/kyc/bank-details
+// @access  Private
+exports.updateBankDetails = async (req, res) => {
+  try {
+    const userId = req.user._id || req.user.id;
+    const {
+      accountHolderName,
+      bankName,
+      accountNumber,
+      ifscCode,
+      branchName,
+      upiId,
+    } = req.body;
+
+    // Basic validation
+    if (!accountHolderName || !bankName || !accountNumber || !ifscCode || !branchName) {
+      return res.status(400).json({ message: 'Required bank fields are missing' });
+    }
+
+    // Find existing KYC record for this user
+    const existingKYC = await KYC.findOne({ userId });
+
+    if (!existingKYC) {
+      return res.status(404).json({ message: 'KYC record not found. Please complete KYC first.' });
+    }
+
+    // Update only bank-detail fields — preserves all other KYC data
+    const updatedKYC = await KYC.findOneAndUpdate(
+      { userId },
+      {
+        accountHolderName: accountHolderName.trim(),
+        bankName: bankName.trim(),
+        accountNumber: accountNumber.trim(),
+        confirmAccountNumber: accountNumber.trim(), // keep in sync
+        ifscCode: ifscCode.trim().toUpperCase(),
+        branchName: branchName.trim(),
+        upiId: upiId ? upiId.trim() : '',
+      },
+      { new: true }
+    );
+
+    res.json({
+      message: 'Bank details updated successfully',
+      bankDetails: {
+        accountHolderName: updatedKYC.accountHolderName,
+        bankName: updatedKYC.bankName,
+        accountNumber: updatedKYC.accountNumber,
+        ifscCode: updatedKYC.ifscCode,
+        branchName: updatedKYC.branchName,
+        upiId: updatedKYC.upiId,
+      },
+    });
+  } catch (error) {
+    console.error('Error updating bank details:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};

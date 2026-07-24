@@ -25,6 +25,9 @@ export const API_ENDPOINTS = {
   UPDATE_EMAIL: '/auth/email',
   UPDATE_MOBILE: '/auth/mobile',
   UPDATE_PROFILE: '/auth/update-profile',
+  FORGOT_PASSWORD: '/auth/forgot-password',
+  RESET_PASSWORD: '/auth/reset-password',
+  VERIFY_RESET_TOKEN: (token) => `/auth/verify-reset-token/${token}`,
 
   // User profile (balances + account data — same as web client)
   USER_PROFILE: '/users/profile',
@@ -56,6 +59,7 @@ export const API_ENDPOINTS = {
   // KYC
   KYC_SUBMIT: '/kyc/submit',
   KYC_STATUS: '/kyc/status',
+  KYC_BANK_DETAILS: '/kyc/bank-details',
   KYC_ALL: '/kyc/all',
   KYC_DETAIL: (id) => `/kyc/${id}`,
   KYC_REVIEW: (id) => `/kyc/${id}/review`,

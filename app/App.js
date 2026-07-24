@@ -80,6 +80,25 @@ function AppContent() {
         <AuthProvider>
           <NavigationContainer
             ref={navigationRef}
+            linking={{
+              prefixes: [
+                'growvest://',
+                'https://growvest-mobile.onrender.com',
+              ],
+              config: {
+                screens: {
+                  // Deep link: growvest://reset-password?token=XXX
+                  // or https://growvest-mobile.onrender.com/reset-password?token=XXX
+                  ResetPassword: {
+                    path: 'reset-password',
+                    parse: { token: (token) => token },
+                  },
+                  ForgotPassword: 'forgot-password',
+                  Login: 'login',
+                  Signup: 'signup',
+                },
+              },
+            }}
             theme={{
               colors: {
                 primary: theme.colors.primary,

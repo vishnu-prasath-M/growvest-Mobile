@@ -7,7 +7,9 @@ const userSchema = new mongoose.Schema({
   email: { type: String, sparse: true, unique: true },
   password: { type: String, required: true },
   balance: { type: Number, default: 0 },
-  role: { type: String, default: 'user' }
+  role: { type: String, default: 'user' },
+  passwordResetToken: { type: String, default: null },
+  passwordResetExpires: { type: Date, default: null },
 }, {
   timestamps: true
 });
