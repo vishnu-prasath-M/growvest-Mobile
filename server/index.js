@@ -156,6 +156,7 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 
 app.use('/api/investments', investmentRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/mobile/auth', authRoutes);
 app.use('/api/withdrawals', withdrawalRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/transactions', transactionRoutes);
