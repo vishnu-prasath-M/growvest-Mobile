@@ -164,7 +164,7 @@ const ChitDetailsScreen = ({ navigation, route }) => {
             }}
             disabled={isDisabled}
           >
-            <Text style={styles.joinNowBtnText}>
+            <Text style={[styles.joinNowBtnText, isDisabled && styles.joinNowBtnTextDisabled]}>
               {isFull ? 'Slot Full' : isClosed ? 'Closed' : hasJoined ? 'Already Joined' : 'Join This Chit'}
             </Text>
             {!isDisabled && <MaterialCommunityIcons name="arrow-right" size={20} color={colors.white} />}
@@ -543,9 +543,10 @@ const styles = StyleSheet.create({
     ...colors.shadow.button, marginBottom: 16,
   },
   joinNowBtnDisabled: {
-    backgroundColor: colors.muted,
+    backgroundColor: '#E2E8F0',
   },
   joinNowBtnText: { fontSize: 17, fontWeight: '700', color: colors.white },
+  joinNowBtnTextDisabled: { color: '#64748B' },
   // Members
   memberRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
   memberRowBorder: { borderBottomWidth: 1, borderBottomColor: colors.borderLight },

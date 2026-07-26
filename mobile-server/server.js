@@ -22,12 +22,17 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
+const paymentRoutes = require('../server/routes/paymentRoutes');
+
 app.use('/api/mobile/auth', authRoutes);
 app.use('/api/mobile/dashboard', dashboardRoutes);
 app.use('/api/mobile/investments', investmentRoutes);
 app.use('/api/mobile/transactions', transactionRoutes);
 app.use('/api/mobile/withdrawals', withdrawalRoutes);
 app.use('/api/mobile/chits', chitFundRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/mobile/payments', paymentRoutes);
+
 
 // Health check
 app.get('/api/mobile/health', (req, res) => {

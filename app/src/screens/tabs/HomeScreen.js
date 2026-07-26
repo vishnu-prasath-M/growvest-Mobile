@@ -10,10 +10,10 @@ import {
   Dimensions,
   Animated,
   Modal,
-  SafeAreaView,
   Platform,
   StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
@@ -204,7 +204,7 @@ const HomeScreen = ({ navigation }) => {
       >
         <Animated.View style={{ opacity: fadeAnim }}>
           {/* ── Header ── */}
-          <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+          <SafeAreaView style={[styles.header]}>
             <View style={styles.headerLeft}>
               <LinearGradient
                 colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
@@ -233,7 +233,7 @@ const HomeScreen = ({ navigation }) => {
                 </View>
               )}
             </TouchableOpacity>
-          </View>
+          </SafeAreaView>
 
           {/* ── Balance Card ── */}
           <View style={styles.balanceCardOuter}>

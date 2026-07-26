@@ -54,6 +54,7 @@ exports.registerUser = async (req, res) => {
         name: user.name,
         email: user.email,
         mobileNumber: user.mobileNumber,
+        createdAt: user.createdAt,
         token: generateToken(user._id),
       });
     } else {
@@ -107,6 +108,7 @@ exports.loginUser = async (req, res) => {
       email: user.email,
       mobileNumber: user.mobileNumber,
       role: user.role,
+      createdAt: user.createdAt,
       token: generateToken(user._id),
     });
   } catch (error) {
@@ -126,7 +128,8 @@ exports.getMe = async (req, res) => {
         email: user.email,
         mobileNumber: user.mobileNumber,
         role: user.role,
-        balance: user.balance
+        balance: user.balance,
+        createdAt: user.createdAt,
       });
     } else {
       res.status(404).json({ message: 'User not found' });
@@ -184,6 +187,7 @@ exports.updateEmail = async (req, res) => {
       mobileNumber: user.mobileNumber,
       role: user.role,
       balance: user.balance,
+      createdAt: user.createdAt,
     });
   } catch (error) {
     console.error('Update email error:', error);
@@ -232,6 +236,7 @@ exports.updateUsername = async (req, res) => {
       mobileNumber: user.mobileNumber,
       role: user.role,
       balance: user.balance,
+      createdAt: user.createdAt,
     });
   } catch (error) {
     console.error('Update username error:', error);
@@ -356,6 +361,7 @@ exports.updateProfile = async (req, res) => {
       mobileNumber: user.mobileNumber,
       role: user.role,
       balance: user.balance,
+      createdAt: user.createdAt,
     });
   } catch (error) {
     console.error('Update profile error:', error);
