@@ -42,10 +42,11 @@ export const executeRazorpayPayment = async ({
       theme: { color: '#0E3D23' },
     };
 
-    // Try native Razorpay Checkout module first
-    let RazorpayCheckout;
+    // Safe native check
+    let RazorpayCheckout = null;
     try {
-      RazorpayCheckout = require('react-native-razorpay').default;
+      const RZ = require('react-native-razorpay');
+      RazorpayCheckout = RZ.default || RZ;
     } catch (err) {
       RazorpayCheckout = null;
     }
@@ -74,8 +75,7 @@ export const executeRazorpayPayment = async ({
         if (onFailure) onFailure(error);
       }
     } else {
-      // Fallback for Expo Go / Dev mode simulation if native Razorpay Checkout binary is not compiled in Expo Go:
-      // Simulates exact Razorpay checkout flow with Order verification on backend
+      // Test Mode Simulation fallback when running in Expo Go without native build
       Alert.alert(
         'Razorpay Test Mode',
         `Initiate Razorpay Test Payment of ₹${amount} for Order ${orderId}?`,
@@ -92,12 +92,9 @@ export const executeRazorpayPayment = async ({
             text: 'Pay Now (Test Success)',
             onPress: async () => {
               try {
-                // Generate HMAC signature simulation for test mode verify
-                const crypto = require('crypto-js');
-                const secret = 'xxxxxxxxxxxx';
                 const mockPaymentId = `pay_${Date.now()}`;
-                const body = orderId + '|' + mockPaymentId;
-                const signature = crypto.HmacSHA256(body, secret).toString();
+                // Signature simulation token sent to backend for test verify
+                const signature = `simulated_signature_${orderId}_${mockPaymentId}`;
 
                 const verification = await paymentService.verifyPayment({
                   razorpay_order_id: orderId,
