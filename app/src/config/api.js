@@ -76,5 +76,10 @@ export const API_ENDPOINTS = {
   CHIT_WINNERS: '/chits/winners',
   CHIT_DIVIDENDS: '/chits/dividends',
   CHIT_MEMBERS: (id) => `/chits/${id}/members`,
+
+  // Razorpay Payments
+  PAYMENT_CREATE_ORDER: '/payments/create-order',
+  PAYMENT_VERIFY: '/payments/verify',
+
   CHIT_AUCTION: (id) => `/chits/${id}/auction`,
 };

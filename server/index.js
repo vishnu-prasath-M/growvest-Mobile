@@ -154,6 +154,8 @@ const transactionRoutes = require('./routes/transactionRoutes');
 const userRoutes = require('./routes/userRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 
+const paymentRoutes = require('./routes/paymentRoutes');
+
 app.use('/api/investments', investmentRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/mobile/auth', authRoutes);
@@ -165,6 +167,8 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/chits', chitAdminRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/kyc', kycRoutes);
+app.use('/api/payments', paymentRoutes);
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
