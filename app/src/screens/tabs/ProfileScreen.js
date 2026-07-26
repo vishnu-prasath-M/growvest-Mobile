@@ -210,7 +210,7 @@ const ProfileScreen = ({ navigation }) => {
             colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={[styles.heroBanner, { paddingTop: insets.top + 20 }]}
+            style={styles.heroBanner}
           >
             <View style={styles.heroBlobGold} />
           </LinearGradient>
