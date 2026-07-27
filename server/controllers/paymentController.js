@@ -151,14 +151,14 @@ const completeInvestment = async (user, data, orderId, paymentId, signature) => 
   user.totalInvestment = (user.totalInvestment || 0) + Number(amount);
   await user.save();
 
-  // 4. Send Push Notification
+  // 4. Send Push Notification & Save to DB
   try {
-    await sendNotification(
-      user._id,
-      'Payment Successful',
-      `₹${amount} ${type === 'fixed' ? 'Fixed' : 'Savings'} deposit has been successfully added to your account.`,
-      'investment'
-    );
+    await sendNotification({
+      userId: user._id,
+      title: 'Payment Successful',
+      description: `₹${amount} ${type === 'fixed' ? 'Fixed' : 'Savings'} deposit has been successfully added to your account.`,
+      type: 'investment_approved',
+    });
   } catch (notifErr) {
     console.error('[PaymentController] Notification error:', notifErr);
   }
@@ -211,12 +211,12 @@ const completeChitJoin = async (user, data, orderId, paymentId, signature) => {
 
   // 4. Send Notification
   try {
-    await sendNotification(
-      user._id,
-      'Chit Payment Successful',
-      `₹${amount} payment for joining Chit plan confirmed successfully!`,
-      'chit'
-    );
+    await sendNotification({
+      userId: user._id,
+      title: 'Chit Joined Successfully',
+      description: `₹${amount} payment for joining Chit plan confirmed successfully!`,
+      type: 'chit_join_approved',
+    });
   } catch (notifErr) {
     console.error('[PaymentController] Notification error:', notifErr);
   }
@@ -271,12 +271,12 @@ const completeMonthlyDue = async (user, data, orderId, paymentId, signature) => 
 
   // 4. Send Notification
   try {
-    await sendNotification(
-      user._id,
-      'Monthly Due Paid',
-      `₹${totalPaidAmt} monthly installment for Month ${month} successfully paid!`,
-      'chit'
-    );
+    await sendNotification({
+      userId: user._id,
+      title: 'Monthly Due Paid',
+      description: `₹${totalPaidAmt} monthly installment for Month ${month} successfully paid!`,
+      type: 'chit_payment_approved',
+    });
   } catch (notifErr) {
     console.error('[PaymentController] Notification error:', notifErr);
   }
