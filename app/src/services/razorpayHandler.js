@@ -45,7 +45,9 @@ export const executeRazorpayPayment = async ({
     // Safe native check
     let RazorpayCheckout = null;
     try {
-      const RZ = require('react-native-razorpay');
+      // Use eval/Function require to bypass Metro bundler static analysis when running in Expo Go without native build
+      const safeRequire = eval('require');
+      const RZ = safeRequire('react-native-razorpay');
       RazorpayCheckout = RZ.default || RZ;
     } catch (err) {
       RazorpayCheckout = null;
