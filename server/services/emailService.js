@@ -4,11 +4,26 @@ const nodemailer = require('nodemailer');
 // Uses environment variables so credentials never live in code.
 // Falls back to Gmail app-password config; swap to any SMTP provider in .env.
 const createTransporter = () => {
+  if (process.env.EMAIL_HOST) {
+    return nodemailer.createTransport({
+      host: process.env.EMAIL_HOST,
+      port: Number(process.env.EMAIL_PORT) || 465,
+      secure: process.env.EMAIL_SECURE !== 'false',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+  }
+
+  // Gmail SMTP default
   return nodemailer.createTransport({
-    service: process.env.EMAIL_SERVICE || 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true, // use SSL
     auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS, // Use an App Password for Gmail (not the main password)
+      user: process.env.EMAIL_USER || 'prasathhari713@gmail.com',
+      pass: process.env.EMAIL_PASS || 'subgdiigiiajtrhe',
     },
   });
 };
