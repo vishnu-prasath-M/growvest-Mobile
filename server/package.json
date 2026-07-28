@@ -22,6 +22,7 @@
     "mongoose": "^9.4.1",
     "node-cron": "^4.2.1",
     "nodemailer": "^9.0.3",
-    "razorpay": "^2.9.6"
+    "razorpay": "^2.9.6",
+    "resend": "^6.18.1"
   }
 }
