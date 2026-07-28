@@ -383,46 +383,52 @@ const hashToken = (token) =>
 // @route   POST /api/auth/forgot-password
 // @access  Public
 exports.forgotPassword = async (req, res) => {
+  console.log('[Trace] 1. Request received at POST /api/auth/forgot-password');
   try {
     const { email } = req.body;
     const trimmedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
 
     if (!trimmedEmail) {
+      console.warn('[Trace] Validation failed: Email address is required');
       return res.status(400).json({ message: 'Email address is required' });
     }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(trimmedEmail)) {
+      console.warn('[Trace] Validation failed: Invalid email format');
       return res.status(400).json({ message: 'Please enter a valid email address' });
     }
 
-    // Find user
+    // Find user in MongoDB
     const user = await User.findOne({ email: { $regex: new RegExp(`^${trimmedEmail}$`, 'i') } });
 
     if (!user) {
-      // Return a generic 404 to confirm the email doesn't exist in our system
+      console.warn(`[Trace] 2. User NOT found for email: ${trimmedEmail}`);
       return res.status(404).json({ message: 'No account found with this email address.' });
     }
+    console.log(`[Trace] 2. User found: ID ${user._id}`);
 
     // Generate a secure random token (plain text — sent in link)
     const plainToken = crypto.randomBytes(32).toString('hex');
+    console.log('[Trace] 3. Secure token generated');
 
     // Store only the hashed version — NEVER the plain token
     user.passwordResetToken = hashToken(plainToken);
     user.passwordResetExpires = new Date(Date.now() + RESET_TOKEN_EXPIRY_MS);
     await user.save({ validateBeforeSave: false });
+    console.log('[Trace] 4. Hashed token saved in MongoDB');
 
     // Build reset URL
-    // Deep link: growvest://reset-password?token=<plain>
-    // Web fallback: https://<host>/reset-password?token=<plain>
     const webHost = process.env.APP_URL || 'https://growvest-mobile.onrender.com';
     const resetWebUrl = `${webHost}/reset-password?token=${plainToken}`;
 
     try {
+      console.log('[Trace] 5. Resend request started');
       await sendPasswordResetEmail(user.email, resetWebUrl, 15);
-      console.log(`[ForgotPassword] Reset email sent to ${user.email}`);
-      res.json({
+      console.log(`[Trace] 6. Resend response success for ${user.email}`);
+      console.log('[Trace] 7. API response sent to client');
+      return res.json({
         message: 'Password reset link has been sent to your email address.',
       });
     } catch (emailError) {
@@ -430,12 +436,14 @@ exports.forgotPassword = async (req, res) => {
       user.passwordResetToken = null;
       user.passwordResetExpires = null;
       await user.save({ validateBeforeSave: false });
-      console.error('[ForgotPassword] Email send error:', emailError.message);
-      res.status(500).json({ message: 'Failed to send reset email. Please try again later.' });
+      console.error('[Trace Error] Resend Email send error:', emailError.message);
+      return res.status(400).json({
+        message: emailError.message || 'Failed to send reset email via Resend.',
+      });
     }
   } catch (error) {
-    console.error('[ForgotPassword] Error:', error);
-    res.status(500).json({ message: 'Server error. Please try again.' });
+    console.error('[Trace Error] Server Error:', error);
+    return res.status(500).json({ message: 'Server error. Please try again.' });
   }
 };
 

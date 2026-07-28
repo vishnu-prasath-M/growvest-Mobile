@@ -1,16 +1,12 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-// ─── Transporter ─────────────────────────────────────────────────────────────
-// Uses environment variables so credentials never live in code.
-// Falls back to Gmail app-password config; swap to any SMTP provider in .env.
-const createTransporter = () => {
-  return nodemailer.createTransport({
-    service: process.env.EMAIL_SERVICE || 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS, // Use an App Password for Gmail (not the main password)
-    },
-  });
+// ─── Initialize Resend Client ───────────────────────────────────────────────
+const getResendClient = () => {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey || apiKey.trim() === '') {
+    return null;
+  }
+  return new Resend(apiKey.trim());
 };
 
 // ─── HTML Email Template ─────────────────────────────────────────────────────
@@ -116,24 +112,41 @@ const buildPasswordResetHtml = (resetUrl, expiryMinutes = 15) => `
 
 // ─── Send Password Reset Email ────────────────────────────────────────────────
 /**
- * Sends a password reset email to the user.
+ * Sends a password reset email using Resend API.
  * @param {string} toEmail   - Recipient email address
  * @param {string} resetUrl  - Full reset URL (web or deep-link)
  * @param {number} expiryMin - Token expiry in minutes (default 15)
  */
 const sendPasswordResetEmail = async (toEmail, resetUrl, expiryMin = 15) => {
-  const transporter = createTransporter();
+  console.log(`[Resend] Initiating password reset email send to: ${toEmail}`);
+  const resend = getResendClient();
 
-  const mailOptions = {
-    from: `"Growvest Security" <${process.env.EMAIL_USER}>`,
-    to: toEmail,
+  if (!resend) {
+    console.error('[Resend] RESEND_API_KEY environment variable is missing.');
+    throw new Error('Resend API Key not configured. Please set RESEND_API_KEY in environment variables.');
+  }
+
+  // Sender email (Resend default testing sender: 'onboarding@resend.dev' unless custom domain is verified)
+  const fromEmail = process.env.FROM_EMAIL || 'onboarding@resend.dev';
+
+  const { data, error } = await resend.emails.send({
+    from: `Growvest Security <${fromEmail}>`,
+    to: [toEmail],
     subject: '🔐 Reset Your Growvest Password',
     text: `Reset your Growvest password by visiting this link (expires in ${expiryMin} minutes):\n\n${resetUrl}\n\nIf you did not request this, ignore this email.`,
     html: buildPasswordResetHtml(resetUrl, expiryMin),
-  };
+  });
 
-  await transporter.sendMail(mailOptions);
-  console.log(`[EmailService] Password reset email sent to ${toEmail}`);
+  if (error) {
+    console.error('[Resend Error]', error);
+    if (error.name === 'validation_error' && error.message?.includes('domain')) {
+      throw new Error('Resend unverified domain error: Testing mode only sends to account email unless custom domain is verified in Resend.');
+    }
+    throw new Error(error.message || 'Failed to send email via Resend API');
+  }
+
+  console.log(`[Resend Success] Email sent via Resend API! ID: ${data?.id}`);
+  return data;
 };
 
 module.exports = { sendPasswordResetEmail };
