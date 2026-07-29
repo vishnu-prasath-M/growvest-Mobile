@@ -169,6 +169,21 @@ const WithdrawScreen = ({ navigation }) => {
             <Text style={styles.heroLabel}>Available Balance</Text>
             <Text style={styles.heroAmount}>{formatCurrency(availableToWithdraw)}</Text>
             <Text style={styles.heroNote}>Instant withdrawal • No fees</Text>
+
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.15)', paddingTop: 12, marginTop: 12 }}>
+              <View>
+                <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', fontWeight: '600', textTransform: 'uppercase' }}>Savings</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#F8FAF9' }}>{formatCurrency(userData?.savingBalance)}</Text>
+              </View>
+              <View>
+                <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', fontWeight: '600', textTransform: 'uppercase' }}>Chit Winning</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.gold }}>{formatCurrency(userData?.totalChitWinningAmount || userData?.winningAmount)}</Text>
+              </View>
+              <View>
+                <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', fontWeight: '600', textTransform: 'uppercase' }}>Fixed</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#F8FAF9' }}>{formatCurrency(userData?.fixedBalance)}</Text>
+              </View>
+            </View>
           </LinearGradient>
         </View>
 

@@ -36,6 +36,16 @@ const chitMemberSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  winningDate: {
+    type: Date,
+  },
+  winningAmount: {
+    type: Number,
+    default: 0,
+  },
+  winningTransactionRef: {
+    type: String,
+  },
   nextDueDate: {
     type: Date,
   },

@@ -27,6 +27,7 @@ const FILTER_OPTIONS = [
   { id: 'withdrawal', label: 'Withdrawals' },
   { id: 'chit_join', label: 'Chit Join' },
   { id: 'chit_payment', label: 'Monthly Due Payments' },
+  { id: 'chit_winning', label: 'Chit Winning Credit' },
   { id: 'fixed', label: 'Fixed Deposit' },
   { id: 'savings', label: 'Savings Deposit' },
   { id: 'approved', label: 'Success' },
@@ -110,13 +111,14 @@ const TransactionsScreen = ({ navigation }) => {
     const map = {
       chit_join: 'Chit Fund Join',
       chit_payment: 'Monthly Due Payment',
+      chit_winning: 'Chit Winning Credit',
       withdrawal: 'Withdrawal',
     };
     return map[tx.type] || tx.type;
   };
 
   const isInvestmentType = (type) => {
-    return ['investment', 'chit_join', 'chit_payment'].includes(type);
+    return ['investment', 'chit_join', 'chit_payment', 'chit_winning'].includes(type);
   };
 
   // Combined Search + Filter logic

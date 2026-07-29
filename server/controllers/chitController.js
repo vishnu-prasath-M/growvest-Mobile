@@ -185,20 +185,33 @@ const getMyChits = async (req, res) => {
       const monthlyWithFee = (chit?.monthlyAmount || 0) + processingFeeAmount;
       const nextDueAmount = actualPending > 0 ? monthlyWithFee * actualPending : monthlyWithFee;
 
+      const totalMembers = chit?.totalMembers || 0;
+      const availableSlots = chit?.availableSlots || 0;
+      const filledMembers = Math.max(0, totalMembers - availableSlots);
+      const remainingInstallments = Math.max(0, (chit?.duration || 0) - m.currentMonth);
+
       return {
         _id: m._id,
         chitId: chit?._id,
         chitName: chit?.name || 'Unknown',
         monthlyAmount: chit?.monthlyAmount || 0,
         duration: chit?.duration || 0,
-        totalMembers: chit?.totalMembers || 0,
+        totalMembers,
+        filledMembers,
+        availableSlots,
+        remainingSlots: availableSlots,
         totalPot: chit?.totalPot || 0,
         memberNumber: m.memberNumber,
         status: m.status,
         totalPaid: m.totalPaid,
         remainingAmount: m.remainingAmount,
         currentMonth: m.currentMonth,
+        installmentsPaid: m.currentMonth,
+        remainingInstallments,
         hasWon: m.hasWon,
+        winningDate: m.winningDate || null,
+        winningAmount: m.winningAmount || 0,
+        winningTransactionRef: m.winningTransactionRef || null,
         nextDueDate: nextDueDate ? nextDueDate.toISOString().split('T')[0] : null,
         nextDueAmount,
         pendingInstallments: actualPending,
