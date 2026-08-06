@@ -52,12 +52,12 @@ export const generateAndShareTransactionStatement = async (user, transactions) =
     const getStatusBadgeStyle = (status) => {
       const s = (status || '').toLowerCase();
       if (s === 'approved' || s === 'completed' || s === 'paid') {
-        return 'background:#dcfce7;color:#15803d;';
+        return 'background:#dcfce7;color:#16a34a;border:1px solid #bbf7d0;';
       }
       if (s === 'rejected' || s === 'failed') {
-        return 'background:#fee2e2;color:#b91c1c;';
+        return 'background:#fee2e2;color:#ef4444;border:1px solid #fecaca;';
       }
-      return 'background:#fef3c7;color:#b45309;';
+      return 'background:#fef3c7;color:#d97706;border:1px solid #fde68a;';
     };
 
     const tableRowsHtml = transactions
@@ -77,16 +77,14 @@ export const generateAndShareTransactionStatement = async (user, transactions) =
 
         return `
           <tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f8faf9'};">
-            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-size:12px;color:#374151;">${dateStr}</td>
-            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-size:12px;font-weight:600;color:#111827;">${typeLabel}</td>
-            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;font-family:monospace;">${refId}</td>
-            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-size:12px;text-align:center;">
-              <span style="display:inline-block;padding:3px 8px;border-radius:12px;font-size:10px;font-weight:700;${getStatusBadgeStyle(
-                tx.status
-              )}">${statusLabel}</span>
+            <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;">${dateStr}</td>
+            <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;font-weight:600;color:#111827;">${typeLabel}</td>
+            <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;color:#64748b;font-family:monospace;font-size:12px;">${refId}</td>
+            <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;text-align:center;">
+              <span class="status-badge" style="${getStatusBadgeStyle(tx.status)}">${statusLabel}</span>
             </td>
-            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-size:12px;font-weight:700;text-align:right;color:${
-              isCredit ? '#16a34a' : '#1f2937'
+            <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;text-align:right;color:${
+              isCredit ? '#16a34a' : '#ef4444'
             };">${amtStr}</td>
           </tr>
         `;
@@ -99,34 +97,135 @@ export const generateAndShareTransactionStatement = async (user, transactions) =
     <head>
       <meta charset="utf-8"/>
       <title>Account Statement - Growvest</title>
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
       <style>
-        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1f2937; margin: 0; padding: 24px; background: #ffffff; }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0E3D23; padding-bottom: 16px; margin-bottom: 20px; }
-        .logo { font-size: 26px; font-weight: 800; color: #0E3D23; letter-spacing: -0.5px; }
+        * { box-sizing: border-box; }
+        body { 
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+          color: #1f2937; 
+          margin: 0; 
+          padding: 40px; 
+          background: #ffffff; 
+          line-height: 1.5;
+        }
+        .header { 
+          display: flex; 
+          justify-content: space-between; 
+          align-items: center; 
+          border-bottom: 2px solid #0E3D23; 
+          padding-bottom: 20px; 
+          margin-bottom: 30px; 
+        }
+        .logo { 
+          font-size: 32px; 
+          font-weight: 800; 
+          color: #0E3D23; 
+          letter-spacing: -1px; 
+        }
         .logo span { color: #D4A843; }
-        .title { font-size: 14px; font-weight: 700; color: #4b5563; text-transform: uppercase; letter-spacing: 1px; }
+        .title { 
+          font-size: 13px; 
+          font-weight: 800; 
+          color: #6b7280; 
+          text-transform: uppercase; 
+          letter-spacing: 1.5px; 
+          border: 1.5px solid #e5e7eb;
+          padding: 8px 20px;
+          border-radius: 99px;
+          background: #f8fafc;
+        }
         
-        .user-info { display: flex; justify-content: space-between; background: #f8faf9; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 20px; }
-        .info-col p { margin: 3px 0; font-size: 13px; color: #4b5563; }
-        .info-col p strong { color: #111827; }
+        .user-info { 
+          display: flex; 
+          justify-content: space-between; 
+          background: #f4f7f5; 
+          border: 1px solid #e2e8f0; 
+          border-radius: 16px; 
+          padding: 24px; 
+          margin-bottom: 30px; 
+        }
+        .info-col { flex: 1; }
+        .info-col p { margin: 6px 0; font-size: 14px; color: #4b5563; }
+        .info-col p strong { color: #0E3D23; font-weight: 600; }
 
-        .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
-        .summary-card { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; text-align: center; }
-        .summary-card .label { font-size: 10px; font-weight: 700; color: #6b7280; text-transform: uppercase; margin-bottom: 4px; }
-        .summary-card .val { font-size: 14px; font-weight: 800; color: #0E3D23; }
+        .summary-grid { 
+          display: flex;
+          gap: 16px; 
+          margin-bottom: 35px; 
+        }
+        .summary-card { 
+          flex: 1;
+          background: #ffffff; 
+          border: 1px solid #e2e8f0; 
+          border-radius: 16px; 
+          padding: 18px 20px; 
+          text-align: left;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.01);
+        }
+        .summary-card .label { 
+          font-size: 10px; 
+          font-weight: 700; 
+          color: #94a3b8; 
+          text-transform: uppercase; 
+          margin-bottom: 8px; 
+          letter-spacing: 0.5px;
+        }
+        .summary-card .val { 
+          font-size: 18px; 
+          font-weight: 800; 
+          color: #0E3D23; 
+        }
+        .summary-card.withdraw .val {
+          color: #dc2626;
+        }
 
-        table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
-        th { background: #0E3D23; color: #ffffff; font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 10px 12px; text-align: left; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 35px; }
+        tr { page-break-inside: avoid; }
+        th { 
+          background: #0E3D23; 
+          color: #ffffff; 
+          font-size: 11px; 
+          font-weight: 700; 
+          text-transform: uppercase; 
+          padding: 14px 16px; 
+          text-align: left; 
+          letter-spacing: 0.5px;
+        }
+        th:first-child { border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
+        th:last-child { border-top-right-radius: 8px; border-bottom-right-radius: 8px; text-align: right; }
         th:nth-child(4) { text-align: center; }
-        th:nth-child(5) { text-align: right; }
 
-        .footer { border-top: 1px solid #e5e7eb; padding-top: 16px; text-align: center; font-size: 11px; color: #9ca3af; }
+        td { padding: 16px; font-size: 13px; border-bottom: 1px solid #e2e8f0; color: #374151; }
+        td:last-child { text-align: right; font-weight: 700; }
+        td:nth-child(2) { font-weight: 600; color: #111827; }
+        td:nth-child(4) { text-align: center; }
+
+        .status-badge {
+          display: inline-block;
+          padding: 4px 12px;
+          border-radius: 99px;
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.3px;
+          text-transform: uppercase;
+        }
+
+        .footer { 
+          border-top: 1px solid #e2e8f0; 
+          padding-top: 24px; 
+          text-align: center; 
+          font-size: 12px; 
+          color: #94a3b8; 
+          margin-top: 50px;
+        }
       </style>
     </head>
     <body>
       <div class="header">
         <div class="logo">Grow<span>vest</span></div>
-        <div class="title">ACCOUNT STATEMENT</div>
+        <div class="title">Account Statement</div>
       </div>
 
       <div class="user-info">
@@ -146,7 +245,7 @@ export const generateAndShareTransactionStatement = async (user, transactions) =
           <div class="label">Total Deposits</div>
           <div class="val">${formatCurrency(totalDeposits)}</div>
         </div>
-        <div class="summary-card">
+        <div class="summary-card withdraw">
           <div class="label">Total Withdrawals</div>
           <div class="val">${formatCurrency(totalWithdrawals)}</div>
         </div>
@@ -171,7 +270,7 @@ export const generateAndShareTransactionStatement = async (user, transactions) =
           </tr>
         </thead>
         <tbody>
-          ${tableRowsHtml.length > 0 ? tableRowsHtml : `<tr><td colspan="5" style="text-align:center;padding:20px;color:#6b7280;">No transactions found</td></tr>`}
+          ${tableRowsHtml.length > 0 ? tableRowsHtml : `<tr><td colspan="5" style="text-align:center;padding:30px;color:#94a3b8;">No transactions found</td></tr>`}
         </tbody>
       </table>
 

@@ -69,13 +69,16 @@ async function pollForNotifications() {
     // Everything BEFORE lastSeenIndex is newer than what we last saw
     const newNotifications = allNotifications.slice(0, lastSeenIndex);
 
+    // Update last seen to the newest notification immediately to prevent infinite notification loops
+    const newestId = allNotifications[0]?._id;
+    if (newestId) {
+      await AsyncStorage.setItem(LAST_SEEN_NOTIF_KEY, newestId);
+    }
+
     // Show notifications oldest-first so they appear in order
     for (const notif of newNotifications.reverse()) {
       await showLocalNotification(notif.title, notif.description);
     }
-
-    // Update last seen to the newest notification
-    await AsyncStorage.setItem(LAST_SEEN_NOTIF_KEY, allNotifications[0]._id);
   } catch (error) {
     // Silently fail - polling is best-effort
   }

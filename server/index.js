@@ -77,6 +77,43 @@ cron.schedule("0 8 * * *", async () => {
         
         reminderCount++;
       }
+
+      // 2 Days Reminder
+      if (diffDays === 2) {
+        await sendNotification({
+          userId: member.userId._id,
+          title: '⚠️ Payment Due in 2 Days',
+          description: `Your monthly due of ₹${member.chitId.monthlyAmount} for "${member.chitId.name}" is due in 2 days.`,
+          type: 'due_reminder_2_days',
+          metadata: { chitId: member.chitId._id, memberId: member._id, dueDate: nextDue },
+          pushData: { screen: 'MonthlyDue' },
+        });
+      }
+
+      // 1 Day Reminder
+      if (diffDays === 1) {
+        await sendNotification({
+          userId: member.userId._id,
+          title: '🚨 Payment Due Tomorrow',
+          description: `Your monthly due of ₹${member.chitId.monthlyAmount} for "${member.chitId.name}" is due tomorrow. Please pay to avoid late fees.`,
+          type: 'due_reminder_1_day',
+          metadata: { chitId: member.chitId._id, memberId: member._id, dueDate: nextDue },
+          pushData: { screen: 'MonthlyDue' },
+        });
+      }
+
+      // Overdue (last 3 days)
+      if (diffDays < 0 && diffDays >= -3) {
+        const overdueDays = Math.abs(diffDays);
+        await sendNotification({
+          userId: member.userId._id,
+          title: '🔥 Payment Overdue',
+          description: `Your monthly installment for "${member.chitId.name}" is overdue by ${overdueDays} day(s). Please make your payment immediately.`,
+          type: 'due_overdue',
+          metadata: { chitId: member.chitId._id, memberId: member._id, dueDate: nextDue },
+          pushData: { screen: 'MonthlyDue' },
+        });
+      }
     }
     console.log(`Due Reminder Cron Job Finished: Sent ${reminderCount} reminders.`);
   } catch (error) {

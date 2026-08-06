@@ -22,7 +22,10 @@ import StatusChip from '../../components/StatusChip';
 import { generateAndShareTransactionStatement } from '../../utils/pdfGenerator';
 
 const FILTER_OPTIONS = [
-  { id: 'all', label: 'All' },
+  { id: 'all', label: 'All Transactions' },
+  { id: 'last_week', label: 'Last Week' },
+  { id: 'last_month', label: 'Last Month' },
+  { id: 'last_3_months', label: 'Last 3 Months' },
   { id: 'investment', label: 'Investment Deposits' },
   { id: 'withdrawal', label: 'Withdrawals' },
   { id: 'chit_join', label: 'Chit Join' },
@@ -129,15 +132,30 @@ const TransactionsScreen = ({ navigation }) => {
 
     // Filter check
     if (selectedFilter !== 'all') {
-      if (selectedFilter === 'investment' && tx.type !== 'investment') return false;
-      if (selectedFilter === 'withdrawal' && tx.type !== 'withdrawal') return false;
-      if (selectedFilter === 'chit_join' && tx.type !== 'chit_join') return false;
-      if (selectedFilter === 'chit_payment' && tx.type !== 'chit_payment') return false;
-      if (selectedFilter === 'fixed' && !(tx.type === 'investment' && desc.includes('fixed'))) return false;
-      if (selectedFilter === 'savings' && !(tx.type === 'investment' && desc.includes('saving'))) return false;
-      if (selectedFilter === 'approved' && statusLabel !== 'success') return false;
-      if (selectedFilter === 'pending' && statusLabel !== 'pending') return false;
-      if (selectedFilter === 'rejected' && statusLabel !== 'failed') return false;
+      const txDate = new Date(tx.createdAt);
+      const today = new Date();
+
+      if (selectedFilter === 'last_week') {
+        const lastWeek = new Date();
+        lastWeek.setDate(today.getDate() - 7);
+        if (txDate < lastWeek) return false;
+      } else if (selectedFilter === 'last_month') {
+        const lastMonth = new Date();
+        lastMonth.setMonth(today.getMonth() - 1);
+        if (txDate < lastMonth) return false;
+      } else if (selectedFilter === 'last_3_months') {
+        const last3Months = new Date();
+        last3Months.setMonth(today.getMonth() - 3);
+        if (txDate < last3Months) return false;
+      } else if (selectedFilter === 'investment' && tx.type !== 'investment') return false;
+      else if (selectedFilter === 'withdrawal' && tx.type !== 'withdrawal') return false;
+      else if (selectedFilter === 'chit_join' && tx.type !== 'chit_join') return false;
+      else if (selectedFilter === 'chit_payment' && tx.type !== 'chit_payment') return false;
+      else if (selectedFilter === 'fixed' && !(tx.type === 'investment' && desc.includes('fixed'))) return false;
+      else if (selectedFilter === 'savings' && !(tx.type === 'investment' && desc.includes('saving'))) return false;
+      else if (selectedFilter === 'approved' && statusLabel !== 'success') return false;
+      else if (selectedFilter === 'pending' && statusLabel !== 'pending') return false;
+      else if (selectedFilter === 'rejected' && statusLabel !== 'failed') return false;
     }
 
     // Search query check
@@ -314,10 +332,10 @@ const TransactionsScreen = ({ navigation }) => {
               disabled={downloadingPdf}
             >
               {downloadingPdf ? (
-                <ActivityIndicator size="small" color={colors.text} />
+                <ActivityIndicator size="small" color={colors.white} />
               ) : (
                 <>
-                  <MaterialCommunityIcons name="receipt" size={16} color={colors.text} />
+                  <MaterialCommunityIcons name="receipt" size={16} color={colors.white} />
                   <Text style={styles.downloadBtnText}>Download statement</Text>
                 </>
               )}
@@ -514,20 +532,22 @@ const styles = StyleSheet.create({
   downloadBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
     gap: 8,
-    marginHorizontal: 16,
-    marginTop: 4,
+    marginTop: 24,
+    marginBottom: 16,
     paddingVertical: 14,
-    backgroundColor: colors.surface,
+    paddingHorizontal: 28,
+    backgroundColor: colors.primary,
     borderRadius: 999,
     shadowColor: '#0E3D23',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 4,
   },
-  downloadBtnText: { fontSize: 13, fontWeight: '700', color: colors.text },
+  downloadBtnText: { fontSize: 13, fontWeight: '700', color: colors.white },
 
   // Empty
   emptyState: { alignItems: 'center', paddingVertical: 60, paddingHorizontal: 40 },

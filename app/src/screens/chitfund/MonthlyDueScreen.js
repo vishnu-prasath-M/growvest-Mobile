@@ -6,7 +6,9 @@ import {
   ScrollView,
   TouchableOpacity,
   Modal,
+  Alert,
 } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
@@ -23,6 +25,96 @@ const MonthlyDueScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState(null);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showReminderModal, setShowReminderModal] = useState(false);
+  const [reminderChit, setReminderChit] = useState(null);
+
+  const handleSetReminder = async (type) => {
+    try {
+      setShowReminderModal(false);
+      
+      // Request notification permissions
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Please enable notifications in settings to receive reminders.');
+        return;
+      }
+
+      // Clear any previously scheduled local notifications to stop loops/duplicates
+      await Notifications.cancelAllScheduledNotificationsAsync();
+
+      const now = new Date();
+      let targetDate = new Date();
+      let timeLabel = "";
+      let trigger = null;
+
+      if (type === '10_seconds') {
+        timeLabel = "in 10 seconds";
+        trigger = {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: new Date(now.getTime() + 10 * 1000),
+          repeats: false,
+        };
+      } else if (type === 'tomorrow_morning') {
+        // Tomorrow at 9:00 AM
+        targetDate.setDate(now.getDate() + 1);
+        targetDate.setHours(9, 0, 0, 0);
+        timeLabel = "tomorrow morning at 9:00 AM";
+        trigger = {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: targetDate,
+          repeats: false,
+        };
+      } else if (type === 'two_days') {
+        // 2 days from now at 9:00 AM
+        targetDate.setDate(now.getDate() + 2);
+        targetDate.setHours(9, 0, 0, 0);
+        timeLabel = "in 2 days at 9:00 AM";
+        trigger = {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: targetDate,
+          repeats: false,
+        };
+      } else if (type === 'due_date') {
+        // 9:00 AM on the due date
+        const joinedDate = new Date(reminderChit?.joinedAt);
+        targetDate = new Date(joinedDate);
+        targetDate.setMonth(joinedDate.getMonth() + (reminderChit?.nextUnpaidMonth - 1));
+        targetDate.setDate(1);
+        targetDate.setHours(9, 0, 0, 0);
+        timeLabel = `on your Due Date (${reminderChit?.nextDueDateFormatted} at 9:00 AM)`;
+        
+        // Fallback if calculated due date has already passed
+        if (targetDate.getTime() <= now.getTime()) {
+          targetDate = new Date(now.getTime() + 10 * 1000); // 10 seconds from now
+          timeLabel = "in 10 seconds (as your due date is in the past)";
+        }
+
+        trigger = {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: targetDate,
+          repeats: false,
+        };
+      }
+
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '📅 Growvest Due Reminder',
+          body: `Reminder: Your monthly due of ${formatCurrency(reminderChit?.nextDueAmount)} for "${reminderChit?.chitName}" is due soon.`,
+          sound: 'default',
+          data: { screen: 'MonthlyDue' },
+        },
+        trigger,
+      });
+
+      Alert.alert(
+        'Reminder Set',
+        `We'll send you a notification ${timeLabel} to remind you of this due.`
+      );
+    } catch (error) {
+      console.error('Error setting reminder:', error);
+      Alert.alert('Error', 'Failed to set reminder. Please try again.');
+    }
+  };
 
   const fetchMyChits = async () => {
     try {
@@ -291,7 +383,14 @@ const MonthlyDueScreen = ({ navigation }) => {
                   >
                     <Text style={styles.payNowBtnText}>Pay Now</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.reminderBtn} activeOpacity={0.85}>
+                  <TouchableOpacity
+                    style={styles.reminderBtn}
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      setReminderChit(chit);
+                      setShowReminderModal(true);
+                    }}
+                  >
                     <MaterialCommunityIcons name="bell-outline" size={20} color={colors.primary} />
                     <Text style={styles.reminderBtnText}>Remind</Text>
                   </TouchableOpacity>
@@ -407,6 +506,49 @@ const MonthlyDueScreen = ({ navigation }) => {
           </View>
         </View>
       </Modal>
+
+      {/* Reminder Modal */}
+      <Modal visible={showReminderModal} transparent animationType="fade" onRequestClose={() => setShowReminderModal(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowReminderModal(false)}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitleEmail}>Set Reminder</Text>
+              <TouchableOpacity onPress={() => setShowReminderModal(false)} style={styles.modalCloseBtn}>
+                <MaterialCommunityIcons name="close" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.modalTextEmail}>
+              Set a local notification reminder for your upcoming installment of {formatCurrency(reminderChit?.nextDueAmount)} for "{reminderChit?.chitName}".
+            </Text>
+            
+            <View style={styles.reminderOptions}>
+              <TouchableOpacity style={styles.reminderOptionBtn} activeOpacity={0.7} onPress={() => handleSetReminder('10_seconds')}>
+                <MaterialCommunityIcons name="alarm" size={20} color={colors.primary} />
+                <Text style={styles.reminderOptionText}>In 10 seconds (Test Demo)</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.reminderOptionBtn} activeOpacity={0.7} onPress={() => handleSetReminder('tomorrow_morning')}>
+                <MaterialCommunityIcons name="weather-sunny" size={20} color={colors.primary} />
+                <Text style={styles.reminderOptionText}>Tomorrow morning (9:00 AM)</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.reminderOptionBtn} activeOpacity={0.7} onPress={() => handleSetReminder('two_days')}>
+                <MaterialCommunityIcons name="calendar-clock" size={20} color={colors.primary} />
+                <Text style={styles.reminderOptionText}>In 2 Days</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.reminderOptionBtn} activeOpacity={0.7} onPress={() => handleSetReminder('due_date')}>
+                <MaterialCommunityIcons name="alert-decagram-outline" size={20} color={colors.primary} />
+                <Text style={styles.reminderOptionText}>On Due Date ({reminderChit?.nextDueDateFormatted})</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity style={[styles.cancelBtn, { marginTop: 16 }]} onPress={() => setShowReminderModal(false)}>
+              <Text style={styles.cancelBtnText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -483,6 +625,9 @@ const styles = StyleSheet.create({
   payBtnOuterEmail: { flex: 1 },
   payBtnGradientEmail: { height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
   payBtnTextEmail: { fontSize: 15, fontWeight: '700', color: colors.white },
+  reminderOptions: { gap: 10, marginVertical: 10 },
+  reminderOptionBtn: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, backgroundColor: colors.primaryLight, borderRadius: 14 },
+  reminderOptionText: { fontSize: 14, fontWeight: '600', color: colors.text },
 });
 
 export default MonthlyDueScreen;

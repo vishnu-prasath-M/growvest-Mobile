@@ -12,6 +12,7 @@ import {
   Modal,
   Platform,
   StatusBar,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -164,7 +165,10 @@ const HomeScreen = ({ navigation }) => {
         style={styles.loadingContainer}
       >
         <View style={styles.loadingIconWrapper}>
-          <MaterialCommunityIcons name="leaf" size={48} color="rgba(255,255,255,0.9)" />
+          <Image
+            source={require('../../../assets/growvest-logo.png')}
+            style={{ width: 64, height: 64, borderRadius: 16 }}
+          />
         </View>
         <Text style={styles.loadingTitle}>Growvest</Text>
         <Text style={styles.loadingSubtitle}>Loading your dashboard...</Text>
