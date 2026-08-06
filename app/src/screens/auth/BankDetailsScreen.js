@@ -137,7 +137,7 @@ const BankDetailsScreen = ({ navigation }) => {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.container}
     >
       <TopBar title="Bank Details" navigation={navigation} showBack />

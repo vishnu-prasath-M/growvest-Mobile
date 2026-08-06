@@ -399,23 +399,50 @@ const declareAuctionWinner = async (req, res) => {
       return res.status(400).json({ message: 'This member has already won an auction' });
     }
 
-    // Mark the member as winner
+    const prizeAmount = winningAmount ? Number(winningAmount) : chit.totalPot;
+
+    // Mark the member as winner with winning details
     member.hasWon = true;
+    member.winningDate = new Date();
+    member.winningAmount = prizeAmount;
     await member.save();
 
-    // Send unified notification (DB + Push) using the same implementation
+    // 1. Credit winning amount to user balance in DB
     if (member.userId) {
+      const winnerUser = await User.findById(member.userId._id || member.userId);
+      if (winnerUser) {
+        winnerUser.balance = (winnerUser.balance || 0) + prizeAmount;
+        await winnerUser.save();
+      }
+
+      // 2. Create Transaction History Record
+      const transaction = new Transaction({
+        userId: winnerUser?._id || member.userId._id || member.userId,
+        userEmail: winnerUser?.email || 'no-email@growvest.com',
+        type: 'chit_winning',
+        amount: prizeAmount,
+        status: 'approved',
+        referenceId: member._id,
+        referenceType: 'ChitMember',
+        description: `Chit Auction Winner Credit - ${chit.name} Month ${month}`,
+      });
+      await transaction.save();
+
+      member.winningTransactionRef = transaction._id.toString();
+      await member.save();
+
+      // 3. Send unified notification (DB + Push)
       await sendNotification({
         userId: member.userId._id || member.userId,
         title: '🏆 Auction Winner!',
-        description: `Congratulations! You have won the auction for "${chit.name}" in month ${month}. The winning amount of ₹${winningAmount || chit.totalPot} will be credited to your account.`,
+        description: `Congratulations! You have won the auction for "${chit.name}" in month ${month}. The winning amount of ₹${prizeAmount.toLocaleString('en-IN')} has been credited to your account!`,
         type: 'auction_winner',
-        metadata: { chitId: chit._id, chitName: chit.name, memberId: member._id, month, winningAmount: winningAmount || chit.totalPot },
+        metadata: { chitId: chit._id, chitName: chit.name, memberId: member._id, month, winningAmount: prizeAmount, transactionId: transaction._id },
         pushData: { screen: 'MyChits' },
       });
     }
 
-    res.json({ message: 'Auction winner declared successfully', member });
+    res.json({ message: 'Auction winner declared and amount credited successfully', member });
   } catch (error) {
     console.error('Error declaring auction winner:', error);
     res.status(500).json({ message: 'Server error', error: error.message });

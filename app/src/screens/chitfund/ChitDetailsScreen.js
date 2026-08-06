@@ -98,39 +98,173 @@ const ChitDetailsScreen = ({ navigation, route }) => {
         </LinearGradient>
       </View>
 
-      <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Plan Details</Text>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Total Members</Text>
-          <Text style={styles.detailValue}>{chit.totalMembers}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Available Slots</Text>
-          <Text style={[styles.detailValue, chit.availableSlots > 0 ? { color: colors.success } : { color: colors.error }]}>
-            {chit.availableSlots > 0 ? `${chit.availableSlots} Open` : 'Full'}
-          </Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Processing Fee</Text>
-          <Text style={styles.detailValue}>{chit.processingFee}%</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Start Date</Text>
-          <Text style={styles.detailValue}>{chit.startDate}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>End Date</Text>
-          <Text style={styles.detailValue}>{chit.endDate}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Status</Text>
-          <View style={[styles.statusBadge, { backgroundColor: chit.status === 'active' ? colors.successLight : colors.infoLight }]}>
-            <Text style={[styles.statusText, { color: chit.status === 'active' ? colors.success : colors.info }]}>
-              {chit.status.charAt(0).toUpperCase() + chit.status.slice(1)}
-            </Text>
+      {/* Logged-in User Chit Action Details */}
+      {(() => {
+        const myMembership = myChits.find(m => m.chitId === chit._id) || chit.myMembership;
+        const totalMembers = chit.totalMembers || 0;
+        const availableSlots = chit.availableSlots || 0;
+        const filledMembers = Math.max(0, totalMembers - availableSlots);
+        const remainingSlots = availableSlots;
+
+        if (myMembership) {
+          const userJoinedDate = myMembership.joinedAt 
+            ? new Date(myMembership.joinedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+            : 'N/A';
+          const installmentsPaid = myMembership.currentMonth || 0;
+          const remainingInstallments = Math.max(0, (chit.duration || 0) - installmentsPaid);
+          const totalPaid = myMembership.totalPaid || 0;
+          const remainingAmount = Math.max(0, (chit.totalPot || 0) - totalPaid);
+          const nextDueStr = myMembership.nextDueDate || 'N/A';
+          const dueStatus = myMembership.pendingInstallments > 0 ? 'Pending' : 'Paid';
+
+          return (
+            <View style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>My Chit Status & Action Details</Text>
+              
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Chit ID</Text>
+                <Text style={styles.detailValue}>{chit._id}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Total Chit Value</Text>
+                <Text style={styles.detailValue}>{formatCurrency(chit.totalPot)}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Monthly Installment</Text>
+                <Text style={styles.detailValue}>{formatCurrency(chit.monthlyAmount)}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Total Members</Text>
+                <Text style={styles.detailValue}>{totalMembers}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Filled Members</Text>
+                <Text style={styles.detailValue}>{filledMembers}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Remaining Slots</Text>
+                <Text style={[styles.detailValue, remainingSlots > 0 ? { color: colors.success } : { color: colors.error }]}>
+                  {remainingSlots}
+                </Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>User Join Date</Text>
+                <Text style={styles.detailValue}>{userJoinedDate}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Current Month Number</Text>
+                <Text style={styles.detailValue}>Month {installmentsPaid} of {chit.duration}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Next Due Date</Text>
+                <Text style={styles.detailValue}>{nextDueStr}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Due Status</Text>
+                <View style={[styles.statusBadge, { backgroundColor: dueStatus === 'Paid' ? colors.successLight : '#fef9c3' }]}>
+                  <Text style={[styles.statusText, { color: dueStatus === 'Paid' ? colors.success : colors.warning }]}>
+                    {dueStatus}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Total Amount Paid</Text>
+                <Text style={styles.detailValue}>{formatCurrency(totalPaid)}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Remaining Amount</Text>
+                <Text style={styles.detailValue}>{formatCurrency(remainingAmount)}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Installments Paid</Text>
+                <Text style={styles.detailValue}>{installmentsPaid} Months</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Remaining Installments</Text>
+                <Text style={styles.detailValue}>{remainingInstallments} Months</Text>
+              </View>
+
+              {/* Winning Status Banner */}
+              <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.borderLight }}>
+                {myMembership.hasWon ? (
+                  <View style={{ backgroundColor: colors.successLight, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: colors.success }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <MaterialCommunityIcons name="trophy" size={24} color={colors.success} />
+                      <Text style={{ fontSize: 16, fontWeight: '800', color: colors.success }}>AUCTION WINNER</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Winning Amount</Text>
+                      <Text style={{ fontSize: 15, fontWeight: '800', color: colors.success }}>{formatCurrency(myMembership.winningAmount || chit.totalPot)}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Winning Date</Text>
+                      <Text style={styles.detailValue}>
+                        {myMembership.winningDate ? new Date(myMembership.winningDate).toLocaleDateString('en-IN') : 'Confirmed'}
+                      </Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Amount Credited</Text>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: colors.success }}>✔ Credited to Wallet</Text>
+                    </View>
+                    {myMembership.winningTransactionRef ? (
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Txn Reference</Text>
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary }}>{myMembership.winningTransactionRef}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                ) : (
+                  <View style={{ backgroundColor: colors.background, padding: 14, borderRadius: 14, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textSecondary }}>
+                      ⏳ Waiting for Winning Turn
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          );
+        }
+
+        return (
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Plan Details</Text>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Total Members</Text>
+              <Text style={styles.detailValue}>{totalMembers}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Filled Members</Text>
+              <Text style={styles.detailValue}>{filledMembers}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Available Slots</Text>
+              <Text style={[styles.detailValue, remainingSlots > 0 ? { color: colors.success } : { color: colors.error }]}>
+                {remainingSlots > 0 ? `${remainingSlots} Open` : 'Full'}
+              </Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Processing Fee</Text>
+              <Text style={styles.detailValue}>{chit.processingFee}%</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Start Date</Text>
+              <Text style={styles.detailValue}>{chit.startDate}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>End Date</Text>
+              <Text style={styles.detailValue}>{chit.endDate}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Status</Text>
+              <View style={[styles.statusBadge, { backgroundColor: chit.status === 'active' ? colors.successLight : colors.infoLight }]}>
+                <Text style={[styles.statusText, { color: chit.status === 'active' ? colors.success : colors.info }]}>
+                  {chit.status.charAt(0).toUpperCase() + chit.status.slice(1)}
+                </Text>
+              </View>
+            </View>
           </View>
-        </View>
-      </View>
+        );
+      })()}
 
       {chit.features && (
         <View style={styles.sectionCard}>

@@ -77,6 +77,8 @@ const getEnrichedUserData = async (query) => {
     : { status: { $in: ['paid', 'approved'] }, userEmail: '__no_match__' };
   const withdrawals = await Withdrawal.find(withdrawalQuery);
 
+  const ChitMember = require('../models/ChitMember');
+
   const savingInvestments = investments.filter(inv => inv.type === 'saving');
   const fixedInvestments = investments.filter(inv => inv.type === 'fixed');
 
@@ -94,15 +96,19 @@ const getEnrichedUserData = async (query) => {
   let fixedBalance = fixedInvested + fixedInterest - fixedWithdrawn;
   if (fixedBalance < 0) fixedBalance = 0;
 
+  // Calculate Chit Winning Amount directly from ChitMember records for this user
+  const wonMemberships = await ChitMember.find({ userId: user._id, hasWon: true });
+  const totalChitWinningAmount = wonMemberships.reduce((acc, m) => acc + (m.winningAmount || 0), 0);
+
   const availableFixed = fixedInvestments.filter(inv => {
     const diffDays = (new Date() - new Date(inv.startDate)) / (1000 * 60 * 60 * 24);
     return diffDays >= 365;
   }).reduce((acc, inv) => acc + inv.amount + (inv.interestEarned || 0), 0);
 
-  const availableToWithdraw = savingBalance + availableFixed;
+  const availableToWithdraw = savingBalance + availableFixed + totalChitWinningAmount;
 
-  // Total balance - ALWAYS calculate from investments (user.balance is not the source of truth)
-  let totalBalance = savingBalance + fixedBalance;
+  // Total balance includes savings balance + fixed balance + total chit winning amount
+  let totalBalance = savingBalance + fixedBalance + totalChitWinningAmount;
   if (totalBalance < 0) totalBalance = 0;
 
   // Total calculations
@@ -117,6 +123,8 @@ const getEnrichedUserData = async (query) => {
     savingBalance,
     fixedBalance,
     availableToWithdraw,
+    totalChitWinningAmount,
+    winningAmount: totalChitWinningAmount,
     totalInvested,
     totalInterest,
     totalWithdrawn,

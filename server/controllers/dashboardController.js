@@ -49,10 +49,15 @@ exports.getDashboard = async (req, res) => {
     const savingBalance = savingInvestments.reduce((sum, inv) => sum + inv.amount + (inv.interestEarned || 0), 0);
     const fixedBalance = fixedInvestments.reduce((sum, inv) => sum + inv.amount + (inv.interestEarned || 0), 0);
     const totalInterest = investments.reduce((sum, inv) => sum + (inv.interestEarned || 0), 0);
-    const totalBalance = savingBalance + fixedBalance;
 
-    // Available to withdraw (saving deposits only)
-    const availableToWithdraw = savingBalance;
+    // Get won chit memberships for winning amount calculation
+    const wonMemberships = await ChitMember.find({ userId: user._id, hasWon: true });
+    const totalChitWinningAmount = wonMemberships.reduce((sum, m) => sum + (m.winningAmount || 0), 0);
+
+    const totalBalance = savingBalance + fixedBalance + totalChitWinningAmount;
+
+    // Available to withdraw (saving deposits + won chit amounts)
+    const availableToWithdraw = savingBalance + totalChitWinningAmount;
 
     // Pending count
     const pendingInvestments = investments.filter(inv => inv.status === 'pending').length;
@@ -66,7 +71,8 @@ exports.getDashboard = async (req, res) => {
         name: user.name,
         mobileNumber: user.mobileNumber,
         email: user.email,
-        balance: user.balance,
+        balance: totalBalance,
+        winningAmount: totalChitWinningAmount,
         role: user.role,
       },
       balances: {
@@ -74,6 +80,8 @@ exports.getDashboard = async (req, res) => {
         fixedBalance,
         totalBalance,
         totalInterest,
+        winningAmount: totalChitWinningAmount,
+        totalChitWinningAmount,
         availableToWithdraw,
       },
       stats: {
