@@ -135,6 +135,8 @@ const BankDetailsScreen = ({ navigation }) => {
     );
   }
 
+  
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
