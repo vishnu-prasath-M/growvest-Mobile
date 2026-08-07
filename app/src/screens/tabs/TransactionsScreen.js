@@ -56,12 +56,7 @@ const TransactionsScreen = ({ navigation }) => {
       setCurrentUser(user);
       const data = await transactionService.getMyTransactions();
       const userTransactions = Array.isArray(data)
-        ? data.filter(
-            (tx) =>
-              (user?._id && String(tx.userId) === String(user._id)) ||
-              (user?.email && tx.userEmail?.toLowerCase() === user.email.toLowerCase()) ||
-              (user?.mobileNumber && tx.mobileNumber === user.mobileNumber)
-          )
+        ? data.filter((tx) => user?._id && String(tx.userId) === String(user._id))
         : [];
       setTransactions(userTransactions);
     } catch (error) {

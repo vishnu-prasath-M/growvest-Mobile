@@ -1,5 +1,5 @@
 import React, { useRef, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Dimensions, ActivityIndicator, Image } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -337,7 +337,10 @@ const SplashScreen = () => (
     style={splashStyles.container}
   >
     <View style={splashStyles.iconWrapper}>
-      <Ionicons name="leaf-outline" size={56} color="rgba(255,255,255,0.9)" />
+      <Image
+        source={require('../../assets/growvest-logo.png')}
+        style={{ width: 64, height: 64, borderRadius: 16 }}
+      />
     </View>
     <Text style={splashStyles.title}>Growvest</Text>
     <Text style={splashStyles.subtitle}>Premium Investments</Text>

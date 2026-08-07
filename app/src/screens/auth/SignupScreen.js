@@ -9,6 +9,7 @@ import {
   Alert,
   TouchableOpacity,
   Dimensions,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TextInput } from 'react-native-paper';
@@ -89,7 +90,10 @@ const SignupScreen = ({ navigation }) => {
             <View style={styles.blobTopRight} />
 
             <View style={styles.logoWrapper}>
-              <MaterialCommunityIcons name="leaf" size={40} color={colors.primaryFg} />
+              <Image
+                source={require('../../../assets/growvest-logo.png')}
+                style={{ width: 48, height: 48, borderRadius: 12 }}
+              />
             </View>
             <Text style={styles.appName}>Join Growvest</Text>
             <Text style={styles.tagline}>Smart Wealth Creation</Text>

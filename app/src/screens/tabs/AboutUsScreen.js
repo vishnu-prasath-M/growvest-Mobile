@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Linking,
+  Image,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, typography } from '../../theme/theme';
@@ -25,7 +26,10 @@ const AboutUsScreen = ({ navigation }) => {
         {/* Logo Section */}
         <View style={styles.logoSection}>
           <View style={styles.logoIcon}>
-            <MaterialCommunityIcons name="leaf" size={40} color="#25b053" />
+            <Image
+              source={require('../../../assets/growvest-logo.png')}
+              style={{ width: 56, height: 56, borderRadius: 16 }}
+            />
           </View>
           <Text style={styles.logoText}>Growvest</Text>
           <Text style={styles.tagline}>Smart Investment Platform</Text>
@@ -150,10 +154,12 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 24,
-    backgroundColor: '#dcfce7',
+    backgroundColor: colors.white,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   logoText: {
     fontSize: 28,
