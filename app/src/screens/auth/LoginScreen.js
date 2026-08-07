@@ -90,7 +90,7 @@ const LoginScreen = ({ navigation }) => {
 
             <View style={styles.formSection}>
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Email Address</Text>
+                <Text style={styles.inputLabel}>Email Address or Mobile Number</Text>
                 <TextInput
                   value={email}
                   onChangeText={setEmail}
