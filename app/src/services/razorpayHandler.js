@@ -80,7 +80,7 @@ export const executeRazorpayPayment = async ({
       // Test Mode Simulation fallback when running in Expo Go without native build
       Alert.alert(
         'Razorpay Test Mode',
-        `Initiate Razorpay Test Payment of ₹${amount} for Order ${orderId}?`,
+        `Initiate Payment of ₹${amount} for Order ${orderId}?`,
         [
           {
             text: 'Cancel Payment',
@@ -91,7 +91,7 @@ export const executeRazorpayPayment = async ({
             },
           },
           {
-            text: 'Pay Now (Test Success)',
+            text: 'Pay Now',
             onPress: async () => {
               try {
                 const mockPaymentId = `pay_${Date.now()}`;

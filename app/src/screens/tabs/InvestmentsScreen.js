@@ -16,6 +16,7 @@ import { colors } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import TopBar from '../../components/TopBar';
 import StatusChip from '../../components/StatusChip';
+import { SkeletonLoader } from '../../components/SkeletonLoader';
 
 const FILTERS = ['All', 'Fixed', 'Saving', 'Pending'];
 
@@ -83,10 +84,7 @@ const InvestmentsScreen = ({ navigation }) => {
     return (
       <View style={styles.container}>
         <TopBar title="My Investments" navigation={navigation} showBack={navigation?.canGoBack?.() ?? false} />
-        <View style={styles.loadingContainer}>
-          <MaterialCommunityIcons name="chart-box-outline" size={36} color={colors.border} />
-          <Text style={styles.loadingText}>Loading investments...</Text>
-        </View>
+        <SkeletonLoader variant="list" count={4} />
       </View>
     );
   }

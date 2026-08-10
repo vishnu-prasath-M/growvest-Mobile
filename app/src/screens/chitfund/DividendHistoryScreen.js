@@ -4,6 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, typography } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { chitFundService } from '../../services/chitFundService';
+import { SkeletonLoader } from '../../components/SkeletonLoader';
 
 const DividendHistoryScreen = ({ navigation }) => {
   const insets = useScreenInsets(8);
@@ -48,9 +49,7 @@ const DividendHistoryScreen = ({ navigation }) => {
         </View>
 
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Loading Dividends...</Text>
-          </View>
+          <SkeletonLoader variant="list" count={5} />
         ) : dividends.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No dividends received yet.</Text>

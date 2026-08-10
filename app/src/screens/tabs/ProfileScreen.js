@@ -18,6 +18,7 @@ import { authService } from '../../services/authService';
 import { useAuth } from '../../context/AuthContext';
 import { colors } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
+import { SkeletonLoader } from '../../components/SkeletonLoader';
 
 const ProfileScreen = ({ navigation }) => {
   const insets = useScreenInsets(8);
@@ -146,10 +147,7 @@ const ProfileScreen = ({ navigation }) => {
   if (loading) {
     return (
       <View style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <MaterialCommunityIcons name="account-circle-outline" size={40} color={colors.border} />
-          <Text style={styles.loadingText}>Loading profile...</Text>
-        </View>
+        <SkeletonLoader variant="profile" />
       </View>
     );
   }

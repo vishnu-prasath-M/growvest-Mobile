@@ -4,6 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, typography } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { chitFundService } from '../../services/chitFundService';
+import { SkeletonLoader } from '../../components/SkeletonLoader';
 
 const WinnerHistoryScreen = ({ navigation }) => {
   const insets = useScreenInsets(8);
@@ -39,9 +40,7 @@ const WinnerHistoryScreen = ({ navigation }) => {
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Loading Winners...</Text>
-          </View>
+          <SkeletonLoader variant="list" count={5} />
         ) : winners.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No winners yet.</Text>

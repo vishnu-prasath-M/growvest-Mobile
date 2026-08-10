@@ -25,6 +25,7 @@ import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/apiService';
 import { API_ENDPOINTS } from '../../config/api';
+import { SkeletonLoader } from '../../components/SkeletonLoader';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -158,21 +159,9 @@ const HomeScreen = ({ navigation }) => {
 
   if (loading) {
     return (
-      <LinearGradient
-        colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.loadingContainer}
-      >
-        <View style={styles.loadingIconWrapper}>
-          <Image
-            source={require('../../../assets/growvest-logo.png')}
-            style={{ width: 64, height: 64, borderRadius: 16 }}
-          />
-        </View>
-        <Text style={styles.loadingTitle}>Growvest</Text>
-        <Text style={styles.loadingSubtitle}>Loading your dashboard...</Text>
-      </LinearGradient>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <SkeletonLoader variant="home" />
+      </View>
     );
   }
 

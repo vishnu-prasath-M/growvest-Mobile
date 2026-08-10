@@ -4,6 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, typography } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { chitFundService } from '../../services/chitFundService';
+import { SkeletonLoader } from '../../components/SkeletonLoader';
 
 const AuctionScreen = ({ navigation }) => {
   const insets = useScreenInsets(8);
@@ -46,9 +47,7 @@ const AuctionScreen = ({ navigation }) => {
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Loading Auction Details...</Text>
-          </View>
+          <SkeletonLoader variant="list" count={4} />
         ) : !auction ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No active auctions found.</Text>

@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, typography } from '../../theme/theme';
 import TopBar from '../../components/TopBar';
+import { SkeletonLoader } from '../../components/SkeletonLoader';
 import api from '../../services/apiService';
 import { API_ENDPOINTS } from '../../config/api';
 
@@ -127,10 +128,7 @@ const BankDetailsScreen = ({ navigation }) => {
     return (
       <View style={styles.container}>
         <TopBar title="Bank Details" navigation={navigation} showBack />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading bank details...</Text>
-        </View>
+        <SkeletonLoader variant="form" />
       </View>
     );
   }

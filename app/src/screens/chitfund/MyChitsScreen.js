@@ -178,7 +178,7 @@ const MyChitsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
-  scrollContent: { paddingBottom: 20 },
+  scrollContent: { paddingBottom: 20, paddingTop:20 },
   
   emptyContainer: { padding: 40, alignItems: 'center' },
   emptyText: { color: colors.textSecondary, fontSize: 14 },

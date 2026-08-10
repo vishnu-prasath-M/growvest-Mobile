@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { chitFundService } from '../../services/chitFundService';
+import { SkeletonLoader } from '../../components/SkeletonLoader';
 import Reanimated, {
   useSharedValue,
   useAnimatedStyle,
@@ -183,6 +184,20 @@ const ChitFundHomeScreen = ({ navigation }) => {
     transform: [{ scale: bannerScale.value }],
   }));
 
+  if (loading || !dashboard) {
+    return (
+      <View style={styles.container}>
+        <View style={[styles.header, { paddingTop: insets.top }]}>
+          <View>
+            <Text style={styles.greeting}>Chit Funds</Text>
+            <Text style={styles.subtitle}>Your savings community</Text>
+          </View>
+        </View>
+        <SkeletonLoader variant="dashboard" />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -217,7 +232,7 @@ const ChitFundHomeScreen = ({ navigation }) => {
           />
         }
       >
-        {loading || !dashboard ? (
+        {false ? (
           <View style={styles.loadingContainer}>
             <Text style={styles.loadingText}>Loading Dashboard...</Text>
           </View>

@@ -20,6 +20,7 @@ import { useScreenInsets } from '../../hooks/useScreenInsets';
 import TopBar from '../../components/TopBar';
 import StatusChip from '../../components/StatusChip';
 import { generateAndShareTransactionStatement } from '../../utils/pdfGenerator';
+import { SkeletonLoader } from '../../components/SkeletonLoader';
 
 const FILTER_OPTIONS = [
   { id: 'all', label: 'All Transactions' },
@@ -198,12 +199,7 @@ const TransactionsScreen = ({ navigation }) => {
     return (
       <View style={styles.container}>
         <TopBar title="Transactions" navigation={navigation} showBack={canGoBack} />
-        <View style={styles.loadingContainer}>
-          <View style={styles.loadingIconBox}>
-            <MaterialCommunityIcons name="swap-horizontal-bold" size={36} color={colors.border} />
-          </View>
-          <Text style={styles.loadingText}>Loading transactions...</Text>
-        </View>
+        <SkeletonLoader variant="list" count={5} />
       </View>
     );
   }

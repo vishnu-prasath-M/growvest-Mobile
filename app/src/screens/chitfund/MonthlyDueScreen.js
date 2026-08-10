@@ -16,6 +16,7 @@ import { colors, typography } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { chitFundService } from '../../services/chitFundService';
 import { authService } from '../../services/authService';
+import { SkeletonLoader } from '../../components/SkeletonLoader';
 
 const MonthlyDueScreen = ({ navigation }) => {
   const insets = useScreenInsets(8);
@@ -421,9 +422,7 @@ const MonthlyDueScreen = ({ navigation }) => {
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Loading Dues...</Text>
-          </View>
+          <SkeletonLoader variant="list" count={4} />
         ) : chits.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>You have no upcoming dues!</Text>
