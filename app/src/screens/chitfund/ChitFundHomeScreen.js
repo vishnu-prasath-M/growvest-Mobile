@@ -9,6 +9,7 @@ import {
   Animated,
   Pressable,
   Easing,
+  Image,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -78,7 +79,7 @@ const StatCard = React.memo(({ icon, label, value, tint, iconColor }) => {
 });
 
 // ---------- Animated quick action ----------
-const QuickAction = React.memo(({ icon, label, onPress, badge }) => {
+const QuickAction = React.memo(({ icon, label, onPress, badge, image }) => {
   const { colors: themeColors } = useTheme();
   const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
 
@@ -124,7 +125,11 @@ const QuickAction = React.memo(({ icon, label, onPress, badge }) => {
       onPressOut={handlePressOut}
     >
       <Reanimated.View style={[styles.quickActionIconWrap, containerStyle]}>
-        <Ionicons name={icon} size={26} color={colors.primary} />
+        {image ? (
+          <Image source={image} style={styles.quickActionImage} resizeMode="contain" />
+        ) : (
+          <Ionicons name={icon} size={26} color={colors.primary} />
+        )}
         {badge && (
           <Reanimated.View style={[styles.quickActionBadge, badgeStyle]}>
             <Text style={styles.quickActionBadgeText}>{badge}</Text>
@@ -316,7 +321,7 @@ const ChitFundHomeScreen = ({ navigation }) => {
               </View>
               <View style={styles.quickActionsGrid}>
                 <QuickAction
-                  icon="compass-outline"
+                  image={require('../../../assets/compass.png')}
                   label="Explore"
                   onPress={() => navigation.navigate('ExploreChits')}
                 />
@@ -579,6 +584,10 @@ const getStyles = (colors) => StyleSheet.create({
     borderColor: colors.background,
   },
   quickActionBadgeText: { fontSize: 10, fontWeight: '800', color: colors.white },
+  quickActionImage: {
+    width: 50,
+    height: 50,
+  },
 
   // Stats Grid
   statsGrid: {

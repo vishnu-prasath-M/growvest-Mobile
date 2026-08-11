@@ -415,6 +415,7 @@ const HomeScreen = ({ navigation }) => {
               { icon: 'chart-line-variant', label: 'New Investment', sub: 'Start a new deposit', colors: ['#0E3D23', '#1A5C39'], screen: 'InvestmentAmount' },
               { icon: 'account-cash', label: 'My Investments', sub: 'View your deposits', colors: ['#1A5C39', '#2E8B5A'], screen: 'Investments' },
               { icon: 'cash-multiple', label: 'Chit Fund', sub: 'Join a savings community', colors: ['#0E3D23', '#1A5C39'], screen: 'ChitFundHome' },
+              { icon: 'wallet-giftcard', label: 'Pocket Money', sub: 'Setup regular release payouts', colors: ['#1A5C39', '#2E8B5A'], screen: 'PocketMoney' },
             ].map((opt) => (
               <TouchableOpacity
                 key={opt.label}

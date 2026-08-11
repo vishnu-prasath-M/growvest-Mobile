@@ -20,6 +20,7 @@ import {
   Edit,
   Trash2,
   Eye,
+  Wallet,
 } from "lucide-react";
 import ZenvestLogo from "@/components/ZenvestLogo";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ import { generateUPILink } from "@/utils/upi";
 import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "@/context/AuthContext";
 import ChitFundAdmin from "@/components/admin/ChitFundAdmin";
+import PocketMoneyAdmin from "@/components/admin/PocketMoneyAdmin";
 
 const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" ? "http://localhost:5000" : "https://growvest-mobile.onrender.com");
 
@@ -82,7 +84,7 @@ const statusStyle: Record<string, string> = {
   paid: "bg-accent text-accent-foreground border-accent-foreground/10",
 };
 
-type AdminTab = "overview" | "pending" | "users" | "withdrawals" | "kyc" | "chits" | "settings";
+type AdminTab = "overview" | "pending" | "users" | "withdrawals" | "kyc" | "chits" | "settings" | "pocket";
 
 const AdminDashboard = () => {
   const { user: authUser, token, logout } = useAuth();
@@ -105,6 +107,7 @@ const AdminDashboard = () => {
     { label: "Withdrawals", tab: "withdrawals", icon: ArrowDownToLine, badge: 0 },
     { label: "KYC Verification", tab: "kyc", icon: Shield, badge: 0 },
     { label: "Chit Funds", tab: "chits", icon: TrendingUp, badge: 0 },
+    { label: "Pocket Money", tab: "pocket", icon: Wallet },
     { label: "Settings", tab: "settings", icon: Settings },
   ]);
 
@@ -131,6 +134,50 @@ const AdminDashboard = () => {
 
   // Dashboard Stats State
   const [dashboardStats, setDashboardStats] = useState<any>(null);
+  const [lastNotificationCount, setLastNotificationCount] = useState<number | null>(null);
+
+  // Ask browser notification permission on load
+  useEffect(() => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      if (Notification.permission === "default") {
+        Notification.requestPermission();
+      }
+    }
+  }, []);
+
+  // Register Web FCM simulated token to MongoDB
+  useEffect(() => {
+    if (!token) return;
+    const registerWebPush = async () => {
+      try {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          let webFCMToken = localStorage.getItem('growvest_web_fcm_token');
+          if (!webFCMToken) {
+            webFCMToken = `WEB_FCM_${Math.random().toString(36).substring(2, 15)}_${Date.now()}`;
+            localStorage.setItem('growvest_web_fcm_token', webFCMToken);
+          }
+          
+          await fetch(`${API_URL}/api/users/fcm-token`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              fcmToken: webFCMToken,
+              platform: 'web',
+              deviceId: 'browser'
+            })
+          });
+          console.log('[WebPush] Web FCM Token successfully saved to MongoDB:', webFCMToken);
+        }
+      } catch (err) {
+        console.error('[WebPush] Error registering browser push token:', err);
+      }
+    };
+    registerWebPush();
+  }, [token]);
 
   useEffect(() => {
     if (authUser && authUser.role !== 'admin') {
@@ -160,6 +207,25 @@ const AdminDashboard = () => {
         .then(res => res.json())
         .then(data => {
           setDashboardStats(data);
+          
+          // Native browser notifications trigger for new notifications
+          if (data && typeof data.totalNotifications === 'number') {
+            if (lastNotificationCount !== null && data.totalNotifications > lastNotificationCount) {
+              fetch(`${API_URL}/api/notifications`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+              })
+                .then(res => res.json())
+                .then(notifs => {
+                  if (Array.isArray(notifs) && notifs.length > 0) {
+                    const latest = notifs[0];
+                    if (Notification.permission === 'granted') {
+                      new Notification(latest.title, { body: latest.description });
+                    }
+                  }
+                }).catch(() => {});
+            }
+            setLastNotificationCount(data.totalNotifications);
+          }
         })
         .catch(err => console.error("Error fetching dashboard stats:", err));
 
@@ -199,11 +265,11 @@ const AdminDashboard = () => {
               user: inv?.userName || "Unknown User",
               email: inv?.userEmail || "user@example.com",
               amount: inv?.amount || 0,
-              startDate: inv?.startDate || new Date().toISOString(),
-              ref: inv?.ref || "REF-ERROR",
+              startDate: inv?.startDate || "",
+              ref: inv?.referenceId || "",
               status: inv?.status || "pending",
               type: inv?.type || "saving",
-              interestEarned: inv?.interestEarned || 0
+              interestEarned: inv?.interestEarned || 0,
             })));
             const pendingInvCount = data.filter((inv: any) => inv.status === 'pending').length;
             setNavItems(prev => prev.map(item =>
@@ -213,7 +279,7 @@ const AdminDashboard = () => {
         })
         .catch(err => console.error("Error fetching investments:", err));
 
-      // Fetch Users
+      // Fetch Users list
       fetch(`${API_URL}/api/users`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
@@ -225,7 +291,7 @@ const AdminDashboard = () => {
         })
         .catch(err => console.error("Error fetching users:", err));
 
-      // Fetch KYC List
+      // Fetch KYC
       fetch(`${API_URL}/api/kyc/all`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
@@ -233,10 +299,9 @@ const AdminDashboard = () => {
         .then(data => {
           if (Array.isArray(data)) {
             setKycList(data);
-            // Update badge for KYC tab
-            const pendingCount = data.filter((k: any) => k.status === 'pending').length;
+            const pendingKycCount = data.filter((k: any) => k.status === 'pending').length;
             setNavItems(prev => prev.map(item =>
-              item.tab === 'kyc' ? { ...item, badge: pendingCount } : item
+              item.tab === 'kyc' ? { ...item, badge: pendingKycCount } : item
             ));
           }
         })
@@ -264,7 +329,9 @@ const AdminDashboard = () => {
     };
 
     fetchAll();
-  }, [token, activeTab]);
+    const interval = setInterval(fetchAll, 5000);
+    return () => clearInterval(interval);
+  }, [token, activeTab, lastNotificationCount]);
 
   // Combined user fetch logic above in fetchAll
 
@@ -998,7 +1065,7 @@ const AdminDashboard = () => {
                                   </div>
 
                                   {/* Deposit type breakdown */}
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {/* Saving */}
                                     <div className="rounded-xl border border-border bg-card p-4">
                                       <div className="flex items-center justify-between mb-3">
@@ -1032,6 +1099,26 @@ const AdminDashboard = () => {
                                           { label: "Interest Earned", value: `₹${fmtCur(detail.fixed?.interest ?? 0)}` },
                                           { label: "Withdrawn", value: `₹${fmtCur(detail.fixed?.withdrawn ?? 0)}` },
                                           { label: "Current Balance", value: `₹${fmtCur(detail.fixed?.balance ?? 0)}`, bold: true },
+                                        ].map(r => (
+                                          <div key={r.label} className="flex justify-between text-xs font-body">
+                                            <span className="text-muted-foreground">{r.label}</span>
+                                            <span className={r.bold ? "font-bold text-secondary" : "text-foreground"}>{r.value}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    {/* Pocket Money */}
+                                    <div className="rounded-xl border border-border bg-card p-4">
+                                      <div className="flex items-center justify-between mb-3">
+                                        <p className="text-xs font-body font-semibold text-muted-foreground uppercase tracking-wider">Pocket Money</p>
+                                        <span className="text-xs font-body font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">Scheduler</span>
+                                      </div>
+                                      <div className="space-y-2">
+                                        {[
+                                          { label: "Invested", value: `₹${fmtCur(detail.pocketMoney?.invested ?? 0)}` },
+                                          { label: "Released", value: `₹${fmtCur(detail.pocketMoney?.released ?? 0)}` },
+                                          { label: "Remaining", value: `₹${fmtCur(detail.pocketMoney?.remaining ?? 0)}`, bold: true },
                                         ].map(r => (
                                           <div key={r.label} className="flex justify-between text-xs font-body">
                                             <span className="text-muted-foreground">{r.label}</span>
@@ -1262,6 +1349,18 @@ const AdminDashboard = () => {
               className="w-full"
             >
               <ChitFundAdmin token={token} />
+            </motion.div>
+          )}
+
+          {/* ── POCKET MONEY ── */}
+          {activeTab === "pocket" && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="w-full"
+            >
+              <PocketMoneyAdmin token={token} />
             </motion.div>
           )}
 

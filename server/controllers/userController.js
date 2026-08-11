@@ -78,6 +78,10 @@ const getEnrichedUserData = async (query) => {
   const withdrawals = await Withdrawal.find(withdrawalQuery);
 
   const ChitMember = require('../models/ChitMember');
+  const PocketMoneyPayout = require('../models/PocketMoneyPayout');
+
+  const pocketPayouts = await PocketMoneyPayout.find({ userId: user._id });
+  const totalPocketReleased = pocketPayouts.reduce((acc, p) => acc + p.amount, 0);
 
   const savingInvestments = investments.filter(inv => inv.type === 'saving');
   const fixedInvestments = investments.filter(inv => inv.type === 'fixed');
@@ -87,7 +91,7 @@ const getEnrichedUserData = async (query) => {
   const savingInvested = savingInvestments.reduce((acc, inv) => acc + inv.amount, 0);
   const savingInterest = savingInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
   const savingWithdrawn = savingWithdrawals.reduce((acc, wd) => acc + wd.amount, 0);
-  let savingBalance = savingInvested + savingInterest - savingWithdrawn;
+  let savingBalance = savingInvested + savingInterest + totalPocketReleased - savingWithdrawn;
   if (savingBalance < 0) savingBalance = 0;
 
   const fixedInvested = fixedInvestments.reduce((acc, inv) => acc + inv.amount, 0);
@@ -125,6 +129,7 @@ const getEnrichedUserData = async (query) => {
     availableToWithdraw,
     totalChitWinningAmount,
     winningAmount: totalChitWinningAmount,
+    totalPocketReleased,
     totalInvested,
     totalInterest,
     totalWithdrawn,
@@ -206,6 +211,12 @@ exports.getUserDetailByEmail = async (req, res) => {
 
     const withdrawals = await Withdrawal.find(wdQuery);
 
+    const PocketMoney = require('../models/PocketMoney');
+    const pocketMonies = await PocketMoney.find({ userId: user._id });
+    const pocketInvested = pocketMonies.reduce((acc, pm) => acc + pm.investedAmount, 0);
+    const pocketReleased = pocketMonies.reduce((acc, pm) => acc + pm.totalPaidOut, 0);
+    const pocketRemaining = pocketMonies.reduce((acc, pm) => acc + pm.remainingAmount, 0);
+
     const savingInvestments = investments.filter(inv => inv.type === 'saving');
     const fixedInvestments = investments.filter(inv => inv.type === 'fixed');
     const savingWithdrawals = withdrawals.filter(wd => wd.withdrawType === 'saving');
@@ -214,14 +225,14 @@ exports.getUserDetailByEmail = async (req, res) => {
     const savingInvested = savingInvestments.reduce((acc, inv) => acc + inv.amount, 0);
     const savingInterest = savingInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
     const savingWithdrawn = savingWithdrawals.reduce((acc, wd) => acc + wd.amount, 0);
-    const savingBalance = Math.max(0, savingInvested + savingInterest - savingWithdrawn);
+    const savingBalance = Math.max(0, savingInvested + savingInterest + pocketReleased - savingWithdrawn);
 
     const fixedInvested = fixedInvestments.reduce((acc, inv) => acc + inv.amount, 0);
     const fixedInterest = fixedInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
     const fixedWithdrawn = fixedWithdrawals.reduce((acc, wd) => acc + wd.amount, 0);
     const fixedBalance = Math.max(0, fixedInvested + fixedInterest - fixedWithdrawn);
 
-    const totalInvested = savingInvested + fixedInvested;
+    const totalInvested = savingInvested + fixedInvested + pocketInvested;
     const totalInterest = savingInterest + fixedInterest;
     const totalBalance = savingBalance + fixedBalance;
 
@@ -251,6 +262,12 @@ exports.getUserDetailByEmail = async (req, res) => {
         withdrawn: fixedWithdrawn,
         balance: fixedBalance,
         count: fixedInvestments.length
+      },
+      pocketMoney: {
+        invested: pocketInvested,
+        released: pocketReleased,
+        remaining: pocketRemaining,
+        count: pocketMonies.length
       }
     });
   } catch (error) {
@@ -335,10 +352,14 @@ exports.getAllUsers = async (req, res) => {
 
       const withdrawals = await Withdrawal.find(allUserWdQuery);
       
+      const PocketMoneyPayout = require('../models/PocketMoneyPayout');
+      const pocketPayouts = await PocketMoneyPayout.find({ userId: user._id });
+      const totalPocketReleased = pocketPayouts.reduce((acc, p) => acc + p.amount, 0);
+
       const totalInvested = investments.reduce((acc, inv) => acc + inv.amount, 0);
       const totalWithdrawn = withdrawals.reduce((acc, wd) => acc + wd.amount, 0);
       
-      const currentBalance = Math.max(0, totalInvested + totalInterest - totalWithdrawn);
+      const currentBalance = Math.max(0, totalInvested + totalInterest + totalPocketReleased - totalWithdrawn);
       
       // Update balance if changed
       if (user.balance !== currentBalance) {

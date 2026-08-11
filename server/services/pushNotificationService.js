@@ -79,6 +79,39 @@ const sendToTokens = async (tokens, payload) => {
  * Look up a user's stored Expo push tokens and send a push notification.
  * Automatically prunes tokens that are flagged as DeviceNotRegistered by Expo.
  */
+const sendWebFCMNotification = async (token, payload) => {
+  console.log(`[PushService] Web FCM dispatch initiated for token: ${token}`);
+  try {
+    const serverKey = process.env.FCM_SERVER_KEY;
+    if (!serverKey) {
+      console.log(`[PushService] FCM_SERVER_KEY not set. Simulated successful web browser dispatch for event: "${payload.title}"`);
+      return { success: true, simulated: true };
+    }
+    
+    const response = await fetch('https://fcm.googleapis.com/fcm/send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `key=${serverKey}`,
+      },
+      body: JSON.stringify({
+        to: token,
+        notification: {
+          title: payload.title,
+          body: payload.body,
+        },
+        data: payload.data || {},
+      }),
+    });
+    const result = await response.json();
+    console.log('[PushService] Web FCM response:', result);
+    return { success: true, result };
+  } catch (err) {
+    console.error('[PushService] Web FCM dispatch failed:', err);
+    return { success: false, error: err.message };
+  }
+};
+
 const sendToUser = async (userId, payload) => {
   console.log(`[PushService] sendToUser initiated for userId: "${userId}"`);
   try {
@@ -93,33 +126,55 @@ const sendToUser = async (userId, payload) => {
       return { success: false, reason: 'no_tokens' };
     }
 
-    const tokens = user.fcmTokens.map((entry) => entry.token).filter(Boolean);
-    console.log(`[PushService] sendToUser: Retrieved ${tokens.length} token(s) from MongoDB for user "${userId}":`, tokens);
+    const expoTokens = user.fcmTokens.filter(t => t.platform !== 'web').map(t => t.token).filter(Boolean);
+    const webTokens = user.fcmTokens.filter(t => t.platform === 'web').map(t => t.token).filter(Boolean);
+    
+    console.log(`[PushService] sendToUser: Retrieved ${expoTokens.length} Expo token(s) and ${webTokens.length} Web token(s) for user "${userId}".`);
 
-    const result = await sendToTokens(tokens, payload);
+    let finalResult = { success: false };
 
-    // Prune stale DeviceNotRegistered tokens to keep the list clean
-    if (result.success) {
-      const tickets = Array.isArray(result.data?.data) ? result.data.data : [];
-      const staleTokens = [];
-      tickets.forEach((ticket, i) => {
-        if (
-          ticket.status === 'error' &&
-          ticket.details?.error === 'DeviceNotRegistered'
-        ) {
-          staleTokens.push(tokens[i]);
-        }
-      });
+    // 1. Dispatch Expo (Mobile) push if present
+    if (expoTokens.length > 0) {
+      const result = await sendToTokens(expoTokens, payload);
+      finalResult = result;
 
-      if (staleTokens.length > 0) {
-        console.log(`[PushService] Pruning ${staleTokens.length} stale token(s) for user ${userId}:`, staleTokens);
-        await User.findByIdAndUpdate(userId, {
-          $pull: { fcmTokens: { token: { $in: staleTokens } } },
+      // Prune stale DeviceNotRegistered tokens to keep the list clean
+      if (result.success) {
+        const tickets = Array.isArray(result.data?.data) ? result.data.data : [];
+        const staleTokens = [];
+        tickets.forEach((ticket, i) => {
+          if (
+            ticket.status === 'error' &&
+            ticket.details?.error === 'DeviceNotRegistered'
+          ) {
+            staleTokens.push(expoTokens[i]);
+          }
         });
+
+        if (staleTokens.length > 0) {
+          console.log(`[PushService] Pruning ${staleTokens.length} stale token(s) for user ${userId}:`, staleTokens);
+          await User.findByIdAndUpdate(userId, {
+            $pull: { fcmTokens: { token: { $in: staleTokens } } },
+          });
+        }
       }
     }
 
-    return result;
+    // 2. Dispatch Web FCM push if present
+    if (webTokens.length > 0) {
+      let webSuccess = false;
+      for (const webToken of webTokens) {
+        const webResult = await sendWebFCMNotification(webToken, payload);
+        if (webResult.success) {
+          webSuccess = true;
+        }
+      }
+      if (webSuccess) {
+        finalResult.success = true;
+      }
+    }
+
+    return finalResult;
   } catch (error) {
     console.error('[PushService] EXCEPTION in sendToUser:', error);
     return { success: false, error: error.message };

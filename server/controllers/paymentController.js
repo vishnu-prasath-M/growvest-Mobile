@@ -6,6 +6,8 @@ const ChitPayment = require('../models/ChitPayment');
 const Transaction = require('../models/Transaction');
 const User = require('../models/User');
 const { sendNotification } = require('../services/notificationHelper');
+const PocketMoney = require('../models/PocketMoney');
+const PocketMoneyPayout = require('../models/PocketMoneyPayout');
 
 const getRazorpayInstance = () => {
   const key_id = process.env.RAZORPAY_KEY_ID || 'rzp_test_xxxxxxxxx';
@@ -104,6 +106,9 @@ exports.verifyPayment = async (req, res) => {
     } else if (paymentType === 'chit_payment') {
       const result = await completeMonthlyDue(user, payloadData, razorpay_order_id, razorpay_payment_id, razorpay_signature);
       return res.status(200).json({ success: true, message: 'Chit due payment verified & recorded successfully.', data: result });
+    } else if (paymentType === 'pocket_money') {
+      const result = await completePocketMoney(user, payloadData, razorpay_order_id, razorpay_payment_id, razorpay_signature);
+      return res.status(200).json({ success: true, message: 'Pocket Money payment verified & activated.', data: result });
     } else {
       return res.status(400).json({ message: 'Unknown payment type' });
     }
@@ -297,4 +302,111 @@ const completeMonthlyDue = async (user, data, orderId, paymentId, signature) => 
   }
 
   return payment;
+};
+
+// Complete Pocket Money Investment
+const completePocketMoney = async (user, data, orderId, paymentId, signature) => {
+  const { amount, frequency } = data;
+  
+  const payoutAmount = Number(amount) / 10;
+  
+  const nextPayoutDate = new Date();
+  if (frequency === 'daily') {
+    nextPayoutDate.setDate(nextPayoutDate.getDate() + 1);
+  } else if (frequency === 'every_2_days') {
+    nextPayoutDate.setDate(nextPayoutDate.getDate() + 2);
+  } else if (frequency === 'weekly') {
+    nextPayoutDate.setDate(nextPayoutDate.getDate() + 7);
+  }
+  
+  const pocketMoney = new PocketMoney({
+    userId: user._id,
+    userEmail: user.email,
+    userName: user.name || user.username,
+    mobileNumber: user.mobileNumber,
+    investedAmount: Number(amount),
+    remainingAmount: Number(amount) - payoutAmount,
+    payoutAmount,
+    frequency,
+    startDate: new Date(),
+    nextPayoutDate,
+    totalPaidOut: payoutAmount,
+    payoutCount: 1,
+    status: 'active',
+    paymentProvider: 'Razorpay',
+    orderId,
+    paymentId,
+    signature,
+    paidAt: new Date()
+  });
+  
+  await pocketMoney.save();
+  
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const payout = new PocketMoneyPayout({
+    pocketMoneyId: pocketMoney._id,
+    userId: user._id,
+    amount: payoutAmount,
+    payoutDate: new Date(),
+    payoutNumber: 1,
+    idempotencyKey: `PM_${pocketMoney._id}_${todayStr}`
+  });
+  
+  await payout.save();
+  
+  const investTx = new Transaction({
+    userId: user._id,
+    userEmail: user.email,
+    type: 'pocket_money_invest',
+    amount: Number(amount),
+    status: 'approved',
+    referenceId: pocketMoney._id,
+    referenceType: 'PocketMoney',
+    description: `Pocket Money Plan Investment (Txn ID: ${paymentId})`
+  });
+  await investTx.save();
+  
+  const payoutTx = new Transaction({
+    userId: user._id,
+    userEmail: user.email,
+    type: 'pocket_money_payout',
+    amount: payoutAmount,
+    status: 'approved',
+    referenceId: pocketMoney._id,
+    referenceType: 'PocketMoney',
+    description: `Pocket Money Payout Release #1 (${frequency})`
+  });
+  await payoutTx.save();
+  
+  payout.transactionId = payoutTx._id;
+  await payout.save();
+  
+  try {
+    await sendNotification({
+      userId: user._id,
+      title: '💼 Pocket Money Activated',
+      description: `Your ₹${amount} Pocket Money investment is active. Day 1 payout of ₹${payoutAmount} is credited!`,
+      type: 'pocket_money_approved',
+      metadata: { pocketMoneyId: pocketMoney._id }
+    });
+  } catch (notifErr) {
+    console.error('[PaymentController] Notification error:', notifErr);
+  }
+  
+  try {
+    const adminUsers = await User.find({ role: 'admin' });
+    for (const admin of adminUsers) {
+      await sendNotification({
+        userId: admin._id,
+        title: '🔔 New Pocket Money Investment',
+        description: `${user.name || user.username} invested ₹${amount} in Pocket Money.`,
+        type: 'pocket_money_approved',
+        metadata: { pocketMoneyId: pocketMoney._id }
+      });
+    }
+  } catch (adminNotifErr) {
+    console.error('[PaymentController] Admin notification error:', adminNotifErr);
+  }
+  
+  return pocketMoney;
 };

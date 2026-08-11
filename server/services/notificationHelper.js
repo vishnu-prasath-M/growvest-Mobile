@@ -107,6 +107,10 @@ function getIconForType(type) {
     'due_reminder': 'bell-alert',
     'kyc_approved': 'shield-check',
     'kyc_rejected': 'shield-off',
+    'pocket_money_approved': 'wallet-giftcard',
+    'pocket_money_payout': 'cash-multiple',
+    'pocket_money_reminder': 'bell-ring',
+    'pocket_money_completed': 'check-decagram',
     'general': 'bell-outline',
   };
   return iconMap[type] || 'bell-outline';
