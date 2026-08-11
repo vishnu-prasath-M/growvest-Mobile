@@ -195,4 +195,102 @@ exports.triggerPocketMoneyPayouts = async (req, res) => {
   }
 };
 
+// POST /api/pocket-money/admin/release/:id (Admin-only)
+exports.releaseSinglePayout = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const pocket = await PocketMoney.findById(id);
+    if (!pocket) {
+      return res.status(404).json({ message: 'Pocket Money record not found' });
+    }
+    if (pocket.status !== 'active') {
+      return res.status(400).json({ message: 'Pocket Money is not active' });
+    }
+    if (pocket.remainingAmount <= 0) {
+      return res.status(400).json({ message: 'Pocket Money is already fully paid out' });
+    }
+    
+    const now = new Date();
+    const payoutNum = pocket.payoutCount + 1;
+    const todayStr = now.toISOString().slice(0, 10);
+    const idempotencyKey = `PM_${pocket._id}_${todayStr}_release_${payoutNum}`;
+    
+    // Check if already released today to prevent double clicks
+    const existingPayout = await PocketMoneyPayout.findOne({ idempotencyKey });
+    if (existingPayout) {
+      return res.status(400).json({ message: 'Payout already released for this plan today.' });
+    }
+    
+    const amountToPay = Math.min(pocket.payoutAmount, pocket.remainingAmount);
+    
+    const transaction = new Transaction({
+      userId: pocket.userId,
+      userEmail: pocket.userEmail,
+      type: 'pocket_money_payout',
+      amount: amountToPay,
+      status: 'approved',
+      referenceId: pocket._id,
+      referenceType: 'PocketMoney',
+      description: `Pocket Money Payout Release #${payoutNum} (Manual Admin Release)`
+    });
+    await transaction.save();
+    
+    const payout = new PocketMoneyPayout({
+      pocketMoneyId: pocket._id,
+      userId: pocket.userId,
+      amount: amountToPay,
+      payoutDate: now,
+      payoutNumber: payoutNum,
+      idempotencyKey,
+      transactionId: transaction._id
+    });
+    await payout.save();
+    
+    pocket.remainingAmount = Math.max(0, pocket.remainingAmount - amountToPay);
+    pocket.totalPaidOut += amountToPay;
+    pocket.payoutCount = payoutNum;
+    
+    if (pocket.remainingAmount <= 0) {
+      pocket.status = 'completed';
+      pocket.completedAt = now;
+    } else {
+      // Increment next payout date based on frequency
+      const nextDate = new Date(pocket.nextPayoutDate);
+      if (pocket.frequency === 'daily') {
+        nextDate.setDate(nextDate.getDate() + 1);
+      } else if (pocket.frequency === 'every_2_days') {
+        nextDate.setDate(nextDate.getDate() + 2);
+      } else if (pocket.frequency === 'weekly') {
+        nextDate.setDate(nextDate.getDate() + 7);
+      }
+      pocket.nextPayoutDate = nextDate;
+    }
+    
+    await pocket.save();
+    
+    // Notify User
+    await sendNotification({
+      userId: pocket.userId,
+      title: '💰 Pocket Money Released',
+      description: `₹${amountToPay} Pocket Money has been manually released by Admin to your wallet!`,
+      type: 'pocket_money_payout',
+      metadata: { pocketMoneyId: pocket._id }
+    });
+    
+    if (pocket.status === 'completed') {
+      await sendNotification({
+        userId: pocket.userId,
+        title: '🏆 Pocket Money Completed',
+        description: `Your ₹${pocket.investedAmount} Pocket Money plan has been fully paid out!`,
+        type: 'pocket_money_completed',
+        metadata: { pocketMoneyId: pocket._id }
+      });
+    }
+    
+    res.json({ success: true, message: `Successfully released ₹${amountToPay} payout.`, pocket });
+  } catch (error) {
+    res.status(500).json({ message: 'Error releasing payout', error: error.message });
+  }
+};
+
 module.exports.runPocketMoneyPayouts = runPocketMoneyPayouts;

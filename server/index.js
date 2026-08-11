@@ -29,8 +29,9 @@ cron.schedule("0 0 * * *", async () => {
   }
 });
 
-// Daily Pocket Money Payout Cron Job (runs daily at 12:05 AM)
+// Daily Pocket Money Payout Cron Job (runs daily at 12:05 AM) - Commented out for manual admin releases
 const { runPocketMoneyPayouts } = require('./controllers/pocketMoneyController');
+/*
 cron.schedule("5 0 * * *", async () => {
   console.log("Running Daily Pocket Money Payout Cron Job...");
   try {
@@ -40,6 +41,7 @@ cron.schedule("5 0 * * *", async () => {
     console.error("Pocket Money Payout Cron Job Error:", error);
   }
 });
+*/
 
 // Due Reminder Cron Job (runs daily at 8:00 AM)
 cron.schedule("0 8 * * *", async () => {

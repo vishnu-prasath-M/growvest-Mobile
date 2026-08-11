@@ -326,18 +326,18 @@ const ChitFundHomeScreen = ({ navigation }) => {
                   onPress={() => navigation.navigate('ExploreChits')}
                 />
                 <QuickAction
-                  icon="people-outline"
+                  image={require('../../../assets/my-chits.png')}
                   label="My Chits"
                   onPress={() => navigation.navigate('MyChits')}
                 />
                 <QuickAction
-                  icon="card-outline"
+                  image={require('../../../assets/due.png')}
                   label="Pay Due"
                   onPress={() => navigation.navigate('MonthlyDue')}
                   badge={dashboard.upcomingDue > 0 ? dashboard.pendingDueCount || '!' : null}
                 />
                 <QuickAction
-                  icon="hammer-outline"
+                  image={require('../../../assets/auction.png')}
                   label="Auction"
                   onPress={() => navigation.navigate('Auction')}
                 />
@@ -585,8 +585,8 @@ const getStyles = (colors) => StyleSheet.create({
   },
   quickActionBadgeText: { fontSize: 10, fontWeight: '800', color: colors.white },
   quickActionImage: {
-    width: 50,
-    height: 50,
+    width: 35,
+    height: 35,
   },
 
   // Stats Grid

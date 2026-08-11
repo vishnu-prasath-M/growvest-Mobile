@@ -211,6 +211,10 @@ exports.getUserDetailByEmail = async (req, res) => {
 
     const withdrawals = await Withdrawal.find(wdQuery);
 
+    const KYC = require('../models/KYC');
+    const kyc = await KYC.findOne({ userId: user._id });
+    const upiId = kyc ? kyc.upiId : '';
+
     const PocketMoney = require('../models/PocketMoney');
     const pocketMonies = await PocketMoney.find({ userId: user._id });
     const pocketInvested = pocketMonies.reduce((acc, pm) => acc + pm.investedAmount, 0);
@@ -245,6 +249,7 @@ exports.getUserDetailByEmail = async (req, res) => {
 
     res.status(200).json({
       user,
+      upiId,
       totalInvested,
       totalEarnings: totalInterest,
       currentBalance: totalBalance,
@@ -547,3 +552,5 @@ exports.registerDevice = async (req, res) => {
     res.status(500).json({ message: 'Error registering device', error: error.message });
   }
 };
+
+exports.getEnrichedUserData = getEnrichedUserData;

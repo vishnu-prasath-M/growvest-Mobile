@@ -30,6 +30,8 @@ import { useAuth } from "@/context/AuthContext";
 import ChitFundAdmin from "@/components/admin/ChitFundAdmin";
 import PocketMoneyAdmin from "@/components/admin/PocketMoneyAdmin";
 
+import { toast } from "sonner";
+
 const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" ? "http://localhost:5000" : "https://growvest-mobile.onrender.com");
 
 /* ─── Mock Data & Types ─────────────────────────── */
@@ -352,9 +354,13 @@ const AdminDashboard = () => {
         setPendingList((prev) =>
           prev.map((inv) => (inv._id === id ? { ...inv, status: action } : inv))
         );
+        toast.success(`Investment successfully ${action}!`);
+      } else {
+        toast.error("Failed to update investment status.");
       }
     } catch (error) {
       console.error("Error updating status:", error);
+      toast.error("Error updating investment status.");
     }
   };
 
@@ -375,9 +381,13 @@ const AdminDashboard = () => {
         setWithdrawList((prev) =>
           prev.map((w) => (w.id === id ? { ...w, status: action } : w))
         );
+        toast.success(`Withdrawal request ${action}!`);
+      } else {
+        toast.error("Failed to update withdrawal status.");
       }
     } catch (error) {
       console.error("Error updating withdrawal status:", error);
+      toast.error("Error updating withdrawal status.");
     }
   };
 
@@ -400,6 +410,7 @@ const AdminDashboard = () => {
         ));
         setKycModalOpen(false);
         setSelectedKYC(null);
+        toast.success(`KYC verification successfully ${action}!`);
         // Refresh KYC list to update badge
         fetch(`${API_URL}/api/kyc/all`, {
           headers: { 'Authorization': `Bearer ${token}` }
@@ -414,9 +425,12 @@ const AdminDashboard = () => {
               ));
             }
           });
+      } else {
+        toast.error("Failed to update KYC status.");
       }
     } catch (error) {
       console.error("Error updating KYC status:", error);
+      toast.error("Error updating KYC status.");
     }
   };
 
