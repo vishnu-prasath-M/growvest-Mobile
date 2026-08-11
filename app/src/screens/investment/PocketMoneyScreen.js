@@ -15,6 +15,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { colors } from '../../theme/theme';
 import TopBar from '../../components/TopBar';
 import { authService } from '../../services/authService';
+import api from '../../services/apiService';
 
 const API_URL = 'http://localhost:5000'; // Fallback URL, authService uses base URL
 
@@ -30,15 +31,15 @@ const PocketMoneyScreen = ({ navigation }) => {
     try {
       setLoading(true);
       // Fetch pocket money plans
-      const plansRes = await authService.makeAuthenticatedRequest('/api/pocket-money/my', { method: 'GET' });
-      if (plansRes) {
-        setPocketPlans(plansRes);
+      const plansRes = await api.get('/pocket-money/my');
+      if (plansRes && plansRes.data) {
+        setPocketPlans(plansRes.data);
       }
 
       // Fetch transaction list
-      const txRes = await authService.makeAuthenticatedRequest('/api/transactions/my', { method: 'GET' });
-      if (txRes && Array.isArray(txRes)) {
-        const pocketTxs = txRes.filter(
+      const txRes = await api.get('/transactions/my');
+      if (txRes && txRes.data && Array.isArray(txRes.data)) {
+        const pocketTxs = txRes.data.filter(
           (tx) => tx.type === 'pocket_money_payout' || tx.type === 'pocket_money_invest'
         );
         setTransactions(pocketTxs);
