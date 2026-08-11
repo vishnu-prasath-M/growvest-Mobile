@@ -5,8 +5,11 @@ import { colors, typography } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { chitFundService } from '../../services/chitFundService';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
+import { useTheme } from '../../context/ThemeContext';
 
 const PaymentHistoryScreen = ({ navigation }) => {
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const insets = useScreenInsets(8);
   const [payments, setPayments] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
@@ -101,7 +104,7 @@ const PaymentHistoryScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 100 },
@@ -109,11 +112,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 20, paddingBottom: 8, backgroundColor: colors.background,
   },
-  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.white, justifyContent: 'center', alignItems: 'center', ...colors.shadow.soft },
+  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center', ...colors.shadow.soft },
   headerTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
   paymentCard: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: colors.white, borderRadius: 16, padding: 16, marginBottom: 10,
+    backgroundColor: colors.surface, borderRadius: 16, padding: 16, marginBottom: 10,
     borderWidth: 1, borderColor: colors.borderLight, ...colors.shadow.card,
   },
   paymentLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },

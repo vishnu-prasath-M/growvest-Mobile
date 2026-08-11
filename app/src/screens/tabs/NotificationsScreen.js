@@ -14,6 +14,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
+import { useTheme } from '../../context/ThemeContext';
 import TopBar from '../../components/TopBar';
 import api from '../../services/apiService';
 import { API_ENDPOINTS } from '../../config/api';
@@ -183,6 +184,8 @@ const groupNotifications = (notifications) => {
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 const SkeletonCard = () => {
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const opacity = useRef(new Animated.Value(0.5)).current;
   useEffect(() => {
     const p = Animated.loop(
@@ -207,6 +210,8 @@ const SkeletonCard = () => {
 
 // ─── Notification Row ─────────────────────────────────────────────────────────
 const NotificationRow = React.memo(({ notification: n, onMarkRead, isLast }) => {
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const cfg = getTypeConfig(n.type);
   const scale = useRef(new Animated.Value(1)).current;
 
@@ -264,6 +269,8 @@ const NotificationRow = React.memo(({ notification: n, onMarkRead, isLast }) => 
 
 // ─── Empty State ──────────────────────────────────────────────────────────────
 const EmptyState = () => {
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const float = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const a = Animated.loop(
@@ -280,7 +287,7 @@ const EmptyState = () => {
     <View style={styles.emptyWrap}>
       <Animated.View style={{ transform: [{ translateY: float }], marginBottom: 24 }}>
         <LinearGradient colors={['#E8F5EE', '#D1FAE5']} style={styles.emptyIconWrap}>
-          <Ionicons name="notifications-off-outline" size={40} color={colors.primary} />
+          <Ionicons name="notifications-off-outline" size={40} color={themeColors.primary} />
         </LinearGradient>
       </Animated.View>
       <Text style={styles.emptyTitle}>All Caught Up</Text>
@@ -293,6 +300,8 @@ const EmptyState = () => {
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 const NotificationsScreen = ({ navigation }) => {
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const insets = useScreenInsets(8);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -422,10 +431,10 @@ const NotificationsScreen = ({ navigation }) => {
 };
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F3F7',
+    backgroundColor: colors.background,
   },
   scroll: { flex: 1 },
   scrollContent: {
@@ -445,13 +454,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'flex-start',
     gap: 6,
-    backgroundColor: '#E8F5EE',
+    backgroundColor: colors.primaryLight,
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 6,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(26,92,57,0.1)',
+    borderColor: colors.borderLight,
   },
   unreadPillDot: {
     width: 6,
@@ -472,7 +481,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#8E95A2',
+    color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 10,
@@ -481,8 +490,10 @@ const styles = StyleSheet.create({
 
   // ── Card shell (groups all rows) ─────────────────────────────────────────────
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -499,11 +510,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     gap: 13,
     position: 'relative',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
   },
   rowBorder: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E8EAED',
+    borderBottomColor: colors.borderLight,
   },
   unreadStrip: {
     position: 'absolute',
@@ -541,22 +552,22 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: '500',
-    color: '#3C4550',
+    color: colors.text,
     letterSpacing: -0.1,
   },
   rowTitleBold: {
     fontWeight: '700',
-    color: '#0F1C14',
+    color: colors.text,
   },
   rowTime: {
     fontSize: 11,
     fontWeight: '400',
-    color: '#9BA6B2',
+    color: colors.textMuted,
     flexShrink: 0,
   },
   rowDesc: {
     fontSize: 13,
-    color: '#8E95A2',
+    color: colors.textSecondary,
     lineHeight: 19,
     marginBottom: 7,
   },
@@ -588,9 +599,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     gap: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 18,
     marginHorizontal: 16,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
     overflow: 'hidden',
   },
   skeletonCard: {
@@ -599,28 +612,28 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     gap: 13,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E8EAED',
+    borderBottomColor: colors.borderLight,
   },
   skeletonIcon: {
     width: 48,
     height: 48,
     borderRadius: 15,
-    backgroundColor: '#EAECEF',
+    backgroundColor: colors.border,
   },
   skeletonBody: { flex: 1, gap: 8 },
   skeletonLineA: {
     height: 13,
     width: '80%',
     borderRadius: 6,
-    backgroundColor: '#EAECEF',
+    backgroundColor: colors.border,
   },
   skeletonLineB: {
     height: 11,
     width: '55%',
     borderRadius: 6,
-    backgroundColor: '#EAECEF',
+    backgroundColor: colors.border,
   },
 
   // ── Empty ─────────────────────────────────────────────────────────────────
@@ -639,13 +652,13 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#0F1C14',
+    color: colors.text,
     letterSpacing: -0.4,
     marginBottom: 8,
   },
   emptyBody: {
     fontSize: 14,
-    color: '#8E95A2',
+    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 22,
   },

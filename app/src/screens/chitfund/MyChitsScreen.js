@@ -11,10 +11,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
+import { useTheme } from '../../context/ThemeContext';
 import { chitFundService } from '../../services/chitFundService';
 import TopBar from '../../components/TopBar';
 
 const MyChitsScreen = ({ navigation }) => {
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const insets = useScreenInsets(8);
   const [chits, setChits] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -92,8 +95,8 @@ const MyChitsScreen = ({ navigation }) => {
                 onPress={() => navigation.navigate('ChitDetails', { chitId: chit.chitId, memberId: chit._id, memberStatus: chit.status })}
               >
                 <View style={styles.chitCardHeader}>
-                  <View style={[styles.chitIconWrap, isPending && { backgroundColor: '#fef3c7' }]}>
-                    <MaterialCommunityIcons name={isPending ? "clock-outline" : "account-group-outline"} size={24} color={isPending ? colors.warning : colors.primary} />
+                  <View style={[styles.chitIconWrap, isPending && { backgroundColor: themeColors.warningLight }]}>
+                    <MaterialCommunityIcons name={isPending ? "clock-outline" : "account-group-outline"} size={24} color={isPending ? themeColors.warning : themeColors.primary} />
                   </View>
                   <View style={styles.chitInfo}>
                     <Text style={styles.chitName}>{chit.chitName}</Text>
@@ -101,19 +104,19 @@ const MyChitsScreen = ({ navigation }) => {
                       {isPending ? 'Joining Request Submitted' : `Member #${chit.memberNumber} of ${chit.totalMembers}`}
                     </Text>
                   </View>
-                  <View style={[styles.winBadge, isPending ? { backgroundColor: '#fef3c7' } : chit.hasWon ? styles.wonBadge : styles.notWonBadge]}>
-                    <Text style={[styles.winBadgeText, { color: isPending ? colors.warning : chit.hasWon ? colors.success : colors.textTertiary }]}>
+                  <View style={[styles.winBadge, isPending ? { backgroundColor: themeColors.warningLight } : chit.hasWon ? styles.wonBadge : styles.notWonBadge]}>
+                    <Text style={[styles.winBadgeText, { color: isPending ? themeColors.warning : chit.hasWon ? themeColors.success : themeColors.textTertiary }]}>
                       {isPending ? 'Pending Approval' : chit.hasWon ? 'Won' : 'Active'}
                     </Text>
                   </View>
                 </View>
 
                 {isPending ? (
-                  <View style={{ backgroundColor: '#fffbeb', padding: 12, borderRadius: 12, marginTop: 4 }}>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.warning, marginBottom: 4 }}>
+                  <View style={{ backgroundColor: themeColors.warningLight, padding: 12, borderRadius: 12, marginTop: 4 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: themeColors.warning, marginBottom: 4 }}>
                       Waiting for Admin Approval
                     </Text>
-                    <Text style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 18 }}>
+                    <Text style={{ fontSize: 12, color: themeColors.textSecondary, lineHeight: 18 }}>
                       Your Chit Fund joining request has been submitted successfully. Please wait until the administrator approves your request.
                     </Text>
                   </View>
@@ -175,7 +178,7 @@ const MyChitsScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 20, paddingTop:20 },

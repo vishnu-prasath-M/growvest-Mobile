@@ -12,6 +12,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
+import { useTheme } from '../../context/ThemeContext';
 import { chitFundService } from '../../services/chitFundService';
 import TopBar from '../../components/TopBar';
 import StatusChip from '../../components/StatusChip';
@@ -19,6 +20,8 @@ import StatusChip from '../../components/StatusChip';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const ExploreChitsScreen = ({ navigation }) => {
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const insets = useScreenInsets(8);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
@@ -221,7 +224,7 @@ const ExploreChitsScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 20 },
@@ -239,6 +242,7 @@ const styles = StyleSheet.create({
   filterChip: {
     backgroundColor: colors.surface, borderRadius: 999,
     paddingHorizontal: 16, paddingVertical: 9,
+    borderWidth: 1, borderColor: colors.borderLight,
     shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
   },
   filterChipActive: { borderRadius: 999, paddingHorizontal: 16, paddingVertical: 9 },
@@ -261,6 +265,7 @@ const styles = StyleSheet.create({
   chitCard: {
     marginHorizontal: 16, marginBottom: 16, backgroundColor: colors.surface,
     borderRadius: 24, padding: 16,
+    borderWidth: 1, borderColor: colors.borderLight,
     shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
   chitCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },

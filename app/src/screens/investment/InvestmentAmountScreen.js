@@ -14,8 +14,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { authService } from '../../services/authService';
 import { colors, typography } from '../../theme/theme';
 import TopBar from '../../components/TopBar';
+import { useTheme } from '../../context/ThemeContext';
 
 const InvestmentAmountScreen = ({ navigation, route }) => {
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const [amount, setAmount] = useState('');
   const [investmentType, setInvestmentType] = useState('saving');
   const [userData, setUserData] = useState(null);
@@ -149,6 +152,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
               placeholderTextColor={colors.border}
               underlineColor="transparent"
               activeUnderlineColor="transparent"
+              textColor={themeColors.text}
             />
           </View>
           <Text style={styles.minAmount}>Minimum: ₹1,000</Text>
@@ -268,7 +272,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -294,19 +298,20 @@ const styles = StyleSheet.create({
   typeCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1.5,
+    borderColor: colors.border,
     ...colors.shadow.card,
   },
   typeCardActive: {
-    borderColor: colors.saving,
-    backgroundColor: '#f0fdf4',
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
   },
   typeCardActiveFixed: {
-    borderColor: colors.fixed,
-    backgroundColor: '#f0fdf4',
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
   },
   typeRadio: {
     width: 22,
@@ -353,7 +358,7 @@ const styles = StyleSheet.create({
   amountContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     paddingHorizontal: 20,
     height: 64,
@@ -386,8 +391,10 @@ const styles = StyleSheet.create({
   summaryContainer: {
     margin: 20,
     padding: 20,
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
     ...colors.shadow.card,
   },
   summaryTitle: {
@@ -465,6 +472,14 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     gap: 8,
     ...colors.shadow.button,
+  },
+  inputCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    ...colors.shadow.card,
   },
   continueBtnDisabled: {
     opacity: 0.5,

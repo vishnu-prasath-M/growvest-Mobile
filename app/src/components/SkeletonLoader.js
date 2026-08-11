@@ -1,11 +1,13 @@
 import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Animated } from 'react-native';
-import { colors } from '../theme/theme';
 import { useScreenInsets } from '../hooks/useScreenInsets';
+import { useTheme } from '../context/ThemeContext';
 
 export const SkeletonLoader = ({ variant = 'list', count = 4 }) => {
   const opacity = useRef(new Animated.Value(0.4)).current;
   const insets = useScreenInsets(8);
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
 
   useEffect(() => {
     const pulse = Animated.loop(
@@ -154,27 +156,27 @@ export const SkeletonLoader = ({ variant = 'list', count = 4 }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background || '#F8FAF9',
+    backgroundColor: colors.background,
   },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     padding: 16,
     marginHorizontal: 16,
     marginVertical: 6,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E8EAED',
+    borderColor: colors.border,
   },
   avatar: {
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: '#EAECEF',
+    backgroundColor: colors.border,
   },
   cardContent: {
     flex: 1,
@@ -185,23 +187,23 @@ const styles = StyleSheet.create({
     height: 12,
     width: '75%',
     borderRadius: 6,
-    backgroundColor: '#EAECEF',
+    backgroundColor: colors.border,
   },
   lineShort: {
     height: 10,
     width: '45%',
     borderRadius: 6,
-    backgroundColor: '#EAECEF',
+    backgroundColor: colors.border,
   },
 
   // Dashboard styles
   bannerSkeleton: {
     height: 140,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 24,
     margin: 16,
     borderWidth: 1,
-    borderColor: '#E8EAED',
+    borderColor: colors.border,
   },
   gridRow: {
     flexDirection: 'row',
@@ -213,10 +215,10 @@ const styles = StyleSheet.create({
   gridBox: {
     flex: 1,
     height: 80,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#E8EAED',
+    borderColor: colors.border,
   },
   listWrapper: {
     gap: 2,
@@ -226,37 +228,37 @@ const styles = StyleSheet.create({
   profileHeader: {
     alignItems: 'center',
     paddingVertical: 24,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#E8EAED',
+    borderBottomColor: colors.border,
   },
   largeAvatar: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#EAECEF',
+    backgroundColor: colors.border,
   },
   profileRow: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 18,
     borderBottomWidth: 1,
-    borderBottomColor: '#E8EAED',
-    backgroundColor: '#FFFFFF',
+    borderBottomColor: colors.border,
+    backgroundColor: colors.surface,
     gap: 16,
   },
   smallIcon: {
     width: 24,
     height: 24,
     borderRadius: 6,
-    backgroundColor: '#EAECEF',
+    backgroundColor: colors.border,
   },
 
   // Form styles
   formContainer: {
     padding: 20,
     gap: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     flex: 1,
   },
   formGroup: {
@@ -265,14 +267,14 @@ const styles = StyleSheet.create({
   inputSkeleton: {
     height: 54,
     borderRadius: 14,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.background,
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
+    borderColor: colors.border,
   },
   buttonSkeleton: {
     height: 54,
     borderRadius: 16,
-    backgroundColor: '#EAECEF',
+    backgroundColor: colors.border,
     marginTop: 12,
   },
 
@@ -283,7 +285,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#F8FAF9',
+    backgroundColor: colors.background,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -294,7 +296,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#EAECEF',
+    backgroundColor: colors.border,
   },
   headerTextStack: {
     gap: 2,
@@ -303,7 +305,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: '#EAECEF',
+    backgroundColor: colors.border,
   },
   homeBalanceCard: {
     height: 180,
@@ -340,6 +342,6 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#EAECEF',
+    backgroundColor: colors.border,
   },
 });

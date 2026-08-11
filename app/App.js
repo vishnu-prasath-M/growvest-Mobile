@@ -15,6 +15,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { navigationRef } from './src/navigation/navigationRef';
 import { theme } from './src/theme/theme';
 import { AuthProvider } from './src/context/AuthContext';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -60,6 +61,8 @@ class ErrorBoundary extends Component {
 }
 
 function AppContent() {
+  const { theme: activeTheme, isDarkMode } = useTheme();
+
   // Hide the native splash screen once the React tree is mounted and attach notification tap listener
   useEffect(() => {
     SplashScreen.hideAsync().catch(() => {});
@@ -76,7 +79,7 @@ function AppContent() {
 
   return (
     <SafeAreaProvider>
-      <PaperProvider theme={theme}>
+      <PaperProvider theme={activeTheme}>
         <AuthProvider>
           <NavigationContainer
             ref={navigationRef}
@@ -101,17 +104,17 @@ function AppContent() {
             }}
             theme={{
               colors: {
-                primary: theme.colors.primary,
-                background: theme.colors.background,
-                card: theme.colors.surface,
-                text: theme.colors.text,
-                border: theme.colors.border,
-                notification: theme.colors.primary,
+                primary: activeTheme.colors.primary,
+                background: activeTheme.colors.background,
+                card: activeTheme.colors.surface,
+                text: activeTheme.colors.text,
+                border: activeTheme.colors.border,
+                notification: activeTheme.colors.primary,
               },
-              dark: false,
+              dark: isDarkMode,
             }}
           >
-            <StatusBar style="dark" />
+            <StatusBar style={isDarkMode ? 'light' : 'dark'} />
             <AppNavigator />
           </NavigationContainer>
         </AuthProvider>
@@ -123,7 +126,9 @@ function AppContent() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <AppContent />
+      <ThemeProvider>
+        <AppContent />
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }

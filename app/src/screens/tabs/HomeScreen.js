@@ -23,6 +23,7 @@ import { authService } from '../../services/authService';
 import { colors, typography, spacing } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import api from '../../services/apiService';
 import { API_ENDPOINTS } from '../../config/api';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
@@ -55,6 +56,8 @@ const getTipOfTheDay = () => {
 };
 
 const HomeScreen = ({ navigation }) => {
+  const { isDarkMode, toggleTheme, colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const insets = useScreenInsets(8);
   const { user: authUser, updateUser } = useAuth();
   const [dashboardData, setDashboardData] = useState(null);
@@ -212,20 +215,34 @@ const HomeScreen = ({ navigation }) => {
                 <Text style={styles.greetingName} numberOfLines={1}>{displayName}</Text>
               </View>
             </View>
-            <TouchableOpacity
-              style={styles.notifBtn}
-              onPress={() => navigation.navigate('Notifications')}
-              activeOpacity={0.8}
-            >
-              <MaterialCommunityIcons name="bell-outline" size={22} color={colors.text} />
-              {unreadNotifCount > 0 && (
-                <View style={styles.notifBadge}>
-                  <Text style={styles.notifBadgeText}>
-                    {unreadNotifCount > 99 ? '99+' : unreadNotifCount}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
+            <View style={styles.headerRight}>
+              <TouchableOpacity
+                style={styles.themeBtn}
+                onPress={toggleTheme}
+                activeOpacity={0.8}
+              >
+                <MaterialCommunityIcons 
+                  name={isDarkMode ? "weather-sunny" : "weather-night"} 
+                  size={22} 
+                  color={themeColors.text} 
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.notifBtn}
+                onPress={() => navigation.navigate('Notifications')}
+                activeOpacity={0.8}
+              >
+                <MaterialCommunityIcons name="bell-outline" size={22} color={themeColors.text} />
+                {unreadNotifCount > 0 && (
+                  <View style={styles.notifBadge}>
+                    <Text style={styles.notifBadgeText}>
+                      {unreadNotifCount > 99 ? '99+' : unreadNotifCount}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
           </SafeAreaView>
 
           {/* ── Balance Card ── */}
@@ -430,7 +447,7 @@ const HomeScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 20 },
@@ -456,6 +473,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  themeBtn: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: colors.surface,
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+  },
   avatarCircle: {
     width: 44, height: 44, borderRadius: 22,
     justifyContent: 'center', alignItems: 'center',
@@ -563,6 +592,8 @@ const styles = StyleSheet.create({
   },
   summaryCardSurface: {
     backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
     shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
@@ -592,6 +623,8 @@ const styles = StyleSheet.create({
   // Tip Card
   tipCard: {
     backgroundColor: colors.surface, borderRadius: 24,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
     overflow: 'hidden',
     shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,

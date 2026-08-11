@@ -4,14 +4,17 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, typography } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
+import { useTheme } from '../../context/ThemeContext';
 const SUPPORT_DATA = {
   whatsapp: '+91 98765 43210',
-  phone: '1800-123-4567',
+  phone: '+91 98765 43210',
   email: 'chitfund@growvest.com',
   workingHours: 'Mon - Sat, 9:00 AM - 8:00 PM',
 };
 
 const SupportScreen = ({ navigation }) => {
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const insets = useScreenInsets(8);
 
   const supportOptions = [
@@ -106,7 +109,7 @@ const SupportScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 100 },
@@ -114,14 +117,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 20, paddingBottom: 8, backgroundColor: colors.background,
   },
-  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.white, justifyContent: 'center', alignItems: 'center', ...colors.shadow.soft },
+  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center', ...colors.shadow.soft },
   headerTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
   heroCard: { borderRadius: 20, overflow: 'hidden', marginBottom: 20, ...colors.shadow.elevated },
   heroInner: { alignItems: 'center', padding: 30 },
   heroTitle: { fontSize: 22, fontWeight: '700', color: colors.white, marginTop: 12, marginBottom: 4 },
   heroText: { fontSize: 13, color: 'rgba(255,255,255,0.8)' },
   optionCard: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface,
     borderRadius: 16, padding: 16, marginBottom: 10,
     borderWidth: 1, borderColor: colors.borderLight, ...colors.shadow.card,
   },
@@ -132,7 +135,7 @@ const styles = StyleSheet.create({
   ticketCard: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primaryLight,
     borderRadius: 16, padding: 16, marginTop: 10, marginBottom: 16,
-    borderWidth: 1, borderColor: '#d1fae5',
+    borderWidth: 1, borderColor: colors.borderLight,
   },
   ticketIconWrap: { width: 52, height: 52, borderRadius: 16, backgroundColor: colors.white, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
   ticketInfo: { flex: 1 },

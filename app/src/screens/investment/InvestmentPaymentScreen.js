@@ -12,8 +12,11 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/theme';
 import { executeRazorpayPayment } from '../../services/razorpayHandler';
+import { useTheme } from '../../context/ThemeContext';
 
 const InvestmentPaymentScreen = ({ navigation, route }) => {
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const { amount, type, userData } = route.params;
   const [loading, setLoading] = useState(false);
 
@@ -133,7 +136,7 @@ const InvestmentPaymentScreen = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, paddingTop: 50 },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
@@ -142,6 +145,8 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 20,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
     shadowColor: '#0E3D23',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
@@ -159,6 +164,8 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 20,
     marginBottom: 24,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
     shadowColor: '#0E3D23',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,

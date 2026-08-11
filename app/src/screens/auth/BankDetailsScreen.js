@@ -17,10 +17,14 @@ import { useFocusEffect } from '@react-navigation/native';
 import { colors, typography } from '../../theme/theme';
 import TopBar from '../../components/TopBar';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
+import { useTheme } from '../../context/ThemeContext';
 import api from '../../services/apiService';
 import { API_ENDPOINTS } from '../../config/api';
 
 const BankDetailsScreen = ({ navigation }) => {
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
+  
   const [form, setForm] = useState({
     accountHolderName: '',
     bankName: '',
@@ -278,7 +282,7 @@ const BankDetailsScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 20 },

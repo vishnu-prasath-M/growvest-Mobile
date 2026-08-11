@@ -5,8 +5,11 @@ import { colors, typography } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { chitFundService } from '../../services/chitFundService';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
+import { useTheme } from '../../context/ThemeContext';
 
 const WinnerHistoryScreen = ({ navigation }) => {
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const insets = useScreenInsets(8);
   const [winners, setWinners] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
@@ -84,7 +87,7 @@ const WinnerHistoryScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 100 },
@@ -92,7 +95,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 20, paddingBottom: 8, backgroundColor: colors.background,
   },
-  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.white, justifyContent: 'center', alignItems: 'center', ...colors.shadow.soft },
+  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center', ...colors.shadow.soft },
   headerTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
   timeline: { paddingLeft: 4 },
   timelineItem: { flexDirection: 'row', marginBottom: 4 },
@@ -100,7 +103,7 @@ const styles = StyleSheet.create({
   timelineDot: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#fef3c7', justifyContent: 'center', alignItems: 'center', zIndex: 1 },
   timelineDotFirst: { backgroundColor: '#d97706' },
   timelineLine: { width: 2, flex: 1, backgroundColor: colors.borderLight, marginVertical: -2 },
-  timelineCard: { flex: 1, backgroundColor: colors.white, borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: colors.borderLight, ...colors.shadow.card },
+  timelineCard: { flex: 1, backgroundColor: colors.surface, borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: colors.borderLight, ...colors.shadow.card },
   timelineCardHeader: { flexDirection: 'row', alignItems: 'center' },
   winnerAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   winnerAvatarText: { fontSize: 16, fontWeight: '700', color: colors.primary },

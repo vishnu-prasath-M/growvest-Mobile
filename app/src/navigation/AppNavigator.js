@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
 import { colors } from '../theme/theme';
+import { useTheme } from '../context/ThemeContext';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -111,6 +112,7 @@ const LABEL_SPRING = {
 
 // ---------- Individual Tab Item ----------
 const TabItem = React.memo(({ tab, index, focused, onPress }) => {
+  const { colors: themeColors } = useTheme();
   const scale = useSharedValue(focused ? 1 : 0.88);
   const iconOpacity = useSharedValue(focused ? 1 : 0.5);
   const labelOpacity = useSharedValue(focused ? 1 : 0);
@@ -157,7 +159,7 @@ const TabItem = React.memo(({ tab, index, focused, onPress }) => {
         <Ionicons
           name={focused ? tab.activeIcon : tab.inactiveIcon}
           size={22}
-          color={focused ? colors.primaryFg : colors.textSecondary}
+          color={focused ? themeColors.primaryFg : themeColors.textSecondary}
         />
         {focused && (
           <Animated.Text style={[tabStyles.activeLabel, labelStyle]}>
@@ -171,6 +173,12 @@ const TabItem = React.memo(({ tab, index, focused, onPress }) => {
 
 // ---------- Premium Floating Tab Bar ----------
 const PrimeTabBar = ({ state, descriptors, navigation }) => {
+  const { colors: themeColors, isDarkMode } = useTheme();
+  const dynamicPillStyle = {
+    backgroundColor: isDarkMode ? 'rgba(18,24,20,0.95)' : 'rgba(255,255,255,0.95)',
+    borderColor: isDarkMode ? 'rgba(24,36,28,0.8)' : 'rgba(255,255,255,0.8)',
+    shadowColor: isDarkMode ? '#000000' : '#0E3D23',
+  };
   const tabCount = TABS.length;
   const containerWidth = useSharedValue(0);
 
@@ -203,7 +211,7 @@ const PrimeTabBar = ({ state, descriptors, navigation }) => {
 
   return (
     <View style={tabStyles.outerContainer} pointerEvents="box-none">
-      <View style={tabStyles.pill} onLayout={onContainerLayout}>
+      <View style={[tabStyles.pill, dynamicPillStyle]} onLayout={onContainerLayout}>
         {/* Sliding gradient pill indicator */}
         <Animated.View style={[tabStyles.slidingPillWrapper, pillStyle]} pointerEvents="none">
           <LinearGradient

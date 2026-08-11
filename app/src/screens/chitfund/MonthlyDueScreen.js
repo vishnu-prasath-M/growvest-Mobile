@@ -17,8 +17,11 @@ import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { chitFundService } from '../../services/chitFundService';
 import { authService } from '../../services/authService';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
+import { useTheme } from '../../context/ThemeContext';
 
 const MonthlyDueScreen = ({ navigation }) => {
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const insets = useScreenInsets(8);
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedChit, setSelectedChit] = useState(null);
@@ -552,7 +555,7 @@ const MonthlyDueScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 100 },
@@ -560,9 +563,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 20, paddingBottom: 8, backgroundColor: colors.background,
   },
-  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.white, justifyContent: 'center', alignItems: 'center', ...colors.shadow.soft },
+  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center', ...colors.shadow.soft },
   headerTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
-  dueCard: { backgroundColor: colors.white, borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: colors.borderLight, ...colors.shadow.card },
+  dueCard: { backgroundColor: colors.surface, borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: colors.borderLight, ...colors.shadow.card },
   dueCardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   dueIconWrap: { width: 48, height: 48, borderRadius: 16, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
   dueInfo: { flex: 1 },
@@ -575,7 +578,7 @@ const styles = StyleSheet.create({
   dueDate: { fontSize: 16, fontWeight: '600', color: colors.text, textAlign: 'right' },
   dueDateWrap: { alignItems: 'flex-end' },
   remainingDays: { fontSize: 16, fontWeight: '700', color: colors.primary, textAlign: 'right' },
-  lateFeeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16, padding: 10, backgroundColor: '#fef9c3', borderRadius: 10 },
+  lateFeeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16, padding: 10, backgroundColor: colors.warningLight, borderRadius: 10, borderWidth: 1, borderColor: colors.borderLight },
   lateFeeText: { fontSize: 12, color: colors.warning, fontWeight: '500', flex: 1 },
   dueActions: { flexDirection: 'row', gap: 12 },
   payNowBtnEnabled: { flex: 2, backgroundColor: colors.primary, paddingVertical: 14, borderRadius: 14, alignItems: 'center', ...colors.shadow.button },
@@ -586,17 +589,17 @@ const styles = StyleSheet.create({
   paidSection: { marginBottom: 16 },
   paidBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12, backgroundColor: colors.successLight, borderRadius: 12, marginBottom: 16 },
   paidText: { fontSize: 18, fontWeight: '800', color: colors.success },
-  fullyPaidBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12, backgroundColor: '#fef3c7', borderRadius: 12 },
+  fullyPaidBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12, backgroundColor: colors.warningLight, borderRadius: 12, borderWidth: 1, borderColor: colors.borderLight },
   fullyPaidText: { fontSize: 14, fontWeight: '700', color: '#d97706' },
   // Closed section
   closedSection: { alignItems: 'center', marginBottom: 16 },
-  closedBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, backgroundColor: '#f3f4f6', borderRadius: 12, marginBottom: 16 },
+  closedBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, backgroundColor: colors.surface, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: colors.borderLight },
   closedText: { fontSize: 16, fontWeight: '700', color: colors.textTertiary },
   closedBtn: { backgroundColor: colors.muted, paddingVertical: 14, borderRadius: 14, alignItems: 'center', width: '100%' },
   closedBtnText: { fontSize: 16, fontWeight: '700', color: colors.textTertiary },
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { width: '85%', backgroundColor: colors.white, borderRadius: 24, padding: 24, ...colors.shadow.elevated },
+  modalContent: { width: '85%', backgroundColor: colors.surface, borderRadius: 24, padding: 24, borderWidth: 1, borderColor: colors.border, ...colors.shadow.elevated },
   modalIconWrap: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center', alignSelf: 'center', marginBottom: 16 },
   modalTitle: { fontSize: 20, fontWeight: '700', color: colors.text, textAlign: 'center', marginBottom: 20 },
   modalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 },

@@ -11,8 +11,11 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { investmentService } from '../../services/investmentService';
 import { colors } from '../../theme/theme';
+import { useTheme } from '../../context/ThemeContext';
 
 const InvestmentStatusScreen = ({ navigation, route }) => {
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const { amount, type, userData } = route.params;
   const [loading, setLoading] = useState(false);
 
@@ -184,7 +187,7 @@ const InvestmentStatusScreen = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
   scrollContent: { padding: 20 },
@@ -203,6 +206,7 @@ const styles = StyleSheet.create({
   // Details
   detailsCard: {
     backgroundColor: colors.surface, borderRadius: 24, padding: 20, marginBottom: 20,
+    borderWidth: 1, borderColor: colors.borderLight,
     shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
   detailsTitle: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 16 },
@@ -219,6 +223,7 @@ const styles = StyleSheet.create({
   stepCard: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface,
     borderRadius: 16, padding: 16, marginBottom: 10,
+    borderWidth: 1, borderColor: colors.borderLight,
     shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
   },
   stepIconWrapper: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
@@ -230,6 +235,7 @@ const styles = StyleSheet.create({
   infoNote: {
     flexDirection: 'row', padding: 16, backgroundColor: colors.primaryLight,
     borderRadius: 16, marginBottom: 32, alignItems: 'flex-start',
+    borderWidth: 1, borderColor: colors.borderLight,
   },
   infoText: { flex: 1, fontSize: 14, color: colors.primary, marginLeft: 12, lineHeight: 20, fontWeight: '600' },
   

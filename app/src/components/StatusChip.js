@@ -1,13 +1,14 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { colors } from '../theme/theme';
+import { useTheme } from '../context/ThemeContext';
 
 /**
  * StatusChip — inline badge for Success, Pending, Failed, Active, Maturing, Paid
  * Matches prime-ui status chip pattern
  */
 const StatusChip = ({ status, style }) => {
-  const config = STATUS_CONFIG[status] || STATUS_CONFIG['default'];
+  const { colors: themeColors } = useTheme();
+  const config = getStatusConfig(themeColors)[status] || getStatusConfig(themeColors)['default'];
 
   return (
     <View style={[styles.chip, { backgroundColor: config.bg }, style]}>
@@ -16,7 +17,7 @@ const StatusChip = ({ status, style }) => {
   );
 };
 
-const STATUS_CONFIG = {
+const getStatusConfig = (colors) => ({
   Success: { bg: colors.successLight, color: colors.success },
   Active: { bg: colors.successLight, color: colors.success },
   Paid: { bg: colors.successLight, color: colors.success },
@@ -26,7 +27,7 @@ const STATUS_CONFIG = {
   Failed: { bg: colors.errorLight, color: colors.error },
   Rejected: { bg: colors.errorLight, color: colors.error },
   default: { bg: colors.accent, color: colors.accentFg },
-};
+});
 
 const styles = StyleSheet.create({
   chip: {
