@@ -29,6 +29,18 @@ cron.schedule("0 0 * * *", async () => {
   }
 });
 
+// Daily Pocket Money Payout Cron Job (runs daily at 12:05 AM)
+const { runPocketMoneyPayouts } = require('./controllers/pocketMoneyController');
+cron.schedule("5 0 * * *", async () => {
+  console.log("Running Daily Pocket Money Payout Cron Job...");
+  try {
+    const processed = await runPocketMoneyPayouts();
+    console.log(`Pocket Money Payout Cron Job Finished: processed ${processed} payouts.`);
+  } catch (error) {
+    console.error("Pocket Money Payout Cron Job Error:", error);
+  }
+});
+
 // Due Reminder Cron Job (runs daily at 8:00 AM)
 cron.schedule("0 8 * * *", async () => {
   console.log("Running Due Reminder Cron Job...");
@@ -192,6 +204,7 @@ const userRoutes = require('./routes/userRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 
 const paymentRoutes = require('./routes/paymentRoutes');
+const pocketMoneyRoutes = require('./routes/pocketMoneyRoutes');
 
 app.use('/api/investments', investmentRoutes);
 app.use('/api/auth', authRoutes);
@@ -205,6 +218,7 @@ app.use('/api/chits', chitAdminRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/kyc', kycRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/pocket-money', pocketMoneyRoutes);
 
 
 const PORT = process.env.PORT || 5000;

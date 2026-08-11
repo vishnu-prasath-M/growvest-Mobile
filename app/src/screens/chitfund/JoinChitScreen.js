@@ -12,10 +12,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
+import { useTheme } from '../../context/ThemeContext';
 import { chitFundService } from '../../services/chitFundService';
 import { authService } from '../../services/authService';
 
 const JoinChitScreen = ({ navigation, route }) => {
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const insets = useScreenInsets(8);
   const { chitId } = route.params || {};
   const [chit, setChit] = useState(null);
@@ -298,7 +301,7 @@ const JoinChitScreen = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 100 },
@@ -306,7 +309,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 20, paddingBottom: 8, backgroundColor: colors.background,
   },
-  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.white, justifyContent: 'center', alignItems: 'center', ...colors.shadow.soft },
+  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center', ...colors.shadow.soft },
   headerTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
   
   // Summary
@@ -322,7 +325,7 @@ const styles = StyleSheet.create({
   summaryDivider: { width: 1, height: 30, backgroundColor: 'rgba(255,255,255,0.2)' },
   
   // Fee
-  feeCard: { backgroundColor: colors.surface, borderRadius: 20, padding: 20, marginBottom: 16, shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
+  feeCard: { backgroundColor: colors.surface, borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: colors.borderLight, shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
   feeTitle: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: 16 },
   feeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 },
   feeLabel: { fontSize: 14, color: colors.textSecondary },
@@ -332,7 +335,7 @@ const styles = StyleSheet.create({
   feeTotalValue: { fontSize: 18, fontWeight: '800', color: colors.primary },
   
   // Terms
-  termsCard: { backgroundColor: colors.surface, borderRadius: 20, padding: 20, marginBottom: 16, shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
+  termsCard: { backgroundColor: colors.surface, borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: colors.borderLight, shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
   termsTitle: { fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 8 },
   termsText: { fontSize: 13, color: colors.textSecondary, lineHeight: 20 },
   
@@ -344,7 +347,7 @@ const styles = StyleSheet.create({
   declarationLink: { color: colors.primary, fontWeight: '600' },
   
   // Bottom
-  bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.borderLight },
+  bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.borderLight },
   proceedBtnOuter: { shadowColor: '#1A5C39', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 },
   proceedBtnGradient: { height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
   proceedBtnDisabled: { shadowOpacity: 0, elevation: 0 },

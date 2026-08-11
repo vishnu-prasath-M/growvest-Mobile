@@ -12,8 +12,24 @@ exports.createWithdrawal = async (req, res) => {
       $or: [{ email: userEmail }, { mobileNumber: userEmail }] 
     });
 
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const { getEnrichedUserData } = require('./userController');
+    const enrichedUser = await getEnrichedUserData({ _id: user._id });
+    
+    // Validate balance before proceeding
+    const available = withdrawType === 'fixed' 
+      ? enrichedUser.fixedBalance 
+      : enrichedUser.availableToWithdraw;
+
+    if (amount > available) {
+      return res.status(400).json({ message: `Insufficient balance. Available to withdraw: ₹${available.toLocaleString('en-IN')}` });
+    }
+
     const newWithdrawal = new Withdrawal({
-      userId: user?._id || null,
+      userId: user._id,
       amount,
       upiId,
       userName,

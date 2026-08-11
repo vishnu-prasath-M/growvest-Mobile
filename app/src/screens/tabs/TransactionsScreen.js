@@ -20,6 +20,8 @@ import { useScreenInsets } from '../../hooks/useScreenInsets';
 import TopBar from '../../components/TopBar';
 import StatusChip from '../../components/StatusChip';
 import { generateAndShareTransactionStatement } from '../../utils/pdfGenerator';
+import { SkeletonLoader } from '../../components/SkeletonLoader';
+import { useTheme } from '../../context/ThemeContext';
 
 const FILTER_OPTIONS = [
   { id: 'all', label: 'All Transactions' },
@@ -39,6 +41,8 @@ const FILTER_OPTIONS = [
 ];
 
 const TransactionsScreen = ({ navigation }) => {
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const insets = useScreenInsets(8);
   const canGoBack = navigation?.canGoBack?.() ?? false;
   const [currentUser, setCurrentUser] = useState(null);
@@ -56,12 +60,7 @@ const TransactionsScreen = ({ navigation }) => {
       setCurrentUser(user);
       const data = await transactionService.getMyTransactions();
       const userTransactions = Array.isArray(data)
-        ? data.filter(
-            (tx) =>
-              (user?._id && String(tx.userId) === String(user._id)) ||
-              (user?.email && tx.userEmail?.toLowerCase() === user.email.toLowerCase()) ||
-              (user?.mobileNumber && tx.mobileNumber === user.mobileNumber)
-          )
+        ? data.filter((tx) => user?._id && String(tx.userId) === String(user._id))
         : [];
       setTransactions(userTransactions);
     } catch (error) {
@@ -203,12 +202,7 @@ const TransactionsScreen = ({ navigation }) => {
     return (
       <View style={styles.container}>
         <TopBar title="Transactions" navigation={navigation} showBack={canGoBack} />
-        <View style={styles.loadingContainer}>
-          <View style={styles.loadingIconBox}>
-            <MaterialCommunityIcons name="swap-horizontal-bold" size={36} color={colors.border} />
-          </View>
-          <Text style={styles.loadingText}>Loading transactions...</Text>
-        </View>
+        <SkeletonLoader variant="list" count={5} />
       </View>
     );
   }
@@ -426,7 +420,7 @@ const TransactionsScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 20 },

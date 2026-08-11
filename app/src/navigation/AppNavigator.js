@@ -1,11 +1,12 @@
 import React, { useRef, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Dimensions, ActivityIndicator, Image } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
 import { colors } from '../theme/theme';
+import { useTheme } from '../context/ThemeContext';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -32,6 +33,8 @@ import ProfileScreen from '../screens/tabs/ProfileScreen';
 import InvestmentAmountScreen from '../screens/investment/InvestmentAmountScreen';
 import InvestmentPaymentScreen from '../screens/investment/InvestmentPaymentScreen';
 import InvestmentStatusScreen from '../screens/investment/InvestmentStatusScreen';
+import PocketMoneyScreen from '../screens/investment/PocketMoneyScreen';
+import PocketMoneyAmountScreen from '../screens/investment/PocketMoneyAmountScreen';
 
 // Investment List Screen
 import InvestmentsScreen from '../screens/tabs/InvestmentsScreen';
@@ -111,6 +114,7 @@ const LABEL_SPRING = {
 
 // ---------- Individual Tab Item ----------
 const TabItem = React.memo(({ tab, index, focused, onPress }) => {
+  const { colors: themeColors } = useTheme();
   const scale = useSharedValue(focused ? 1 : 0.88);
   const iconOpacity = useSharedValue(focused ? 1 : 0.5);
   const labelOpacity = useSharedValue(focused ? 1 : 0);
@@ -157,7 +161,7 @@ const TabItem = React.memo(({ tab, index, focused, onPress }) => {
         <Ionicons
           name={focused ? tab.activeIcon : tab.inactiveIcon}
           size={22}
-          color={focused ? colors.primaryFg : colors.textSecondary}
+          color={focused ? themeColors.primaryFg : themeColors.textSecondary}
         />
         {focused && (
           <Animated.Text style={[tabStyles.activeLabel, labelStyle]}>
@@ -171,6 +175,12 @@ const TabItem = React.memo(({ tab, index, focused, onPress }) => {
 
 // ---------- Premium Floating Tab Bar ----------
 const PrimeTabBar = ({ state, descriptors, navigation }) => {
+  const { colors: themeColors, isDarkMode } = useTheme();
+  const dynamicPillStyle = {
+    backgroundColor: isDarkMode ? 'rgba(18,24,20,0.95)' : 'rgba(255,255,255,0.95)',
+    borderColor: isDarkMode ? 'rgba(24,36,28,0.8)' : 'rgba(255,255,255,0.8)',
+    shadowColor: isDarkMode ? '#000000' : '#0E3D23',
+  };
   const tabCount = TABS.length;
   const containerWidth = useSharedValue(0);
 
@@ -203,7 +213,7 @@ const PrimeTabBar = ({ state, descriptors, navigation }) => {
 
   return (
     <View style={tabStyles.outerContainer} pointerEvents="box-none">
-      <View style={tabStyles.pill} onLayout={onContainerLayout}>
+      <View style={[tabStyles.pill, dynamicPillStyle]} onLayout={onContainerLayout}>
         {/* Sliding gradient pill indicator */}
         <Animated.View style={[tabStyles.slidingPillWrapper, pillStyle]} pointerEvents="none">
           <LinearGradient
@@ -337,7 +347,10 @@ const SplashScreen = () => (
     style={splashStyles.container}
   >
     <View style={splashStyles.iconWrapper}>
-      <Ionicons name="leaf-outline" size={56} color="rgba(255,255,255,0.9)" />
+      <Image
+        source={require('../../assets/growvest-logo.png')}
+        style={{ width: 64, height: 64, borderRadius: 16 }}
+      />
     </View>
     <Text style={splashStyles.title}>Growvest</Text>
     <Text style={splashStyles.subtitle}>Premium Investments</Text>
@@ -448,6 +461,8 @@ const AppNavigator = () => {
           <Stack.Screen name="InvestmentAmount" component={InvestmentAmountScreen} options={{ headerShown: false }} />
           <Stack.Screen name="InvestmentPayment" component={InvestmentPaymentScreen} options={{ headerShown: false }} />
           <Stack.Screen name="InvestmentStatus" component={InvestmentStatusScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="PocketMoney" component={PocketMoneyScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="PocketMoneyAmount" component={PocketMoneyAmountScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Investments" component={InvestmentsScreen} options={{ headerShown: false }} />
           <Stack.Screen name="AboutUs" component={AboutUsScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Terms" component={TermsScreen} options={{ headerShown: false }} />

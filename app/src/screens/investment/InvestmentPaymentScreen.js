@@ -12,9 +12,12 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/theme';
 import { executeRazorpayPayment } from '../../services/razorpayHandler';
+import { useTheme } from '../../context/ThemeContext';
 
 const InvestmentPaymentScreen = ({ navigation, route }) => {
-  const { amount, type, userData } = route.params;
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
+  const { amount, type, userData, frequency } = route.params;
   const [loading, setLoading] = useState(false);
 
   const formatCurrency = (value) => {
@@ -24,14 +27,16 @@ const InvestmentPaymentScreen = ({ navigation, route }) => {
   const handlePayNow = async () => {
     await executeRazorpayPayment({
       amount,
-      paymentType: 'investment',
-      payloadData: { amount, type },
+      paymentType: type === 'pocket_money' ? 'pocket_money' : 'investment',
+      payloadData: type === 'pocket_money' ? { amount, type, frequency } : { amount, type },
       user: userData,
       setLoading,
       onSuccess: (response) => {
         Alert.alert(
           'Payment Successful! 🎉',
-          `Your ₹${amount} ${type === 'fixed' ? 'Fixed' : 'Savings'} Deposit has been verified and automatically approved.`,
+          type === 'pocket_money'
+            ? `Your ₹${amount} Pocket Money Plan has been verified and activated.`
+            : `Your ₹${amount} ${type === 'fixed' ? 'Fixed' : 'Savings'} Deposit has been verified and automatically approved.`,
           [
             {
               text: 'View Dashboard',
@@ -59,12 +64,12 @@ const InvestmentPaymentScreen = ({ navigation, route }) => {
         <View style={styles.summaryCard}>
           <View style={styles.summaryHeader}>
             <MaterialCommunityIcons
-              name={type === 'saving' ? 'piggy-bank' : 'lock'}
+              name={type === 'pocket_money' ? 'wallet-giftcard' : type === 'saving' ? 'piggy-bank' : 'lock'}
               size={28}
-              color={type === 'saving' ? colors.saving : colors.fixed}
+              color={type === 'pocket_money' ? colors.primary : type === 'saving' ? colors.saving : colors.fixed}
             />
             <Text style={styles.summaryType}>
-              {type === 'saving' ? 'Saving Deposit' : 'Fixed Deposit'}
+              {type === 'pocket_money' ? 'Pocket Money Plan' : type === 'saving' ? 'Saving Deposit' : 'Fixed Deposit'}
             </Text>
           </View>
           <View style={styles.summaryAmountRow}>
@@ -133,7 +138,7 @@ const InvestmentPaymentScreen = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, paddingTop: 50 },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
@@ -142,6 +147,8 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 20,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
     shadowColor: '#0E3D23',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
@@ -159,6 +166,8 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 20,
     marginBottom: 24,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
     shadowColor: '#0E3D23',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,

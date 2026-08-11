@@ -4,8 +4,12 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, typography } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { chitFundService } from '../../services/chitFundService';
+import { SkeletonLoader } from '../../components/SkeletonLoader';
+import { useTheme } from '../../context/ThemeContext';
 
 const AuctionScreen = ({ navigation }) => {
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const insets = useScreenInsets(8);
   const { chitId } = navigation.getState().routes.find(r => r.name === 'Auction')?.params || {};
   const [auction, setAuction] = React.useState(null);
@@ -46,9 +50,7 @@ const AuctionScreen = ({ navigation }) => {
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Loading Auction Details...</Text>
-          </View>
+          <SkeletonLoader variant="list" count={4} />
         ) : !auction ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No active auctions found.</Text>
@@ -131,7 +133,7 @@ const AuctionScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 100 },
@@ -139,14 +141,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 20, paddingBottom: 8, backgroundColor: colors.background,
   },
-  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.white, justifyContent: 'center', alignItems: 'center', ...colors.shadow.soft },
+  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center', ...colors.shadow.soft },
   headerTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
-  countdownCard: { alignItems: 'center', backgroundColor: colors.white, borderRadius: 20, padding: 30, marginBottom: 16, borderWidth: 1, borderColor: colors.borderLight, ...colors.shadow.card },
+  countdownCard: { alignItems: 'center', backgroundColor: colors.surface, borderRadius: 20, padding: 30, marginBottom: 16, borderWidth: 1, borderColor: colors.borderLight, ...colors.shadow.card },
   countdownLabel: { fontSize: 13, color: colors.textSecondary, fontWeight: '600', marginTop: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
   countdownDate: { fontSize: 24, fontWeight: '700', color: colors.text, marginTop: 4, marginBottom: 16 },
   countdownTimer: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primaryLight, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, gap: 8 },
   countdownText: { fontSize: 16, fontWeight: '700', color: colors.primary },
-  sectionCard: { backgroundColor: colors.white, borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: colors.borderLight, ...colors.shadow.card },
+  sectionCard: { backgroundColor: colors.surface, borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: colors.borderLight, ...colors.shadow.card },
   sectionTitle: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: 16 },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
   detailLabel: { fontSize: 14, color: colors.textSecondary },

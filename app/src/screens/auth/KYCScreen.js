@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { colors, typography } from '../../theme/theme';
 import TopBar from '../../components/TopBar';
+import { useTheme } from '../../context/ThemeContext';
 import api from '../../services/apiService';
 import { API_ENDPOINTS } from '../../config/api';
 
@@ -39,7 +40,9 @@ const checkImageSize = (base64String, field) => {
   return true;
 };
 
-const KYCScreen = ({ navigation, route }) => {
+const KYCScreen = ({ navigation }) => {
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const [currentStep, setCurrentStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const scrollRef = useRef(null);
@@ -409,7 +412,7 @@ const KYCScreen = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 20 },

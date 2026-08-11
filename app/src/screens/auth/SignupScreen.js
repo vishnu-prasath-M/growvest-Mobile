@@ -9,6 +9,7 @@ import {
   Alert,
   TouchableOpacity,
   Dimensions,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TextInput } from 'react-native-paper';
@@ -17,10 +18,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { authService } from '../../services/authService';
 import { useAuth } from '../../context/AuthContext';
 import { colors } from '../../theme/theme';
+import { useTheme } from '../../context/ThemeContext';
 
 const { width, height } = Dimensions.get('window');
 
 const SignupScreen = ({ navigation }) => {
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const [username, setUsername] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
   const [email, setEmail] = useState('');
@@ -89,7 +93,10 @@ const SignupScreen = ({ navigation }) => {
             <View style={styles.blobTopRight} />
 
             <View style={styles.logoWrapper}>
-              <MaterialCommunityIcons name="leaf" size={40} color={colors.primaryFg} />
+              <Image
+                source={require('../../../assets/growvest-logo.png')}
+                style={{ width: 48, height: 48, borderRadius: 12 }}
+              />
             </View>
             <Text style={styles.appName}>Join Growvest</Text>
             <Text style={styles.tagline}>Smart Wealth Creation</Text>
@@ -221,7 +228,7 @@ const SignupScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#0E3D23' }, // match gradient top
   container: { flex: 1, backgroundColor: colors.background },
   scrollContent: { flexGrow: 1, minHeight: height },

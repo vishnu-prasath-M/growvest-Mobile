@@ -20,6 +20,10 @@ const notificationSchema = new mongoose.Schema({
     'due_reminder',
     'kyc_approved',
     'kyc_rejected',
+    'pocket_money_approved',
+    'pocket_money_payout',
+    'pocket_money_reminder',
+    'pocket_money_completed',
     'general'
   ]},
   icon: { type: String, default: 'bell-outline' },

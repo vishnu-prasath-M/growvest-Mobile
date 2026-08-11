@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '../theme/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../context/ThemeContext';
 
 /**
  * TopBar — sticky header for stack screens
@@ -10,6 +11,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
  */
 const TopBar = ({ title, onBack, navigation, right, showBack = true }) => {
   const insets = useSafeAreaInsets();
+  const { colors: themeColors, isDarkMode } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
 
   const handleBack = () => {
     if (onBack) {
@@ -31,7 +34,7 @@ const TopBar = ({ title, onBack, navigation, right, showBack = true }) => {
             activeOpacity={0.7}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <MaterialCommunityIcons name="chevron-left" size={22} color={colors.text} />
+            <MaterialCommunityIcons name="chevron-left" size={22} color={themeColors.text} />
           </TouchableOpacity>
         ) : (
           <View style={styles.backPlaceholder} />
@@ -47,9 +50,9 @@ const TopBar = ({ title, onBack, navigation, right, showBack = true }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors, isDarkMode) => StyleSheet.create({
   container: {
-    backgroundColor: 'rgba(255,255,255,0.88)',
+    backgroundColor: isDarkMode ? 'rgba(18,24,20,0.88)' : 'rgba(255,255,255,0.88)',
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
     paddingBottom: 12,

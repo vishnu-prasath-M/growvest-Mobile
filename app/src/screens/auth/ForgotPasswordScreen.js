@@ -17,10 +17,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../services/apiService';
 import { API_ENDPOINTS } from '../../config/api';
 import { colors } from '../../theme/theme';
+import { useTheme } from '../../context/ThemeContext';
 
 const { height } = Dimensions.get('window');
 
 const ForgotPasswordScreen = ({ navigation }) => {
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [emailError, setEmailError] = useState('');
@@ -232,7 +235,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#0E3D23' },
   container: { flex: 1, backgroundColor: colors.background },
   scrollContent: { flexGrow: 1, minHeight: height },

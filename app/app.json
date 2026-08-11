@@ -5,12 +5,12 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/growvest-logo.png",
     "assetBundlePatterns": [
       "**/*"
     ],
     "splash": {
-      "image": "./assets/icon.png",
+      "image": "./assets/growvest-logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#085428"
     },
@@ -36,7 +36,7 @@
       }
     },
     "web": {
-      "favicon": "./assets/icon.png"
+      "favicon": "./assets/growvest-logo.png"
     },
     "plugins": [
       "expo-asset",

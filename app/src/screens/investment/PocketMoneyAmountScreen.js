@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   Modal,
 } from 'react-native';
-import { TextInput, Button } from 'react-native-paper';
+import { TextInput } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { authService } from '../../services/authService';
@@ -16,11 +16,11 @@ import { colors, typography } from '../../theme/theme';
 import TopBar from '../../components/TopBar';
 import { useTheme } from '../../context/ThemeContext';
 
-const InvestmentAmountScreen = ({ navigation, route }) => {
+const PocketMoneyAmountScreen = ({ navigation }) => {
   const { colors: themeColors } = useTheme();
   const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const [amount, setAmount] = useState('');
-  const [investmentType, setInvestmentType] = useState('saving');
+  const [frequency, setFrequency] = useState('daily');
   const [userData, setUserData] = useState(null);
   const [showEmailModal, setShowEmailModal] = useState(false);
 
@@ -35,12 +35,6 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
     } catch (error) {
       console.error('Error loading user data:', error);
     }
-  };
-
-  const formatCurrency = (value) => {
-    if (!value) return '₹0';
-    const numValue = parseFloat(value.replace(/[^\d.]/g, ''));
-    return `₹${numValue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
   };
 
   const handleAmountChange = (text) => {
@@ -66,73 +60,81 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
 
     navigation.navigate('InvestmentPayment', {
       amount: parseFloat(amount),
-      type: investmentType,
+      type: 'pocket_money',
+      frequency,
       userData,
     });
   };
 
-  const getInterestRate = () => {
-    return investmentType === 'fixed' ? '24% p.a.' : '12% p.a.';
+  const getPayoutAmount = () => {
+    const amt = parseFloat(amount) || 0;
+    return amt / 10;
   };
 
-  const getLockPeriod = () => {
-    return investmentType === 'fixed' ? '1 year' : 'No lock period';
+  const getFrequencyLabel = () => {
+    if (frequency === 'daily') return 'Daily';
+    if (frequency === 'every_2_days') return 'Every 2 Days';
+    return 'Weekly';
   };
 
   return (
     <View style={styles.container}>
-      <TopBar title="New Investment" navigation={navigation} showBack={navigation?.canGoBack?.() ?? false} />
+      <TopBar title="Pocket Money" navigation={navigation} showBack />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Investment Type Selection */}
+        {/* Frequency Selection */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Investment Type</Text>
+          <Text style={styles.sectionTitle}>Select Payout Frequency</Text>
           <View style={styles.typeCards}>
+            {/* Daily */}
             <TouchableOpacity
-              style={[
-                styles.typeCard,
-                investmentType === 'saving' && styles.typeCardActive,
-                { borderColor: investmentType === 'saving' ? colors.saving : colors.border }
-              ]}
-              activeOpacity={0.85}
-              onPress={() => setInvestmentType('saving')}
+              style={[styles.typeCard, frequency === 'daily' && styles.typeCardActive]}
+              activeOpacity={0.8}
+              onPress={() => setFrequency('daily')}
             >
-              <View style={[styles.typeRadio, investmentType === 'saving' && { borderColor: colors.saving }]}>
-                {investmentType === 'saving' && <View style={[styles.typeRadioInner, { backgroundColor: colors.saving }]} />}
+              <View style={[styles.typeRadio, frequency === 'daily' && { borderColor: themeColors.primary }]}>
+                {frequency === 'daily' && <View style={[styles.typeRadioInner, { backgroundColor: themeColors.primary }]} />}
               </View>
               <View style={styles.typeContent}>
-                <Text style={styles.typeTitle}>Saving Deposit</Text>
-                <Text style={styles.typeDesc}>Flexible withdrawals, 12% p.a.</Text>
-                <View style={styles.typeRateBadge}>
-                  <Text style={styles.typeRateText}>12% p.a.</Text>
-                </View>
+                <Text style={styles.typeTitle}>Daily</Text>
+                <Text style={styles.typeDesc}>Released every day</Text>
               </View>
-              <MaterialCommunityIcons name="piggy-bank" size={32} color={colors.saving} />
+              <MaterialCommunityIcons name="calendar-today" size={28} color={themeColors.primary} />
             </TouchableOpacity>
 
+            {/* Every 2 Days */}
             <TouchableOpacity
-              style={[
-                styles.typeCard,
-                investmentType === 'fixed' && styles.typeCardActiveFixed,
-                { borderColor: investmentType === 'fixed' ? colors.fixed : colors.border }
-              ]}
-              activeOpacity={0.85}
-              onPress={() => setInvestmentType('fixed')}
+              style={[styles.typeCard, frequency === 'every_2_days' && styles.typeCardActive]}
+              activeOpacity={0.8}
+              onPress={() => setFrequency('every_2_days')}
             >
-              <View style={[styles.typeRadio, investmentType === 'fixed' && { borderColor: colors.fixed }]}>
-                {investmentType === 'fixed' && <View style={[styles.typeRadioInner, { backgroundColor: colors.fixed }]} />}
+              <View style={[styles.typeRadio, frequency === 'every_2_days' && { borderColor: themeColors.primary }]}>
+                {frequency === 'every_2_days' && <View style={[styles.typeRadioInner, { backgroundColor: themeColors.primary }]} />}
               </View>
               <View style={styles.typeContent}>
-                <Text style={styles.typeTitle}>Fixed Deposit</Text>
-                <Text style={styles.typeDesc}>1-year lock period, 24% p.a.</Text>
-                <View style={[styles.typeRateBadge, { backgroundColor: colors.fixedLight }]}>
-                  <Text style={[styles.typeRateText, { color: colors.fixed }]}>24% p.a.</Text>
-                </View>
+                <Text style={styles.typeTitle}>Every 2 Days</Text>
+                <Text style={styles.typeDesc}>Released every alternate day</Text>
               </View>
-              <MaterialCommunityIcons name="lock" size={32} color={colors.fixed} />
+              <MaterialCommunityIcons name="calendar-range" size={28} color={themeColors.primary} />
+            </TouchableOpacity>
+
+            {/* Weekly */}
+            <TouchableOpacity
+              style={[styles.typeCard, frequency === 'weekly' && styles.typeCardActive]}
+              activeOpacity={0.8}
+              onPress={() => setFrequency('weekly')}
+            >
+              <View style={[styles.typeRadio, frequency === 'weekly' && { borderColor: themeColors.primary }]}>
+                {frequency === 'weekly' && <View style={[styles.typeRadioInner, { backgroundColor: themeColors.primary }]} />}
+              </View>
+              <View style={styles.typeContent}>
+                <Text style={styles.typeTitle}>Weekly</Text>
+                <Text style={styles.typeDesc}>Released once a week</Text>
+              </View>
+              <MaterialCommunityIcons name="calendar-week" size={28} color={themeColors.primary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -149,7 +151,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
               keyboardType="numeric"
               style={styles.amountInput}
               placeholder="0"
-              placeholderTextColor={colors.border}
+              placeholderTextColor={themeColors.border}
               underlineColor="transparent"
               activeUnderlineColor="transparent"
               textColor={themeColors.text}
@@ -158,48 +160,35 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
           <Text style={styles.minAmount}>Minimum: ₹1,000</Text>
         </View>
 
-        {/* Investment Summary */}
+        {/* Payout Summary */}
         {amount && parseFloat(amount) > 0 && (
           <View style={styles.summaryContainer}>
-            <Text style={styles.summaryTitle}>Investment Summary</Text>
+            <Text style={styles.summaryTitle}>Payout Schedule Summary</Text>
             
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Type</Text>
-              <Text style={[styles.summaryValue, { 
-                color: investmentType === 'saving' ? colors.saving : colors.fixed 
-              }]}>
-                {investmentType === 'saving' ? 'Saving Deposit' : 'Fixed Deposit'}
+              <Text style={styles.summaryLabel}>Total Investment</Text>
+              <Text style={styles.summaryAmount}>₹{parseFloat(amount).toLocaleString('en-IN')}</Text>
+            </View>
+
+            <View style={styles.summaryDivider} />
+
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Frequency</Text>
+              <Text style={styles.summaryValue}>{getFrequencyLabel()}</Text>
+            </View>
+
+            <View style={styles.summaryDivider} />
+
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Payout Amount</Text>
+              <Text style={[styles.summaryValue, { color: themeColors.success }]}>
+                ₹{getPayoutAmount().toLocaleString('en-IN')}
               </Text>
-            </View>
-
-            <View style={styles.summaryDivider} />
-
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Amount</Text>
-              <Text style={styles.summaryAmount}>
-                ₹{parseFloat(amount).toLocaleString('en-IN')}
-              </Text>
-            </View>
-
-            <View style={styles.summaryDivider} />
-
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Interest Rate</Text>
-              <Text style={[styles.summaryValue, { color: colors.success }]}>{getInterestRate()}</Text>
-            </View>
-
-            <View style={styles.summaryDivider} />
-
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Lock Period</Text>
-              <Text style={styles.summaryValue}>{getLockPeriod()}</Text>
             </View>
 
             <View style={styles.summaryHighlightRow}>
-              <Text style={styles.summaryHighlightLabel}>Expected Returns (1 year)</Text>
-              <Text style={[styles.summaryHighlightValue, { color: colors.success }]}>
-                +₹{((parseFloat(amount) * (investmentType === 'fixed' ? 0.24 : 0.12)).toFixed(0)).toLocaleString('en-IN')}
-              </Text>
+              <Text style={styles.summaryHighlightLabel}>Total Installments</Text>
+              <Text style={[styles.summaryHighlightValue, { color: themeColors.primary }]}>10 Release Payouts</Text>
             </View>
           </View>
         )}
@@ -207,12 +196,12 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
         {/* Info Points */}
         <View style={styles.infoContainer}>
           {[
-            { icon: 'check-circle', text: 'Interest calculated daily' },
-            { icon: 'check-circle', text: 'No hidden charges' },
-            { icon: 'check-circle', text: 'Secure and regulated' },
+            { icon: 'lock', text: 'Payouts automatically released to wallet balance' },
+            { icon: 'shield-check', text: 'Safe and regulated schedule rules' },
+            { icon: 'arrow-right-bold-circle-outline', text: '10% released per eligible payout cycle' },
           ].map((item, i) => (
             <View key={i} style={styles.infoItem}>
-              <MaterialCommunityIcons name={item.icon} size={18} color={colors.success} />
+              <MaterialCommunityIcons name={item.icon} size={18} color={themeColors.primary} />
               <Text style={styles.infoText}>{item.text}</Text>
             </View>
           ))}
@@ -225,7 +214,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
           disabled={!amount || parseFloat(amount) <= 0}
         >
           <Text style={styles.continueBtnText}>Continue to Payment</Text>
-          <MaterialCommunityIcons name="arrow-right" size={20} color={colors.white} />
+          <MaterialCommunityIcons name="arrow-right" size={20} color={themeColors.white} />
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />
@@ -238,11 +227,11 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Email Required</Text>
               <TouchableOpacity onPress={() => setShowEmailModal(false)} style={styles.modalCloseBtn}>
-                <MaterialCommunityIcons name="close" size={18} color={colors.textSecondary} />
+                <MaterialCommunityIcons name="close" size={18} color={themeColors.textSecondary} />
               </TouchableOpacity>
             </View>
             <Text style={styles.modalText}>
-              Your email address is required before making investments or payments. Please update your email in your Profile.
+              Your email address is required before making investments. Please update your email in your Profile.
             </Text>
             <View style={styles.modalBtns}>
               <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowEmailModal(false)}>
@@ -288,10 +277,11 @@ const getStyles = (colors) => StyleSheet.create({
     paddingBottom: 0,
   },
   sectionTitle: {
-    ...typography.h4,
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.text,
     marginBottom: 14,
   },
-  // Type Cards
   typeCards: {
     gap: 10,
   },
@@ -306,10 +296,6 @@ const getStyles = (colors) => StyleSheet.create({
     ...colors.shadow.card,
   },
   typeCardActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryLight,
-  },
-  typeCardActiveFixed: {
     borderColor: colors.primary,
     backgroundColor: colors.primaryLight,
   },
@@ -333,28 +319,14 @@ const getStyles = (colors) => StyleSheet.create({
   },
   typeTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.text,
     marginBottom: 2,
   },
   typeDesc: {
     fontSize: 13,
     color: colors.textSecondary,
-    marginBottom: 6,
   },
-  typeRateBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    backgroundColor: colors.savingLight,
-  },
-  typeRateText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.saving,
-  },
-  // Amount
   amountContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -379,7 +351,6 @@ const getStyles = (colors) => StyleSheet.create({
     color: colors.text,
     height: 64,
     backgroundColor: 'transparent',
-    padding: 0,
   },
   minAmount: {
     fontSize: 13,
@@ -387,7 +358,6 @@ const getStyles = (colors) => StyleSheet.create({
     marginTop: 8,
     fontWeight: '500',
   },
-  // Summary
   summaryContainer: {
     margin: 20,
     padding: 20,
@@ -398,7 +368,9 @@ const getStyles = (colors) => StyleSheet.create({
     ...colors.shadow.card,
   },
   summaryTitle: {
-    ...typography.h4,
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.text,
     marginBottom: 16,
   },
   summaryRow: {
@@ -434,7 +406,7 @@ const getStyles = (colors) => StyleSheet.create({
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 2,
-    borderTopColor: colors.successLight,
+    borderTopColor: colors.primaryLight,
   },
   summaryHighlightLabel: {
     fontSize: 15,
@@ -442,10 +414,9 @@ const getStyles = (colors) => StyleSheet.create({
     color: colors.text,
   },
   summaryHighlightValue: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
   },
-  // Info
   infoContainer: {
     paddingHorizontal: 20,
     marginBottom: 24,
@@ -456,12 +427,11 @@ const getStyles = (colors) => StyleSheet.create({
     marginBottom: 8,
   },
   infoText: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.textSecondary,
     marginLeft: 10,
     fontWeight: '500',
   },
-  // Continue Button
   continueBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -473,14 +443,6 @@ const getStyles = (colors) => StyleSheet.create({
     gap: 8,
     ...colors.shadow.button,
   },
-  inputCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    ...colors.shadow.card,
-  },
   continueBtnDisabled: {
     opacity: 0.5,
   },
@@ -489,22 +451,79 @@ const getStyles = (colors) => StyleSheet.create({
     fontWeight: '700',
     color: colors.white,
   },
-  // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { width: '88%', backgroundColor: colors.surface, borderRadius: 28, padding: 24 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  modalTitle: { fontSize: 19, fontWeight: '700', color: colors.text, letterSpacing: -0.4 },
-  modalCloseBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },
-  modalText: { fontSize: 15, color: colors.textSecondary, marginBottom: 24, lineHeight: 22 },
-  modalBtns: { flexDirection: 'row', gap: 12 },
-  modalCancelBtn: {
-    flex: 1, height: 48, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border,
-    justifyContent: 'center', alignItems: 'center',
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  modalCancelText: { fontSize: 15, fontWeight: '600', color: colors.textSecondary },
-  modalSaveBtnOuter: { flex: 1 },
-  modalSaveGradient: { height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  modalSaveText: { fontSize: 15, fontWeight: '700', color: colors.white },
+  modalContent: {
+    width: '85%',
+    backgroundColor: colors.surface,
+    borderRadius: 24,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...colors.shadow.elevated,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 19,
+    fontWeight: '700',
+    color: colors.text,
+    letterSpacing: -0.4,
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalText: {
+    fontSize: 15,
+    color: colors.textSecondary,
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  modalBtns: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  modalSaveBtnOuter: {
+    flex: 1,
+  },
+  modalSaveGradient: {
+    height: 48,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalSaveText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.white,
+  },
 });
 
-export default InvestmentAmountScreen;
+export default PocketMoneyAmountScreen;

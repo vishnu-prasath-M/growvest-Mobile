@@ -21,10 +21,14 @@ import { colors } from '../../theme/theme';
 import { mapProfileToWithdrawUser } from '../../utils/userBalances';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { Portal } from 'react-native-paper';
+import { SkeletonLoader } from '../../components/SkeletonLoader';
+import { useTheme } from '../../context/ThemeContext';
 
 const QUICK_AMOUNTS = [1000, 5000, 10000, 25000];
 
 const WithdrawScreen = ({ navigation }) => {
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const insets = useScreenInsets(8);
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -126,10 +130,7 @@ const WithdrawScreen = ({ navigation }) => {
           <Text style={styles.headerSub}>Withdraw</Text>
           <Text style={styles.headerTitle}>Move money out</Text>
         </View>
-        <View style={styles.loadingContainer}>
-          <MaterialCommunityIcons name="bank-transfer-out" size={36} color={colors.border} />
-          <Text style={styles.loadingText}>Loading...</Text>
-        </View>
+        <SkeletonLoader variant="form" />
       </View>
     );
   }
@@ -432,7 +433,7 @@ const WithdrawScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 20 },

@@ -9,6 +9,7 @@ import {
   Animated,
   Pressable,
   Easing,
+  Image,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +17,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { chitFundService } from '../../services/chitFundService';
+import { SkeletonLoader } from '../../components/SkeletonLoader';
+import { useTheme } from '../../context/ThemeContext';
 import Reanimated, {
   useSharedValue,
   useAnimatedStyle,
@@ -61,6 +64,9 @@ const useCountAnimation = (targetValue, duration = 900, delay = 300) => {
 
 // ---------- Animated stat card (no entrance animation — instant render) ----------
 const StatCard = React.memo(({ icon, label, value, tint, iconColor }) => {
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
+
   return (
     <View style={styles.statCard}>
       <View style={[styles.statIconWrap, { backgroundColor: tint }]}>
@@ -73,7 +79,10 @@ const StatCard = React.memo(({ icon, label, value, tint, iconColor }) => {
 });
 
 // ---------- Animated quick action ----------
-const QuickAction = React.memo(({ icon, label, onPress, badge }) => {
+const QuickAction = React.memo(({ icon, label, onPress, badge, image }) => {
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
+
   const scale = useSharedValue(1);
   const badgeScale = useSharedValue(badge ? 0 : 1);
 
@@ -116,7 +125,11 @@ const QuickAction = React.memo(({ icon, label, onPress, badge }) => {
       onPressOut={handlePressOut}
     >
       <Reanimated.View style={[styles.quickActionIconWrap, containerStyle]}>
-        <Ionicons name={icon} size={26} color={colors.primary} />
+        {image ? (
+          <Image source={image} style={styles.quickActionImage} resizeMode="contain" />
+        ) : (
+          <Ionicons name={icon} size={26} color={colors.primary} />
+        )}
         {badge && (
           <Reanimated.View style={[styles.quickActionBadge, badgeStyle]}>
             <Text style={styles.quickActionBadgeText}>{badge}</Text>
@@ -130,6 +143,8 @@ const QuickAction = React.memo(({ icon, label, onPress, badge }) => {
 
 // ---------- Main Screen ----------
 const ChitFundHomeScreen = ({ navigation }) => {
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const insets = useScreenInsets(8);
   const [refreshing, setRefreshing] = useState(false);
   const [dashboard, setDashboard] = useState(null);
@@ -183,6 +198,20 @@ const ChitFundHomeScreen = ({ navigation }) => {
     transform: [{ scale: bannerScale.value }],
   }));
 
+  if (loading || !dashboard) {
+    return (
+      <View style={styles.container}>
+        <View style={[styles.header, { paddingTop: insets.top }]}>
+          <View>
+            <Text style={styles.greeting}>Chit Funds</Text>
+            <Text style={styles.subtitle}>Your savings community</Text>
+          </View>
+        </View>
+        <SkeletonLoader variant="dashboard" />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -217,7 +246,7 @@ const ChitFundHomeScreen = ({ navigation }) => {
           />
         }
       >
-        {loading || !dashboard ? (
+        {false ? (
           <View style={styles.loadingContainer}>
             <Text style={styles.loadingText}>Loading Dashboard...</Text>
           </View>
@@ -292,7 +321,7 @@ const ChitFundHomeScreen = ({ navigation }) => {
               </View>
               <View style={styles.quickActionsGrid}>
                 <QuickAction
-                  icon="compass-outline"
+                  image={require('../../../assets/compass.png')}
                   label="Explore"
                   onPress={() => navigation.navigate('ExploreChits')}
                 />
@@ -358,7 +387,7 @@ const ChitFundHomeScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 20 },
@@ -489,6 +518,8 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: colors.surface,
     borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
     shadowColor: '#0E3D23',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
@@ -526,6 +557,8 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 20,
     backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
@@ -551,6 +584,10 @@ const styles = StyleSheet.create({
     borderColor: colors.background,
   },
   quickActionBadgeText: { fontSize: 10, fontWeight: '800', color: colors.white },
+  quickActionImage: {
+    width: 50,
+    height: 50,
+  },
 
   // Stats Grid
   statsGrid: {
@@ -564,6 +601,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: 20,
     padding: 16,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
     shadowColor: '#0E3D23',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,

@@ -14,6 +14,11 @@ const Notification = require('../models/Notification');
 exports.getDashboard = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
+    const PocketMoney = require('../models/PocketMoney');
+    const pocketMonies = await PocketMoney.find({ userId: user._id });
+    const pocketReleased = pocketMonies.reduce((sum, pm) => sum + pm.totalPaidOut, 0);
+    const pocketInvested = pocketMonies.reduce((sum, pm) => sum + pm.investedAmount, 0);
+    const pocketRemaining = pocketMonies.reduce((sum, pm) => sum + pm.remainingAmount, 0);
 
     // Get user's investments using userId (primary), fallback to email/mobile
     const investments = await Investment.find({
@@ -46,7 +51,7 @@ exports.getDashboard = async (req, res) => {
     const savingInvestments = investments.filter(inv => inv.type === 'saving' && inv.status === 'approved');
     const fixedInvestments = investments.filter(inv => inv.type === 'fixed' && inv.status === 'approved');
 
-    const savingBalance = savingInvestments.reduce((sum, inv) => sum + inv.amount + (inv.interestEarned || 0), 0);
+    const savingBalance = savingInvestments.reduce((sum, inv) => sum + inv.amount + (inv.interestEarned || 0), 0) + pocketReleased;
     const fixedBalance = fixedInvestments.reduce((sum, inv) => sum + inv.amount + (inv.interestEarned || 0), 0);
     const totalInterest = investments.reduce((sum, inv) => sum + (inv.interestEarned || 0), 0);
 
@@ -87,6 +92,9 @@ exports.getDashboard = async (req, res) => {
       stats: {
         totalInvestments: investments.length,
         pendingRequests,
+        totalPocketInvested: pocketInvested,
+        totalPocketReleased: pocketReleased,
+        totalPocketRemaining: pocketRemaining,
       },
       recentInvestments: investments.slice(0, 5),
       recentTransactions: transactions,
@@ -120,6 +128,7 @@ exports.getAdminStats = async (req, res) => {
       activeChitMembers,
       totalNotifications,
       revenueResult,
+      pocketMoneyStatsResult,
     ] = await Promise.all([
       // Total Users
       User.countDocuments({ role: { $ne: 'admin' } }),
@@ -156,6 +165,29 @@ exports.getAdminStats = async (req, res) => {
         { $match: { status: 'approved' } },
         { $group: { _id: null, total: { $sum: '$amount' } } },
       ]),
+      // Pocket Money Stats
+      (async () => {
+        const PocketMoney = require('../models/PocketMoney');
+        const r = await PocketMoney.aggregate([
+          {
+            $group: {
+              _id: null,
+              invested: { $sum: '$investedAmount' },
+              released: { $sum: '$totalPaidOut' },
+              remaining: { $sum: '$remainingAmount' }
+            }
+          }
+        ]);
+        const active = await PocketMoney.countDocuments({ status: 'active' });
+        const completed = await PocketMoney.countDocuments({ status: 'completed' });
+        return {
+          invested: r[0]?.invested || 0,
+          released: r[0]?.released || 0,
+          remaining: r[0]?.remaining || 0,
+          active,
+          completed
+        };
+      })()
     ]);
 
     const revenue = revenueResult.length > 0 ? revenueResult[0].total : 0;
@@ -177,6 +209,7 @@ exports.getAdminStats = async (req, res) => {
       activeChitMembers,
       totalNotifications,
       revenue,
+      pocketMoney: pocketMoneyStatsResult
     });
   } catch (error) {
     console.error('Admin dashboard stats error:', error);

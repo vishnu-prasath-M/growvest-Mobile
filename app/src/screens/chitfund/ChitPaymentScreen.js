@@ -13,8 +13,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/theme';
 import { executeRazorpayPayment } from '../../services/razorpayHandler';
 import { authService } from '../../services/authService';
+import { useTheme } from '../../context/ThemeContext';
 
 const ChitPaymentScreen = ({ navigation, route }) => {
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const { chitId, memberId, month, amount, lateFee = 0, type, chitName, returnScreen } = route.params;
   const [loading, setLoading] = useState(false);
   const [userData, setUserData] = useState(null);
@@ -157,7 +160,7 @@ const ChitPaymentScreen = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, paddingTop: 50 },
   scrollView: { flex: 1 },
   scrollContent: { padding: 20 },
@@ -178,6 +181,8 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 20,
     marginBottom: 24,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
     shadowColor: '#0E3D23',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,

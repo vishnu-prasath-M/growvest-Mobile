@@ -12,11 +12,14 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, typography } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
+import { useTheme } from '../../context/ThemeContext';
 import { chitFundService } from '../../services/chitFundService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const ChitDetailsScreen = ({ navigation, route }) => {
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const insets = useScreenInsets(8);
   const { chitId } = route.params || {};
   const { memberId } = route.params || {};
@@ -629,7 +632,7 @@ const ChitDetailsScreen = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
   scrollContent: { padding: 20, paddingTop: 12 },
@@ -637,14 +640,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 20, paddingBottom: 8, backgroundColor: colors.background,
   },
-  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.white, justifyContent: 'center', alignItems: 'center', ...colors.shadow.soft },
+  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center', ...colors.shadow.soft },
   headerTitle: { fontSize: 18, fontWeight: '700', color: colors.text, flex: 1, textAlign: 'center' },
   // Tab Bar
   tabBar: { maxHeight: 48, marginBottom: 4 },
   tabBarContent: { paddingHorizontal: 20, gap: 8, alignItems: 'center' },
   tab: {
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8,
-    borderRadius: 20, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, gap: 6,
+    borderRadius: 20, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 6,
   },
   tabActive: { backgroundColor: colors.primaryLight, borderColor: colors.primary },
   tabLabel: { fontSize: 12, fontWeight: '600', color: colors.textTertiary },

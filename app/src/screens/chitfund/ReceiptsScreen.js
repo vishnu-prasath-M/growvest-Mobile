@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, typography } from '../../theme/theme';
@@ -29,7 +29,10 @@ const ReceiptsScreen = ({ navigation, route }) => {
           <View style={styles.receiptCard}>
             {/* Header */}
             <View style={styles.receiptHeader}>
-              <MaterialCommunityIcons name="leaf" size={32} color={colors.primary} />
+              <Image
+                source={require('../../../assets/growvest-logo.png')}
+                style={{ width: 44, height: 44, borderRadius: 10, marginBottom: 8 }}
+              />
               <Text style={styles.receiptBrand}>Growvest</Text>
               <Text style={styles.receiptSubtitle}>Chit Fund Payment Receipt</Text>
             </View>

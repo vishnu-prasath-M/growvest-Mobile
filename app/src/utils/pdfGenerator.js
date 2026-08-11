@@ -1,9 +1,24 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Alert } from 'react-native';
+import { Asset } from 'expo-asset';
+import * as FileSystem from 'expo-file-system';
 
 export const generateAndShareTransactionStatement = async (user, transactions) => {
   try {
+    let logoBase64 = '';
+    try {
+      const asset = Asset.fromModule(require('../../assets/growvest-logo-big.png'));
+      await asset.downloadAsync();
+      if (asset.localUri) {
+        logoBase64 = await FileSystem.readAsStringAsync(asset.localUri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+      }
+    } catch (e) {
+      console.warn('Failed to load logo asset for PDF:', e);
+    }
+
     const generatedDate = new Date().toLocaleDateString('en-IN', {
       day: '2-digit',
       month: 'short',
@@ -125,6 +140,7 @@ export const generateAndShareTransactionStatement = async (user, transactions) =
           letter-spacing: -1px; 
         }
         .logo span { color: #D4A843; }
+        .logo-img { height: 44px; width: auto; display: block; }
         .title { 
           font-size: 13px; 
           font-weight: 800; 
@@ -224,7 +240,9 @@ export const generateAndShareTransactionStatement = async (user, transactions) =
     </head>
     <body>
       <div class="header">
-        <div class="logo">Grow<span>vest</span></div>
+        <div class="logo-container">
+          ${logoBase64 ? `<img class="logo-img" src="data:image/png;base64,${logoBase64}" alt="Growvest Logo" />` : `<div class="logo">Grow<span>vest</span></div>`}
+        </div>
         <div class="title">Account Statement</div>
       </div>
 
