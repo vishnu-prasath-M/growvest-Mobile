@@ -217,7 +217,8 @@ const AdminDashboard = () => {
                 headers: { 'Authorization': `Bearer ${token}` }
               })
                 .then(res => res.json())
-                .then(notifs => {
+                .then(result => {
+                  const notifs = result?.notifications || [];
                   if (Array.isArray(notifs) && notifs.length > 0) {
                     const latest = notifs[0];
                     if (Notification.permission === 'granted') {

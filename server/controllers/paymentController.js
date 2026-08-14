@@ -173,11 +173,18 @@ const completeInvestment = async (user, data, orderId, paymentId, signature) => 
 
   // 4. Send Push Notification & Save to DB
   try {
+    const { sendNotification, notifyAdmins } = require('../services/notificationHelper');
     await sendNotification({
       userId: user._id,
       title: 'Payment Successful',
       description: `₹${amount} ${type === 'fixed' ? 'Fixed' : 'Savings'} deposit has been successfully added to your account.`,
       type: 'investment_approved',
+    });
+    await notifyAdmins({
+      title: '📈 New Investment Received',
+      description: `${user.name || user.username} invested ₹${amount} in a ${type} deposit plan.`,
+      type: 'general',
+      metadata: { investmentId: investment._id }
     });
   } catch (notifErr) {
     console.error('[PaymentController] Notification error:', notifErr);
@@ -394,16 +401,13 @@ const completePocketMoney = async (user, data, orderId, paymentId, signature) =>
   }
   
   try {
-    const adminUsers = await User.find({ role: 'admin' });
-    for (const admin of adminUsers) {
-      await sendNotification({
-        userId: admin._id,
-        title: '🔔 New Pocket Money Investment',
-        description: `${user.name || user.username} invested ₹${amount} in Pocket Money.`,
-        type: 'pocket_money_approved',
-        metadata: { pocketMoneyId: pocketMoney._id }
-      });
-    }
+    const { notifyAdmins } = require('../services/notificationHelper');
+    await notifyAdmins({
+      title: '🔔 New Pocket Money Investment',
+      description: `${user.name || user.username} invested ₹${amount} in Pocket Money.`,
+      type: 'general',
+      metadata: { pocketMoneyId: pocketMoney._id }
+    });
   } catch (adminNotifErr) {
     console.error('[PaymentController] Admin notification error:', adminNotifErr);
   }

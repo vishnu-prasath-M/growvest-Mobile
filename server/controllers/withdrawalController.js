@@ -56,6 +56,18 @@ exports.createWithdrawal = async (req, res) => {
       await transaction.save();
     }
 
+    try {
+      const { notifyAdmins } = require('../services/notificationHelper');
+      await notifyAdmins({
+        title: '💸 New Withdrawal Request',
+        description: `${userName} (${userEmail}) requested to withdraw ₹${amount} (${withdrawType || 'saving'}).`,
+        type: 'general',
+        metadata: { withdrawalId: newWithdrawal._id }
+      });
+    } catch (notifErr) {
+      console.warn('[Withdrawal Create] Failed to notify admins:', notifErr.message);
+    }
+
     res.status(201).json(newWithdrawal);
   } catch (error) {
     res.status(500).json({ message: 'Error creating withdrawal', error: error.message });

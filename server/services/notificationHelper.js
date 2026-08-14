@@ -116,4 +116,33 @@ function getIconForType(type) {
   return iconMap[type] || 'bell-outline';
 }
 
-module.exports = { sendNotification };
+/**
+ * Send a notification to all admin users.
+ * 
+ * @param {Object} options
+ * @param {string} options.title - Notification title
+ * @param {string} options.description - Notification body/description
+ * @param {string} options.type - Notification type
+ * @param {Object} [options.metadata] - Additional metadata
+ * @returns {Promise<void>}
+ */
+async function notifyAdmins({ title, description, type = 'general', metadata }) {
+  try {
+    const User = require('../models/User');
+    const admins = await User.find({ role: 'admin' });
+    console.log(`[NotificationHelper] Notifying ${admins.length} admins of event: ${title}`);
+    for (const admin of admins) {
+      await sendNotification({
+        userId: admin._id,
+        title,
+        description,
+        type,
+        metadata
+      });
+    }
+  } catch (err) {
+    console.error('[NotificationHelper] Error in notifyAdmins:', err);
+  }
+}
+
+module.exports = { sendNotification, notifyAdmins };
