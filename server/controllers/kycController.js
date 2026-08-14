@@ -70,12 +70,18 @@ exports.submitKYC = async (req, res) => {
     
     // Send notification using unified helper
     try {
-      const { sendNotification } = require('../services/notificationHelper');
+      const { sendNotification, notifyAdmins } = require('../services/notificationHelper');
       await sendNotification({
         userId,
         title: 'KYC Submitted',
         description: 'Your KYC documents have been submitted successfully. We will review them shortly.',
         type: 'general',
+      });
+      await notifyAdmins({
+        title: '📋 New KYC Submission',
+        description: `${req.body.fullName} submitted KYC documents for verification.`,
+        type: 'general',
+        metadata: { kycId: kyc._id }
       });
     } catch (notifError) {
       console.warn('[KYC Submit] Failed to create notification:', notifError.message);

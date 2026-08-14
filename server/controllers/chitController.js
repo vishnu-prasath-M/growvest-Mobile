@@ -389,6 +389,18 @@ const joinChit = async (req, res) => {
 
       console.log('[Chit Join] Transaction created:', transaction._id);
 
+      try {
+        const { notifyAdmins } = require('../services/notificationHelper');
+        await notifyAdmins({
+          title: '🤝 New Chit Join Request',
+          description: `${req.user.name || req.user.username} requested to join chit "${chit.name}".`,
+          type: 'general',
+          metadata: { chitId: chit._id, memberId: member._id }
+        });
+      } catch (notifErr) {
+        console.warn('[Chit Join] Admin notification failed:', notifErr.message);
+      }
+
       res.status(201).json({
         member,
         transaction,
