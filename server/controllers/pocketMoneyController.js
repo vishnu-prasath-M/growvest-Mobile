@@ -293,4 +293,204 @@ exports.releaseSinglePayout = async (req, res) => {
   }
 };
 
+// POST /api/pocket-money/request-payout/:pocketId (User-facing)
+exports.requestPayout = async (req, res) => {
+  try {
+    const { pocketId } = req.params;
+    const pocket = await PocketMoney.findById(pocketId);
+    
+    if (!pocket) {
+      return res.status(404).json({ message: 'Pocket Money plan not found' });
+    }
+    
+    if (pocket.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Unauthorized action' });
+    }
+    
+    if (pocket.status !== 'active') {
+      return res.status(400).json({ message: 'Pocket Money plan is not active' });
+    }
+    
+    if (pocket.remainingAmount <= 0) {
+      return res.status(400).json({ message: 'Pocket Money is already fully paid out' });
+    }
+    
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+    // Unique key: PM_req_{pocketId}_{todayStr}
+    const idempotencyKey = `PM_req_${pocket._id}_${todayStr}`;
+    
+    // Check if user already requested/received payout today
+    const existingPayout = await PocketMoneyPayout.findOne({ idempotencyKey });
+    if (existingPayout) {
+      return res.status(400).json({
+        message: 'Payout already requested today. Please wait for Admin approval or try again tomorrow.',
+        status: existingPayout.status
+      });
+    }
+    
+    const amountToPay = Math.min(pocket.payoutAmount, pocket.remainingAmount);
+    const payoutNum = pocket.payoutCount + 1;
+    
+    const payout = new PocketMoneyPayout({
+      pocketMoneyId: pocket._id,
+      userId: pocket.userId,
+      amount: amountToPay,
+      payoutDate: now,
+      payoutNumber: payoutNum,
+      idempotencyKey,
+      status: 'requested',
+    });
+    await payout.save();
+    
+    // Notify admins
+    try {
+      const { notifyAdmins } = require('../services/notificationHelper');
+      await notifyAdmins({
+        title: '💼 New Pocket Money Payout Request',
+        description: `${pocket.userName} requested a Pocket Money payout of ₹${amountToPay}.`,
+        type: 'general',
+        metadata: { payoutId: payout._id, pocketMoneyId: pocket._id }
+      });
+    } catch (notifErr) {
+      console.error('[PocketMoneyRequest] Admin notification error:', notifErr);
+    }
+    
+    res.status(201).json({ success: true, message: 'Payout requested successfully', payout });
+  } catch (error) {
+    res.status(500).json({ message: 'Error requesting payout', error: error.message });
+  }
+};
+
+// GET /api/pocket-money/payout-status/:pocketId (User-facing)
+exports.getPayoutStatus = async (req, res) => {
+  try {
+    const { pocketId } = req.params;
+    const pocket = await PocketMoney.findById(pocketId);
+    
+    if (!pocket) {
+      return res.status(404).json({ message: 'Pocket Money plan not found' });
+    }
+    
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+    const idempotencyKey = `PM_req_${pocket._id}_${todayStr}`;
+    
+    const payout = await PocketMoneyPayout.findOne({ idempotencyKey });
+    
+    if (!payout) {
+      return res.json({ status: 'available', payoutAmount: Math.min(pocket.payoutAmount, pocket.remainingAmount) });
+    }
+    
+    res.json({ status: payout.status, payout });
+  } catch (error) {
+    res.status(500).json({ message: 'Error checking payout status', error: error.message });
+  }
+};
+
+// GET /api/pocket-money/admin/pending-payouts (Admin-only)
+exports.getAdminPendingPayouts = async (req, res) => {
+  try {
+    const pending = await PocketMoneyPayout.find({ status: 'requested' })
+      .populate('pocketMoneyId')
+      .populate('userId', 'name username mobileNumber email')
+      .sort({ createdAt: -1 });
+      
+    res.json(pending);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching pending payouts list', error: error.message });
+  }
+};
+
+// POST /api/pocket-money/admin/confirm-release/:payoutId (Admin-only)
+exports.confirmReleasePayout = async (req, res) => {
+  try {
+    const { payoutId } = req.params;
+    const payout = await PocketMoneyPayout.findById(payoutId);
+    
+    if (!payout) {
+      return res.status(404).json({ message: 'Payout request not found' });
+    }
+    
+    if (payout.status === 'released') {
+      return res.status(400).json({ message: 'Payout is already released' });
+    }
+    
+    const pocket = await PocketMoney.findById(payout.pocketMoneyId);
+    if (!pocket) {
+      return res.status(404).json({ message: 'Associated Pocket Money plan not found' });
+    }
+    
+    const now = new Date();
+    
+    // Create transaction
+    const transaction = new Transaction({
+      userId: payout.userId,
+      userEmail: pocket.userEmail,
+      type: 'pocket_money_payout',
+      amount: payout.amount,
+      status: 'approved',
+      referenceId: pocket._id,
+      referenceType: 'PocketMoney',
+      description: `Pocket Money Payout Release #${payout.payoutNumber} (Admin Approved Release)`
+    });
+    await transaction.save();
+    
+    // Update payout status
+    payout.status = 'released';
+    payout.transactionId = transaction._id;
+    await payout.save();
+    
+    // Update Pocket Money record
+    pocket.remainingAmount = Math.max(0, pocket.remainingAmount - payout.amount);
+    pocket.totalPaidOut += payout.amount;
+    pocket.payoutCount = payout.payoutNumber;
+    
+    if (pocket.remainingAmount <= 0) {
+      pocket.status = 'completed';
+      pocket.completedAt = now;
+    } else {
+      // Calculate next payout date based on frequency
+      const nextDate = new Date(pocket.nextPayoutDate);
+      if (pocket.frequency === 'daily') {
+        nextDate.setDate(nextDate.getDate() + 1);
+      } else if (pocket.frequency === 'every_2_days') {
+        nextDate.setDate(nextDate.getDate() + 2);
+      } else if (pocket.frequency === 'weekly') {
+        nextDate.setDate(nextDate.getDate() + 7);
+      }
+      pocket.nextPayoutDate = nextDate;
+    }
+    
+    await pocket.save();
+    
+    // Send notifications to the user
+    try {
+      await sendNotification({
+        userId: pocket.userId,
+        title: '💰 Pocket Money Payout Released',
+        description: `Your Pocket Money payout request of ₹${payout.amount} has been approved and released!`,
+        type: 'pocket_money_payout',
+        metadata: { pocketMoneyId: pocket._id }
+      });
+      
+      if (pocket.status === 'completed') {
+        await sendNotification({
+          userId: pocket.userId,
+          title: '🏆 Pocket Money Plan Completed',
+          description: `Congratulations! Your pocket money plan of ₹${pocket.investedAmount} is fully paid out!`,
+          type: 'pocket_money_completed',
+          metadata: { pocketMoneyId: pocket._id }
+        });
+      }
+    } catch (notifErr) {
+      console.error('[PocketMoneyConfirm] User notification error:', notifErr);
+    }
+    
+    res.json({ success: true, message: `Payout of ₹${payout.amount} approved and released successfully`, payout, pocket });
+  } catch (error) {
+    res.status(500).json({ message: 'Error confirming release payout', error: error.message });
+  }
+};
+
 module.exports.runPocketMoneyPayouts = runPocketMoneyPayouts;
