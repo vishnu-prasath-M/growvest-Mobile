@@ -176,10 +176,10 @@ const HomeScreen = ({ navigation }) => {
   const tipOfTheDay = getTipOfTheDay();
 
   const quickActions = [
-    { label: 'New Investment', icon: 'plus-circle', onPress: () => setInvestModalVisible(true) },
-    { label: 'My Investments', icon: 'briefcase', onPress: () => navigation.navigate('Investments') },
-    { label: 'Withdraw', icon: 'bank-transfer-out', onPress: () => navigation.navigate('Withdraw') },
-    { label: 'History', icon: 'receipt', onPress: () => navigation.navigate('Transactions') },
+    { label: 'New Investment', image: require('../../../assets/add.png'), onPress: () => setInvestModalVisible(true) },
+    { label: 'My Investments', image: require('../../../assets/earning.png'), onPress: () => navigation.navigate('Investments') },
+    { label: 'Withdraw', image: require('../../../assets/withdrawal.png'), onPress: () => navigation.navigate('Withdraw') },
+    { label: 'History', image: require('../../../assets/history.png'), onPress: () => navigation.navigate('Transactions') },
   ];
 
   return (
@@ -309,11 +309,11 @@ const HomeScreen = ({ navigation }) => {
                         end={{ x: 1, y: 1 }}
                         style={styles.qaIconGradient}
                       >
-                        <MaterialCommunityIcons name={a.icon} size={22} color="#F8FAF9" />
+                        <Image source={a.image} style={styles.quickActionImage} resizeMode="contain" />
                       </LinearGradient>
                     ) : (
                       <View style={styles.qaIconSurface}>
-                        <MaterialCommunityIcons name={a.icon} size={22} color={colors.primary} />
+                        <Image source={a.image} style={styles.quickActionImage} resizeMode="contain" />
                       </View>
                     )}
                   </View>
@@ -583,6 +583,7 @@ const getStyles = (colors) => StyleSheet.create({
     shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
   qaLabel: { fontSize: 11, fontWeight: '600', color: colors.text, textAlign: 'center', lineHeight: 14 },
+  quickActionImage: { width: 30, height: 30 },
 
   // Summary Cards
   summaryGrid: { flexDirection: 'row', gap: 12 },

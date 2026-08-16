@@ -29,7 +29,9 @@
     },
     "android": {
       "package": "com.growvest.mobile",
-      "permissions": [],
+      "permissions": [
+        "POST_NOTIFICATIONS"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/growvest-logo.png",
         "backgroundColor": "#085428"

@@ -138,48 +138,59 @@ const AdminDashboard = () => {
   const [dashboardStats, setDashboardStats] = useState<any>(null);
   const [lastNotificationCount, setLastNotificationCount] = useState<number | null>(null);
 
-  // Ask browser notification permission on load
-  useEffect(() => {
-    if (typeof window !== "undefined" && "Notification" in window) {
-      if (Notification.permission === "default") {
-        Notification.requestPermission();
-      }
-    }
-  }, []);
+  const [permissionState, setPermissionState] = useState<string>(
+    typeof window !== "undefined" && "Notification" in window ? Notification.permission : "default"
+  );
 
   // Register Web FCM simulated token to MongoDB
-  useEffect(() => {
+  const registerWebPush = async () => {
     if (!token) return;
-    const registerWebPush = async () => {
+    try {
+      let webFCMToken = localStorage.getItem('growvest_web_fcm_token');
+      if (!webFCMToken) {
+        webFCMToken = `WEB_FCM_${Math.random().toString(36).substring(2, 15)}_${Date.now()}`;
+        localStorage.setItem('growvest_web_fcm_token', webFCMToken);
+      }
+      
+      await fetch(`${API_URL}/api/users/fcm-token`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          fcmToken: webFCMToken,
+          platform: 'web',
+          deviceId: 'browser'
+        })
+      });
+      console.log('[WebPush] Web FCM Token successfully saved to MongoDB:', webFCMToken);
+    } catch (err) {
+      console.error('[WebPush] Error registering browser push token:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (permissionState === 'granted') {
+      registerWebPush();
+    }
+  }, [token, permissionState]);
+
+  const handleRequestPermission = async () => {
+    if (typeof window !== "undefined" && "Notification" in window) {
       try {
         const permission = await Notification.requestPermission();
+        setPermissionState(permission);
         if (permission === 'granted') {
-          let webFCMToken = localStorage.getItem('growvest_web_fcm_token');
-          if (!webFCMToken) {
-            webFCMToken = `WEB_FCM_${Math.random().toString(36).substring(2, 15)}_${Date.now()}`;
-            localStorage.setItem('growvest_web_fcm_token', webFCMToken);
-          }
-          
-          await fetch(`${API_URL}/api/users/fcm-token`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              fcmToken: webFCMToken,
-              platform: 'web',
-              deviceId: 'browser'
-            })
-          });
-          console.log('[WebPush] Web FCM Token successfully saved to MongoDB:', webFCMToken);
+          toast.success("Push notifications enabled successfully!");
+        } else {
+          toast.error("Permission denied. You can enable them in browser settings.");
         }
       } catch (err) {
-        console.error('[WebPush] Error registering browser push token:', err);
+        console.error("Error requesting notifications:", err);
       }
-    };
-    registerWebPush();
-  }, [token]);
+    }
+  };
 
   useEffect(() => {
     if (authUser && authUser.role !== 'admin') {
@@ -224,6 +235,11 @@ const AdminDashboard = () => {
                     if (Notification.permission === 'granted') {
                       new Notification(latest.title, { body: latest.description });
                     }
+                    // Always show local sonner toast as well for immediate visibility on mobile tabs
+                    toast(latest.title, {
+                      description: latest.description,
+                      duration: 8000,
+                    });
                   }
                 }).catch(() => {});
             }
@@ -803,6 +819,30 @@ const AdminDashboard = () => {
             </div>
           )}
         </header>
+
+        {/* Browser Push Notifications Request Banner */}
+        {typeof window !== "undefined" && "Notification" in window && permissionState !== "granted" && (
+          <div className="bg-primary/5 border-b border-primary/20 px-4 py-3 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                <AlertCircle className="h-5 w-5 animate-pulse" />
+              </div>
+              <div>
+                <p className="text-sm font-heading font-semibold text-foreground">Enable Real-Time Alerts</p>
+                <p className="text-xs font-body text-muted-foreground mt-0.5">
+                  Get instant push notifications for new investments, withdrawals, KYC submissions, and chits.
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={handleRequestPermission}
+              size="sm"
+              className="rounded-xl font-body flex items-center gap-2 h-9 px-4 bg-primary text-primary-foreground hover:bg-primary/90 shrink-0"
+            >
+              Enable Notifications
+            </Button>
+          </div>
+        )}
 
         <main className="flex-1 p-3 sm:p-4 lg:p-6 max-w-full overflow-hidden w-full min-w-0">
           {/* ── OVERVIEW ── */}
