@@ -16,6 +16,7 @@ import { navigationRef } from './src/navigation/navigationRef';
 import { theme } from './src/theme/theme';
 import { AuthProvider } from './src/context/AuthContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
+import { FeedbackProvider } from './src/context/FeedbackContext';
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -127,7 +128,9 @@ export default function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider>
-        <AppContent />
+        <FeedbackProvider>
+          <AppContent />
+        </FeedbackProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );

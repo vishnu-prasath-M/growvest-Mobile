@@ -26,6 +26,33 @@ const PocketMoneyScreen = ({ navigation }) => {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [payoutStatus, setPayoutStatus] = useState('available'); // 'available', 'requested', 'released'
+
+  const fetchPayoutStatus = async (planId) => {
+    try {
+      const res = await api.get(`/pocket-money/payout-status/${planId}`);
+      if (res && res.data) {
+        setPayoutStatus(res.data.status);
+      }
+    } catch (err) {
+      console.error('Error fetching payout status:', err);
+    }
+  };
+
+  const handleRequestPayout = async () => {
+    try {
+      if (!activePlan) return;
+      const res = await api.post(`/pocket-money/request-payout/${activePlan._id}`);
+      if (res && res.data) {
+        Alert.alert('Request Sent', 'Your payout request has been sent to Admin. You will be notified once released!');
+        setPayoutStatus('requested');
+        loadData();
+      }
+    } catch (error) {
+      const msg = error.response?.data?.message || 'Failed to request payout. Try again tomorrow.';
+      Alert.alert('Request Failed', msg);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -34,6 +61,10 @@ const PocketMoneyScreen = ({ navigation }) => {
       const plansRes = await api.get('/pocket-money/my');
       if (plansRes && plansRes.data) {
         setPocketPlans(plansRes.data);
+        const active = plansRes.data.find(p => p.status === 'active');
+        if (active) {
+          await fetchPayoutStatus(active._id);
+        }
       }
 
       // Fetch transaction list
@@ -134,6 +165,30 @@ const PocketMoneyScreen = ({ navigation }) => {
                   <Text style={styles.progressLabelText}>Released: {formatCurrency(activePlan.totalPaidOut)}</Text>
                   <Text style={styles.progressLabelText}>Remaining: {formatCurrency(activePlan.remainingAmount)}</Text>
                 </View>
+              </View>
+
+              {/* Payout Request Section */}
+              <View style={styles.requestSection}>
+                {payoutStatus === 'available' ? (
+                  <TouchableOpacity
+                    style={styles.requestBtn}
+                    activeOpacity={0.8}
+                    onPress={handleRequestPayout}
+                  >
+                    <MaterialCommunityIcons name="hand-coin" size={20} color={colors.primary} />
+                    <Text style={styles.requestBtnText}>Request Today's Payout (₹{activePlan.payoutAmount})</Text>
+                  </TouchableOpacity>
+                ) : payoutStatus === 'requested' ? (
+                  <View style={styles.statusPillPending}>
+                    <MaterialCommunityIcons name="clock-outline" size={16} color="#B45309" style={{ marginRight: 6 }} />
+                    <Text style={styles.statusTextPending}>Payout Requested (Pending Approval)</Text>
+                  </View>
+                ) : (
+                  <View style={styles.statusPillSuccess}>
+                    <MaterialCommunityIcons name="check-circle-outline" size={16} color="#065F46" style={{ marginRight: 6 }} />
+                    <Text style={styles.statusTextSuccess}>Today's Payout Released (Paid Out)</Text>
+                  </View>
+                )}
               </View>
 
               <View style={styles.cardFooter}>
@@ -342,6 +397,60 @@ const getStyles = (colors, isDarkMode) =>
       borderTopWidth: 1,
       borderTopColor: 'rgba(255,255,255,0.15)',
       paddingTop: 16,
+    },
+    requestSection: {
+      backgroundColor: 'rgba(255,255,255,0.1)',
+      borderRadius: 16,
+      padding: 12,
+      marginBottom: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    requestBtn: {
+      backgroundColor: colors.white,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      width: '100%',
+    },
+    requestBtnText: {
+      color: colors.primary,
+      fontWeight: '700',
+      fontSize: 14,
+      marginLeft: 8,
+    },
+    statusPillPending: {
+      backgroundColor: '#FEF3C7',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      width: '100%',
+    },
+    statusTextPending: {
+      color: '#B45309',
+      fontWeight: '700',
+      fontSize: 13,
+    },
+    statusPillSuccess: {
+      backgroundColor: '#D1FAE5',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      width: '100%',
+    },
+    statusTextSuccess: {
+      color: '#065F46',
+      fontWeight: '700',
+      fontSize: 13,
     },
     footerCol: {
       alignItems: 'center',

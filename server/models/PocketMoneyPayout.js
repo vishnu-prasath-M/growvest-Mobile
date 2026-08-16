@@ -30,6 +30,12 @@ const pocketMoneyPayoutSchema = new mongoose.Schema({
     required: true,
     unique: true, // e.g., PM_{pocketId}_{payoutDate_YYYY_MM_DD}
   },
+  status: {
+    type: String,
+    enum: ['requested', 'released', 'rejected'],
+    default: 'requested',
+    required: true,
+  },
   transactionId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Transaction',

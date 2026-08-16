@@ -12,9 +12,25 @@ const api = axios.create({
   timeout: 15000, // 15 second timeout
 });
 
+let slowNetworkListener = null;
+let databaseErrorListener = null;
+
+export const registerApiListeners = (onSlow, onError) => {
+  slowNetworkListener = onSlow;
+  databaseErrorListener = onError;
+};
+
 // Request interceptor to add token
 api.interceptors.request.use(
   async (config) => {
+    // Start a 6-second timer to detect slowness
+    const timerId = setTimeout(() => {
+      if (slowNetworkListener) {
+        slowNetworkListener(true);
+      }
+    }, 6000);
+    config.metadata = { timerId };
+
     try {
       const token = await AsyncStorage.getItem('userToken');
       if (token) {
@@ -33,12 +49,40 @@ api.interceptors.request.use(
 
 // Response interceptor to handle errors
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Clear the slowness timer
+    if (response.config?.metadata?.timerId) {
+      clearTimeout(response.config.metadata.timerId);
+    }
+    if (slowNetworkListener) {
+      slowNetworkListener(false);
+    }
+    return response;
+  },
   async (error) => {
+    // Clear the slowness timer
+    if (error.config?.metadata?.timerId) {
+      clearTimeout(error.config.metadata.timerId);
+    }
+    if (slowNetworkListener) {
+      slowNetworkListener(false);
+    }
+
     const status = error.response?.status;
     const url = error.config?.url || '';
     console.error('[apiService] Response error:', error?.message || error, 'Status:', status, 'URL:', url);
     console.error('[apiService] Error response data:', error.response?.data);
+
+    // Trigger error alerts via listeners
+    if (databaseErrorListener) {
+      if (!error.response) {
+        // Network connection error
+        databaseErrorListener('network_error', 'No Internet Connection', 'Cannot connect to the server. Please check your internet connection.');
+      } else if (status >= 500) {
+        // Server / Database error
+        databaseErrorListener('db_slow_error', 'Database Timeout', 'The database returned a server error. Please try again in a moment.');
+      }
+    }
     
     // Only clear auth tokens when the /auth/me endpoint returns 401
     // (meaning the stored token is truly invalid / expired).

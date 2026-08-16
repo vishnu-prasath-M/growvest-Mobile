@@ -69,6 +69,43 @@ const HomeScreen = ({ navigation }) => {
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
+  // Custom Modal Animations
+  const [modalVisible, setModalVisible] = useState(false);
+  const modalAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (investModalVisible) {
+      setModalVisible(true);
+      Animated.spring(modalAnim, {
+        toValue: 1,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [investModalVisible]);
+
+  const closeModal = () => {
+    Animated.timing(modalAnim, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      setModalVisible(false);
+      setInvestModalVisible(false);
+    });
+  };
+
+  const overlayOpacity = modalAnim;
+  const contentTranslateY = modalAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [150, 0],
+  });
+  const contentScale = modalAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.92, 1],
+  });
+
   const fetchUserAndDashboard = async () => {
     try {
       if (authUser?.name || authUser?.username) {
@@ -301,21 +338,8 @@ const HomeScreen = ({ navigation }) => {
                   onPress={a.onPress}
                   activeOpacity={0.85}
                 >
-                  <View style={[styles.qaIconBox, a.label === 'New Investment' && styles.qaIconBoxPrimary]}>
-                    {a.label === 'New Investment' ? (
-                      <LinearGradient
-                        colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.qaIconGradient}
-                      >
-                        <Image source={a.image} style={styles.quickActionImage} resizeMode="contain" />
-                      </LinearGradient>
-                    ) : (
-                      <View style={styles.qaIconSurface}>
-                        <Image source={a.image} style={styles.quickActionImage} resizeMode="contain" />
-                      </View>
-                    )}
+                  <View style={styles.qaIconSurface}>
+                    <Image source={a.image} style={styles.quickActionImage} resizeMode="contain" />
                   </View>
                   <Text style={styles.qaLabel}>{a.label}</Text>
                 </TouchableOpacity>
@@ -393,47 +417,55 @@ const HomeScreen = ({ navigation }) => {
 
       {/* ── Invest Now Modal ── */}
       <Modal
-        visible={investModalVisible}
+        visible={modalVisible}
         transparent
-        animationType="fade"
-        onRequestClose={() => setInvestModalVisible(false)}
+        animationType="none"
+        onRequestClose={closeModal}
       >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setInvestModalVisible(false)}
-        >
-          <View style={styles.modalContent}>
+        <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={closeModal}
+          />
+          <Animated.View
+            style={[
+              styles.modalContent,
+              {
+                transform: [
+                  { translateY: contentTranslateY },
+                  { scale: contentScale }
+                ]
+              }
+            ]}
+          >
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Invest Now</Text>
-              <TouchableOpacity onPress={() => setInvestModalVisible(false)} style={styles.modalCloseBtn}>
+              <TouchableOpacity onPress={closeModal} style={styles.modalCloseBtn}>
                 <MaterialCommunityIcons name="close" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
             {[
-              { icon: 'chart-line-variant', label: 'New Investment', sub: 'Start a new deposit', colors: ['#0E3D23', '#1A5C39'], screen: 'InvestmentAmount' },
-              { icon: 'account-cash', label: 'My Investments', sub: 'View your deposits', colors: ['#1A5C39', '#2E8B5A'], screen: 'Investments' },
-              { icon: 'cash-multiple', label: 'Chit Fund', sub: 'Join a savings community', colors: ['#0E3D23', '#1A5C39'], screen: 'ChitFundHome' },
-              { icon: 'wallet-giftcard', label: 'Pocket Money', sub: 'Setup regular release payouts', colors: ['#1A5C39', '#2E8B5A'], screen: 'PocketMoney' },
+              { image: require('../../../assets/add.png'), label: 'New Investment', sub: 'Start a new deposit', screen: 'InvestmentAmount' },
+              { image: require('../../../assets/earning.png'), label: 'My Investments', sub: 'View your deposits', screen: 'Investments' },
+              { image: require('../../../assets/my-chits.png'), label: 'Chit Fund', sub: 'Join a savings community', screen: 'ChitFundHome' },
+              { image: require('../../../assets/pocket.png'), label: 'Pocket Money', sub: 'Setup regular release payouts', screen: 'PocketMoney' },
             ].map((opt) => (
               <TouchableOpacity
                 key={opt.label}
                 style={styles.modalOption}
                 activeOpacity={0.85}
                 onPress={() => {
-                  setInvestModalVisible(false);
-                  navigation.navigate(opt.screen);
+                  closeModal();
+                  setTimeout(() => {
+                    navigation.navigate(opt.screen);
+                  }, 220);
                 }}
               >
-                <LinearGradient
-                  colors={opt.colors}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.modalOptionGradient}
-                >
-                  <MaterialCommunityIcons name={opt.icon} size={26} color={colors.white} />
-                </LinearGradient>
+                <View style={styles.modalOptionImageWrap}>
+                  <Image source={opt.image} style={styles.modalOptionImage} resizeMode="contain" />
+                </View>
                 <View style={styles.modalOptionText}>
                   <Text style={styles.modalOptionTitle}>{opt.label}</Text>
                   <Text style={styles.modalOptionSub}>{opt.sub}</Text>
@@ -441,8 +473,8 @@ const HomeScreen = ({ navigation }) => {
                 <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textMuted} />
               </TouchableOpacity>
             ))}
-          </View>
-        </TouchableOpacity>
+          </Animated.View>
+        </Animated.View>
       </Modal>
     </SafeAreaView>
   );
@@ -567,13 +599,12 @@ const getStyles = (colors) => StyleSheet.create({
   // Quick Actions
   quickActionsGrid: { flexDirection: 'row', justifyContent: 'space-between' },
   quickAction: { alignItems: 'center', gap: 8, flex: 1 },
-  qaIconBox: { width: 56, height: 56 },
-  qaIconBoxPrimary: {},
-  qaIconGradient: {
-    width: 56, height: 56, borderRadius: 18,
-    justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#1A5C39', shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25, shadowRadius: 12, elevation: 8,
+  qaIconBox: { 
+    width: 56, 
+    height: 56,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
   },
   qaIconSurface: {
     width: 56, height: 56, borderRadius: 18,
@@ -581,9 +612,10 @@ const getStyles = (colors) => StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
     shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+    borderWidth: 1, borderColor: colors.borderLight,
   },
   qaLabel: { fontSize: 11, fontWeight: '600', color: colors.text, textAlign: 'center', lineHeight: 14 },
-  quickActionImage: { width: 30, height: 30 },
+  quickActionImage: { width: 34, height: 34 },
 
   // Summary Cards
   summaryGrid: { flexDirection: 'row', gap: 12 },
@@ -676,10 +708,15 @@ const getStyles = (colors) => StyleSheet.create({
     borderWidth: 1, borderColor: colors.borderLight,
     gap: 14,
   },
-  modalOptionGradient: {
+  modalOptionImageWrap: {
     width: 52, height: 52, borderRadius: 16,
+    backgroundColor: colors.surface,
     justifyContent: 'center', alignItems: 'center',
+    borderWidth: 1, borderColor: colors.borderLight,
+    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
   },
+  modalOptionImage: { width: 32, height: 32 },
   modalOptionText: { flex: 1 },
   modalOptionTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
   modalOptionSub: { fontSize: 12, color: colors.textMuted, marginTop: 2 },

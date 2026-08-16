@@ -27,11 +27,25 @@ interface PocketMoneyAdminProps {
 export default function PocketMoneyAdmin({ token }: PocketMoneyAdminProps) {
   const [stats, setStats] = useState<any>(null);
   const [list, setList] = useState<any[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [triggering, setTriggering] = useState(false);
   const [releasingId, setReleasingId] = useState<string | null>(null);
+
+  const fetchPendingRequests = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/api/pocket-money/admin/pending-payouts`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      setPendingRequests(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Error fetching pending payouts:", err);
+    }
+  };
 
   // Modal State for UPI Pay Modal
   const [releaseModalData, setReleaseModalData] = useState<any | null>(null);
@@ -148,9 +162,41 @@ export default function PocketMoneyAdmin({ token }: PocketMoneyAdminProps) {
     }
   };
 
+  const handleConfirmReleasePayout = async (payoutId: string, userName: string) => {
+    if (!token || releasingId) return;
+    try {
+      setReleasingId(payoutId);
+      const res = await fetch(`${API_URL}/api/pocket-money/admin/confirm-release/${payoutId}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch (e) {}
+
+      if (res.ok) {
+        toast.success(`Released pocket money payout for ${userName}!`);
+        setReleaseModalData(null);
+        fetchStats();
+        fetchList();
+        fetchPendingRequests();
+      } else {
+        toast.error(data.message || `Failed to release payout (Status: ${res.status}).`);
+      }
+    } catch (err) {
+      console.error("Error releasing payout:", err);
+      toast.error("Failed to release payout. Please check connection.");
+    } finally {
+      setReleasingId(null);
+    }
+  };
+
   useEffect(() => {
     fetchStats();
     fetchList();
+    fetchPendingRequests();
   }, [token]);
 
   const filteredList = list.filter((item) => {
@@ -256,50 +302,56 @@ export default function PocketMoneyAdmin({ token }: PocketMoneyAdminProps) {
         </div>
       )}
 
-      {/* Today's Due Payouts */}
+      {/* Pending Payout Requests */}
       <div className="bg-card border border-border rounded-2xl overflow-hidden p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-lg font-heading font-bold text-foreground">Today's Due Payouts</h2>
+            <h2 className="text-lg font-heading font-bold text-foreground">Pending Payout Requests</h2>
             <p className="text-xs font-body text-muted-foreground mt-0.5">
-              Pocket money payouts waiting for scheduler release check today.
+              User requested pocket money payouts awaiting approval.
             </p>
           </div>
           <span className="text-xs font-body font-bold text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full">
-            {todayPayoutsList.length} Due
+            {pendingRequests.length} Pending
           </span>
         </div>
 
-        {todayPayoutsList.length > 0 ? (
+        {pendingRequests.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-border text-xs font-body font-semibold text-muted-foreground uppercase tracking-wider bg-muted/40">
                   <th className="py-3 px-4">User</th>
                   <th className="py-3 px-4">Frequency</th>
-                  <th className="py-3 px-4">Release Payout</th>
+                  <th className="py-3 px-4">Request Amount</th>
                   <th className="py-3 px-4">Remaining</th>
-                  <th className="py-3 px-4">Due Date</th>
+                  <th className="py-3 px-4">Request Date</th>
                   <th className="py-3 px-4 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border text-sm font-body">
-                {todayPayoutsList.map((item) => (
-                  <tr key={item._id} className="hover:bg-muted/30">
+                {pendingRequests.map((payout) => (
+                  <tr key={payout._id} className="hover:bg-muted/30">
                     <td className="py-3 px-4">
-                      <div className="font-semibold text-foreground">{item.userName}</div>
-                      <div className="text-xs text-muted-foreground">{item.userEmail}</div>
+                      <div className="font-semibold text-foreground">{payout.userId?.name || payout.userId?.username || 'User'}</div>
+                      <div className="text-xs text-muted-foreground">{payout.userId?.email || 'No email'}</div>
                     </td>
-                    <td className="py-3 px-4 capitalize font-semibold">{item.frequency}</td>
-                    <td className="py-3 px-4 text-emerald-600 font-bold">₹{fmt(item.payoutAmount)}</td>
-                    <td className="py-3 px-4">₹{fmt(item.remainingAmount)}</td>
+                    <td className="py-3 px-4 capitalize font-semibold">{payout.pocketMoneyId?.frequency || 'daily'}</td>
+                    <td className="py-3 px-4 text-emerald-600 font-bold">₹{fmt(payout.amount)}</td>
+                    <td className="py-3 px-4">₹{fmt(payout.pocketMoneyId?.remainingAmount || 0)}</td>
                     <td className="py-3 px-4 text-amber-600 font-semibold">
-                      {new Date(item.nextPayoutDate).toLocaleDateString("en-IN")}
+                      {new Date(payout.createdAt).toLocaleDateString("en-IN")}
                     </td>
                     <td className="py-3 px-4 text-center">
                       <Button
                         size="sm"
-                        onClick={() => setReleaseModalData(item)}
+                        onClick={() => setReleaseModalData({
+                          ...payout,
+                          _id: payout._id,
+                          payoutAmount: payout.amount,
+                          userName: payout.userId?.name || payout.userId?.username || 'User',
+                          userEmail: payout.userId?.email || 'No email',
+                        })}
                         className="rounded-xl font-body h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 flex items-center gap-1 mx-auto"
                       >
                         <Play className="h-3 w-3 fill-current" />
@@ -314,7 +366,7 @@ export default function PocketMoneyAdmin({ token }: PocketMoneyAdminProps) {
         ) : (
           <div className="text-center py-8 bg-muted/20 border border-dashed border-border rounded-xl">
             <CheckCircle className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
-            <p className="text-sm font-body text-muted-foreground">All pocket money payouts are up to date.</p>
+            <p className="text-sm font-body text-muted-foreground">All pocket money payout requests are up to date.</p>
           </div>
         )}
       </div>
@@ -517,7 +569,13 @@ export default function PocketMoneyAdmin({ token }: PocketMoneyAdminProps) {
                     Cancel
                   </Button>
                   <Button
-                    onClick={() => handleReleasePayout(releaseModalData._id, releaseModalData.userName)}
+                    onClick={() => {
+                      if (releaseModalData.status === 'requested') {
+                        handleConfirmReleasePayout(releaseModalData._id, releaseModalData.userName);
+                      } else {
+                        handleReleasePayout(releaseModalData._id, releaseModalData.userName);
+                      }
+                    }}
                     disabled={releasingId === releaseModalData._id || !modalUpiId}
                     className="rounded-xl font-body bg-emerald-600 hover:bg-emerald-700"
                   >
