@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { userService } from '../../services/userService';
 import { withdrawalService } from '../../services/withdrawalService';
+import { investmentService } from '../../services/investmentService';
 import { colors } from '../../theme/theme';
 import { mapProfileToWithdrawUser } from '../../utils/userBalances';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
@@ -39,17 +40,38 @@ const WithdrawScreen = ({ navigation }) => {
   const [upiId, setUpiId] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
   const [emailRequiredModalVisible, setEmailRequiredModalVisible] = useState(false);
+  const [investments, setInvestments] = useState([]);
 
   const fetchUserData = async () => {
     try {
       const profile = await userService.getUserProfile();
       setUserData(mapProfileToWithdrawUser(profile));
+      
+      const allInvestments = await investmentService.getInvestments();
+      const userInvestments = allInvestments.filter(inv =>
+        inv.userEmail === profile.email || inv.mobileNumber === profile.mobileNumber
+      );
+      // Filter only duration-based investments
+      const durationPlanTypes = ['15_days', '1_month', '3_months', '6_months', '1_year'];
+      const durationInvests = userInvestments.filter(inv => durationPlanTypes.includes(inv.type));
+      setInvestments(durationInvests);
     } catch (error) {
       console.error('Error fetching user profile:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
+  };
+
+  const getPlanDisplayName = (type) => {
+    if (type === 'saving') return 'Saving Deposit';
+    if (type === 'fixed') return 'Fixed Deposit';
+    if (type === '15_days') return '15 Days Plan';
+    if (type === '1_month') return '1 Month Plan';
+    if (type === '3_months') return '3 Months Plan';
+    if (type === '6_months') return '6 Months Plan';
+    if (type === '1_year') return '1 Year Plan';
+    return 'Investment';
   };
 
   useFocusEffect(
@@ -249,6 +271,43 @@ const WithdrawScreen = ({ navigation }) => {
           </View>
         </View>
 
+        {/* Duration-based Plans Status */}
+        {investments.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Duration Investment Plans</Text>
+            {investments.map((inv) => {
+              const isMatured = new Date() >= new Date(inv.maturityDate);
+              const totalInterest = inv.totalInterest || (inv.amount * inv.interestRate / 100);
+              const totalVal = inv.amount + totalInterest;
+              return (
+                <View key={inv._id} style={styles.planStatusCard}>
+                  <View style={styles.planStatusTop}>
+                    <View style={styles.planStatusInfo}>
+                      <Text style={styles.planStatusName}>{getPlanDisplayName(inv.type)}</Text>
+                      <Text style={styles.planStatusSub}>
+                        {formatCurrency(inv.amount)} + {formatCurrency(totalInterest)} Interest
+                      </Text>
+                    </View>
+                    <View style={[styles.statusBadge, isMatured ? styles.statusBadgeMatured : styles.statusBadgeLocked]}>
+                      <MaterialCommunityIcons name={isMatured ? 'check-circle' : 'lock'} size={14} color={isMatured ? '#065F46' : '#B45309'} />
+                      <Text style={[styles.statusBadgeText, { color: isMatured ? '#065F46' : '#B45309' }]}>
+                        {isMatured ? 'Matured' : 'Locked'}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.planStatusDivider} />
+                  <Text style={styles.planStatusFooter}>
+                    {isMatured 
+                      ? 'Withdrawal Available (Merged in Saving Balance)' 
+                      : `Withdrawal available after ${new Date(inv.maturityDate).toLocaleDateString('en-IN')}`
+                    }
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
         {/* Security Notice */}
         <View style={styles.securityNotice}>
           <MaterialCommunityIcons name="shield-check" size={16} color={colors.primary} />
@@ -277,109 +336,107 @@ const WithdrawScreen = ({ navigation }) => {
       </ScrollView>
 
       {/* Withdraw Modal */}
-      <Portal>
-        <Modal
-          visible={withdrawModalVisible}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setWithdrawModalVisible(false)}
-        >
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalWrapper}>
-            <TouchableOpacity
-              style={styles.modalOverlay}
-              activeOpacity={1}
-              onPress={() => setWithdrawModalVisible(false)}
-            />
-            <View style={styles.modalSheet}>
-              <View style={styles.modalHandle} />
-              <View style={styles.modalHeaderRow}>
-                <Text style={styles.modalTitle}>
-                  Withdraw from {withdrawType === 'saving' ? 'Saving' : 'Fixed'}
-                </Text>
-                <TouchableOpacity onPress={() => setWithdrawModalVisible(false)} style={styles.modalCloseBtn}>
-                  <MaterialCommunityIcons name="close" size={18} color={colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Balance display */}
-              <View style={styles.modalBalanceBox}>
-                <Text style={styles.modalBalanceLabel}>Available Balance</Text>
-                <Text style={styles.modalBalanceAmount}>
-                  {formatCurrency(withdrawType === 'saving' ? userData?.savingBalance : userData?.fixedBalance)}
-                </Text>
-              </View>
-
-              {/* Amount input */}
-              <Text style={styles.inputLabel}>Amount to Withdraw</Text>
-              <View style={styles.amountInputRow}>
-                <Text style={styles.currencySymbol}>₹</Text>
-                <TextInput
-                  style={styles.amountInput}
-                  value={amount}
-                  onChangeText={setAmount}
-                  keyboardType="numeric"
-                  placeholder="0"
-                  placeholderTextColor={colors.border}
-                />
-              </View>
-
-              {/* Quick amounts */}
-              <View style={styles.quickAmountRow}>
-                {QUICK_AMOUNTS.map((q) => (
-                  <TouchableOpacity
-                    key={q}
-                    style={styles.quickAmountChip}
-                    onPress={() => setAmount(String(q))}
-                  >
-                    <Text style={styles.quickAmountText}>+₹{q.toLocaleString()}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* UPI input */}
-              <Text style={[styles.inputLabel, { marginTop: 16 }]}>UPI ID</Text>
-              <View style={styles.upiInputRow}>
-                <MaterialCommunityIcons name="bank" size={18} color={colors.textMuted} />
-                <TextInput
-                  style={styles.upiInput}
-                  value={upiId}
-                  onChangeText={setUpiId}
-                  placeholder="yourname@upi"
-                  placeholderTextColor={colors.textMuted}
-                  autoCapitalize="none"
-                />
-              </View>
-
-              {/* Actions */}
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={styles.cancelBtn}
-                  onPress={() => setWithdrawModalVisible(false)}
-                  disabled={withdrawing}
-                >
-                  <Text style={styles.cancelBtnText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.submitBtnOuter, withdrawing && styles.submitBtnDisabled]}
-                  onPress={handleWithdraw}
-                  disabled={withdrawing}
-                  activeOpacity={0.85}
-                >
-                  <LinearGradient
-                    colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.submitBtnGradient}
-                  >
-                    {!withdrawing && <MaterialCommunityIcons name="check-circle" size={18} color={colors.white} />}
-                    <Text style={styles.submitBtnText}>{withdrawing ? 'Processing...' : 'Submit'}</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
+      <Modal
+        visible={withdrawModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setWithdrawModalVisible(false)}
+      >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalWrapper}>
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setWithdrawModalVisible(false)}
+          />
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalTitle}>
+                Withdraw from {withdrawType === 'saving' ? 'Saving' : 'Fixed'}
+              </Text>
+              <TouchableOpacity onPress={() => setWithdrawModalVisible(false)} style={styles.modalCloseBtn}>
+                <MaterialCommunityIcons name="close" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
             </View>
-          </KeyboardAvoidingView>
-        </Modal>
-      </Portal>
+
+            {/* Balance display */}
+            <View style={styles.modalBalanceBox}>
+              <Text style={styles.modalBalanceLabel}>Available Balance</Text>
+              <Text style={styles.modalBalanceAmount}>
+                {formatCurrency(withdrawType === 'saving' ? userData?.savingBalance : userData?.fixedBalance)}
+              </Text>
+            </View>
+
+            {/* Amount input */}
+            <Text style={styles.inputLabel}>Amount to Withdraw</Text>
+            <View style={styles.amountInputRow}>
+              <Text style={styles.currencySymbol}>₹</Text>
+              <TextInput
+                style={styles.amountInput}
+                value={amount}
+                onChangeText={setAmount}
+                keyboardType="numeric"
+                placeholder="0"
+                placeholderTextColor={colors.border}
+              />
+            </View>
+
+            {/* Quick amounts */}
+            <View style={styles.quickAmountRow}>
+              {QUICK_AMOUNTS.map((q) => (
+                <TouchableOpacity
+                  key={q}
+                  style={styles.quickAmountChip}
+                  onPress={() => setAmount(String(q))}
+                >
+                  <Text style={styles.quickAmountText}>+₹{q.toLocaleString()}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* UPI input */}
+            <Text style={[styles.inputLabel, { marginTop: 16 }]}>UPI ID</Text>
+            <View style={styles.upiInputRow}>
+              <MaterialCommunityIcons name="bank" size={18} color={colors.textMuted} />
+              <TextInput
+                style={styles.upiInput}
+                value={upiId}
+                onChangeText={setUpiId}
+                placeholder="yourname@upi"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="none"
+              />
+            </View>
+
+            {/* Actions */}
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={() => setWithdrawModalVisible(false)}
+                disabled={withdrawing}
+              >
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.submitBtnOuter, withdrawing && styles.submitBtnDisabled]}
+                onPress={handleWithdraw}
+                disabled={withdrawing}
+                activeOpacity={0.85}
+              >
+                <LinearGradient
+                  colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.submitBtnGradient}
+                >
+                  {!withdrawing && <MaterialCommunityIcons name="check-circle" size={18} color={colors.white} />}
+                  <Text style={styles.submitBtnText}>{withdrawing ? 'Processing...' : 'Submit'}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* Email Required Modal */}
       <Modal
@@ -606,6 +663,63 @@ const getStyles = (colors) => StyleSheet.create({
     shadowOpacity: 0.2, shadowRadius: 8, elevation: 6,
   },
   emailModalUpdateText: { fontSize: 15, fontWeight: '700', color: colors.white },
+  
+  // Plan Status Cards
+  planStatusCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    ...colors.shadow.card,
+  },
+  planStatusTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  planStatusInfo: {
+    flex: 1,
+  },
+  planStatusName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  planStatusSub: {
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+  },
+  statusBadgeMatured: {
+    backgroundColor: '#D1FAE5',
+  },
+  statusBadgeLocked: {
+    backgroundColor: '#FEF3C7',
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  planStatusDivider: {
+    height: 1,
+    backgroundColor: colors.borderLight,
+    marginVertical: 12,
+  },
+  planStatusFooter: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
 });
 
 export default WithdrawScreen;

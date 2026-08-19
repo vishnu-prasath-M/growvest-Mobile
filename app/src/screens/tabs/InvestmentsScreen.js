@@ -19,7 +19,7 @@ import StatusChip from '../../components/StatusChip';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
 import { useTheme } from '../../context/ThemeContext';
 
-const FILTERS = ['All', 'Fixed', 'Saving', 'Pending'];
+const FILTERS = ['All', 'Active', 'Pending'];
 
 const InvestmentsScreen = ({ navigation }) => {
   const { colors: themeColors } = useTheme();
@@ -62,19 +62,39 @@ const InvestmentsScreen = ({ navigation }) => {
     `₹${amount?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`;
 
   const formatDate = (dateString) => {
+    if (!dateString) return '';
     const date = new Date(dateString);
     return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
-  const getStatusLabel = (status) => {
-    const map = { approved: 'Active', pending: 'Pending', rejected: 'Failed', withdrawn: 'Withdrawn' };
-    return map[status] || 'Pending';
+  const getPlanDisplayName = (type) => {
+    if (type === 'saving') return 'Saving Deposit';
+    if (type === 'fixed') return 'Fixed Deposit';
+    if (type === '15_days') return '15 Days Plan';
+    if (type === '1_month') return '1 Month Plan';
+    if (type === '3_months') return '3 Months Plan';
+    if (type === '6_months') return '6 Months Plan';
+    if (type === '1_year') return '1 Year Plan';
+    return 'Investment';
+  };
+
+  const getStatusLabel = (inv) => {
+    if (inv.status === 'pending') return 'Pending';
+    if (inv.status === 'rejected') return 'Failed';
+    if (inv.status === 'withdrawn') return 'Withdrawn';
+    if (inv.status === 'approved') {
+      const isDurationPlan = ['15_days', '1_month', '3_months', '6_months', '1_year'].includes(inv.type);
+      if (isDurationPlan) {
+        return new Date() >= new Date(inv.maturityDate) ? 'Matured' : 'Locked';
+      }
+      return 'Active';
+    }
+    return 'Pending';
   };
 
   const filteredInvestments = investments.filter((inv) => {
     if (activeFilter === 'All') return true;
-    if (activeFilter === 'Fixed') return inv.type === 'fixed';
-    if (activeFilter === 'Saving') return inv.type === 'saving';
+    if (activeFilter === 'Active') return inv.status === 'approved';
     if (activeFilter === 'Pending') return inv.status === 'pending';
     return true;
   });
@@ -166,7 +186,7 @@ const InvestmentsScreen = ({ navigation }) => {
           {filteredInvestments.length > 0 ? (
             filteredInvestments.map((inv) => {
               const isSaving = inv.type === 'saving';
-              const statusLabel = getStatusLabel(inv.status);
+              const statusLabel = getStatusLabel(inv);
               return (
                 <View key={inv._id} style={styles.investCard}>
                   <View style={styles.investCardTop}>
@@ -180,7 +200,7 @@ const InvestmentsScreen = ({ navigation }) => {
                     <View style={styles.investCardInfo}>
                       <View style={styles.investNameRow}>
                         <Text style={styles.investName} numberOfLines={1}>
-                          {isSaving ? 'Saving Deposit' : 'Fixed Deposit'}
+                          {getPlanDisplayName(inv.type)}
                         </Text>
                         <StatusChip status={statusLabel} />
                       </View>

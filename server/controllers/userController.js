@@ -15,6 +15,22 @@ const syncInvestmentInterest = async (inv) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  // If this is a duration-based plan, calculate elapsed interest dynamically
+  if (inv.durationDays && inv.dailyInterest) {
+    const totalElapsedDays = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
+    const elapsedDays = Math.max(0, Math.min(inv.durationDays, totalElapsedDays));
+    const interestEarned = elapsedDays * inv.dailyInterest;
+    
+    // Save to DB
+    await Investment.updateOne(
+      { _id: inv._id },
+      { $set: { interestEarned, lastInterestCalculatedAt: today } }
+    );
+    inv.interestEarned = interestEarned;
+    inv.lastInterestCalculatedAt = today;
+    return interestEarned;
+  }
+
   // Feature 4: Reset Wrong Interest Data (Version 3)
   if (inv.interestLogicVersion !== 3) {
     await Investment.updateOne({ _id: inv._id }, { $set: { interestEarned: 0, interestLogicVersion: 3, lastInterestCalculatedAt: startDate } });
@@ -85,13 +101,32 @@ const getEnrichedUserData = async (query) => {
 
   const savingInvestments = investments.filter(inv => inv.type === 'saving');
   const fixedInvestments = investments.filter(inv => inv.type === 'fixed');
+  
+  // Dynamic duration-based investment categories
+  const durationPlanTypes = ['15_days', '1_month', '3_months', '6_months', '1_year'];
+  const durationInvestments = investments.filter(inv => durationPlanTypes.includes(inv.type));
+  
+  // Separate into Matured vs Locked
+  const maturedInvestments = durationInvestments.filter(inv => {
+    return new Date() >= new Date(inv.maturityDate);
+  });
+  const lockedInvestments = durationInvestments.filter(inv => {
+    return new Date() < new Date(inv.maturityDate);
+  });
 
   const savingWithdrawals = withdrawals.filter(wd => wd.withdrawType === 'saving');
   const fixedWithdrawals = withdrawals.filter(wd => wd.withdrawType === 'fixed');
+  
   const savingInvested = savingInvestments.reduce((acc, inv) => acc + inv.amount, 0);
   const savingInterest = savingInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
+  
+  // Matured principal + interest added directly to withdrawable savings pool
+  const maturedPrincipal = maturedInvestments.reduce((acc, inv) => acc + inv.amount, 0);
+  const maturedInterest = maturedInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
+  const maturedTotal = maturedPrincipal + maturedInterest;
+  
   const savingWithdrawn = savingWithdrawals.reduce((acc, wd) => acc + wd.amount, 0);
-  let savingBalance = savingInvested + savingInterest + totalPocketReleased - savingWithdrawn;
+  let savingBalance = savingInvested + savingInterest + totalPocketReleased + maturedTotal - savingWithdrawn;
   if (savingBalance < 0) savingBalance = 0;
 
   const fixedInvested = fixedInvestments.reduce((acc, inv) => acc + inv.amount, 0);
@@ -109,15 +144,23 @@ const getEnrichedUserData = async (query) => {
     return diffDays >= 365;
   }).reduce((acc, inv) => acc + inv.amount + (inv.interestEarned || 0), 0);
 
+  // Locked investments principal and interest
+  const lockedDurationPrincipal = lockedInvestments.reduce((acc, inv) => acc + inv.amount, 0);
+  const lockedDurationInterest = lockedInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
+  const lockedDurationTotal = lockedDurationPrincipal + lockedDurationInterest;
+
   const availableToWithdraw = savingBalance + availableFixed + totalChitWinningAmount;
 
-  // Total balance includes savings balance + fixed balance + total chit winning amount
-  let totalBalance = savingBalance + fixedBalance + totalChitWinningAmount;
+  // Total balance includes savings balance + fixed balance + locked duration plans + total chit winning amount
+  let totalBalance = savingBalance + fixedBalance + lockedDurationTotal + totalChitWinningAmount;
   if (totalBalance < 0) totalBalance = 0;
 
   // Total calculations
-  const totalInvested = savingInvested + fixedInvested;
-  const totalInterest = savingInterest + fixedInterest;
+  const durationInvested = durationInvestments.reduce((acc, inv) => acc + inv.amount, 0);
+  const durationInterest = durationInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
+  
+  const totalInvested = savingInvested + fixedInvested + durationInvested;
+  const totalInterest = savingInterest + fixedInterest + durationInterest;
   const totalWithdrawn = savingWithdrawn + fixedWithdrawn;
 
   return {
@@ -223,22 +266,49 @@ exports.getUserDetailByEmail = async (req, res) => {
 
     const savingInvestments = investments.filter(inv => inv.type === 'saving');
     const fixedInvestments = investments.filter(inv => inv.type === 'fixed');
+    
+    // Dynamic duration-based investment categories
+    const durationPlanTypes = ['15_days', '1_month', '3_months', '6_months', '1_year'];
+    const durationInvestments = investments.filter(inv => durationPlanTypes.includes(inv.type));
+    
+    // Separate into Matured vs Locked
+    const maturedInvestments = durationInvestments.filter(inv => {
+      return new Date() >= new Date(inv.maturityDate);
+    });
+    const lockedInvestments = durationInvestments.filter(inv => {
+      return new Date() < new Date(inv.maturityDate);
+    });
+
     const savingWithdrawals = withdrawals.filter(wd => wd.withdrawType === 'saving');
     const fixedWithdrawals = withdrawals.filter(wd => wd.withdrawType === 'fixed');
 
     const savingInvested = savingInvestments.reduce((acc, inv) => acc + inv.amount, 0);
     const savingInterest = savingInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
+    
+    // Matured principal + interest added directly to withdrawable savings pool
+    const maturedPrincipal = maturedInvestments.reduce((acc, inv) => acc + inv.amount, 0);
+    const maturedInterest = maturedInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
+    const maturedTotal = maturedPrincipal + maturedInterest;
+
     const savingWithdrawn = savingWithdrawals.reduce((acc, wd) => acc + wd.amount, 0);
-    const savingBalance = Math.max(0, savingInvested + savingInterest + pocketReleased - savingWithdrawn);
+    const savingBalance = Math.max(0, savingInvested + savingInterest + pocketReleased + maturedTotal - savingWithdrawn);
 
     const fixedInvested = fixedInvestments.reduce((acc, inv) => acc + inv.amount, 0);
     const fixedInterest = fixedInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
     const fixedWithdrawn = fixedWithdrawals.reduce((acc, wd) => acc + wd.amount, 0);
     const fixedBalance = Math.max(0, fixedInvested + fixedInterest - fixedWithdrawn);
 
-    const totalInvested = savingInvested + fixedInvested + pocketInvested;
-    const totalInterest = savingInterest + fixedInterest;
-    const totalBalance = savingBalance + fixedBalance;
+    // Locked duration plans
+    const lockedDurationPrincipal = lockedInvestments.reduce((acc, inv) => acc + inv.amount, 0);
+    const lockedDurationInterest = lockedInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
+    const lockedDurationTotal = lockedDurationPrincipal + lockedDurationInterest;
+
+    const durationInvested = durationInvestments.reduce((acc, inv) => acc + inv.amount, 0);
+    const durationInterest = durationInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
+
+    const totalInvested = savingInvested + fixedInvested + pocketInvested + durationInvested;
+    const totalInterest = savingInterest + fixedInterest + durationInterest;
+    const totalBalance = savingBalance + fixedBalance + lockedDurationTotal;
 
     const withdrawableFixed = fixedInvestments.filter(inv => {
       const diffDays = (new Date() - new Date(inv.startDate)) / (1000 * 60 * 60 * 24);
@@ -255,11 +325,11 @@ exports.getUserDetailByEmail = async (req, res) => {
       currentBalance: totalBalance,
       availableToWithdraw: availableToWithdrawDetail,
       saving: {
-        invested: savingInvested,
-        interest: savingInterest,
+        invested: savingInvested + maturedPrincipal,
+        interest: savingInterest + maturedInterest,
         withdrawn: savingWithdrawn,
         balance: savingBalance,
-        count: savingInvestments.length
+        count: savingInvestments.length + maturedInvestments.length
       },
       fixed: {
         invested: fixedInvested,
@@ -273,6 +343,13 @@ exports.getUserDetailByEmail = async (req, res) => {
         released: pocketReleased,
         remaining: pocketRemaining,
         count: pocketMonies.length
+      },
+      durationInvestments: {
+        invested: durationInvested,
+        interest: durationInterest,
+        lockedAmount: lockedDurationTotal,
+        maturedAmount: maturedTotal,
+        count: durationInvestments.length
       }
     });
   } catch (error) {

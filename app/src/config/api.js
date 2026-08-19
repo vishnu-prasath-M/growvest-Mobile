@@ -1,16 +1,26 @@
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
 const getBaseUrl = () => {
   try {
-    // In release builds, process.env may be undefined.
-    // babel-preset-expo replaces EXPO_PUBLIC_* at build time,
-    // but we guard against process.env being absent at runtime.
     if (typeof process !== 'undefined' && process.env && process.env.EXPO_PUBLIC_API_URL) {
       return process.env.EXPO_PUBLIC_API_URL;
     }
   } catch (e) {
     console.warn('[api] process.env not available, using fallback URL');
   }
+  
+  // Extract dev server IP dynamically for physical devices and emulators
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (hostUri) {
+    const ip = hostUri.split(':').shift();
+    return `http://${ip}:5000/api`;
+  }
+  
+  if (__DEV__) {
+    return 'http://10.0.2.2:5000/api';
+  }
+
   return 'https://growvest-mobile.onrender.com/api';
 };
 
@@ -38,6 +48,7 @@ export const API_ENDPOINTS = {
   // Investments
   INVESTMENTS: '/investments',
   INVESTMENT_BY_ID: (id) => `/investments/${id}`,
+  INVESTMENT_PLANS: '/investments/plans',
 
   // Transactions
   TRANSACTIONS: '/transactions',

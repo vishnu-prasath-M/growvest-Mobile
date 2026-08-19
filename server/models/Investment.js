@@ -17,7 +17,7 @@ const investmentSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['saving', 'fixed'],
+    enum: ['saving', 'fixed', '15_days', '1_month', '3_months', '6_months', '1_year'],
     required: true,
   },
   userId: {
@@ -49,6 +49,30 @@ const investmentSchema = new mongoose.Schema({
   interestEarned: {
     type: Number,
     default: 0,
+  },
+  // Duration-based investment fields
+  planType: {
+    type: String,
+  },
+  durationDays: {
+    type: Number,
+  },
+  totalInterest: {
+    type: Number,
+  },
+  dailyInterest: {
+    type: Number,
+  },
+  maturityAmount: {
+    type: Number,
+  },
+  maturityDate: {
+    type: Date,
+  },
+  withdrawalStatus: {
+    type: String,
+    enum: ['locked', 'available', 'withdrawn'],
+    default: 'locked',
   },
   lastInterestCalculatedAt: {
     type: Date,

@@ -86,6 +86,17 @@ const statusStyle: Record<string, string> = {
   paid: "bg-accent text-accent-foreground border-accent-foreground/10",
 };
 
+const getPlanDisplayName = (type: string) => {
+  if (type === 'saving') return 'Saving Deposit';
+  if (type === 'fixed') return 'Fixed Deposit';
+  if (type === '15_days') return '15 Days Plan';
+  if (type === '1_month') return '1 Month Plan';
+  if (type === '3_months') return '3 Months Plan';
+  if (type === '6_months') return '6 Months Plan';
+  if (type === '1_year') return '1 Year Plan';
+  return type + ' Plan';
+};
+
 type AdminTab = "overview" | "pending" | "users" | "withdrawals" | "kyc" | "chits" | "settings" | "pocket";
 
 const AdminDashboard = () => {
@@ -917,7 +928,7 @@ const AdminDashboard = () => {
                           {inv.status === "rejected" && <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-500" />}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-body font-semibold text-foreground">{inv.user} <span className="opacity-50 font-normal">({inv.type} deposit)</span></p>
+                          <p className="text-sm font-body font-semibold text-foreground">{inv.user} <span className="opacity-50 font-normal">({getPlanDisplayName(inv.type)})</span></p>
                           <p className="text-xs font-body text-muted-foreground">{inv.ref} · {new Date(inv.startDate).toLocaleDateString()}</p>
                         </div>
                       </div>
@@ -972,7 +983,7 @@ const AdminDashboard = () => {
                             <span className={`text-[10px] font-body font-semibold px-2 py-0.5 rounded-full border ${statusStyle[inv.status]}`}>
                               {inv.status.charAt(0).toUpperCase() + inv.status.slice(1)}
                             </span>
-                            <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full capitalize">{inv.type} deposit</span>
+                            <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full">{getPlanDisplayName(inv.type)}</span>
                           </div>
                           <p className="text-xs font-body text-muted-foreground mt-0.5">{inv.email}</p>
                           <div className="flex flex-wrap items-center gap-4 mt-2">
@@ -1120,7 +1131,7 @@ const AdminDashboard = () => {
                                   </div>
 
                                   {/* Deposit type breakdown */}
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                                     {/* Saving */}
                                     <div className="rounded-xl border border-border bg-card p-4">
                                       <div className="flex items-center justify-between mb-3">
@@ -1154,6 +1165,27 @@ const AdminDashboard = () => {
                                           { label: "Interest Earned", value: `₹${fmtCur(detail.fixed?.interest ?? 0)}` },
                                           { label: "Withdrawn", value: `₹${fmtCur(detail.fixed?.withdrawn ?? 0)}` },
                                           { label: "Current Balance", value: `₹${fmtCur(detail.fixed?.balance ?? 0)}`, bold: true },
+                                        ].map(r => (
+                                          <div key={r.label} className="flex justify-between text-xs font-body">
+                                            <span className="text-muted-foreground">{r.label}</span>
+                                            <span className={r.bold ? "font-bold text-secondary" : "text-foreground"}>{r.value}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    {/* Duration-based Plans */}
+                                    <div className="rounded-xl border border-border bg-card p-4">
+                                      <div className="flex items-center justify-between mb-3">
+                                        <p className="text-xs font-body font-semibold text-muted-foreground uppercase tracking-wider">Duration Plans</p>
+                                        <span className="text-xs font-body font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">Duration</span>
+                                      </div>
+                                      <div className="space-y-2">
+                                        {[
+                                          { label: "Total Invested", value: `₹${fmtCur(detail.durationInvestments?.invested ?? 0)}` },
+                                          { label: "Interest Earned", value: `₹${fmtCur(detail.durationInvestments?.interest ?? 0)}` },
+                                          { label: "Locked Amount", value: `₹${fmtCur(detail.durationInvestments?.lockedAmount ?? 0)}` },
+                                          { label: "Matured Balance", value: `₹${fmtCur(detail.durationInvestments?.maturedAmount ?? 0)}`, bold: true },
                                         ].map(r => (
                                           <div key={r.label} className="flex justify-between text-xs font-body">
                                             <span className="text-muted-foreground">{r.label}</span>
