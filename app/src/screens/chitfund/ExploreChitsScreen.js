@@ -166,12 +166,12 @@ const ExploreChitsScreen = ({ navigation }) => {
 
                 <View style={styles.chitDetailsGrid}>
                   <View style={styles.chitDetailItem}>
-                    <Text style={styles.chitDetailLabel}>Monthly</Text>
-                    <Text style={styles.chitDetailValue}>{formatCurrency(chit.monthlyAmount)}</Text>
+                    <Text style={styles.chitDetailLabel}>{chit.isWeekly ? 'Weekly' : 'Monthly'}</Text>
+                    <Text style={styles.chitDetailValue}>{formatCurrency(chit.isWeekly ? (chit.weeklyAmount || chit.monthlyAmount) : chit.monthlyAmount)}</Text>
                   </View>
                   <View style={styles.chitDetailItem}>
                     <Text style={styles.chitDetailLabel}>Duration</Text>
-                    <Text style={styles.chitDetailValue}>{chit.duration} mo</Text>
+                    <Text style={styles.chitDetailValue}>{chit.isWeekly ? `${chit.totalWeeks || chit.duration} wks` : `${chit.duration} mo`}</Text>
                   </View>
                   <View style={styles.chitDetailItem}>
                     <Text style={styles.chitDetailLabel}>Slots Left</Text>

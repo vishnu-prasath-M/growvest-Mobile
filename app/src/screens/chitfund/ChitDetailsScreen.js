@@ -47,7 +47,7 @@ const ChitDetailsScreen = ({ navigation, route }) => {
         chitFundService.getPaymentHistory(chitId).catch(() => []),
         chitFundService.getAuction(chitId).catch(() => null),
         chitFundService.getWinners(chitId).catch(() => []),
-        chitFundService.getDividends().catch(() => []), // or getDividends(chitId) if supported
+        chitFundService.getDividends().catch(() => []),
         chitFundService.getMyChits().catch(() => []),
       ]);
       setChit(chitData);
@@ -70,246 +70,511 @@ const ChitDetailsScreen = ({ navigation, route }) => {
     { key: 'overview', label: 'Overview', icon: 'view-dashboard' },
     { key: 'members', label: 'Members', icon: 'account-group' },
     { key: 'payments', label: 'Payments', icon: 'cash-check' },
-    { key: 'auction', label: 'Auction', icon: 'gavel' },
     { key: 'winners', label: 'Winners', icon: 'trophy' },
-    { key: 'dividends', label: 'Dividends', icon: 'gift' },
     { key: 'rules', label: 'Rules', icon: 'book-open-variant' },
     { key: 'faq', label: 'FAQ', icon: 'frequently-asked-questions' },
     { key: 'support', label: 'Support', icon: 'headset' },
   ];
 
-  const renderOverview = () => (
-    <View>
-      <View style={styles.overviewHero}>
-        <LinearGradient colors={['#064e3b', '#065f46', '#047857']} style={styles.overviewHeroInner}>
-          <Text style={styles.overviewHeroName}>{chit.name}</Text>
-          <Text style={styles.overviewHeroDesc}>{chit.description}</Text>
-          <View style={styles.overviewHeroRow}>
-            <View style={styles.overviewHeroItem}>
-              <Text style={styles.overviewHeroLabel}>Monthly</Text>
-              <Text style={styles.overviewHeroValue}>{formatCurrency(chit.monthlyAmount)}</Text>
-            </View>
-            <View style={styles.overviewHeroItem}>
-              <Text style={styles.overviewHeroLabel}>Duration</Text>
-              <Text style={styles.overviewHeroValue}>{chit.duration}mo</Text>
-            </View>
-            <View style={styles.overviewHeroItem}>
-              <Text style={styles.overviewHeroLabel}>Total Pot</Text>
-              <Text style={styles.overviewHeroValue}>{formatCurrency(chit.totalPot)}</Text>
-            </View>
-          </View>
-        </LinearGradient>
-      </View>
+  const getActionPercentage = (totalWeeks, week) => {
+    if (totalWeeks === 10) {
+      if (week >= 1 && week <= 4) return null;
+      const schedule = { 5: 16, 6: 14, 7: 12, 8: 10, 9: 8, 10: 6 };
+      return schedule[week] ?? 0;
+    } else if (totalWeeks === 20) {
+      if (week >= 1 && week <= 9) return null;
+      const schedule = { 10: 28, 11: 26, 12: 24, 13: 22, 14: 20, 15: 18, 16: 16, 17: 14, 18: 12, 19: 10, 20: 8 };
+      return schedule[week] ?? 0;
+    }
+    return 0;
+  };
 
-      {/* Logged-in User Chit Action Details */}
-      {(() => {
-        const myMembership = myChits.find(m => m.chitId === chit._id) || chit.myMembership;
-        const totalMembers = chit.totalMembers || 0;
-        const availableSlots = chit.availableSlots || 0;
-        const filledMembers = Math.max(0, totalMembers - availableSlots);
-        const remainingSlots = availableSlots;
+  const getWeeklyRowData = (weeklyAmount, totalWeeks, w) => {
+    const totalContribution = weeklyAmount * totalWeeks;
+    const actionPct = getActionPercentage(totalWeeks, w);
+    
+    if (actionPct === null) {
+      return {
+        week: w,
+        weeklyPayment: weeklyAmount,
+        priceAmount: null,
+        dividend: null,
+        actionPercentage: null,
+        totalValue: null,
+        isLocked: true
+      };
+    }
+    
+    const priceAmount = totalContribution - (totalContribution * actionPct / 100);
+    const dividend = weeklyAmount * actionPct / 100;
+    
+    const totalDividend = totalWeeks === 10
+      ? (weeklyAmount * 66 / 100)
+      : (weeklyAmount * 198 / 100);
+    const totalValue = priceAmount + totalDividend;
+    const profitPercentage = ((totalValue / totalContribution) * 100).toFixed(1);
+    
+    return {
+      week: w,
+      weeklyPayment: weeklyAmount,
+      priceAmount,
+      dividend,
+      actionPercentage: actionPct,
+      totalValue,
+      profitPercentage,
+      isLocked: false
+    };
+  };
 
-        if (myMembership) {
-          const userJoinedDate = myMembership.joinedAt 
-            ? new Date(myMembership.joinedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-            : 'N/A';
-          const installmentsPaid = myMembership.currentMonth || 0;
-          const remainingInstallments = Math.max(0, (chit.duration || 0) - installmentsPaid);
-          const totalPaid = myMembership.totalPaid || 0;
-          const remainingAmount = Math.max(0, (chit.totalPot || 0) - totalPaid);
-          const nextDueStr = myMembership.nextDueDate || 'N/A';
-          const dueStatus = myMembership.pendingInstallments > 0 ? 'Pending' : 'Paid';
+  const generateWeeklySchedule = (weeklyAmount, totalWeeks) => {
+    const totalContribution = weeklyAmount * totalWeeks;
+    const schedule = [];
+    
+    for (let w = 1; w <= totalWeeks; w++) {
+      schedule.push(getWeeklyRowData(weeklyAmount, totalWeeks, w));
+    }
+    
+    const settlementWeek = totalWeeks + 1;
+    const totalDividend = totalWeeks === 10
+      ? (weeklyAmount * 66 / 100)
+      : (weeklyAmount * 198 / 100);
+    const settlementAmount = totalContribution + totalDividend;
+    
+    schedule.push({
+      week: settlementWeek,
+      weeklyPayment: 0,
+      priceAmount: null,
+      dividend: totalDividend,
+      actionPercentage: 0,
+      totalValue: settlementAmount,
+      profitPercentage: ((settlementAmount / totalContribution) * 100).toFixed(1),
+      isSettlement: true
+    });
+    
+    return { schedule, totalDividend, settlementAmount };
+  };
 
-          return (
-            <View style={styles.sectionCard}>
-              <Text style={styles.sectionTitle}>My Chit Status & Action Details</Text>
-              
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Chit ID</Text>
-                <Text style={styles.detailValue}>{chit._id}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Total Chit Value</Text>
-                <Text style={styles.detailValue}>{formatCurrency(chit.totalPot)}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Monthly Installment</Text>
-                <Text style={styles.detailValue}>{formatCurrency(chit.monthlyAmount)}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Total Members</Text>
-                <Text style={styles.detailValue}>{totalMembers}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Filled Members</Text>
-                <Text style={styles.detailValue}>{filledMembers}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Remaining Slots</Text>
-                <Text style={[styles.detailValue, remainingSlots > 0 ? { color: colors.success } : { color: colors.error }]}>
-                  {remainingSlots}
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>User Join Date</Text>
-                <Text style={styles.detailValue}>{userJoinedDate}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Current Month Number</Text>
-                <Text style={styles.detailValue}>Month {installmentsPaid} of {chit.duration}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Next Due Date</Text>
-                <Text style={styles.detailValue}>{nextDueStr}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Due Status</Text>
-                <View style={[styles.statusBadge, { backgroundColor: dueStatus === 'Paid' ? colors.successLight : '#fef9c3' }]}>
-                  <Text style={[styles.statusText, { color: dueStatus === 'Paid' ? colors.success : colors.warning }]}>
-                    {dueStatus}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Total Amount Paid</Text>
-                <Text style={styles.detailValue}>{formatCurrency(totalPaid)}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Remaining Amount</Text>
-                <Text style={styles.detailValue}>{formatCurrency(remainingAmount)}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Installments Paid</Text>
-                <Text style={styles.detailValue}>{installmentsPaid} Months</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Remaining Installments</Text>
-                <Text style={styles.detailValue}>{remainingInstallments} Months</Text>
-              </View>
-
-              {/* Winning Status Banner */}
-              <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.borderLight }}>
-                {myMembership.hasWon ? (
-                  <View style={{ backgroundColor: colors.successLight, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: colors.success }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                      <MaterialCommunityIcons name="trophy" size={24} color={colors.success} />
-                      <Text style={{ fontSize: 16, fontWeight: '800', color: colors.success }}>AUCTION WINNER</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Winning Amount</Text>
-                      <Text style={{ fontSize: 15, fontWeight: '800', color: colors.success }}>{formatCurrency(myMembership.winningAmount || chit.totalPot)}</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Winning Date</Text>
-                      <Text style={styles.detailValue}>
-                        {myMembership.winningDate ? new Date(myMembership.winningDate).toLocaleDateString('en-IN') : 'Confirmed'}
-                      </Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Amount Credited</Text>
-                      <Text style={{ fontSize: 14, fontWeight: '700', color: colors.success }}>✔ Credited to Wallet</Text>
-                    </View>
-                    {myMembership.winningTransactionRef ? (
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Txn Reference</Text>
-                        <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary }}>{myMembership.winningTransactionRef}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                ) : (
-                  <View style={{ backgroundColor: colors.background, padding: 14, borderRadius: 14, alignItems: 'center' }}>
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textSecondary }}>
-                      ⏳ Waiting for Winning Turn
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </View>
-          );
+  const handleWithdrawal = async (memberId) => {
+    Alert.alert(
+      'Confirm Payout Withdrawal',
+      'Are you sure you want to withdraw your Chit payout now? You can only withdraw ONCE per Chit cycle.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Withdraw',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              const res = await chitFundService.withdrawChitPayout(memberId);
+              Alert.alert('Success', res.message || 'Payout completed successfully!');
+              fetchData();
+            } catch (err) {
+              Alert.alert('Error', err.response?.data?.message || err.message || 'Withdrawal failed');
+            } finally {
+              setLoading(false);
+            }
+          }
         }
+      ]
+    );
+  };
 
-        return (
-          <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>Plan Details</Text>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Total Members</Text>
-              <Text style={styles.detailValue}>{totalMembers}</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Filled Members</Text>
-              <Text style={styles.detailValue}>{filledMembers}</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Available Slots</Text>
-              <Text style={[styles.detailValue, remainingSlots > 0 ? { color: colors.success } : { color: colors.error }]}>
-                {remainingSlots > 0 ? `${remainingSlots} Open` : 'Full'}
+  const renderWeeklyTable = () => {
+    const isWeekly = chit?.isWeekly || false;
+    if (!isWeekly) return null;
+    
+    const weeklyAmount = chit.weeklyAmount || chit.monthlyAmount || 200;
+    const totalWeeks = chit.totalWeeks || chit.duration || 10;
+    
+    const myMembership = myChits.find(m => m.chitId === chit._id) || chit.myMembership;
+    const currentWeek = myMembership?.currentWeek || 0;
+    
+    const { schedule } = generateWeeklySchedule(weeklyAmount, totalWeeks);
+    
+    return (
+      <View style={[styles.sectionCard, { paddingHorizontal: 8 }]}>
+        <Text style={styles.sectionTitle}>Chit Fund Cycle Schedule</Text>
+        <View style={styles.tableHeader}>
+          <Text style={[styles.tableHeaderCell, { width: '15%' }]}>Week</Text>
+          <Text style={[styles.tableHeaderCell, { width: '15%' }]}>Pay</Text>
+          <Text style={[styles.tableHeaderCell, { width: '18%' }]}>Price</Text>
+          <Text style={[styles.tableHeaderCell, { width: '14%' }]}>Div</Text>
+          <Text style={[styles.tableHeaderCell, { width: '12%' }]}>Act</Text>
+          <Text style={[styles.tableHeaderCell, { width: '26%', textAlign: 'right' }]}>Total Value</Text>
+        </View>
+        
+        {schedule.map((row) => {
+          const isCurrent = row.week === currentWeek && !row.isSettlement;
+          const isSettledRow = row.isSettlement;
+          const rowStyle = isCurrent 
+            ? [styles.tableRow, styles.tableRowCurrent]
+            : isSettledRow
+              ? [styles.tableRow, styles.tableRowSettled]
+              : styles.tableRow;
+              
+          const cellColor = isCurrent 
+            ? colors.primary 
+            : isSettledRow
+              ? '#d97706'
+              : colors.text;
+              
+          return (
+            <View key={row.week} style={rowStyle}>
+              <Text style={[styles.tableCell, { width: '15%', fontWeight: '600', color: cellColor }]}>
+                {row.isSettlement ? `${row.week} (Settle)` : row.week}
+              </Text>
+              <Text style={[styles.tableCell, { width: '15%', color: cellColor }]}>
+                {row.weeklyPayment > 0 ? `₹${row.weeklyPayment}` : '-'}
+              </Text>
+              <Text style={[styles.tableCell, { width: '18%', color: cellColor }]}>
+                {row.isLocked ? 'LOCKED' : row.priceAmount ? `₹${row.priceAmount}` : '-'}
+              </Text>
+              <Text style={[styles.tableCell, { width: '14%', color: cellColor }]}>
+                {row.isLocked ? 'LOCKED' : `₹${row.dividend}`}
+              </Text>
+              <Text style={[styles.tableCell, { width: '12%', color: cellColor }]}>
+                {row.isLocked ? 'LOCKED' : `${row.actionPercentage}%`}
+              </Text>
+              <Text style={[styles.tableCell, { width: '26%', textAlign: 'right', fontWeight: 'bold', color: cellColor }]}>
+                {row.isLocked 
+                  ? 'LOCKED' 
+                  : `₹${row.totalValue.toLocaleString('en-IN')} (${row.profitPercentage}%)`}
               </Text>
             </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Processing Fee</Text>
-              <Text style={styles.detailValue}>{chit.processingFee}%</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Start Date</Text>
-              <Text style={styles.detailValue}>{chit.startDate}</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>End Date</Text>
-              <Text style={styles.detailValue}>{chit.endDate}</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Status</Text>
-              <View style={[styles.statusBadge, { backgroundColor: chit.status === 'active' ? colors.successLight : colors.infoLight }]}>
-                <Text style={[styles.statusText, { color: chit.status === 'active' ? colors.success : colors.info }]}>
-                  {chit.status.charAt(0).toUpperCase() + chit.status.slice(1)}
-                </Text>
-              </View>
-            </View>
-          </View>
-        );
-      })()}
+          );
+        })}
+      </View>
+    );
+  };
 
-      {chit.features && (
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Features</Text>
-          <View style={styles.featureList}>
-            {chit.features.map((f, i) => (
-              <View key={i} style={styles.featureItem}>
-                <MaterialCommunityIcons name="check-circle" size={18} color={colors.success} />
-                <Text style={styles.featureItemText}>{f}</Text>
+  const renderOverview = () => {
+    const isWeekly = chit.isWeekly || false;
+    const baseAmount = isWeekly ? (chit.weeklyAmount || 200) : chit.monthlyAmount;
+    const totalPotVal = isWeekly ? (chit.totalContribution || 2000) : chit.totalPot;
+    const durationLabel = isWeekly ? `${chit.totalWeeks || 10} Weeks` : `${chit.duration || 20} Months`;
+
+    return (
+      <View>
+        <View style={styles.overviewHero}>
+          <LinearGradient colors={['#064e3b', '#065f46', '#047857']} style={styles.overviewHeroInner}>
+            <Text style={styles.overviewHeroName}>{chit.name}</Text>
+            <Text style={styles.overviewHeroDesc}>{chit.description}</Text>
+            <View style={styles.overviewHeroRow}>
+              <View style={styles.overviewHeroItem}>
+                <Text style={styles.overviewHeroLabel}>{isWeekly ? 'Weekly' : 'Monthly'}</Text>
+                <Text style={styles.overviewHeroValue}>{formatCurrency(baseAmount)}</Text>
               </View>
-            ))}
-          </View>
+              <View style={styles.overviewHeroItem}>
+                <Text style={styles.overviewHeroLabel}>Duration</Text>
+                <Text style={styles.overviewHeroValue}>{durationLabel}</Text>
+              </View>
+              <View style={styles.overviewHeroItem}>
+                <Text style={styles.overviewHeroLabel}>Total Contribution</Text>
+                <Text style={styles.overviewHeroValue}>{formatCurrency(totalPotVal)}</Text>
+              </View>
+            </View>
+          </LinearGradient>
         </View>
-      )}
 
-      {(() => {
-        const isFull = chit.availableSlots <= 0;
-        const hasJoined = myChits.some(m => m.chitId === chit._id);
-        const isClosed = chit.status === 'closed' || chit.status === 'completed' || chit.status === 'archived';
-        const isDisabled = isFull || hasJoined || isClosed;
-        return (
-          <TouchableOpacity
-            style={[styles.joinNowBtn, isDisabled && styles.joinNowBtnDisabled]}
-            activeOpacity={0.85}
-            onPress={() => {
-              if (isFull) {
-                Alert.alert('Slot Full', 'This Chit is already full.');
-              } else if (!hasJoined && !isClosed) {
-                navigation.navigate('JoinChit', { chitId: chit._id });
-              }
-            }}
-            disabled={isDisabled}
-          >
-            <Text style={[styles.joinNowBtnText, isDisabled && styles.joinNowBtnTextDisabled]}>
-              {isFull ? 'Slot Full' : isClosed ? 'Closed' : hasJoined ? 'Already Joined' : 'Join This Chit'}
-            </Text>
-            {!isDisabled && <MaterialCommunityIcons name="arrow-right" size={20} color={colors.white} />}
-          </TouchableOpacity>
-        );
-      })()}
-    </View>
-  );
+        {(() => {
+          const myMembership = myChits.find(m => m.chitId === chit._id) || chit.myMembership;
+          const totalMembers = chit.totalMembers || 0;
+          const availableSlots = chit.availableSlots || 0;
+          const filledMembers = Math.max(0, totalMembers - availableSlots);
+          const remainingSlots = availableSlots;
+
+          if (myMembership) {
+            // ── PENDING: awaiting admin approval ──────────────────────────
+            if (myMembership.status === 'pending') {
+              return (
+                <View style={styles.sectionCard}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                    <MaterialCommunityIcons name="clock-outline" size={28} color={themeColors.warning} />
+                    <Text style={{ fontSize: 16, fontWeight: '800', color: themeColors.warning }}>Pending Admin Approval</Text>
+                  </View>
+                  <View style={{ backgroundColor: themeColors.warningLight, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: themeColors.warning }}>
+                    <Text style={{ fontSize: 13, color: themeColors.text, lineHeight: 20 }}>
+                      Your Chit Fund request has been submitted and is waiting for Admin approval.{'\n\n'}
+                      Once approved, your membership will become active and you will receive a notification.
+                    </Text>
+                    <View style={{ marginTop: 12, gap: 6 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: 12, color: themeColors.textSecondary, fontWeight: '600' }}>Plan</Text>
+                        <Text style={{ fontSize: 12, color: themeColors.text, fontWeight: '700' }}>{chit.name}</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: 12, color: themeColors.textSecondary, fontWeight: '600' }}>{isWeekly ? 'Weekly' : 'Monthly'} Amount</Text>
+                        <Text style={{ fontSize: 12, color: themeColors.text, fontWeight: '700' }}>{formatCurrency(baseAmount)}</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: 12, color: themeColors.textSecondary, fontWeight: '600' }}>Duration</Text>
+                        <Text style={{ fontSize: 12, color: themeColors.text, fontWeight: '700' }}>{durationLabel}</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: 12, color: themeColors.textSecondary, fontWeight: '600' }}>Total Contribution</Text>
+                        <Text style={{ fontSize: 12, color: themeColors.text, fontWeight: '700' }}>{formatCurrency(totalPotVal)}</Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              );
+            }
+
+            // ── REJECTED ────────────────────────────────────────────────
+            if (myMembership.status === 'rejected') {
+              return (
+                <View style={styles.sectionCard}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                    <MaterialCommunityIcons name="close-circle-outline" size={28} color={themeColors.error} />
+                    <Text style={{ fontSize: 16, fontWeight: '800', color: themeColors.error }}>Chit Request Rejected</Text>
+                  </View>
+                  <View style={{ backgroundColor: themeColors.errorLight, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: themeColors.error }}>
+                    <Text style={{ fontSize: 13, color: themeColors.text, lineHeight: 20 }}>
+                      {myMembership.rejectionReason
+                        ? `Your Chit Fund request was not approved.\n\nReason: ${myMembership.rejectionReason}`
+                        : 'Your Chit Fund request was not approved. Please contact support for more information.'}
+                    </Text>
+                  </View>
+                </View>
+              );
+            }
+
+            const userJoinedDate = myMembership.joinedAt 
+              ? new Date(myMembership.joinedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+              : 'N/A';
+            
+            const currentUnit = isWeekly ? (myMembership.currentWeek || 0) : (myMembership.currentMonth || 0);
+            const totalUnits = isWeekly ? (chit.totalWeeks || 10) : (chit.duration || 20);
+            const installmentsPaid = isWeekly ? (myMembership.paidWeeks || 0) : (myMembership.currentMonth || 0);
+            const remainingInstallments = Math.max(0, totalUnits - currentUnit);
+            
+            const totalPaid = myMembership.totalPaid || 0;
+            const remainingAmount = Math.max(0, totalPotVal - totalPaid);
+            const nextDueStr = myMembership.nextDueDate || 'N/A';
+            const dueStatus = myMembership.pendingInstallments > 0 ? 'Pending' : 'Paid';
+
+
+            const eligibleStart = totalUnits === 10 ? 5 : 10;
+            const isEligible = isWeekly && currentUnit >= eligibleStart;
+            const isWithdrawn = myMembership.withdrawalStatus === 'completed';
+
+            return (
+              <View>
+                {/* Penalty Alert Banner */}
+                {myMembership.penaltiesUnpaid > 0 && (
+                  <View style={styles.penaltyAlertCard}>
+                    <MaterialCommunityIcons name="alert-circle" size={24} color={colors.error} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontWeight: 'bold', color: colors.error }}>Overdue Penalty Applied</Text>
+                      <Text style={{ fontSize: 12, color: colors.textSecondary }}>A ₹{myMembership.penaltiesUnpaid} overdue fee has been added to your dues. Please clear it immediately.</Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* Payout & Withdrawal Action Card */}
+                {isWeekly && (
+                  <View style={styles.sectionCard}>
+                    <Text style={styles.sectionTitle}>Chit Fund Payout / Withdrawal</Text>
+                    {isWithdrawn ? (
+                      <View style={{ backgroundColor: themeColors.surface2, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: themeColors.border }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                          <MaterialCommunityIcons name="check-decagram" size={24} color={themeColors.success} />
+                          <Text style={{ fontSize: 15, fontWeight: '800', color: themeColors.success }}>Chit Amount Already Withdrawn</Text>
+                        </View>
+                        <View style={styles.detailRow}>
+                          <Text style={styles.detailLabel}>Withdrawn In Week</Text>
+                          <Text style={styles.detailValue}>Week {myMembership.withdrawalWeek}</Text>
+                        </View>
+                        <View style={styles.detailRow}>
+                          <Text style={styles.detailLabel}>Withdrawn Amount</Text>
+                          <Text style={{ fontSize: 16, fontWeight: '800', color: themeColors.success }}>{formatCurrency(myMembership.withdrawalAmount)}</Text>
+                        </View>
+                        <Text style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 10, lineHeight: 18 }}>
+                          Your payout has been credited to your Growvest balance. Please continue paying the remaining weekly dues ({remainingInstallments} weeks left).
+                        </Text>
+                      </View>
+                    ) : isEligible ? (
+                      <View>
+                        <View style={{ backgroundColor: themeColors.primaryLight, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: themeColors.primary, marginBottom: 16 }}>
+                          <Text style={{ fontWeight: 'bold', color: themeColors.primary, fontSize: 14, marginBottom: 12 }}>Current Eligible Payout Breakdown (Week {currentUnit})</Text>
+                          {(() => {
+                            const row = getWeeklyRowData(baseAmount, totalUnits, currentUnit);
+                            const totalDividend = totalUnits === 10 ? (baseAmount * 66 / 100) : (baseAmount * 198 / 100);
+                            return (
+                              <>
+                                <View style={styles.detailRow}>
+                                  <Text style={styles.detailLabel}>Price Amount</Text>
+                                  <Text style={styles.detailValue}>{formatCurrency(row.priceAmount)}</Text>
+                                </View>
+                                <View style={styles.detailRow}>
+                                  <Text style={styles.detailLabel}>Share Dividend</Text>
+                                  <Text style={styles.detailValue}>{formatCurrency(totalDividend)}</Text>
+                                </View>
+                                <View style={styles.detailRow}>
+                                  <Text style={styles.detailLabel}>Total Value (Withdrawal Amount)</Text>
+                                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: themeColors.primary }}>{formatCurrency(row.totalValue)}</Text>
+                                </View>
+                              </>
+                            );
+                          })()}
+                        </View>
+                        <TouchableOpacity
+                          style={styles.withdrawBtn}
+                          activeOpacity={0.85}
+                          onPress={() => handleWithdrawal(myMembership._id)}
+                        >
+                          <MaterialCommunityIcons name="cash-fast" size={20} color={themeColors.white} />
+                          <Text style={styles.joinNowBtnText}>Withdraw Payout</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <View style={{ backgroundColor: themeColors.surface2, padding: 14, borderRadius: 12, alignItems: 'center' }}>
+                        <Text style={{ fontSize: 13, fontWeight: '600', color: themeColors.textSecondary }}>
+                          🔒 Payout locked until Week {eligibleStart}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+
+                {/* Membership Details */}
+                <View style={styles.sectionCard}>
+                  <Text style={styles.sectionTitle}>My Chit Status & Details</Text>
+                  
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Chit ID</Text>
+                    <Text style={styles.detailValue}>{chit._id}</Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Total Chit Value</Text>
+                    <Text style={styles.detailValue}>{formatCurrency(totalPotVal)}</Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>{isWeekly ? 'Weekly Payment' : 'Monthly Payment'}</Text>
+                    <Text style={styles.detailValue}>{formatCurrency(baseAmount)}</Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>User Join Date</Text>
+                    <Text style={styles.detailValue}>{userJoinedDate}</Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Current Week</Text>
+                    <Text style={styles.detailValue}>Week {currentUnit} of {totalUnits}</Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Next Due Date</Text>
+                    <Text style={styles.detailValue}>{nextDueStr}</Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Due Status</Text>
+                    <View style={[styles.statusBadge, { backgroundColor: dueStatus === 'Paid' ? themeColors.successLight : themeColors.warningLight }]}>
+                      <Text style={[styles.statusText, { color: dueStatus === 'Paid' ? themeColors.success : themeColors.warning }]}>
+                        {dueStatus}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Total Amount Paid</Text>
+                    <Text style={styles.detailValue}>{formatCurrency(totalPaid)}</Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Remaining Amount</Text>
+                    <Text style={styles.detailValue}>{formatCurrency(remainingAmount)}</Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Dues Paid</Text>
+                    <Text style={styles.detailValue}>{installmentsPaid} of {totalUnits} {isWeekly ? 'Weeks' : 'Months'}</Text>
+                  </View>
+                </View>
+
+                {renderWeeklyTable()}
+              </View>
+            );
+          }
+
+          return (
+            <View>
+              <View style={styles.sectionCard}>
+                <Text style={styles.sectionTitle}>Plan Details</Text>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Total Members</Text>
+                  <Text style={styles.detailValue}>{totalMembers}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Filled Members</Text>
+                  <Text style={styles.detailValue}>{filledMembers}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Available Slots</Text>
+                  <Text style={[styles.detailValue, remainingSlots > 0 ? { color: colors.success } : { color: colors.error }]}>
+                    {remainingSlots > 0 ? `${remainingSlots} Open` : 'Full'}
+                  </Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Processing Fee</Text>
+                  <Text style={styles.detailValue}>{chit.processingFee}%</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Payment Schedule</Text>
+                  <Text style={styles.detailValue}>{isWeekly ? 'Every Sunday' : 'Monthly'}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Status</Text>
+                  <View style={[styles.statusBadge, { backgroundColor: chit.status === 'active' ? colors.successLight : colors.infoLight }]}>
+                    <Text style={[styles.statusText, { color: chit.status === 'active' ? colors.success : colors.info }]}>
+                      {chit.status.charAt(0).toUpperCase() + chit.status.slice(1)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              
+              {renderWeeklyTable()}
+            </View>
+          );
+        })()}
+
+        {chit.features && (
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Features</Text>
+            <View style={styles.featureList}>
+              {chit.features.map((f, i) => (
+                <View key={i} style={styles.featureItem}>
+                  <MaterialCommunityIcons name="check-circle" size={18} color={colors.success} />
+                  <Text style={styles.featureItemText}>{f}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {(() => {
+          const isFull = chit.availableSlots <= 0;
+          const hasJoined = myChits.some(m => m.chitId === chit._id);
+          const isClosed = chit.status === 'closed' || chit.status === 'completed' || chit.status === 'archived';
+          const isDisabled = isFull || hasJoined || isClosed;
+          return (
+            <TouchableOpacity
+              style={[styles.joinNowBtn, isDisabled && styles.joinNowBtnDisabled]}
+              activeOpacity={0.85}
+              onPress={() => {
+                if (isFull) {
+                  Alert.alert('Slot Full', 'This Chit is already full.');
+                } else if (!hasJoined && !isClosed) {
+                  navigation.navigate('JoinChit', { chitId: chit._id });
+                }
+              }}
+              disabled={isDisabled}
+            >
+              <Text style={[styles.joinNowBtnText, isDisabled && styles.joinNowBtnTextDisabled]}>
+                {isFull ? 'Slot Full' : isClosed ? 'Closed' : hasJoined ? 'Already Joined' : 'Join This Chit'}
+              </Text>
+              {!isDisabled && <MaterialCommunityIcons name="arrow-right" size={20} color={colors.white} />}
+            </TouchableOpacity>
+          );
+        })()}
+      </View>
+    );
+  };
 
   const renderMembers = () => (
     <View style={styles.sectionCard}>
@@ -346,86 +611,44 @@ const ChitDetailsScreen = ({ navigation, route }) => {
     </View>
   );
 
-  const renderPayments = () => (
-    <View style={styles.sectionCard}>
-      <Text style={styles.sectionTitle}>Payment History</Text>
-      {payments.length === 0 ? (
-        <Text style={{color: colors.textSecondary}}>No payments found.</Text>
-      ) : (
-        payments.map((payment) => (
-          <View key={payment._id} style={styles.paymentRow}>
-            <View style={styles.paymentLeft}>
-              <View style={[styles.paymentDot, { backgroundColor: payment.status === 'approved' || payment.status === 'paid' ? colors.success : colors.warning }]} />
-              <View>
-                <Text style={styles.paymentMonth}>Month {payment.month}</Text>
-                <Text style={styles.paymentDate}>Amount: {formatCurrency(payment.amount)}</Text>
-              </View>
-            </View>
-            <View style={styles.paymentRight}>
-              <Text style={styles.paymentAmount}>{formatCurrency(payment.amount + (payment.lateFee || 0))}</Text>
-              <View style={[styles.paymentStatusBadge, { backgroundColor: payment.status === 'approved' || payment.status === 'paid' ? colors.successLight : '#fef9c3' }]}>
-                <Text style={[styles.paymentStatusText, { color: payment.status === 'approved' || payment.status === 'paid' ? colors.success : colors.warning }]}>
-                  {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
-                </Text>
-              </View>
-            </View>
-          </View>
-        ))
-      )}
-    </View>
-  );
-
-  const renderAuction = () => {
+  const renderPayments = () => {
+    const isWeekly = chit?.isWeekly || false;
     return (
-      <View>
-        <View style={styles.sectionCard}>
-          <View style={styles.auctionHeader}>
-            <MaterialCommunityIcons name="gavel" size={28} color={colors.primary} />
-            <Text style={styles.sectionTitle}>Auction Information</Text>
-          </View>
-          {auction ? (
-            <>
-              <View style={styles.auctionCountdown}>
-                <Text style={styles.auctionCountdownLabel}>Next Auction</Text>
-                <Text style={styles.auctionCountdownDate}>{auction.auctionDate}</Text>
-                <View style={styles.countdownBadge}>
-                  <MaterialCommunityIcons name="clock-outline" size={16} color={colors.white} />
-                  <Text style={styles.countdownText}>{auction.countdown || 'Soon'}</Text>
+      <View style={styles.sectionCard}>
+        <Text style={styles.sectionTitle}>Payment History</Text>
+        {payments.length === 0 ? (
+          <Text style={{color: colors.textSecondary}}>No payments found.</Text>
+        ) : (
+          payments.map((payment) => (
+            <View key={payment._id} style={styles.paymentRow}>
+              <View style={styles.paymentLeft}>
+                <View style={[styles.paymentDot, { backgroundColor: payment.status === 'approved' || payment.status === 'paid' ? colors.success : colors.warning }]} />
+                <View>
+                  <Text style={styles.paymentMonth}>{isWeekly ? 'Week' : 'Month'} {payment.month}</Text>
+                  <Text style={styles.paymentDate}>Base amount: {formatCurrency(payment.amount - (payment.lateFee || 0))}</Text>
+                  {payment.lateFee > 0 && <Text style={{ fontSize: 11, color: colors.error }}>Penalty Applied: {formatCurrency(payment.lateFee)}</Text>}
                 </View>
               </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Month</Text>
-                <Text style={styles.detailValue}>Month {auction.month}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Participants</Text>
-                <Text style={styles.detailValue}>{auction.participants || chit.totalMembers}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Status</Text>
-                <View style={[styles.statusBadge, { backgroundColor: colors.infoLight }]}>
-                  <Text style={[styles.statusText, { color: colors.info }]}>
-                    {auction.status?.charAt(0).toUpperCase() + auction.status?.slice(1) || 'Pending'}
+              <View style={styles.paymentRight}>
+                <Text style={styles.paymentAmount}>{formatCurrency(payment.amount)}</Text>
+                <View style={[styles.paymentStatusBadge, { backgroundColor: payment.status === 'approved' || payment.status === 'paid' ? colors.successLight : '#fef9c3' }]}>
+                  <Text style={[styles.paymentStatusText, { color: payment.status === 'approved' || payment.status === 'paid' ? colors.success : colors.warning }]}>
+                    {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
                   </Text>
                 </View>
               </View>
-            </>
-          ) : (
-            <View style={styles.comingSoonBanner}>
-              <MaterialCommunityIcons name="clock-fast" size={20} color={colors.info} />
-              <Text style={styles.comingSoonText}>Auction details will be available soon.</Text>
             </View>
-          )}
-        </View>
+          ))
+        )}
       </View>
     );
   };
 
   const renderWinners = () => (
     <View style={styles.sectionCard}>
-      <Text style={styles.sectionTitle}>Winner History</Text>
+      <Text style={styles.sectionTitle}>Winner / Payout History</Text>
       {winners.length === 0 ? (
-        <Text style={{color: colors.textSecondary}}>No winners yet.</Text>
+        <Text style={{color: colors.textSecondary}}>No payouts claimed yet.</Text>
       ) : (
         winners.map((winner, index) => (
           <View key={winner._id} style={[styles.winnerRow, index < winners.length - 1 && styles.memberRowBorder]}>
@@ -435,41 +658,12 @@ const ChitDetailsScreen = ({ navigation, route }) => {
               </View>
               <View>
                 <Text style={styles.winnerName}>{winner.user?.username || 'Unknown'}</Text>
-                <Text style={styles.winnerMonth}>Month {winner.month}</Text>
+                <Text style={styles.winnerMonth}>Week/Month {winner.month}</Text>
               </View>
             </View>
             <View style={styles.winnerRight}>
               <Text style={styles.winnerAmount}>{formatCurrency(winner.winningAmount)}</Text>
-              <Text style={styles.winnerDiscount}>-{formatCurrency(winner.discount)} discount</Text>
-            </View>
-          </View>
-        ))
-      )}
-    </View>
-  );
-
-  const renderDividends = () => (
-    <View style={styles.sectionCard}>
-      <Text style={styles.sectionTitle}>Dividend History</Text>
-      {dividends.length === 0 ? (
-        <Text style={{color: colors.textSecondary}}>No dividends distributed yet.</Text>
-      ) : (
-        dividends.map((div) => (
-          <View key={div._id} style={styles.paymentRow}>
-            <View style={styles.paymentLeft}>
-              <View style={[styles.paymentDot, { backgroundColor: div.status === 'credited' ? colors.success : colors.textTertiary }]} />
-              <View>
-                <Text style={styles.paymentMonth}>Month {div.month}</Text>
-                <Text style={styles.paymentDate}>{div.creditedAt || 'Pending'}</Text>
-              </View>
-            </View>
-            <View style={styles.paymentRight}>
-              <Text style={styles.paymentAmount}>{formatCurrency(div.amount)}</Text>
-              <View style={[styles.paymentStatusBadge, { backgroundColor: div.status === 'credited' ? colors.successLight : '#f3f4f6' }]}>
-                <Text style={[styles.paymentStatusText, { color: div.status === 'credited' ? colors.success : colors.textTertiary }]}>
-                  {div.status.charAt(0).toUpperCase() + div.status.slice(1)}
-                </Text>
-              </View>
+              <Text style={styles.winnerDiscount}>Payout Claimed</Text>
             </View>
           </View>
         ))
@@ -531,7 +725,6 @@ const ChitDetailsScreen = ({ navigation, route }) => {
   const myMembership = myChits.find(m => m.chitId === chitId);
   const isPendingApproval = myMembership?.status === 'pending';
 
-  // Filter available tabs based on approval status
   const visibleTabs = isPendingApproval
     ? [
         { key: 'overview', label: 'Overview', icon: 'view-dashboard' },
@@ -554,7 +747,7 @@ const ChitDetailsScreen = ({ navigation, route }) => {
   );
 
   const renderTabContent = () => {
-    if (isPendingApproval && ['members', 'payments', 'auction', 'winners', 'dividends'].includes(activeTab)) {
+    if (isPendingApproval && ['members', 'payments', 'winners'].includes(activeTab)) {
       return (
         <View style={styles.sectionCard}>
           {renderPendingApprovalCard()}
@@ -572,9 +765,7 @@ const ChitDetailsScreen = ({ navigation, route }) => {
         );
       case 'members': return renderMembers();
       case 'payments': return renderPayments();
-      case 'auction': return renderAuction();
       case 'winners': return renderWinners();
-      case 'dividends': return renderDividends();
       case 'rules': return renderRules();
       case 'faq': return renderFaq();
       case 'support': return renderSupport();
@@ -599,24 +790,24 @@ const ChitDetailsScreen = ({ navigation, route }) => {
       ) : (
         <>
           {/* Tab Bar */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabBar} contentContainerStyle={styles.tabBarContent}>
-        {visibleTabs.map((tab) => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[styles.tab, activeTab === tab.key && styles.tabActive]}
-            onPress={() => setActiveTab(tab.key)}
-          >
-            <MaterialCommunityIcons
-              name={tab.icon}
-              size={16}
-              color={activeTab === tab.key ? colors.primary : colors.textTertiary}
-            />
-            <Text style={[styles.tabLabel, activeTab === tab.key && styles.tabLabelActive]}>
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabBar} contentContainerStyle={styles.tabBarContent}>
+            {visibleTabs.map((tab) => (
+              <TouchableOpacity
+                key={tab.key}
+                style={[styles.tab, activeTab === tab.key && styles.tabActive]}
+                onPress={() => setActiveTab(tab.key)}
+              >
+                <MaterialCommunityIcons
+                  name={tab.icon}
+                  size={16}
+                  color={activeTab === tab.key ? colors.primary : colors.textTertiary}
+                />
+                <Text style={[styles.tabLabel, activeTab === tab.key && styles.tabLabelActive]}>
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
 
           <ScrollView
             style={styles.scrollView}
@@ -655,24 +846,24 @@ const getStyles = (colors) => StyleSheet.create({
   // Overview Hero
   overviewHero: { borderRadius: 20, overflow: 'hidden', marginBottom: 16, ...colors.shadow.elevated },
   overviewHeroInner: { padding: 24 },
-  overviewHeroName: { fontSize: 24, fontWeight: '700', color: colors.white, marginBottom: 6 },
+  overviewHeroName: { fontSize: 20, fontWeight: '700', color: colors.white, marginBottom: 6 },
   overviewHeroDesc: { fontSize: 13, color: 'rgba(255,255,255,0.8)', lineHeight: 20, marginBottom: 20 },
   overviewHeroRow: { flexDirection: 'row', justifyContent: 'space-between' },
   overviewHeroItem: { alignItems: 'center', flex: 1 },
-  overviewHeroLabel: { fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: '600', textTransform: 'uppercase', marginBottom: 4 },
-  overviewHeroValue: { fontSize: 18, fontWeight: '700', color: colors.white },
+  overviewHeroLabel: { fontSize: 10, color: 'rgba(255,255,255,0.7)', fontWeight: '600', textTransform: 'uppercase', marginBottom: 4 },
+  overviewHeroValue: { fontSize: 16, fontWeight: '700', color: colors.white },
   // Section Card
-  sectionCard: { backgroundColor: colors.white, borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: colors.borderLight, ...colors.shadow.card },
-  sectionTitle: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: 16 },
+  sectionCard: { backgroundColor: colors.surface, borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: colors.borderLight, ...colors.shadow.card },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 16 },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
-  detailLabel: { fontSize: 14, color: colors.textSecondary },
-  detailValue: { fontSize: 14, fontWeight: '600', color: colors.text },
+  detailLabel: { fontSize: 13, color: colors.textSecondary },
+  detailValue: { fontSize: 13, fontWeight: '600', color: colors.text },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  statusText: { fontSize: 12, fontWeight: '700' },
+  statusText: { fontSize: 11, fontWeight: '700' },
   // Features
   featureList: { gap: 12 },
   featureItem: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  featureItemText: { fontSize: 14, color: colors.text },
+  featureItemText: { fontSize: 13, color: colors.text },
   // Join Button
   joinNowBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
@@ -680,57 +871,110 @@ const getStyles = (colors) => StyleSheet.create({
     ...colors.shadow.button, marginBottom: 16,
   },
   joinNowBtnDisabled: {
-    backgroundColor: '#E2E8F0',
+    backgroundColor: colors.muted,
   },
-  joinNowBtnText: { fontSize: 17, fontWeight: '700', color: colors.white },
-  joinNowBtnTextDisabled: { color: '#64748B' },
+  joinNowBtnText: { fontSize: 16, fontWeight: '700', color: colors.white },
+  joinNowBtnTextDisabled: { color: colors.textTertiary },
   // Members
   memberRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
   memberRowBorder: { borderBottomWidth: 1, borderBottomColor: colors.borderLight },
   memberAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   memberAvatarText: { fontSize: 16, fontWeight: '700', color: colors.primary },
   memberInfo: { flex: 1 },
-  memberName: { fontSize: 15, fontWeight: '600', color: colors.text, marginBottom: 2 },
-  memberNumber: { fontSize: 12, color: colors.textSecondary },
-  memberJoinDate: { fontSize: 11, color: colors.textTertiary, marginTop: 2 },
+  memberName: { fontSize: 14, fontWeight: '600', color: colors.text, marginBottom: 2 },
+  memberNumber: { fontSize: 11, color: colors.textSecondary },
+  memberJoinDate: { fontSize: 10, color: colors.textTertiary, marginTop: 2 },
   memberStatus: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   memberWon: { backgroundColor: colors.successLight },
-  memberNotWon: { backgroundColor: '#f3f4f6' },
-  memberStatusText: { fontSize: 11, fontWeight: '700' },
+  memberNotWon: { backgroundColor: colors.surface2 },
+  memberStatusText: { fontSize: 10, fontWeight: '700' },
   // Payments
   paymentRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
   paymentLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   paymentDot: { width: 10, height: 10, borderRadius: 5 },
-  paymentMonth: { fontSize: 14, fontWeight: '600', color: colors.text, marginBottom: 2 },
-  paymentDate: { fontSize: 11, color: colors.textSecondary },
+  paymentMonth: { fontSize: 13, fontWeight: '600', color: colors.text, marginBottom: 2 },
+  paymentDate: { fontSize: 10, color: colors.textSecondary },
   paymentRight: { alignItems: 'flex-end' },
-  paymentAmount: { fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 4 },
+  paymentAmount: { fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 4 },
   paymentStatusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  paymentStatusText: { fontSize: 10, fontWeight: '700' },
-  // Auction
-  auctionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
-  auctionCountdown: { alignItems: 'center', paddingVertical: 20, marginBottom: 16, backgroundColor: colors.primaryLight, borderRadius: 16 },
-  auctionCountdownLabel: { fontSize: 12, color: colors.textSecondary, fontWeight: '600', marginBottom: 4 },
-  auctionCountdownDate: { fontSize: 20, fontWeight: '700', color: colors.text, marginBottom: 12 },
-  countdownBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, gap: 6 },
-  countdownText: { fontSize: 14, fontWeight: '700', color: colors.white },
-  comingSoonBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.infoLight, padding: 14, borderRadius: 12, marginTop: 16, gap: 10 },
-  comingSoonText: { fontSize: 13, color: colors.info, fontWeight: '500', flex: 1 },
+  paymentStatusText: { fontSize: 9, fontWeight: '700' },
   // Winners
   winnerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 },
   winnerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  winnerRank: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#fef3c7', justifyContent: 'center', alignItems: 'center' },
-  winnerRankText: { fontSize: 13, fontWeight: '700', color: '#d97706' },
-  winnerName: { fontSize: 15, fontWeight: '600', color: colors.text, marginBottom: 2 },
-  winnerMonth: { fontSize: 12, color: colors.textSecondary },
+  winnerRank: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.goldLight, justifyContent: 'center', alignItems: 'center' },
+  winnerRankText: { fontSize: 12, fontWeight: '700', color: colors.gold },
+  winnerName: { fontSize: 14, fontWeight: '600', color: colors.text, marginBottom: 2 },
+  winnerMonth: { fontSize: 11, color: colors.textSecondary },
   winnerRight: { alignItems: 'flex-end' },
-  winnerAmount: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 2 },
-  winnerDiscount: { fontSize: 11, color: colors.success },
+  winnerAmount: { fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 2 },
+  winnerDiscount: { fontSize: 10, color: colors.success },
   // Rule Link
   ruleLink: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.background, borderRadius: 14, gap: 14 },
   ruleLinkText: { flex: 1 },
-  ruleLinkTitle: { fontSize: 15, fontWeight: '600', color: colors.text, marginBottom: 2 },
-  ruleLinkSub: { fontSize: 12, color: colors.textSecondary },
+  ruleLinkTitle: { fontSize: 14, fontWeight: '600', color: colors.text, marginBottom: 2 },
+  ruleLinkSub: { fontSize: 11, color: colors.textSecondary },
+  
+  // Weekly Table styles
+  tableHeader: {
+    flexDirection: 'row',
+    backgroundColor: colors.primaryDark || colors.primary,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    marginBottom: 4
+  },
+  tableHeaderCell: {
+    color: colors.white,
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  tableRow: {
+    flexDirection: 'row',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+    alignItems: 'center'
+  },
+  tableRowCurrent: {
+    backgroundColor: colors.primaryLight,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: 8,
+    marginVertical: 2
+  },
+  tableRowSettled: {
+    backgroundColor: colors.warningLight,
+    borderWidth: 1,
+    borderColor: colors.warning,
+    borderRadius: 8,
+    marginVertical: 2
+  },
+  tableCell: {
+    fontSize: 11,
+    color: colors.text,
+  },
+  withdrawBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    paddingVertical: 14,
+    borderRadius: 14,
+    gap: 8,
+    ...colors.shadow.button
+  },
+  penaltyAlertCard: {
+    backgroundColor: colors.errorLight,
+    borderColor: colors.error,
+    borderWidth: 1,
+    padding: 14,
+    borderRadius: 16,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10
+  }
 });
 
 export default ChitDetailsScreen;

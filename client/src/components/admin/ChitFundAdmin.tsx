@@ -121,7 +121,7 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
 
   // ─── Actions ──────────────────────────────────────────────────────
 
-  const handleAction = async (type: string, id: string, status: string) => {
+  const handleAction = async (type: string, id: string, status: string, rejectionReason?: string) => {
     if (!token) return;
     try {
       setLoading(true);
@@ -131,11 +131,20 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
           ? `${API_URL}/api/chits/join/${id}/status`
           : `${API_URL}/api/chits/${id}/status`;
 
-      await fetch(url, {
+      const body: any = { status };
+      if (rejectionReason) body.rejectionReason = rejectionReason;
+
+      const res = await fetch(url, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ status })
+        body: JSON.stringify(body)
       });
+
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.message || 'Action failed');
+        return;
+      }
       
       if (type === 'payment') fetchPayments();
       if (type === 'join') fetchJoins();
@@ -460,8 +469,16 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
                     </div>
                     <p className="text-sm text-muted-foreground mb-2">{chit.description}</p>
                     <div className="flex flex-wrap gap-4 text-sm">
-                      <span className="font-semibold">₹{chit.monthlyAmount?.toLocaleString('en-IN')}/mo</span>
-                      <span>{chit.duration} Months</span>
+                      <span className="font-semibold">
+                        {chit.isWeekly 
+                          ? `₹${(chit.weeklyAmount || chit.monthlyAmount)?.toLocaleString('en-IN')}/wk` 
+                          : `₹${chit.monthlyAmount?.toLocaleString('en-IN')}/mo`}
+                      </span>
+                      <span>
+                        {chit.isWeekly 
+                          ? `${chit.totalWeeks || chit.duration} Weeks` 
+                          : `${chit.duration} Months`}
+                      </span>
                       <span>{chit.totalMembers} Members</span>
                       <span>{chit.availableSlots} Slots Left</span>
                       <span>Pot: ₹{chit.totalPot?.toLocaleString('en-IN')}</span>
@@ -654,44 +671,105 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
       {/* ─── JOIN REQUESTS ──────────────────────────────────────────── */}
       {subTab === "joins" && (
         <div>
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search by name, email, or chit..."
-              className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          <div className="flex flex-col sm:flex-row gap-4 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search by name, email, or chit..."
+                className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Button variant="outline" size="sm" onClick={fetchJoins} disabled={loading}>
+              <RefreshCw className="w-4 h-4 mr-1" /> Refresh
+            </Button>
           </div>
           <div className="space-y-4">
-            {filteredJoins.map(j => (
-              <div key={j.transactionId || j._id} className="card-premium p-4">
-                <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-1">
-                      <h3 className="font-bold">{j.userName}</h3>
-                      <span className={`text-[10px] font-bold px-2 py-1 rounded-full border ${statusStyle[j.status] || ''}`}>
-                        {j.status}
-                      </span>
+            {filteredJoins.map((j: any) => {
+              const isPending = j.status === 'pending';
+              const isApproved = j.status === 'active' || j.adminApprovalStatus === 'approved';
+              const isRejected = j.status === 'rejected' || j.adminApprovalStatus === 'rejected';
+              return (
+                <div key={j._id} className={`card-premium p-4 ${isRejected ? 'opacity-70' : ''}`}>
+                  <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-1">
+                        <h3 className="font-bold">{j.userName}</h3>
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded-full border ${
+                          isApproved ? 'bg-green-50 text-green-700 border-green-200' :
+                          isRejected ? 'bg-red-50 text-red-600 border-red-200' :
+                          'bg-amber-50 text-amber-700 border-amber-200'
+                        }`}>
+                          {isApproved ? 'Approved' : isRejected ? 'Rejected' : 'Pending'}
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{j.userEmail}{j.userPhone ? ` • ${j.userPhone}` : ''}</p>
+                      <p className="text-sm font-semibold mt-2">{j.chitName}</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2 text-xs">
+                        <div className="bg-gray-50 p-2 rounded">
+                          <p className="text-muted-foreground">Weekly Amount</p>
+                          <p className="font-bold">₹{(j.weeklyAmount || 0).toLocaleString('en-IN')}/wk</p>
+                        </div>
+                        <div className="bg-gray-50 p-2 rounded">
+                          <p className="text-muted-foreground">Total Weeks</p>
+                          <p className="font-bold">{j.totalWeeks || 0} Weeks</p>
+                        </div>
+                        <div className="bg-gray-50 p-2 rounded">
+                          <p className="text-muted-foreground">Total Contribution</p>
+                          <p className="font-bold">₹{(j.totalContribution || 0).toLocaleString('en-IN')}</p>
+                        </div>
+                        <div className="bg-gray-50 p-2 rounded">
+                          <p className="text-muted-foreground">1st Payment Due</p>
+                          <p className="font-bold">₹{(j.totalPayable || j.weeklyAmount || 0).toLocaleString('en-IN')}</p>
+                        </div>
+                        <div className="bg-gray-50 p-2 rounded">
+                          <p className="text-muted-foreground">Member #</p>
+                          <p className="font-bold">#{j.memberNumber}</p>
+                        </div>
+                        <div className="bg-gray-50 p-2 rounded">
+                          <p className="text-muted-foreground">Requested</p>
+                          <p className="font-bold">{new Date(j.joinedAt).toLocaleDateString('en-IN')}</p>
+                        </div>
+                      </div>
+                      {isRejected && j.rejectionReason && (
+                        <p className="text-xs text-red-500 mt-2 bg-red-50 p-2 rounded">Reason: {j.rejectionReason}</p>
+                      )}
+                      {isApproved && j.approvedAt && (
+                        <p className="text-xs text-green-600 mt-2">Approved on {new Date(j.approvedAt).toLocaleDateString('en-IN')}</p>
+                      )}
                     </div>
-                    <p className="text-sm text-muted-foreground">{j.userEmail}</p>
-                    <p className="text-sm font-medium mt-1">Chit: {j.chitName}</p>
-                    <p className="text-sm">Member #{j.memberNumber} • Amount: ₹{j.amount?.toLocaleString('en-IN')}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Requested: {new Date(j.joinedAt).toLocaleDateString()}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" className="text-red-600 border-red-200" onClick={() => handleAction('join', j._id, 'rejected')} disabled={loading}>
-                      <XCircle className="w-4 h-4 mr-1" /> Reject
-                    </Button>
-                    <Button size="sm" onClick={() => handleAction('join', j._id, 'approved')} disabled={loading}>
-                      <CheckCircle className="w-4 h-4 mr-1" /> Approve
-                    </Button>
+                    {isPending && (
+                      <div className="flex flex-col gap-2 min-w-[120px]">
+                        <input
+                          type="text"
+                          placeholder="Rejection reason (optional)"
+                          className="px-2 py-1 border rounded text-xs"
+                          id={`reject-reason-${j._id}`}
+                        />
+                        <Button size="sm" onClick={() => handleAction('join', j._id, 'approved')} disabled={loading} className="w-full">
+                          <CheckCircle className="w-4 h-4 mr-1" /> Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-600 border-red-200 w-full"
+                          onClick={() => {
+                            const reason = (document.getElementById(`reject-reason-${j._id}`) as HTMLInputElement)?.value || '';
+                            handleAction('join', j._id, 'rejected', reason);
+                          }}
+                          disabled={loading}
+                        >
+                          <XCircle className="w-4 h-4 mr-1" /> Reject
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
-            ))}
-            {filteredJoins.length === 0 && <p className="text-muted-foreground p-4">No pending join requests.</p>}
+              );
+            })}
+            {filteredJoins.length === 0 && <p className="text-muted-foreground p-4">No chit join requests found.</p>}
           </div>
         </div>
       )}
@@ -721,7 +799,9 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
                       </span>
                     </div>
                     <p className="text-sm text-muted-foreground">{p.userEmail}</p>
-                    <p className="text-sm font-medium mt-1">{p.chitName} • Month {p.month}</p>
+                    <p className="text-sm font-medium mt-1">
+                      {p.chitName} • {p.isWeekly || p.totalWeeks > 0 ? 'Week' : 'Month'} {p.month}
+                    </p>
                     <p className="text-sm">Amount: ₹{p.amount?.toLocaleString('en-IN')}</p>
                     {p.lateFee > 0 && <p className="text-xs text-amber-600">Late Fee: ₹{p.lateFee}</p>}
                     <p className="text-xs text-muted-foreground mt-1">Submitted: {new Date(p.createdAt).toLocaleDateString()}</p>

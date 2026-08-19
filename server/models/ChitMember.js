@@ -17,8 +17,22 @@ const chitMemberSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'active', 'cancelled'],
+    enum: ['pending', 'active', 'cancelled', 'rejected'],
     default: 'pending',
+  },
+  adminApprovalStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending',
+  },
+  approvedAt: {
+    type: Date,
+  },
+  rejectedAt: {
+    type: Date,
+  },
+  rejectionReason: {
+    type: String,
   },
   totalPaid: {
     type: Number,
@@ -52,6 +66,68 @@ const chitMemberSchema = new mongoose.Schema({
   joinedAt: {
     type: Date,
     default: Date.now,
+  },
+  weeklyAmount: {
+    type: Number,
+  },
+  totalWeeks: {
+    type: Number,
+  },
+  totalContribution: {
+    type: Number,
+  },
+  currentWeek: {
+    type: Number,
+    default: 0,
+  },
+  paidWeeks: {
+    type: Number,
+    default: 0,
+  },
+  unpaidWeeks: {
+    type: Number,
+    default: 0,
+  },
+  withdrawalStatus: {
+    type: String,
+    enum: ['pending', 'completed'],
+    default: 'pending',
+  },
+  withdrawalWeek: {
+    type: Number,
+  },
+  withdrawalAmount: {
+    type: Number,
+  },
+  totalDividendEarned: {
+    type: Number,
+    default: 0,
+  },
+  settlementAmount: {
+    type: Number,
+  },
+  penaltiesPaid: {
+    type: Number,
+    default: 0,
+  },
+  penaltiesUnpaid: {
+    type: Number,
+    default: 0,
+  },
+  withdrawnAt: {
+    type: Date,
+  },
+  actionPercentage: {
+    type: Number,
+  },
+  priceAmount: {
+    type: Number,
+  },
+  accumulatedDividend: {
+    type: Number,
+  },
+  finalWithdrawalAmount: {
+    type: Number,
   },
 }, { timestamps: true });
 

@@ -9,18 +9,6 @@ const getBaseUrl = () => {
   } catch (e) {
     console.warn('[api] process.env not available, using fallback URL');
   }
-  
-  // Extract dev server IP dynamically for physical devices and emulators
-  const hostUri = Constants.expoConfig?.hostUri;
-  if (hostUri) {
-    const ip = hostUri.split(':').shift();
-    return `http://${ip}:5000/api`;
-  }
-  
-  if (__DEV__) {
-    return 'http://10.0.2.2:5000/api';
-  }
-
   return 'https://growvest-mobile.onrender.com/api';
 };
 

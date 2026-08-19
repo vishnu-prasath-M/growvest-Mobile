@@ -156,8 +156,8 @@ const completeInvestment = async (user, data, orderId, paymentId, signature) => 
     planType = '1_year';
   }
   
-  const totalInterest = Number(amount) * interestRate / 100;
-  const dailyInterest = totalInterest / durationDays;
+  const dailyInterest = (Number(amount) * interestRate) / 100 / 365;
+  const totalInterest = dailyInterest * durationDays;
   const maturityAmount = Number(amount) + totalInterest;
   
   const startDate = new Date();

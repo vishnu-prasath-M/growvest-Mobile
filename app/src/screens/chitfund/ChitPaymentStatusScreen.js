@@ -25,13 +25,14 @@ const ChitPaymentStatusScreen = ({ navigation, route }) => {
       const payload = { chitId, memberId, month, amount, lateFee };
       console.log('[ChitPaymentStatus] Submitting payment payload:', payload);
       if (type === 'join') {
-        // The member was already created in JoinChit, now we create a payment record
-        const result = await chitFundService.makePayment(payload);
-        console.log('[ChitPaymentStatus] Payment result:', result);
+        // The member was already created in JoinChit with status: 'pending'.
+        // Initial month 1 payment will be created/approved automatically when Admin approves the request.
         navigation.replace('PaymentSuccess', {
-          title: 'Join Request Submitted!',
-          message: 'Your payment and join request are pending admin verification.',
-          nextScreen: 'ChitFund',
+          title: 'Join Request Submitted! 🎉',
+          message: 'Your payment and join request have been submitted and are pending admin approval.',
+          nextScreen: 'MyChits',
+          amount,
+          type: 'join',
         });
       } else {
         const result = await chitFundService.makePayment(payload);

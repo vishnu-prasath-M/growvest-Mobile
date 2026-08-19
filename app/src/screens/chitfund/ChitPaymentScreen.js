@@ -61,14 +61,14 @@ const ChitPaymentScreen = ({ navigation, route }) => {
       onSuccess: (response) => {
         const nextScreen = returnScreen || 'MyChits';
         navigation.replace('PaymentSuccess', {
-          title: type === 'join' ? 'Chit Joined Successfully!' : 'Chit Due Paid!',
+          title: type === 'join' ? 'Join Request Submitted! 🎉' : 'Chit Due Paid!',
           message:
             type === 'join'
-              ? 'Your Razorpay payment was verified and your Chit membership is now active.'
+              ? 'Your payment was received. Your Chit membership is now pending admin approval. You will be notified once it is approved.'
               : `Your monthly due for Month ${month} has been verified and recorded.`,
           nextScreen,
           amount: totalAmount,
-          type: 'due',
+          type,
         });
       },
       onFailure: (error) => {
@@ -111,18 +111,35 @@ const ChitPaymentScreen = ({ navigation, route }) => {
             <Text style={styles.razorpayTitle}>Razorpay Secure Gateway</Text>
           </View>
           <Text style={styles.razorpayDesc}>
-            Pay securely using UPI, Credit/Debit Card, Netbanking or Wallets. Your Chit membership/installment will be automatically verified and updated.
+            {type === 'join'
+              ? 'Pay securely using UPI, Credit/Debit Card, Netbanking or Wallets. After payment, your join request will be reviewed by admin. You will receive a notification once approved.'
+              : 'Pay securely using UPI, Credit/Debit Card, Netbanking or Wallets. Your installment will be automatically verified and updated.'}
           </Text>
 
           <View style={styles.featureList}>
-            <View style={styles.featureRow}>
-              <MaterialCommunityIcons name="check-circle" size={16} color={colors.success} />
-              <Text style={styles.featureText}>Automatic instant activation</Text>
-            </View>
-            <View style={styles.featureRow}>
-              <MaterialCommunityIcons name="check-circle" size={16} color={colors.success} />
-              <Text style={styles.featureText}>Official digital payment receipt</Text>
-            </View>
+            {type === 'join' ? (
+              <>
+                <View style={styles.featureRow}>
+                  <MaterialCommunityIcons name="check-circle" size={16} color={colors.success} />
+                  <Text style={styles.featureText}>Secure payment via Razorpay</Text>
+                </View>
+                <View style={styles.featureRow}>
+                  <MaterialCommunityIcons name="clock-outline" size={16} color={colors.warning || '#d97706'} />
+                  <Text style={styles.featureText}>Membership activated after admin approval</Text>
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={styles.featureRow}>
+                  <MaterialCommunityIcons name="check-circle" size={16} color={colors.success} />
+                  <Text style={styles.featureText}>Automatic instant verification</Text>
+                </View>
+                <View style={styles.featureRow}>
+                  <MaterialCommunityIcons name="check-circle" size={16} color={colors.success} />
+                  <Text style={styles.featureText}>Official digital payment receipt</Text>
+                </View>
+              </>
+            )}
           </View>
         </View>
 

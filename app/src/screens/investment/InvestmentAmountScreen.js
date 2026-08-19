@@ -102,7 +102,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
 
   const getInterestRate = () => {
     const plan = getSelectedPlan();
-    return plan ? `${plan.interestRate}% p.a.` : '0% p.a.';
+    return plan ? `${plan.interestRate}%` : '0%';
   };
 
   const getLockPeriod = () => {
@@ -114,14 +114,15 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
     const amt = parseFloat(amount) || 0;
     const plan = getSelectedPlan();
     if (!plan) return 0;
-    return (amt * plan.interestRate) / 100;
+    const daily = (amt * plan.interestRate) / 100 / 365;
+    return daily * plan.durationDays;
   };
 
   const calculateDailyInterest = () => {
-    const totalInt = calculateInterest();
+    const amt = parseFloat(amount) || 0;
     const plan = getSelectedPlan();
-    if (!plan || plan.durationDays === 0) return 0;
-    return totalInt / plan.durationDays;
+    if (!plan) return 0;
+    return (amt * plan.interestRate) / 100 / 365;
   };
 
   const calculateMaturityAmount = () => {
@@ -187,7 +188,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
               keyboardType="numeric"
               style={styles.amountInput}
               placeholder="0"
-              placeholderTextColor={themeColors.border}
+              placeholderTextColor={themeColors.textTertiary}
               underlineColor="transparent"
               activeUnderlineColor="transparent"
               textColor={themeColors.text}
@@ -357,6 +358,7 @@ const getStyles = (colors) => StyleSheet.create({
   },
   sectionTitle: {
     ...typography.h4,
+    color: colors.text,
     marginBottom: 14,
   },
   // Type Cards
@@ -451,7 +453,7 @@ const getStyles = (colors) => StyleSheet.create({
   },
   minAmount: {
     fontSize: 13,
-    color: colors.textTertiary,
+    color: colors.textSecondary,
     marginTop: 8,
     fontWeight: '500',
   },
@@ -467,6 +469,7 @@ const getStyles = (colors) => StyleSheet.create({
   },
   summaryTitle: {
     ...typography.h4,
+    color: colors.text,
     marginBottom: 16,
   },
   summaryRow: {

@@ -8,7 +8,7 @@ import { useTheme } from '../../context/ThemeContext';
 const SUPPORT_DATA = {
   whatsapp: '+91 98765 43210',
   phone: '+91 98765 43210',
-  email: 'chitfund@growvest.com',
+  email: 'camohanrajbullbear@gmail.com',
   workingHours: 'Mon - Sat, 9:00 AM - 8:00 PM',
 };
 
@@ -82,18 +82,6 @@ const SupportScreen = ({ navigation }) => {
             <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textTertiary} />
           </TouchableOpacity>
         ))}
-
-        {/* Raise Ticket */}
-        <TouchableOpacity style={styles.ticketCard} activeOpacity={0.85}>
-          <View style={styles.ticketIconWrap}>
-            <MaterialCommunityIcons name="ticket-outline" size={28} color={colors.primary} />
-          </View>
-          <View style={styles.ticketInfo}>
-            <Text style={styles.ticketTitle}>Raise a Ticket</Text>
-            <Text style={styles.ticketSubtitle}>Get personalized support</Text>
-          </View>
-          <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textTertiary} />
-        </TouchableOpacity>
 
         {/* Info */}
         <View style={styles.infoCard}>

@@ -61,11 +61,12 @@ const JoinChitScreen = ({ navigation, route }) => {
     try {
       const res = await chitFundService.joinChit({ chitId });
       setShowConfirm(false);
+      const baseAmount = chit.isWeekly ? (chit.weeklyAmount || chit.monthlyAmount) : chit.monthlyAmount;
       navigation.replace('ChitPayment', {
         chitId: chit._id,
         memberId: res.member._id,
         month: 1,
-        amount: chit.monthlyAmount,
+        amount: baseAmount,
         lateFee: 0,
         type: 'join',
         chitName: chit.name,
@@ -93,8 +94,10 @@ const JoinChitScreen = ({ navigation, route }) => {
   const alreadyJoined = chit.myMembership && chit.myMembership.status !== 'cancelled';
 
   const formatCurrency = (amount) => `₹${amount?.toLocaleString('en-IN') || '0'}`;
-  const processingFeeAmount = (chit.monthlyAmount * (chit.processingFee || 2)) / 100;
-  const totalPayable = chit.monthlyAmount + processingFeeAmount;
+  const isWeekly = chit.isWeekly || false;
+  const baseAmount = isWeekly ? (chit.weeklyAmount || chit.monthlyAmount) : chit.monthlyAmount;
+  const processingFeeAmount = (baseAmount * (chit.processingFee || 2)) / 100;
+  const totalPayable = baseAmount + processingFeeAmount;
 
   return (
     <View style={styles.container}>
@@ -115,13 +118,13 @@ const JoinChitScreen = ({ navigation, route }) => {
             <Text style={styles.summaryDesc}>{chit.description}</Text>
             <View style={styles.summaryRow}>
               <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>Monthly</Text>
-                <Text style={styles.summaryValue}>{formatCurrency(chit.monthlyAmount)}</Text>
+                <Text style={styles.summaryLabel}>{isWeekly ? 'Weekly' : 'Monthly'}</Text>
+                <Text style={styles.summaryValue}>{formatCurrency(baseAmount)}</Text>
               </View>
               <View style={styles.summaryDivider} />
               <View style={styles.summaryItem}>
                 <Text style={styles.summaryLabel}>Duration</Text>
-                <Text style={styles.summaryValue}>{chit.duration}mo</Text>
+                <Text style={styles.summaryValue}>{isWeekly ? `${chit.totalWeeks || chit.duration}w` : `${chit.duration}mo`}</Text>
               </View>
               <View style={styles.summaryDivider} />
               <View style={styles.summaryItem}>
@@ -136,8 +139,8 @@ const JoinChitScreen = ({ navigation, route }) => {
         <View style={styles.feeCard}>
           <Text style={styles.feeTitle}>Payment Summary</Text>
           <View style={styles.feeRow}>
-            <Text style={styles.feeLabel}>Monthly Installment</Text>
-            <Text style={styles.feeValue}>{formatCurrency(chit.monthlyAmount)}</Text>
+            <Text style={styles.feeLabel}>{isWeekly ? 'Weekly Installment' : 'Monthly Installment'}</Text>
+            <Text style={styles.feeValue}>{formatCurrency(baseAmount)}</Text>
           </View>
           <View style={styles.feeRow}>
             <Text style={styles.feeLabel}>Processing Fee ({chit.processingFee}%)</Text>
@@ -220,8 +223,8 @@ const JoinChitScreen = ({ navigation, route }) => {
             <Text style={styles.modalSubtitle}>Please verify the payment details</Text>
 
             <View style={styles.modalRow}>
-              <Text style={styles.modalLabel}>Monthly Due</Text>
-              <Text style={styles.modalValue}>{formatCurrency(chit.monthlyAmount)}</Text>
+              <Text style={styles.modalLabel}>{isWeekly ? 'Weekly Due' : 'Monthly Due'}</Text>
+              <Text style={styles.modalValue}>{formatCurrency(baseAmount)}</Text>
             </View>
             <View style={styles.modalRow}>
               <Text style={styles.modalLabel}>Processing Fee</Text>
