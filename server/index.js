@@ -43,93 +43,182 @@ cron.schedule("5 0 * * *", async () => {
 });
 */
 
-// Due Reminder Cron Job (runs daily at 8:00 AM)
+// Due Reminder & Penalty Cron Job (runs daily at 8:00 AM)
+const calcNextWeeklyDueDate = (joinedAt, weekIndex) => {
+  const base = new Date(joinedAt);
+  const day = base.getDay();
+  const daysToSunday = day === 0 ? 0 : 7 - day;
+  const firstSunday = new Date(base.getTime() + daysToSunday * 24 * 60 * 60 * 1000);
+  firstSunday.setHours(12, 0, 0, 0);
+  const targetDueDate = new Date(firstSunday.getTime() + (weekIndex) * 7 * 24 * 60 * 60 * 1000);
+  return targetDueDate;
+};
+
 cron.schedule("0 8 * * *", async () => {
-  console.log("Running Due Reminder Cron Job...");
+  console.log("Running Due Reminder & Penalty Cron Job...");
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    // Find all active members with upcoming dues within 3 days
+    // Find all active members
     const members = await ChitMember.find({ status: 'active' })
-      .populate('chitId', 'name monthlyAmount')
-      .populate('userId', '_id name username');
+      .populate('chitId', 'name monthlyAmount weeklyAmount totalWeeks totalContribution status isWeekly')
+      .populate('userId', '_id name username email');
     
     let reminderCount = 0;
     for (const member of members) {
       if (!member.chitId || !member.userId) continue;
+      if (['closed', 'completed', 'archived'].includes(member.chitId.status)) continue;
+
+      const isWeekly = member.chitId.isWeekly || false;
+      const currentUnit = isWeekly ? member.currentWeek : member.currentMonth;
+      const totalUnits = isWeekly ? (member.chitId.totalWeeks || member.chitId.duration) : member.chitId.duration;
+      
+      if (currentUnit >= totalUnits) continue; 
+      
+      const dueUnitIndex = currentUnit + 1;
       
       // Calculate next due date
-      const joinedDate = new Date(member.joinedAt);
-      const nextDue = new Date(joinedDate);
-      nextDue.setMonth(joinedDate.getMonth() + member.currentMonth);
-      nextDue.setDate(1);
-      nextDue.setHours(0, 0, 0, 0);
-      
-      // Check if chit is closed
-      if (['closed', 'completed', 'archived'].includes(member.chitId.status)) continue;
-      
-      // Check if member has completed all installments
-      if (member.currentMonth >= member.chitId.duration) continue;
-      
+      const nextDue = isWeekly
+        ? calcNextWeeklyDueDate(member.joinedAt, currentUnit)
+        : calcNextDueDate(member.joinedAt, member.currentMonth);
+        
       const diffTime = nextDue.getTime() - today.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       
-      // Send reminder if due within 3 days or overdue
+      // 1. Check for overdue and apply penalty
+      if (diffDays < 0) {
+        const ChitPayment = require('./models/ChitPayment');
+        const Transaction = require('./models/Transaction');
+        
+        const paidPayment = await ChitPayment.findOne({
+          memberId: member._id,
+          month: dueUnitIndex,
+          status: 'paid'
+        });
+        
+        if (!paidPayment) {
+          let paymentRecord = await ChitPayment.findOne({
+            memberId: member._id,
+            month: dueUnitIndex
+          });
+          
+          const baseAmount = isWeekly ? (member.chitId.weeklyAmount || 200) : (member.chitId.monthlyAmount || 1000);
+          const penaltyAmount = isWeekly ? (baseAmount * 0.05) : 0; 
+          
+          if (penaltyAmount > 0) {
+            if (!paymentRecord) {
+              paymentRecord = new ChitPayment({
+                chitId: member.chitId._id,
+                userId: member.userId._id,
+                memberId: member._id,
+                month: dueUnitIndex,
+                amount: baseAmount + penaltyAmount,
+                lateFee: penaltyAmount,
+                status: 'pending',
+                dueDate: nextDue
+              });
+              await paymentRecord.save();
+              
+              member.penaltiesUnpaid = (member.penaltiesUnpaid || 0) + penaltyAmount;
+              member.unpaidWeeks = (member.unpaidWeeks || 0) + 1;
+              await member.save();
+              
+              const penaltyTx = new Transaction({
+                userId: member.userId._id,
+                userEmail: member.userId.email || 'no-email@growvest.com',
+                type: 'chit_penalty',
+                amount: penaltyAmount,
+                status: 'approved',
+                referenceId: paymentRecord._id,
+                referenceType: 'ChitPayment',
+                description: `Overdue Penalty - ${member.chitId.name} Week ${dueUnitIndex}`,
+              });
+              await penaltyTx.save();
+              
+              await sendNotification({
+                userId: member.userId._id,
+                title: '🔥 Payment Overdue & Penalty Applied',
+                description: `Your weekly installment for "${member.chitId.name}" is overdue. A ₹${penaltyAmount} penalty has been applied.`,
+                type: 'due_overdue',
+                metadata: { chitId: member.chitId._id, memberId: member._id, dueDate: nextDue },
+                pushData: { screen: 'MonthlyDue' },
+              });
+            } else if (paymentRecord.lateFee === 0) {
+              paymentRecord.lateFee = penaltyAmount;
+              paymentRecord.amount += penaltyAmount;
+              await paymentRecord.save();
+              
+              member.penaltiesUnpaid = (member.penaltiesUnpaid || 0) + penaltyAmount;
+              await member.save();
+              
+              const penaltyTx = new Transaction({
+                userId: member.userId._id,
+                userEmail: member.userId.email || 'no-email@growvest.com',
+                type: 'chit_penalty',
+                amount: penaltyAmount,
+                status: 'approved',
+                referenceId: paymentRecord._id,
+                referenceType: 'ChitPayment',
+                description: `Overdue Penalty - ${member.chitId.name} Week ${dueUnitIndex}`,
+              });
+              await penaltyTx.save();
+              
+              await sendNotification({
+                userId: member.userId._id,
+                title: '🔥 Payment Overdue & Penalty Applied',
+                description: `Your weekly installment for "${member.chitId.name}" is overdue. A ₹${penaltyAmount} penalty has been applied.`,
+                type: 'due_overdue',
+                metadata: { chitId: member.chitId._id, memberId: member._id, dueDate: nextDue },
+                pushData: { screen: 'MonthlyDue' },
+              });
+            }
+          }
+        }
+      }
+      
+      // 2. Regular Reminders
+      const baseAmt = isWeekly ? (member.chitId.weeklyAmount || 200) : (member.chitId.monthlyAmount || 1000);
+      const unitLabel = isWeekly ? 'weekly' : 'monthly';
+      const screenName = isWeekly ? 'MonthlyDue' : 'MonthlyDue'; // Unified navigation
+      
       if (diffDays >= 0 && diffDays <= 3) {
         const dueDateStr = nextDue.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
         
-        // Send unified notification (DB + Push) using the same implementation
         await sendNotification({
           userId: member.userId._id,
-          title: '📅 Monthly Due Reminder',
-          description: `Your monthly installment for "${member.chitId.name}" is due on ${dueDateStr}. Please complete your payment before the due date.`,
+          title: `📅 ${unitLabel.toUpperCase()} Due Reminder`,
+          description: `Your ${unitLabel} installment for "${member.chitId.name}" is due on ${dueDateStr}. Please complete your payment.`,
           type: 'due_reminder',
           metadata: { chitId: member.chitId._id, memberId: member._id, dueDate: nextDue },
-          pushData: { screen: 'MonthlyDue' },
+          pushData: { screen: screenName },
         });
-        
         reminderCount++;
       }
 
-      // 2 Days Reminder
       if (diffDays === 2) {
         await sendNotification({
           userId: member.userId._id,
-          title: '⚠️ Payment Due in 2 Days',
-          description: `Your monthly due of ₹${member.chitId.monthlyAmount} for "${member.chitId.name}" is due in 2 days.`,
+          title: `⚠️ Payment Due in 2 Days`,
+          description: `Your ${unitLabel} due of ₹${baseAmt} for "${member.chitId.name}" is due in 2 days.`,
           type: 'due_reminder_2_days',
           metadata: { chitId: member.chitId._id, memberId: member._id, dueDate: nextDue },
-          pushData: { screen: 'MonthlyDue' },
+          pushData: { screen: screenName },
         });
       }
 
-      // 1 Day Reminder
       if (diffDays === 1) {
         await sendNotification({
           userId: member.userId._id,
-          title: '🚨 Payment Due Tomorrow',
-          description: `Your monthly due of ₹${member.chitId.monthlyAmount} for "${member.chitId.name}" is due tomorrow. Please pay to avoid late fees.`,
+          title: `🚨 Payment Due Tomorrow`,
+          description: `Your ${unitLabel} due of ₹${baseAmt} for "${member.chitId.name}" is due tomorrow. Please pay to avoid late fees.`,
           type: 'due_reminder_1_day',
           metadata: { chitId: member.chitId._id, memberId: member._id, dueDate: nextDue },
-          pushData: { screen: 'MonthlyDue' },
-        });
-      }
-
-      // Overdue (last 3 days)
-      if (diffDays < 0 && diffDays >= -3) {
-        const overdueDays = Math.abs(diffDays);
-        await sendNotification({
-          userId: member.userId._id,
-          title: '🔥 Payment Overdue',
-          description: `Your monthly installment for "${member.chitId.name}" is overdue by ${overdueDays} day(s). Please make your payment immediately.`,
-          type: 'due_overdue',
-          metadata: { chitId: member.chitId._id, memberId: member._id, dueDate: nextDue },
-          pushData: { screen: 'MonthlyDue' },
+          pushData: { screen: screenName },
         });
       }
     }
-    console.log(`Due Reminder Cron Job Finished: Sent ${reminderCount} reminders.`);
+    console.log(`Due Reminder & Penalty Cron Job Finished: Sent reminders and checked penalties.`);
   } catch (error) {
     console.error("Due Reminder Cron Job Error:", error);
   }

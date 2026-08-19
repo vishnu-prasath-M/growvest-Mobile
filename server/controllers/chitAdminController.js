@@ -11,7 +11,7 @@ const { sendNotification } = require('../services/notificationHelper');
 const getPendingPayments = async (req, res) => {
   try {
     const payments = await ChitPayment.find({ status: 'pending' })
-      .populate('chitId', 'name monthlyAmount')
+      .populate('chitId', 'name monthlyAmount isWeekly weeklyAmount totalWeeks')
       .populate('userId', 'name username email')
       .sort({ createdAt: -1 });
 
@@ -26,6 +26,8 @@ const getPendingPayments = async (req, res) => {
       lateFee: p.lateFee || 0,
       status: p.status,
       createdAt: p.createdAt,
+      isWeekly: p.chitId?.isWeekly || false,
+      totalWeeks: p.chitId?.totalWeeks || 0,
     }));
 
     res.json(result);
@@ -40,32 +42,41 @@ const getPendingPayments = async (req, res) => {
 // @access  Private/Admin
 const getJoinRequests = async (req, res) => {
   try {
-    const transactions = await Transaction.find({
-      referenceType: 'ChitMember',
-      status: 'pending',
-    }).sort({ createdAt: -1 });
+    // Fetch ALL non-cancelled members (pending, active, rejected) so admin can see all states
+    const members = await ChitMember.find({ status: { $ne: 'cancelled' } })
+      .populate('chitId', 'name monthlyAmount weeklyAmount totalWeeks duration isWeekly totalContribution totalPot processingFee')
+      .populate('userId', 'name username email mobileNumber')
+      .sort({ createdAt: -1 });
 
-    const memberIds = transactions.map(t => t.referenceId);
-    const members = await ChitMember.find({ _id: { $in: memberIds } })
-      .populate('chitId', 'name monthlyAmount')
-      .populate('userId', 'name username email');
+    const result = members.map(m => {
+      const isWeekly = m.chitId?.isWeekly || false;
+      const baseAmount = isWeekly ? (m.chitId?.weeklyAmount || m.chitId?.monthlyAmount || 0) : (m.chitId?.monthlyAmount || 0);
+      const totalWeeks = m.chitId?.totalWeeks || m.chitId?.duration || 0;
+      const totalContribution = m.chitId?.totalContribution || m.chitId?.totalPot || (baseAmount * totalWeeks);
+      const processingFee = m.chitId?.processingFee || 0;
+      const processingFeeAmount = baseAmount * processingFee / 100;
+      const totalPayable = baseAmount + processingFeeAmount;
 
-    const memberMap = {};
-    members.forEach(m => { memberMap[m._id.toString()] = m; });
-
-    const result = transactions.map(t => {
-      const m = memberMap[t.referenceId.toString()];
       return {
-        _id: m?._id || t._id,
-        chitName: m?.chitId?.name || 'Unknown',
-        chitId: m?.chitId?._id,
-        userName: m?.userId?.name || m?.userId?.username || 'Unknown',
-        userEmail: m?.userId?.email || '',
-        memberNumber: m?.memberNumber || 0,
-        amount: m?.chitId?.monthlyAmount || t.amount,
-        status: t.status,
-        joinedAt: m?.joinedAt || t.createdAt,
-        transactionId: t._id,
+        _id: m._id,
+        chitName: m.chitId?.name || 'Unknown',
+        chitId: m.chitId?._id,
+        isWeekly,
+        weeklyAmount: baseAmount,
+        totalWeeks,
+        totalContribution,
+        processingFee,
+        totalPayable,
+        userName: m.userId?.name || m.userId?.username || 'Unknown',
+        userEmail: m.userId?.email || '',
+        userPhone: m.userId?.mobileNumber || '',
+        memberNumber: m.memberNumber,
+        status: m.status,
+        adminApprovalStatus: m.adminApprovalStatus || 'pending',
+        rejectionReason: m.rejectionReason || '',
+        joinedAt: m.joinedAt || m.createdAt,
+        approvedAt: m.approvedAt || null,
+        rejectedAt: m.rejectedAt || null,
       };
     });
 
@@ -94,11 +105,28 @@ const updatePaymentStatus = async (req, res) => {
       payment.receiptId = 'RCP' + Date.now().toString().slice(-8);
 
       // Update member's total paid and current month
-      const member = await ChitMember.findById(payment.memberId);
+      const member = await ChitMember.findById(payment.memberId).populate('chitId');
       if (member) {
+        const isWeekly = member.chitId?.isWeekly || false;
+        
         member.totalPaid += payment.amount;
-        member.remainingAmount -= payment.amount;
-        member.currentMonth += 1;
+        member.remainingAmount = Math.max(0, member.remainingAmount - payment.amount);
+        
+        if (payment.lateFee > 0) {
+          member.penaltiesPaid = (member.penaltiesPaid || 0) + payment.lateFee;
+          member.penaltiesUnpaid = Math.max(0, (member.penaltiesUnpaid || 0) - payment.lateFee);
+        }
+
+        if (isWeekly) {
+          member.currentWeek += 1;
+          member.paidWeeks += 1;
+          if (member.unpaidWeeks > 0) {
+            member.unpaidWeeks = Math.max(0, member.unpaidWeeks - 1);
+          }
+          member.currentMonth = member.currentWeek; // backward compatibility
+        } else {
+          member.currentMonth += 1;
+        }
         await member.save();
       }
     }
@@ -150,59 +178,78 @@ const updatePaymentStatus = async (req, res) => {
 // @access  Private/Admin
 const updateJoinStatus = async (req, res) => {
   try {
-    const { status } = req.body;
+    const { status, rejectionReason } = req.body;
     const member = await ChitMember.findById(req.params.id).populate('chitId');
 
     if (!member) {
       return res.status(404).json({ message: 'Membership not found' });
     }
 
+    // Security: prevent approving an already-approved/rejected member
+    if (member.adminApprovalStatus === 'approved') {
+      return res.status(400).json({ message: 'This request has already been approved' });
+    }
+    if (member.adminApprovalStatus === 'rejected') {
+      return res.status(400).json({ message: 'This request has already been rejected' });
+    }
+
+    // Security: only pending members can be approved/rejected
+    if (member.status !== 'pending') {
+      return res.status(400).json({ message: `Cannot update a membership with status: ${member.status}` });
+    }
+
     if (status === 'approved') {
       member.status = 'active';
-      // totalPaid & currentMonth are updated by the ChitPayment approval — do NOT set here
-      // to avoid double-counting. They are already handled by updatePaymentStatus.
-      await member.save();
+      member.adminApprovalStatus = 'approved';
+      member.approvedAt = new Date();
 
-      // Find the existing pending ChitPayment for month 1 (created when user confirmed payment)
+      // Find the existing pending ChitPayment for month/week 1 (created when user confirmed payment)
       const existingPayment = await ChitPayment.findOne({
         memberId: member._id,
         month: 1,
         status: 'pending',
       });
 
+      const isWeekly = member.chitId?.isWeekly || false;
+      const baseAmount = isWeekly ? (member.chitId?.weeklyAmount || 200) : (member.chitId?.monthlyAmount || 1000);
+      const totalPotVal = isWeekly ? (member.chitId?.totalContribution || 2000) : (member.chitId?.totalPot || 20000);
+
       if (existingPayment) {
-        // Approve the existing payment instead of creating a new one
         existingPayment.status = 'paid';
         existingPayment.paidDate = new Date();
         existingPayment.receiptId = 'RCP' + Date.now().toString().slice(-8);
         await existingPayment.save();
 
-        // Update member totals
         member.totalPaid = existingPayment.amount;
-        member.remainingAmount = (member.chitId?.totalPot || 0) - existingPayment.amount;
+        member.remainingAmount = totalPotVal - existingPayment.amount;
         member.currentMonth = 1;
+        member.currentWeek = 1;
+        member.paidWeeks = 1;
         await member.save();
       } else {
-        // No pending payment found (edge case) — create one as paid
-        const monthlyAmount = member.chitId?.monthlyAmount || 0;
         await ChitPayment.create({
           chitId: member.chitId?._id || member.chitId,
           userId: member.userId,
           memberId: member._id,
           month: 1,
-          amount: monthlyAmount,
+          amount: baseAmount,
           status: 'paid',
           dueDate: new Date(),
           paidDate: new Date(),
           receiptId: 'RCP' + Date.now().toString().slice(-8),
         });
-        member.totalPaid = monthlyAmount;
-        member.remainingAmount = (member.chitId?.totalPot || 0) - monthlyAmount;
+        member.totalPaid = baseAmount;
+        member.remainingAmount = totalPotVal - baseAmount;
         member.currentMonth = 1;
+        member.currentWeek = 1;
+        member.paidWeeks = 1;
         await member.save();
       }
-    } else {
-      member.status = 'cancelled';
+    } else if (status === 'rejected') {
+      member.status = 'rejected';
+      member.adminApprovalStatus = 'rejected';
+      member.rejectedAt = new Date();
+      if (rejectionReason) member.rejectionReason = rejectionReason;
       await member.save();
 
       // Restore available slot
@@ -213,6 +260,8 @@ const updateJoinStatus = async (req, res) => {
           await chitDoc.save();
         }
       }
+    } else {
+      return res.status(400).json({ message: 'Invalid status. Must be "approved" or "rejected"' });
     }
 
     await Transaction.findOneAndUpdate(
@@ -226,12 +275,12 @@ const updateJoinStatus = async (req, res) => {
       },
     );
 
-    // Send unified notification (DB + Push) using the same implementation
+    // Send notification ONLY to the specific user (not all users)
     if (status === 'approved') {
       await sendNotification({
         userId: member.userId,
-        title: '🎉 Great News!',
-        description: 'Your Chit Investment has been approved. Welcome to your Chit Group.',
+        title: '✅ Chit Approved',
+        description: 'Your Chit Fund request has been approved. Your Chit membership is now active.',
         type: 'chit_joined',
         metadata: { memberId: member._id, chitName: member.chitId?.name },
         pushData: { screen: 'MyChits' },
@@ -239,10 +288,12 @@ const updateJoinStatus = async (req, res) => {
     } else {
       await sendNotification({
         userId: member.userId,
-        title: 'Join Request Update',
-        description: `Your request to join ${member.chitId?.name || 'the chit fund'} was not approved. Contact support for details.`,
-        type: 'general',
-        metadata: { memberId: member._id },
+        title: '❌ Chit Request Rejected',
+        description: rejectionReason
+          ? `Your Chit Fund request was not approved. Reason: ${rejectionReason}`
+          : 'Your Chit Fund request was not approved. Please contact support for more information.',
+        type: 'chit_rejected',
+        metadata: { memberId: member._id, chitName: member.chitId?.name },
         pushData: { screen: 'ChitFundHome' },
       });
     }

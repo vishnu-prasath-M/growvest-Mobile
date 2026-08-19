@@ -24,6 +24,17 @@ const InvestmentPaymentScreen = ({ navigation, route }) => {
     return `₹${value?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`;
   };
 
+  const getPlanDisplayName = (planType) => {
+    if (planType === 'saving') return 'Saving Deposit';
+    if (planType === 'fixed') return 'Fixed Deposit';
+    if (planType === '15_days') return '15 Days Plan';
+    if (planType === '1_month') return '1 Month Plan';
+    if (planType === '3_months') return '3 Months Plan';
+    if (planType === '6_months') return '6 Months Plan';
+    if (planType === '1_year') return '1 Year Plan';
+    return 'Investment';
+  };
+
   const handlePayNow = async () => {
     await executeRazorpayPayment({
       amount,
@@ -36,7 +47,7 @@ const InvestmentPaymentScreen = ({ navigation, route }) => {
           'Payment Successful! 🎉',
           type === 'pocket_money'
             ? `Your ₹${amount} Pocket Money Plan has been verified and activated.`
-            : `Your ₹${amount} ${type === 'fixed' ? 'Fixed' : 'Savings'} Deposit has been verified and automatically approved.`,
+            : `Your ₹${amount} ${getPlanDisplayName(type)} has been verified and automatically approved.`,
           [
             {
               text: 'View Dashboard',
@@ -69,7 +80,7 @@ const InvestmentPaymentScreen = ({ navigation, route }) => {
               color={type === 'pocket_money' ? colors.primary : type === 'saving' ? colors.saving : colors.fixed}
             />
             <Text style={styles.summaryType}>
-              {type === 'pocket_money' ? 'Pocket Money Plan' : type === 'saving' ? 'Saving Deposit' : 'Fixed Deposit'}
+              {type === 'pocket_money' ? 'Pocket Money Plan' : getPlanDisplayName(type)}
             </Text>
           </View>
           <View style={styles.summaryAmountRow}>

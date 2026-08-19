@@ -32,6 +32,9 @@ router.post('/join', protect, chitController.joinChit);
 // Submit monthly payment
 router.post('/payment', protect, chitController.makePayment);
 
+// Withdraw chit payout (user-initiated)
+router.post('/:id/withdraw', protect, chitController.withdrawChitPayout);
+
 // ─────────────────────────────────────────────
 // ADMIN ROUTES
 // ─────────────────────────────────────────────

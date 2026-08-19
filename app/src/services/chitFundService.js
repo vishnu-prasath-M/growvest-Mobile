@@ -138,4 +138,14 @@ export const chitFundService = {
       throw error;
     }
   },
+
+  /**
+   * Withdraw/take the Chit payout (user-initiated)
+   * @param {string} memberId - Chit member ID
+   * @returns {Promise<Object>} Withdrawal response
+   */
+  withdrawChitPayout: async (memberId) => {
+    const response = await api.post(`/chits/${memberId}/withdraw`);
+    return response.data;
+  },
 };

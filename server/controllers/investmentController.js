@@ -40,8 +40,8 @@ exports.createInvestment = async (req, res) => {
       planType = '1_year';
     }
     
-    const totalInterest = Number(amount) * interestRate / 100;
-    const dailyInterest = totalInterest / durationDays;
+    const dailyInterest = (Number(amount) * interestRate) / 100 / 365;
+    const totalInterest = dailyInterest * durationDays;
     const maturityAmount = Number(amount) + totalInterest;
     
     const startDate = new Date();
@@ -79,7 +79,7 @@ exports.createInvestment = async (req, res) => {
 
     await newInvestment.save();
 
-    // Create transaction record (user already found above)
+    // Create transaction record
     if (user) {
       const transaction = new Transaction({
         userId: user._id,
@@ -159,7 +159,6 @@ exports.updateInvestmentStatus = async (req, res) => {
 
     // Update user balance when investment is approved
     if (status === 'approved' && investment.status !== 'approved') {
-      // Support old users (email-only) and new users (mobile number)
       const user = await User.findOne({ 
         $or: [
           ...(investment.userEmail ? [{ email: investment.userEmail }] : []),
@@ -167,11 +166,9 @@ exports.updateInvestmentStatus = async (req, res) => {
         ]
       });
       if (user) {
-        // Add to user balance
         user.balance += investment.amount;
         await user.save();
 
-        // Send unified notification (DB + Push) using the same implementation as sendWelcomeNotification
         await sendNotification({
           userId: user._id,
           title: '✅ Investment Approved',

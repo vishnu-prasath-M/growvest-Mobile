@@ -205,7 +205,7 @@ const InvestmentsScreen = ({ navigation }) => {
                         <StatusChip status={statusLabel} />
                       </View>
                       <Text style={styles.investRate}>
-                        {inv.interestRate}% p.a.{inv.ref ? ` • Ref: ${inv.ref}` : ''}
+                        {inv.interestRate}%{['saving', 'fixed'].includes(inv.type) ? ' p.a.' : ''}{inv.ref ? ` • Ref: ${inv.ref}` : ''}
                       </Text>
                     </View>
                     <Text style={styles.investAmount}>{formatCurrency(inv.amount)}</Text>

@@ -49,6 +49,30 @@ const chitSchema = new mongoose.Schema({
     type: [String],
     default: [],
   },
+  weeklyAmount: {
+    type: Number,
+  },
+  totalWeeks: {
+    type: Number,
+  },
+  totalContribution: {
+    type: Number,
+  },
+  paymentFrequency: {
+    type: String,
+    default: 'weekly',
+  },
+  paymentDay: {
+    type: String,
+    default: 'Sunday',
+  },
+  settlementWeek: {
+    type: Number,
+  },
+  isWeekly: {
+    type: Boolean,
+    default: true,
+  },
 }, { timestamps: true });
 
 // Index for fast status-based queries

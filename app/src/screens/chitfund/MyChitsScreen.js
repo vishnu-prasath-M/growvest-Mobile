@@ -15,6 +15,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { chitFundService } from '../../services/chitFundService';
 import TopBar from '../../components/TopBar';
 
+
 const MyChitsScreen = ({ navigation }) => {
   const { colors: themeColors } = useTheme();
   const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
@@ -86,32 +87,65 @@ const MyChitsScreen = ({ navigation }) => {
         ) : (
           chits.map((chit) => {
             const isPending = chit.status === 'pending';
+            const isRejected = chit.status === 'rejected';
             const progressColor = getProgressColor(chit.progress);
             return (
               <TouchableOpacity
                 key={chit._id}
-                style={[styles.chitCard, isPending && { borderLeftWidth: 4, borderLeftColor: colors.warning }]}
+                style={[
+                  styles.chitCard, 
+                  isPending && { borderLeftWidth: 4, borderLeftColor: themeColors.warning },
+                  isRejected && { borderLeftWidth: 4, borderLeftColor: themeColors.error || '#ef4444' },
+                ]}
                 activeOpacity={0.85}
                 onPress={() => navigation.navigate('ChitDetails', { chitId: chit.chitId, memberId: chit._id, memberStatus: chit.status })}
               >
                 <View style={styles.chitCardHeader}>
-                  <View style={[styles.chitIconWrap, isPending && { backgroundColor: themeColors.warningLight }]}>
-                    <MaterialCommunityIcons name={isPending ? "clock-outline" : "account-group-outline"} size={24} color={isPending ? themeColors.warning : themeColors.primary} />
+                  <View style={[
+                    styles.chitIconWrap, 
+                    isPending && { backgroundColor: themeColors.warningLight },
+                    isRejected && { backgroundColor: '#fee2e2' },
+                  ]}>
+                    <MaterialCommunityIcons 
+                      name={isRejected ? "close-circle-outline" : isPending ? "clock-outline" : "account-group-outline"} 
+                      size={24} 
+                      color={isRejected ? '#ef4444' : isPending ? themeColors.warning : themeColors.primary} 
+                    />
                   </View>
                   <View style={styles.chitInfo}>
                     <Text style={styles.chitName}>{chit.chitName}</Text>
                     <Text style={styles.chitMember}>
-                      {isPending ? 'Joining Request Submitted' : `Member #${chit.memberNumber} of ${chit.totalMembers}`}
+                      {isRejected ? 'Request Rejected' : isPending ? 'Joining Request Submitted' : `Member #${chit.memberNumber} of ${chit.totalMembers}`}
                     </Text>
                   </View>
-                  <View style={[styles.winBadge, isPending ? { backgroundColor: themeColors.warningLight } : chit.hasWon ? styles.wonBadge : styles.notWonBadge]}>
-                    <Text style={[styles.winBadgeText, { color: isPending ? themeColors.warning : chit.hasWon ? themeColors.success : themeColors.textTertiary }]}>
-                      {isPending ? 'Pending Approval' : chit.hasWon ? 'Won' : 'Active'}
+                  <View style={[
+                    styles.winBadge, 
+                    isPending ? { backgroundColor: themeColors.warningLight } : 
+                    isRejected ? { backgroundColor: '#fee2e2' } : 
+                    chit.hasWon ? styles.wonBadge : styles.notWonBadge,
+                  ]}>
+                    <Text style={[styles.winBadgeText, { 
+                      color: isPending ? themeColors.warning : 
+                             isRejected ? '#ef4444' : 
+                             chit.hasWon ? themeColors.success : themeColors.textTertiary 
+                    }]}>
+                      {isPending ? 'Pending' : isRejected ? 'Rejected' : chit.hasWon ? 'Won' : 'Active'}
                     </Text>
                   </View>
                 </View>
 
-                {isPending ? (
+                {isRejected ? (
+                  <View style={{ backgroundColor: '#fee2e2', padding: 12, borderRadius: 12, marginTop: 4 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#ef4444', marginBottom: 4 }}>
+                      Chit Request Rejected
+                    </Text>
+                    <Text style={{ fontSize: 12, color: themeColors.textSecondary, lineHeight: 18 }}>
+                      {chit.rejectionReason 
+                        ? `Reason: ${chit.rejectionReason}` 
+                        : 'Your Chit Fund request was not approved. Please contact support for more information.'}
+                    </Text>
+                  </View>
+                ) : isPending ? (
                   <View style={{ backgroundColor: themeColors.warningLight, padding: 12, borderRadius: 12, marginTop: 4 }}>
                     <Text style={{ fontSize: 13, fontWeight: '700', color: themeColors.warning, marginBottom: 4 }}>
                       Waiting for Admin Approval
@@ -135,8 +169,10 @@ const MyChitsScreen = ({ navigation }) => {
 
                     <View style={styles.chitDetailsGrid}>
                       <View style={styles.chitDetailItem}>
-                        <Text style={styles.chitDetailLabel}>Month</Text>
-                        <Text style={styles.chitDetailValue}>{chit.currentMonth}/{chit.duration}</Text>
+                        <Text style={styles.chitDetailLabel}>{chit.totalWeeks > 0 ? 'Week' : 'Month'}</Text>
+                        <Text style={styles.chitDetailValue}>
+                          {chit.totalWeeks > 0 ? chit.currentWeek : chit.currentMonth}/{chit.duration}
+                        </Text>
                       </View>
                       <View style={styles.chitDetailItem}>
                         <Text style={styles.chitDetailLabel}>Paid</Text>
@@ -175,13 +211,14 @@ const MyChitsScreen = ({ navigation }) => {
         <View style={{ height: 40 }} />
       </ScrollView>
     </View>
+
   );
 };
 
 const getStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
-  scrollContent: { paddingBottom: 20, paddingTop:20 },
+  scrollContent: { paddingBottom: 20, paddingTop: 20 },
   
   emptyContainer: { padding: 40, alignItems: 'center' },
   emptyText: { color: colors.textSecondary, fontSize: 14 },
