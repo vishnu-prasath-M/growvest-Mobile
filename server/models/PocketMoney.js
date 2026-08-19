@@ -56,6 +56,26 @@ const pocketMoneySchema = new mongoose.Schema({
     enum: ['pending', 'active', 'paused', 'completed'],
     default: 'pending',
   },
+  // Bonus fields
+  bonusRate: {
+    type: Number,
+    default: 6,
+  },
+  bonusAmount: {
+    type: Number,
+    required: true,
+  },
+  totalFinalValue: {
+    type: Number,
+    required: true,
+  },
+  bonusReleased: {
+    type: Boolean,
+    default: false,
+  },
+  finalPayoutDate: {
+    type: Date,
+  },
   // Payment info
   paymentProvider: { type: String, default: 'Razorpay' },
   orderId: { type: String },

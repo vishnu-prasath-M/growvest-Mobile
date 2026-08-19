@@ -225,6 +225,48 @@ const PocketMoneyScreen = ({ navigation }) => {
           </View>
         )}
 
+        {/* Active Plan Detail Specs */}
+        {activePlan && (
+          <View style={styles.detailsCard}>
+            <Text style={styles.detailsTitle}>Investment Details</Text>
+            
+            {[
+              { label: 'Original Investment', value: formatCurrency(activePlan.investedAmount) },
+              { label: 'Payout Frequency', value: activePlan.frequency === 'daily' ? 'Daily' : activePlan.frequency === 'every_2_days' ? 'Every 2 Days' : 'Weekly' },
+              { label: 'Regular Payout Amount', value: formatCurrency(activePlan.payoutAmount) },
+              { 
+                label: '6% Bonus Amount', 
+                value: formatCurrency(activePlan.bonusAmount),
+                badge: activePlan.bonusReleased ? 'Released' : 'Locked',
+                badgeColor: activePlan.bonusReleased ? '#065F46' : '#B45309',
+                badgeBg: activePlan.bonusReleased ? '#D1FAE5' : '#FEF3C7',
+              },
+              { label: 'Total Final Value', value: formatCurrency(activePlan.totalFinalValue || (activePlan.investedAmount * 1.06)) },
+              { label: 'Payouts Completed', value: `${activePlan.payoutCount} Completed` },
+              { label: 'Remaining Payouts', value: `${Math.max(0, 10 - activePlan.payoutCount)} Remaining` },
+              { label: 'Next Payout Date', value: formatDate(activePlan.nextPayoutDate) },
+              { label: 'Final Payout Date', value: formatDate(activePlan.finalPayoutDate || activePlan.completedAt) },
+              { 
+                label: 'Bonus Status', 
+                value: activePlan.bonusReleased ? 'Released (Paid with Final Payout)' : 'Locked until Payout #10',
+                valueColor: activePlan.bonusReleased ? themeColors.success : '#B45309',
+              },
+            ].map((detail, idx) => (
+              <View key={idx} style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{detail.label}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  {detail.badge && (
+                    <View style={{ backgroundColor: detail.badgeBg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginRight: 8 }}>
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: detail.badgeColor }}>{detail.badge}</Text>
+                    </View>
+                  )}
+                  <Text style={[styles.detailValue, detail.valueColor && { color: detail.valueColor }]}>{detail.value}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
         {/* History / Transactions Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Payout Release History</Text>
@@ -601,6 +643,41 @@ const getStyles = (colors, isDarkMode) =>
       fontSize: 12,
       color: colors.textSecondary,
       fontWeight: '500',
+    },
+    detailsCard: {
+      backgroundColor: colors.surface,
+      marginHorizontal: 20,
+      marginTop: 8,
+      marginBottom: 16,
+      borderRadius: 20,
+      padding: 20,
+      borderWidth: 1,
+      borderColor: colors.borderLight,
+      ...colors.shadow.card,
+    },
+    detailsTitle: {
+      fontSize: 16,
+      fontWeight: '800',
+      color: colors.text,
+      marginBottom: 16,
+    },
+    detailRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderLight,
+    },
+    detailLabel: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      fontWeight: '500',
+    },
+    detailValue: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.text,
     },
   });
 

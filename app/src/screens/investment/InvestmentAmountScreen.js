@@ -7,11 +7,13 @@ import {
   Alert,
   TouchableOpacity,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { TextInput, Button } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { authService } from '../../services/authService';
+import { investmentService } from '../../services/investmentService';
 import { colors, typography } from '../../theme/theme';
 import TopBar from '../../components/TopBar';
 import { useTheme } from '../../context/ThemeContext';
@@ -20,12 +22,15 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
   const { colors: themeColors } = useTheme();
   const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const [amount, setAmount] = useState('');
-  const [investmentType, setInvestmentType] = useState('saving');
+  const [investmentType, setInvestmentType] = useState('1_year');
+  const [plans, setPlans] = useState([]);
+  const [loadingPlans, setLoadingPlans] = useState(true);
   const [userData, setUserData] = useState(null);
   const [showEmailModal, setShowEmailModal] = useState(false);
 
   useEffect(() => {
     loadUserData();
+    loadPlans();
   }, []);
 
   const loadUserData = async () => {
@@ -37,10 +42,30 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
     }
   };
 
-  const formatCurrency = (value) => {
-    if (!value) return '₹0';
-    const numValue = parseFloat(value.replace(/[^\d.]/g, ''));
-    return `₹${numValue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  const loadPlans = async () => {
+    try {
+      const fetchedPlans = await investmentService.getPlans();
+      setPlans(fetchedPlans);
+      if (fetchedPlans && fetchedPlans.length > 0) {
+        // Default to the 1 Year plan (last in the array usually)
+        const yearPlan = fetchedPlans.find(p => p.id === '1_year') || fetchedPlans[fetchedPlans.length - 1];
+        setInvestmentType(yearPlan.id);
+      }
+    } catch (error) {
+      console.error('Error loading plans:', error);
+      // Fallback config if API fails
+      const fallbackPlans = [
+        { id: '15_days', name: '15 Days Plan', durationDays: 15, interestRate: 12, label: '15 Days', desc: 'Locked for 15 days, 12% returns', icon: 'clock-outline' },
+        { id: '1_month', name: '1 Month Plan', durationDays: 30, interestRate: 15, label: '1 Month', desc: 'Locked for 30 days, 15% returns', icon: 'calendar' },
+        { id: '3_months', name: '3 Months Plan', durationDays: 90, interestRate: 18, label: '3 Months', desc: 'Locked for 90 days, 18% returns', icon: 'calendar-range' },
+        { id: '6_months', name: '6 Months Plan', durationDays: 180, interestRate: 20, label: '6 Months', desc: 'Locked for 180 days, 20% returns', icon: 'calendar-clock' },
+        { id: '1_year', name: '1 Year Plan', durationDays: 365, interestRate: 24, label: '1 Year', desc: 'Locked for 365 days, 24% returns', icon: 'lock' },
+      ];
+      setPlans(fallbackPlans);
+      setInvestmentType('1_year');
+    } finally {
+      setLoadingPlans(false);
+    }
   };
 
   const handleAmountChange = (text) => {
@@ -71,12 +96,37 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
     });
   };
 
+  const getSelectedPlan = () => {
+    return plans.find(p => p.id === investmentType) || null;
+  };
+
   const getInterestRate = () => {
-    return investmentType === 'fixed' ? '24% p.a.' : '12% p.a.';
+    const plan = getSelectedPlan();
+    return plan ? `${plan.interestRate}% p.a.` : '0% p.a.';
   };
 
   const getLockPeriod = () => {
-    return investmentType === 'fixed' ? '1 year' : 'No lock period';
+    const plan = getSelectedPlan();
+    return plan ? `${plan.durationDays} Days` : 'No lock period';
+  };
+
+  const calculateInterest = () => {
+    const amt = parseFloat(amount) || 0;
+    const plan = getSelectedPlan();
+    if (!plan) return 0;
+    return (amt * plan.interestRate) / 100;
+  };
+
+  const calculateDailyInterest = () => {
+    const totalInt = calculateInterest();
+    const plan = getSelectedPlan();
+    if (!plan || plan.durationDays === 0) return 0;
+    return totalInt / plan.durationDays;
+  };
+
+  const calculateMaturityAmount = () => {
+    const amt = parseFloat(amount) || 0;
+    return amt + calculateInterest();
   };
 
   return (
@@ -89,52 +139,40 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
       >
         {/* Investment Type Selection */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Investment Type</Text>
-          <View style={styles.typeCards}>
-            <TouchableOpacity
-              style={[
-                styles.typeCard,
-                investmentType === 'saving' && styles.typeCardActive,
-                { borderColor: investmentType === 'saving' ? colors.saving : colors.border }
-              ]}
-              activeOpacity={0.85}
-              onPress={() => setInvestmentType('saving')}
-            >
-              <View style={[styles.typeRadio, investmentType === 'saving' && { borderColor: colors.saving }]}>
-                {investmentType === 'saving' && <View style={[styles.typeRadioInner, { backgroundColor: colors.saving }]} />}
-              </View>
-              <View style={styles.typeContent}>
-                <Text style={styles.typeTitle}>Saving Deposit</Text>
-                <Text style={styles.typeDesc}>Flexible withdrawals, 12% p.a.</Text>
-                <View style={styles.typeRateBadge}>
-                  <Text style={styles.typeRateText}>12% p.a.</Text>
-                </View>
-              </View>
-              <MaterialCommunityIcons name="piggy-bank" size={32} color={colors.saving} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.typeCard,
-                investmentType === 'fixed' && styles.typeCardActiveFixed,
-                { borderColor: investmentType === 'fixed' ? colors.fixed : colors.border }
-              ]}
-              activeOpacity={0.85}
-              onPress={() => setInvestmentType('fixed')}
-            >
-              <View style={[styles.typeRadio, investmentType === 'fixed' && { borderColor: colors.fixed }]}>
-                {investmentType === 'fixed' && <View style={[styles.typeRadioInner, { backgroundColor: colors.fixed }]} />}
-              </View>
-              <View style={styles.typeContent}>
-                <Text style={styles.typeTitle}>Fixed Deposit</Text>
-                <Text style={styles.typeDesc}>1-year lock period, 24% p.a.</Text>
-                <View style={[styles.typeRateBadge, { backgroundColor: colors.fixedLight }]}>
-                  <Text style={[styles.typeRateText, { color: colors.fixed }]}>24% p.a.</Text>
-                </View>
-              </View>
-              <MaterialCommunityIcons name="lock" size={32} color={colors.fixed} />
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.sectionTitle}>Investment Plan</Text>
+          {loadingPlans ? (
+            <ActivityIndicator size="large" color={themeColors.primary} style={{ marginVertical: 20 }} />
+          ) : (
+            <View style={styles.typeCards}>
+              {plans.map((plan) => {
+                const isActive = investmentType === plan.id;
+                return (
+                  <TouchableOpacity
+                    key={plan.id}
+                    style={[
+                      styles.typeCard,
+                      isActive && styles.typeCardActive,
+                      { borderColor: isActive ? themeColors.primary : themeColors.border }
+                    ]}
+                    activeOpacity={0.85}
+                    onPress={() => setInvestmentType(plan.id)}
+                  >
+                    <View style={[styles.typeRadio, isActive && { borderColor: themeColors.primary }]}>
+                      {isActive && <View style={[styles.typeRadioInner, { backgroundColor: themeColors.primary }]} />}
+                    </View>
+                    <View style={styles.typeContent}>
+                      <Text style={styles.typeTitle}>{plan.name}</Text>
+                      <Text style={styles.typeDesc}>{plan.desc}</Text>
+                      <View style={[styles.typeRateBadge, { backgroundColor: themeColors.primaryLight }]}>
+                        <Text style={[styles.typeRateText, { color: themeColors.primary }]}>{plan.interestRate}% Returns</Text>
+                      </View>
+                    </View>
+                    <MaterialCommunityIcons name={plan.icon || 'lock'} size={32} color={themeColors.primary} />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
         </View>
 
         {/* Amount Input */}
@@ -149,7 +187,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
               keyboardType="numeric"
               style={styles.amountInput}
               placeholder="0"
-              placeholderTextColor={colors.border}
+              placeholderTextColor={themeColors.border}
               underlineColor="transparent"
               activeUnderlineColor="transparent"
               textColor={themeColors.text}
@@ -164,18 +202,16 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
             <Text style={styles.summaryTitle}>Investment Summary</Text>
             
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Type</Text>
-              <Text style={[styles.summaryValue, { 
-                color: investmentType === 'saving' ? colors.saving : colors.fixed 
-              }]}>
-                {investmentType === 'saving' ? 'Saving Deposit' : 'Fixed Deposit'}
+              <Text style={styles.summaryLabel}>Plan</Text>
+              <Text style={[styles.summaryValue, { color: themeColors.primary, fontWeight: '700' }]}>
+                {getSelectedPlan()?.name || 'Selected Plan'}
               </Text>
             </View>
 
             <View style={styles.summaryDivider} />
 
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Amount</Text>
+              <Text style={styles.summaryLabel}>Investment Amount</Text>
               <Text style={styles.summaryAmount}>
                 ₹{parseFloat(amount).toLocaleString('en-IN')}
               </Text>
@@ -185,7 +221,32 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
 
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Interest Rate</Text>
-              <Text style={[styles.summaryValue, { color: colors.success }]}>{getInterestRate()}</Text>
+              <Text style={[styles.summaryValue, { color: themeColors.success, fontWeight: '700' }]}>{getInterestRate()}</Text>
+            </View>
+
+            <View style={styles.summaryDivider} />
+
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Investment Duration</Text>
+              <Text style={styles.summaryValue}>{getLockPeriod()}</Text>
+            </View>
+
+            <View style={styles.summaryDivider} />
+
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Total Interest</Text>
+              <Text style={[styles.summaryValue, { color: themeColors.success, fontWeight: '700' }]}>
+                ₹{calculateInterest().toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+              </Text>
+            </View>
+
+            <View style={styles.summaryDivider} />
+
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Daily Interest</Text>
+              <Text style={[styles.summaryValue, { color: themeColors.primary, fontWeight: '700' }]}>
+                ₹{calculateDailyInterest().toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / day
+              </Text>
             </View>
 
             <View style={styles.summaryDivider} />
@@ -195,10 +256,17 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
               <Text style={styles.summaryValue}>{getLockPeriod()}</Text>
             </View>
 
+            <View style={styles.summaryDivider} />
+
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Withdrawal Available</Text>
+              <Text style={[styles.summaryValue, { fontWeight: '700' }]}>After {getLockPeriod()}</Text>
+            </View>
+
             <View style={styles.summaryHighlightRow}>
-              <Text style={styles.summaryHighlightLabel}>Expected Returns (1 year)</Text>
-              <Text style={[styles.summaryHighlightValue, { color: colors.success }]}>
-                +₹{((parseFloat(amount) * (investmentType === 'fixed' ? 0.24 : 0.12)).toFixed(0)).toLocaleString('en-IN')}
+              <Text style={styles.summaryHighlightLabel}>Maturity Amount</Text>
+              <Text style={[styles.summaryHighlightValue, { color: themeColors.success }]}>
+                ₹{calculateMaturityAmount().toLocaleString('en-IN', { maximumFractionDigits: 2 })}
               </Text>
             </View>
           </View>
@@ -212,7 +280,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
             { icon: 'check-circle', text: 'Secure and regulated' },
           ].map((item, i) => (
             <View key={i} style={styles.infoItem}>
-              <MaterialCommunityIcons name={item.icon} size={18} color={colors.success} />
+              <MaterialCommunityIcons name={item.icon} size={18} color={themeColors.success || colors.success} />
               <Text style={styles.infoText}>{item.text}</Text>
             </View>
           ))}
@@ -225,7 +293,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
           disabled={!amount || parseFloat(amount) <= 0}
         >
           <Text style={styles.continueBtnText}>Continue to Payment</Text>
-          <MaterialCommunityIcons name="arrow-right" size={20} color={colors.white} />
+          <MaterialCommunityIcons name="arrow-right" size={20} color={themeColors.white || colors.white} />
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />
@@ -238,7 +306,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Email Required</Text>
               <TouchableOpacity onPress={() => setShowEmailModal(false)} style={styles.modalCloseBtn}>
-                <MaterialCommunityIcons name="close" size={18} color={colors.textSecondary} />
+                <MaterialCommunityIcons name="close" size={18} color={themeColors.textSecondary || colors.textSecondary} />
               </TouchableOpacity>
             </View>
             <Text style={styles.modalText}>

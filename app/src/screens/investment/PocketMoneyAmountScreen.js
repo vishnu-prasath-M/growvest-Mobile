@@ -66,6 +66,16 @@ const PocketMoneyAmountScreen = ({ navigation }) => {
     });
   };
 
+  const getBonusAmount = () => {
+    const amt = parseFloat(amount) || 0;
+    return amt * 6 / 100;
+  };
+
+  const getFinalValue = () => {
+    const amt = parseFloat(amount) || 0;
+    return amt + getBonusAmount();
+  };
+
   const getPayoutAmount = () => {
     const amt = parseFloat(amount) || 0;
     return amt / 10;
@@ -186,9 +196,34 @@ const PocketMoneyAmountScreen = ({ navigation }) => {
               </Text>
             </View>
 
+            <View style={styles.summaryDivider} />
+
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>6% Bonus</Text>
+              <Text style={[styles.summaryValue, { color: themeColors.primary, fontWeight: '700' }]}>
+                +₹{getBonusAmount().toLocaleString('en-IN')}
+              </Text>
+            </View>
+
+            <View style={styles.summaryDivider} />
+
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Final Payout Value</Text>
+              <Text style={[styles.summaryValue, { fontWeight: '800' }]}>
+                ₹{getFinalValue().toLocaleString('en-IN')}
+              </Text>
+            </View>
+
             <View style={styles.summaryHighlightRow}>
               <Text style={styles.summaryHighlightLabel}>Total Installments</Text>
               <Text style={[styles.summaryHighlightValue, { color: themeColors.primary }]}>10 Release Payouts</Text>
+            </View>
+
+            <View style={styles.bonusLockedNote}>
+              <MaterialCommunityIcons name="lock-clock" size={16} color="#B45309" style={{ marginRight: 6 }} />
+              <Text style={styles.bonusLockedText}>
+                Your 6% bonus is locked and will be added only to your final payout.
+              </Text>
             </View>
           </View>
         )}
@@ -523,6 +558,23 @@ const getStyles = (colors) => StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: colors.white,
+  },
+  bonusLockedNote: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 12,
+    padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  bonusLockedText: {
+    color: '#B45309',
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1,
+    lineHeight: 16,
   },
 });
 

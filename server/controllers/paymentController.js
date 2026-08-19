@@ -124,7 +124,44 @@ exports.verifyPayment = async (req, res) => {
 const completeInvestment = async (user, data, orderId, paymentId, signature) => {
   const { amount, type } = data;
   const refCode = `INV-${Date.now().toString().slice(-6)}`;
-  const interestRate = type === 'fixed' ? 24 : 12;
+  
+  // Resolve plan parameters
+  let interestRate = 12;
+  let durationDays = 365;
+  let planType = 'saving';
+  
+  if (type === 'fixed') {
+    interestRate = 24;
+    durationDays = 365;
+    planType = 'fixed';
+  } else if (type === '15_days') {
+    interestRate = 12;
+    durationDays = 15;
+    planType = '15_days';
+  } else if (type === '1_month') {
+    interestRate = 15;
+    durationDays = 30;
+    planType = '1_month';
+  } else if (type === '3_months') {
+    interestRate = 18;
+    durationDays = 90;
+    planType = '3_months';
+  } else if (type === '6_months') {
+    interestRate = 20;
+    durationDays = 180;
+    planType = '6_months';
+  } else if (type === '1_year') {
+    interestRate = 24;
+    durationDays = 365;
+    planType = '1_year';
+  }
+  
+  const totalInterest = Number(amount) * interestRate / 100;
+  const dailyInterest = totalInterest / durationDays;
+  const maturityAmount = Number(amount) + totalInterest;
+  
+  const startDate = new Date();
+  const maturityDate = new Date(startDate.getTime() + durationDays * 24 * 60 * 60 * 1000);
 
   // 1. Create & auto-approve investment
   const investment = new Investment({
@@ -137,7 +174,7 @@ const completeInvestment = async (user, data, orderId, paymentId, signature) => 
     userEmail: user.email,
     mobileNumber: user.mobileNumber,
     interestRate,
-    startDate: new Date(),
+    startDate,
     paymentProvider: 'Razorpay',
     paymentStatus: 'paid',
     orderId,
@@ -145,6 +182,15 @@ const completeInvestment = async (user, data, orderId, paymentId, signature) => 
     signature,
     paidAt: new Date(),
     verified: true,
+    
+    // Duration plan fields
+    planType,
+    durationDays,
+    totalInterest,
+    dailyInterest,
+    maturityAmount,
+    maturityDate,
+    withdrawalStatus: 'locked',
   });
 
   await investment.save();
@@ -316,6 +362,9 @@ const completePocketMoney = async (user, data, orderId, paymentId, signature) =>
   const { amount, frequency } = data;
   
   const payoutAmount = Number(amount) / 10;
+  const bonusRate = 6;
+  const bonusAmount = Number(amount) * 6 / 100;
+  const totalFinalValue = Number(amount) + bonusAmount;
   
   const nextPayoutDate = new Date();
   if (frequency === 'daily') {
@@ -324,6 +373,15 @@ const completePocketMoney = async (user, data, orderId, paymentId, signature) =>
     nextPayoutDate.setDate(nextPayoutDate.getDate() + 2);
   } else if (frequency === 'weekly') {
     nextPayoutDate.setDate(nextPayoutDate.getDate() + 7);
+  }
+  
+  const finalPayoutDate = new Date();
+  if (frequency === 'daily') {
+    finalPayoutDate.setDate(finalPayoutDate.getDate() + 9);
+  } else if (frequency === 'every_2_days') {
+    finalPayoutDate.setDate(finalPayoutDate.getDate() + 18);
+  } else if (frequency === 'weekly') {
+    finalPayoutDate.setDate(finalPayoutDate.getDate() + 63);
   }
   
   const pocketMoney = new PocketMoney({
@@ -337,9 +395,14 @@ const completePocketMoney = async (user, data, orderId, paymentId, signature) =>
     frequency,
     startDate: new Date(),
     nextPayoutDate,
+    finalPayoutDate,
     totalPaidOut: payoutAmount,
     payoutCount: 1,
     status: 'active',
+    bonusRate,
+    bonusAmount,
+    totalFinalValue,
+    bonusReleased: false,
     paymentProvider: 'Razorpay',
     orderId,
     paymentId,

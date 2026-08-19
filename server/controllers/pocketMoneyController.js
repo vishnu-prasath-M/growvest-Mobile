@@ -30,7 +30,7 @@ const runPocketMoneyPayouts = async () => {
         continue;
       }
       
-      const amountToPay = Math.min(pocket.payoutAmount, pocket.remainingAmount);
+      const amountToPay = Math.min(pocket.payoutAmount, pocket.remainingAmount) + (payoutNum === 10 ? (pocket.bonusAmount || 0) : 0);
       
       // Create Transaction first
       const transaction = new Transaction({
@@ -53,14 +53,20 @@ const runPocketMoneyPayouts = async () => {
         payoutDate: now,
         payoutNumber: payoutNum,
         idempotencyKey,
+        status: 'released',
         transactionId: transaction._id
       });
       await payout.save();
       
+      const regularPayoutPart = amountToPay - (payoutNum === 10 ? (pocket.bonusAmount || 0) : 0);
       // Update Pocket Money record
-      pocket.remainingAmount = Math.max(0, pocket.remainingAmount - amountToPay);
+      pocket.remainingAmount = Math.max(0, pocket.remainingAmount - regularPayoutPart);
       pocket.totalPaidOut += amountToPay;
       pocket.payoutCount = payoutNum;
+      
+      if (payoutNum === 10) {
+        pocket.bonusReleased = true;
+      }
       
       if (pocket.remainingAmount <= 0) {
         pocket.status = 'completed';
@@ -221,7 +227,7 @@ exports.releaseSinglePayout = async (req, res) => {
       return res.status(400).json({ message: 'Payout already released for this plan today.' });
     }
     
-    const amountToPay = Math.min(pocket.payoutAmount, pocket.remainingAmount);
+    const amountToPay = Math.min(pocket.payoutAmount, pocket.remainingAmount) + (payoutNum === 10 ? (pocket.bonusAmount || 0) : 0);
     
     const transaction = new Transaction({
       userId: pocket.userId,
@@ -242,13 +248,19 @@ exports.releaseSinglePayout = async (req, res) => {
       payoutDate: now,
       payoutNumber: payoutNum,
       idempotencyKey,
+      status: 'released',
       transactionId: transaction._id
     });
     await payout.save();
     
-    pocket.remainingAmount = Math.max(0, pocket.remainingAmount - amountToPay);
+    const regularPayoutPart = amountToPay - (payoutNum === 10 ? (pocket.bonusAmount || 0) : 0);
+    pocket.remainingAmount = Math.max(0, pocket.remainingAmount - regularPayoutPart);
     pocket.totalPaidOut += amountToPay;
     pocket.payoutCount = payoutNum;
+    
+    if (payoutNum === 10) {
+      pocket.bonusReleased = true;
+    }
     
     if (pocket.remainingAmount <= 0) {
       pocket.status = 'completed';
@@ -329,8 +341,8 @@ exports.requestPayout = async (req, res) => {
       });
     }
     
-    const amountToPay = Math.min(pocket.payoutAmount, pocket.remainingAmount);
     const payoutNum = pocket.payoutCount + 1;
+    const amountToPay = Math.min(pocket.payoutAmount, pocket.remainingAmount) + (payoutNum === 10 ? (pocket.bonusAmount || 0) : 0);
     
     const payout = new PocketMoneyPayout({
       pocketMoneyId: pocket._id,
@@ -379,7 +391,9 @@ exports.getPayoutStatus = async (req, res) => {
     const payout = await PocketMoneyPayout.findOne({ idempotencyKey });
     
     if (!payout) {
-      return res.json({ status: 'available', payoutAmount: Math.min(pocket.payoutAmount, pocket.remainingAmount) });
+      const payoutNum = pocket.payoutCount + 1;
+      const payoutAmt = Math.min(pocket.payoutAmount, pocket.remainingAmount) + (payoutNum === 10 ? (pocket.bonusAmount || 0) : 0);
+      return res.json({ status: 'available', payoutAmount: payoutAmt });
     }
     
     res.json({ status: payout.status, payout });
@@ -441,10 +455,15 @@ exports.confirmReleasePayout = async (req, res) => {
     payout.transactionId = transaction._id;
     await payout.save();
     
+    const regularPayoutPart = payout.amount - (payout.payoutNumber === 10 ? (pocket.bonusAmount || 0) : 0);
     // Update Pocket Money record
-    pocket.remainingAmount = Math.max(0, pocket.remainingAmount - payout.amount);
+    pocket.remainingAmount = Math.max(0, pocket.remainingAmount - regularPayoutPart);
     pocket.totalPaidOut += payout.amount;
     pocket.payoutCount = payout.payoutNumber;
+    
+    if (payout.payoutNumber === 10) {
+      pocket.bonusReleased = true;
+    }
     
     if (pocket.remainingAmount <= 0) {
       pocket.status = 'completed';

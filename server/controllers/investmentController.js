@@ -8,7 +8,44 @@ exports.createInvestment = async (req, res) => {
   try {
     const { amount, type, userName, userEmail, mobileNumber } = req.body;
     const refCode = `INV-${Date.now().toString().slice(-6)}`;
-    const interestRate = type === 'fixed' ? 24 : 12;
+    
+    // Resolve plan parameters
+    let interestRate = 12;
+    let durationDays = 365;
+    let planType = 'saving';
+    
+    if (type === 'fixed') {
+      interestRate = 24;
+      durationDays = 365;
+      planType = 'fixed';
+    } else if (type === '15_days') {
+      interestRate = 12;
+      durationDays = 15;
+      planType = '15_days';
+    } else if (type === '1_month') {
+      interestRate = 15;
+      durationDays = 30;
+      planType = '1_month';
+    } else if (type === '3_months') {
+      interestRate = 18;
+      durationDays = 90;
+      planType = '3_months';
+    } else if (type === '6_months') {
+      interestRate = 20;
+      durationDays = 180;
+      planType = '6_months';
+    } else if (type === '1_year') {
+      interestRate = 24;
+      durationDays = 365;
+      planType = '1_year';
+    }
+    
+    const totalInterest = Number(amount) * interestRate / 100;
+    const dailyInterest = totalInterest / durationDays;
+    const maturityAmount = Number(amount) + totalInterest;
+    
+    const startDate = new Date();
+    const maturityDate = new Date(startDate.getTime() + durationDays * 24 * 60 * 60 * 1000);
 
     // Find user to store userId
     const user = await User.findOne({ 
@@ -28,7 +65,16 @@ exports.createInvestment = async (req, res) => {
       userEmail,
       mobileNumber,
       interestRate,
-      startDate: new Date(),
+      startDate,
+      
+      // Duration plan fields
+      planType,
+      durationDays,
+      totalInterest,
+      dailyInterest,
+      maturityAmount,
+      maturityDate,
+      withdrawalStatus: 'locked',
     });
 
     await newInvestment.save();
@@ -60,30 +106,10 @@ exports.getInvestments = async (req, res) => {
 
     // Calculate dynamic interest for all approved investments
     const computedInvestments = await Promise.all(investments.map(async (inv) => {
-      let userName = inv.userName;
-      let userEmail = inv.userEmail;
-
-      // Logic to fix legacy data
-      if (!userName || userName === "Unknown User") {
-        if (userEmail) {
-          const user = await User.findOne({ email: userEmail });
-          if (user) {
-            userName = user.name;
-          }
-        }
-      }
-
-      // Sync interest logic (using shared helper from userController)
       if (inv.status === 'approved') {
         await syncInvestmentInterest(inv);
       }
-
-      return {
-        ...inv.toObject(),
-        userName: userName || "Unknown User",
-        userEmail: userEmail || "user@example.com",
-        interestEarned: inv.interestEarned || 0,
-      };
+      return inv;
     }));
 
     res.status(200).json(computedInvestments);
@@ -91,6 +117,17 @@ exports.getInvestments = async (req, res) => {
     console.error('Error fetching investments:', error);
     res.status(500).json({ message: 'Error fetching investments', error: error.message });
   }
+};
+
+exports.getPlans = async (req, res) => {
+  const plans = [
+    { id: '15_days', name: '15 Days Plan', durationDays: 15, interestRate: 12, label: '15 Days', desc: 'Locked for 15 days, 12% returns', icon: 'clock-outline' },
+    { id: '1_month', name: '1 Month Plan', durationDays: 30, interestRate: 15, label: '1 Month', desc: 'Locked for 30 days, 15% returns', icon: 'calendar' },
+    { id: '3_months', name: '3 Months Plan', durationDays: 90, interestRate: 18, label: '3 Months', desc: 'Locked for 90 days, 18% returns', icon: 'calendar-range' },
+    { id: '6_months', name: '6 Months Plan', durationDays: 180, interestRate: 20, label: '6 Months', desc: 'Locked for 180 days, 20% returns', icon: 'calendar-clock' },
+    { id: '1_year', name: '1 Year Plan', durationDays: 365, interestRate: 24, label: '1 Year', desc: 'Locked for 365 days, 24% returns', icon: 'lock' },
+  ];
+  res.status(200).json(plans);
 };
 
 exports.updateInvestmentStatus = async (req, res) => {
@@ -172,6 +209,18 @@ exports.withdrawInvestment = async (req, res) => {
       
       if (diffDays < 365) {
         return res.status(400).json({ message: 'Withdrawal available after 1 year' });
+      }
+    }
+
+    const durationPlanTypes = ['15_days', '1_month', '3_months', '6_months', '1_year'];
+    const isDurationPlan = durationPlanTypes.includes(investment.type);
+    
+    if (isDurationPlan) {
+      const now = new Date();
+      if (now < new Date(investment.maturityDate)) {
+        return res.status(400).json({ 
+          message: `Investment is locked. Withdrawal available after maturity date: ${new Date(investment.maturityDate).toLocaleDateString('en-IN')}` 
+        });
       }
     }
 

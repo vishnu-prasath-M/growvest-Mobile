@@ -31,4 +31,14 @@ export const investmentService = {
       throw error.response?.data || error.message;
     }
   },
+
+  // Get investment plans dynamically
+  getPlans: async () => {
+    try {
+      const response = await api.get(API_ENDPOINTS.INVESTMENT_PLANS);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
 };
