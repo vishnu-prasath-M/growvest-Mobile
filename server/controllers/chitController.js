@@ -154,47 +154,38 @@ const getDashboard = async (req, res) => {
       const joinedDate = new Date(m.joinedAt);
       const currentDate = new Date();
       
-      let expectedUnits = 0;
-      let actualPending = 0;
-      let durationUnits = 0;
+      const weeklyAmount = m.weeklyAmount || m.chitId?.weeklyAmount || m.chitId?.monthlyAmount || 0;
+      const durationUnits = isWeekly 
+        ? (m.totalWeeks || m.chitId?.totalWeeks || m.chitId?.duration || 10)
+        : (m.totalWeeks || m.chitId?.duration || 12);
       
-      if (isWeekly) {
-        const diffTime = Math.abs(currentDate - joinedDate);
-        const weeksElapsed = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7));
-        expectedUnits = Math.max(0, weeksElapsed + 1);
-        durationUnits = m.chitId?.totalWeeks || m.chitId?.duration || 0;
-        
-        const pendingInstallments = Math.max(0, expectedUnits - m.currentWeek);
-        actualPending = Math.min(pendingInstallments, Math.max(0, durationUnits - m.currentWeek));
-        
-        if (m.status === 'active' && actualPending > 0) {
-          upcomingDue += (m.chitId?.weeklyAmount || m.chitId?.monthlyAmount || 0) * actualPending;
-          pendingDueCount += actualPending;
+      const paidUnits = m.paidWeeks || m.currentWeek || m.currentMonth || 1;
+
+      if (m.status === 'active' && paidUnits < durationUnits) {
+        let expectedUnits = 0;
+        if (isWeekly) {
+          const diffTime = Math.abs(currentDate - joinedDate);
+          const weeksElapsed = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7));
+          expectedUnits = Math.max(1, weeksElapsed + 1);
+        } else {
+          const monthsElapsed = (currentDate.getFullYear() - joinedDate.getFullYear()) * 12 + 
+                                (currentDate.getMonth() - joinedDate.getMonth());
+          const fullMonthsElapsed = currentDate.getDate() >= joinedDate.getDate() ? monthsElapsed : monthsElapsed - 1;
+          expectedUnits = Math.max(1, fullMonthsElapsed + 1);
         }
+
+        const pendingCount = Math.max(0, expectedUnits - paidUnits);
         
-        const due = calcNextWeeklyDueDate(m.joinedAt, m.currentWeek);
-        if (m.status === 'active' && m.currentWeek < durationUnits) {
-          if (!nextDueDate || due < nextDueDate) nextDueDate = due;
-        }
-      } else {
-        const monthsElapsed = (currentDate.getFullYear() - joinedDate.getFullYear()) * 12 + 
-                              (currentDate.getMonth() - joinedDate.getMonth());
-        const fullMonthsElapsed = currentDate.getDate() >= joinedDate.getDate() ? monthsElapsed : monthsElapsed - 1;
-        expectedUnits = Math.max(0, fullMonthsElapsed + 1);
-        durationUnits = m.chitId?.duration || 0;
-        
-        const pendingInstallments = Math.max(0, expectedUnits - m.currentMonth);
-        actualPending = Math.min(pendingInstallments, Math.max(0, durationUnits - m.currentMonth));
-        
-        if (m.status === 'active' && actualPending > 0) {
-          upcomingDue += (m.chitId?.monthlyAmount || 0) * actualPending;
-          pendingDueCount += actualPending;
-        }
-        
-        const due = calcNextDueDate(m.joinedAt, m.currentMonth);
-        if (m.status === 'active' && m.currentMonth < durationUnits) {
-          if (!nextDueDate || due < nextDueDate) nextDueDate = due;
-        }
+        // If user has overdue pending installments, multiply by pending count.
+        // If current installment is paid up to date, next due is 1 installment for the next cycle.
+        const dueInstallmentCount = pendingCount > 0 ? pendingCount : 1;
+        upcomingDue += weeklyAmount * dueInstallmentCount;
+        pendingDueCount += Math.max(1, pendingCount);
+
+        const due = isWeekly 
+          ? calcNextWeeklyDueDate(m.joinedAt, paidUnits)
+          : calcNextDueDate(m.joinedAt, paidUnits);
+        if (!nextDueDate || due < nextDueDate) nextDueDate = due;
       }
 
       if (m.withdrawalStatus === 'completed' || m.hasWon) winningStatus = 'Won';

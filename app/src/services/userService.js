@@ -24,7 +24,13 @@ export const userService = {
   },
 
   getDashboardData: async () => {
-    const profile = await userService.getUserProfile();
-    return mapProfileToDashboard(profile);
+    try {
+      const response = await api.get(API_ENDPOINTS.DASHBOARD);
+      return response.data;
+    } catch (error) {
+      console.warn('[userService] Falling back to profile for dashboard data:', error?.message || error);
+      const profile = await userService.getUserProfile();
+      return mapProfileToDashboard(profile);
+    }
   },
 };
