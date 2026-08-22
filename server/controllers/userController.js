@@ -61,132 +61,42 @@ const syncInvestmentInterest = async (inv) => {
   return inv.interestEarned || 0;
 };
 
+const { getUserPortfolioSummary } = require('../utils/portfolioHelper');
+
 // Helper to get enriched user data by any query (email or ID)
 const getEnrichedUserData = async (query) => {
   const user = await User.findOne(query);
   if (!user) return null;
 
-  const email = user.email;
-  const mobileNumber = user.mobileNumber;
-
-  // Build $or conditions dynamically (only include non-empty values)
-  const investmentOrConditions = [];
-  if (email) investmentOrConditions.push({ userEmail: email });
-  if (mobileNumber) investmentOrConditions.push({ mobileNumber: mobileNumber });
-  const investmentQuery = investmentOrConditions.length > 0
-    ? { $or: investmentOrConditions, status: 'approved' }
-    : { status: 'approved', userEmail: '__no_match__' };
-
-  // Get all approved investments by email OR mobile number
-  const investments = await Investment.find(investmentQuery);
-
-  // Run Sync Logic for each investment
-  for (const inv of investments) {
-    await syncInvestmentInterest(inv);
-  }
-
-  const withdrawalOrConditions = [];
-  if (email) withdrawalOrConditions.push({ userEmail: email });
-  if (mobileNumber) withdrawalOrConditions.push({ mobileNumber: mobileNumber });
-  const withdrawalQuery = withdrawalOrConditions.length > 0
-    ? { $or: withdrawalOrConditions, status: { $in: ['paid', 'approved'] } }
-    : { status: { $in: ['paid', 'approved'] }, userEmail: '__no_match__' };
-  const withdrawals = await Withdrawal.find(withdrawalQuery);
-
-  const ChitMember = require('../models/ChitMember');
-  const PocketMoneyPayout = require('../models/PocketMoneyPayout');
-
-  const pocketPayouts = await PocketMoneyPayout.find({ userId: user._id });
-  const totalPocketReleased = pocketPayouts.reduce((acc, p) => acc + p.amount, 0);
-
-  const savingInvestments = investments.filter(inv => inv.type === 'saving');
-  const fixedInvestments = investments.filter(inv => inv.type === 'fixed');
-  
-  // Dynamic duration-based investment categories
-  const durationPlanTypes = ['15_days', '1_month', '3_months', '6_months', '1_year'];
-  const durationInvestments = investments.filter(inv => durationPlanTypes.includes(inv.type));
-  
-  // Separate into Matured vs Locked
-  const maturedInvestments = durationInvestments.filter(inv => {
-    return new Date() >= new Date(inv.maturityDate);
-  });
-  const lockedInvestments = durationInvestments.filter(inv => {
-    return new Date() < new Date(inv.maturityDate);
-  });
-
-  const savingWithdrawals = withdrawals.filter(wd => wd.withdrawType === 'saving');
-  const fixedWithdrawals = withdrawals.filter(wd => wd.withdrawType === 'fixed');
-  
-  const savingInvested = savingInvestments.reduce((acc, inv) => acc + inv.amount, 0);
-  const savingInterest = savingInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
-  
-  // Matured principal + interest added directly to withdrawable savings pool
-  const maturedPrincipal = maturedInvestments.reduce((acc, inv) => acc + inv.amount, 0);
-  const maturedInterest = maturedInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
-  const maturedTotal = maturedPrincipal + maturedInterest;
-  
-  const savingWithdrawn = savingWithdrawals.reduce((acc, wd) => acc + wd.amount, 0);
-  let savingBalance = savingInvested + savingInterest + totalPocketReleased + maturedTotal - savingWithdrawn;
-  if (savingBalance < 0) savingBalance = 0;
-
-  const fixedInvested = fixedInvestments.reduce((acc, inv) => acc + inv.amount, 0);
-  const fixedInterest = fixedInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
-  const fixedWithdrawn = fixedWithdrawals.reduce((acc, wd) => acc + wd.amount, 0);
-  let fixedBalance = fixedInvested + fixedInterest - fixedWithdrawn;
-  if (fixedBalance < 0) fixedBalance = 0;
-
-  // Calculate Chit Winning Amount directly from ChitMember records for this user
-  const wonMemberships = await ChitMember.find({ userId: user._id, hasWon: true });
-  const totalChitWinningAmount = wonMemberships.reduce((acc, m) => acc + (m.winningAmount || 0), 0);
-
-  const availableFixed = fixedInvestments.filter(inv => {
-    const diffDays = (new Date() - new Date(inv.startDate)) / (1000 * 60 * 60 * 24);
-    return diffDays >= 365;
-  }).reduce((acc, inv) => acc + inv.amount + (inv.interestEarned || 0), 0);
-
-  // Locked investments principal and interest
-  const lockedDurationPrincipal = lockedInvestments.reduce((acc, inv) => acc + inv.amount, 0);
-  const lockedDurationInterest = lockedInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
-  const lockedDurationTotal = lockedDurationPrincipal + lockedDurationInterest;
-
-  const availableToWithdraw = savingBalance + availableFixed + totalChitWinningAmount;
-
-  // Total balance includes savings balance + fixed balance + locked duration plans + total chit winning amount
-  let totalBalance = savingBalance + fixedBalance + lockedDurationTotal + totalChitWinningAmount;
-  if (totalBalance < 0) totalBalance = 0;
-
-  // Total calculations
-  const durationInvested = durationInvestments.reduce((acc, inv) => acc + inv.amount, 0);
-  const durationInterest = durationInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
-  
-  const totalInvested = savingInvested + fixedInvested + durationInvested;
-  const totalInterest = savingInterest + fixedInterest + durationInterest;
-  const totalWithdrawn = savingWithdrawn + fixedWithdrawn;
+  const summary = await getUserPortfolioSummary(user._id);
+  if (!summary) return user.toObject();
 
   return {
     ...user.toObject(),
-    balance: totalBalance,
-    totalBalance,
-    savingBalance,
-    fixedBalance,
-    availableToWithdraw,
-    totalChitWinningAmount,
-    winningAmount: totalChitWinningAmount,
-    totalPocketReleased,
-    totalInvested,
-    totalInterest,
-    totalWithdrawn,
+    balance: summary.balances.totalBalance,
+    totalBalance: summary.balances.totalBalance,
+    savingBalance: summary.balances.availableToWithdraw,
+    fixedBalance: 0,
+    availableToWithdraw: summary.balances.availableToWithdraw,
+    totalChitWinningAmount: summary.balances.totalChitWinningAmount,
+    winningAmount: summary.balances.totalChitWinningAmount,
+    totalInvested: summary.balances.totalInvested,
+    totalLocked: summary.balances.totalLocked,
+    dailyInterest: summary.balances.dailyInterest,
+    totalInterestEarned: summary.balances.totalInterestEarned,
+    totalInterest: summary.balances.totalInterestEarned,
+    totalWithdrawn: 0,
     saving: {
-      invested: savingInvested,
-      interest: savingInterest,
-      withdrawn: savingWithdrawn,
-      balance: savingBalance
+      invested: summary.balances.totalInvested,
+      interest: summary.balances.totalInterestEarned,
+      withdrawn: 0,
+      balance: summary.balances.availableToWithdraw
     },
     fixed: {
-      invested: fixedInvested,
-      interest: fixedInterest,
-      withdrawn: fixedWithdrawn,
-      balance: fixedBalance
+      invested: 0,
+      interest: 0,
+      withdrawn: 0,
+      balance: 0
     }
   };
 };

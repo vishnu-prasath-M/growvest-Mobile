@@ -3,18 +3,12 @@ export const mapProfileToDashboard = (profile) => {
     return null;
   }
 
-  // Use server-computed balances which already include interestEarned.
-  // NEVER fall back to profile.balance (stale user.balance field from MongoDB)
-  // as it does not reflect daily-accrued interest or approved withdrawals.
   const savingBalance = profile.savingBalance ?? 0;
   const fixedBalance = profile.fixedBalance ?? 0;
-  const totalInterest = profile.totalInterest ?? profile.totalEarnings ?? 0;
-
-  // Compute totalBalance from the two components (both already include their interest).
-  // If server explicitly sends totalBalance, use that; otherwise compute it.
-  const totalBalance = (profile.totalBalance != null)
-    ? profile.totalBalance
-    : savingBalance + fixedBalance;
+  const totalInvested = profile.totalInvested ?? profile.totalInvestment ?? (savingBalance + fixedBalance);
+  const totalInterestEarned = profile.totalInterestEarned ?? profile.totalInterest ?? profile.totalEarnings ?? 0;
+  const availableToWithdraw = profile.availableToWithdraw ?? 0;
+  const totalBalance = profile.totalBalance ?? (totalInvested + totalInterestEarned);
 
   return {
     user: {
@@ -30,8 +24,10 @@ export const mapProfileToDashboard = (profile) => {
       savingBalance,
       fixedBalance,
       totalBalance,
-      totalInterest,
-      availableToWithdraw: profile.availableToWithdraw ?? 0,
+      totalInvested,
+      totalInterestEarned,
+      totalEarned: totalInterestEarned,
+      availableToWithdraw,
     },
   };
 };
