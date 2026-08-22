@@ -24,6 +24,7 @@ import Reanimated, {
   useAnimatedStyle,
   withSpring,
   withSequence,
+  withDelay,
 } from 'react-native-reanimated';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');

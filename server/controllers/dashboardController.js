@@ -14,55 +14,66 @@ const Notification = require('../models/Notification');
 exports.getDashboard = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
     const PocketMoney = require('../models/PocketMoney');
     const pocketMonies = await PocketMoney.find({ userId: user._id });
-    const pocketReleased = pocketMonies.reduce((sum, pm) => sum + pm.totalPaidOut, 0);
-    const pocketInvested = pocketMonies.reduce((sum, pm) => sum + pm.investedAmount, 0);
-    const pocketRemaining = pocketMonies.reduce((sum, pm) => sum + pm.remainingAmount, 0);
+    const pocketReleased = pocketMonies.reduce((sum, pm) => sum + (pm.totalPaidOut || 0), 0);
+    const pocketInvested = pocketMonies.reduce((sum, pm) => sum + (pm.investedAmount || 0), 0);
+    const pocketRemaining = pocketMonies.reduce((sum, pm) => sum + (pm.remainingAmount || 0), 0);
 
-    // Get user's investments using userId (primary), fallback to email/mobile
-    const investments = await Investment.find({
-      $or: [
-        { userId: user._id },
-        { userEmail: user.email },
-        { mobileNumber: user.mobileNumber },
-      ]
-    });
+    // Build robust OR conditions to match all user investments
+    const userOrConditions = [{ userId: user._id }];
+    if (user.email && String(user.email).trim() !== '' && user.email !== 'undefined') {
+      userOrConditions.push({ userEmail: new RegExp(`^${String(user.email).trim()}$`, 'i') });
+    }
+    if (user.mobileNumber && String(user.mobileNumber).trim() !== '' && user.mobileNumber !== 'undefined') {
+      userOrConditions.push({ mobileNumber: String(user.mobileNumber).trim() });
+    }
+
+    // Get user's investments
+    const investments = await Investment.find({ $or: userOrConditions });
 
     // Get recent transactions
-    const transactions = await Transaction.find({
-      $or: [
-        { userId: user._id },
-        { userEmail: user.email }
-      ]
-    })
+    const transactions = await Transaction.find({ $or: userOrConditions })
       .sort({ createdAt: -1 })
       .limit(10);
 
     // Get withdrawals
-    const withdrawals = await Withdrawal.find({
-      $or: [
-        { userId: user._id },
-        { userEmail: user.email }
-      ]
-    }).sort({ createdAt: -1 });
+    const withdrawals = await Withdrawal.find({ $or: userOrConditions }).sort({ createdAt: -1 });
 
-    // Calculate balances
-    const savingInvestments = investments.filter(inv => inv.type === 'saving' && inv.status === 'approved');
-    const fixedInvestments = investments.filter(inv => inv.type === 'fixed' && inv.status === 'approved');
+    // Calculate balances based on both duration investments & chit fund memberships
+    const activeInvestments = investments.filter(inv => inv.status === 'approved');
+    const durationInvested = activeInvestments.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+    const totalInterestEarned = investments.reduce((sum, inv) => sum + (inv.interestEarned || inv.totalInterest || 0), 0);
 
-    const savingBalance = savingInvestments.reduce((sum, inv) => sum + inv.amount + (inv.interestEarned || 0), 0) + pocketReleased;
-    const fixedBalance = fixedInvestments.reduce((sum, inv) => sum + inv.amount + (inv.interestEarned || 0), 0);
-    const totalInterest = investments.reduce((sum, inv) => sum + (inv.interestEarned || 0), 0);
+    // Active Chit memberships paid contribution
+    const activeChitMembers = await ChitMember.find({ userId: user._id, status: 'active' });
+    const chitInvested = activeChitMembers.reduce((sum, m) => sum + (m.totalPaid || (m.paidWeeks || 1) * (m.weeklyAmount || 0)), 0);
+
+    const totalInvested = durationInvested + chitInvested;
+    const activeInvestmentsCount = activeInvestments.length + activeChitMembers.length;
+
+    // Matured investments available to withdraw
+    const now = new Date();
+    const maturedAmount = activeInvestments
+      .filter(inv => inv.maturityDate && now >= new Date(inv.maturityDate))
+      .reduce((sum, inv) => sum + (inv.maturityAmount || (inv.amount + (inv.totalInterest || 0))), 0);
 
     // Get won chit memberships for winning amount calculation
     const wonMemberships = await ChitMember.find({ userId: user._id, hasWon: true });
     const totalChitWinningAmount = wonMemberships.reduce((sum, m) => sum + (m.winningAmount || 0), 0);
 
-    const totalBalance = savingBalance + fixedBalance + totalChitWinningAmount;
+    const walletBalance = user.balance || 0;
+    const availableToWithdraw = maturedAmount + walletBalance + totalChitWinningAmount;
+    const totalBalance = totalInvested + totalInterestEarned + walletBalance + totalChitWinningAmount;
 
-    // Available to withdraw (saving deposits + won chit amounts)
-    const availableToWithdraw = savingBalance + totalChitWinningAmount;
+    // Legacy fields for backward compatibility
+    const savingBalance = availableToWithdraw;
+    const fixedBalance = 0;
+    const totalInterest = totalInterestEarned;
 
     // Pending count
     const pendingInvestments = investments.filter(inv => inv.status === 'pending').length;
@@ -81,16 +92,21 @@ exports.getDashboard = async (req, res) => {
         role: user.role,
       },
       balances: {
+        totalBalance,
+        totalInvested,
+        totalInterestEarned,
+        totalEarned: totalInterestEarned,
+        availableToWithdraw,
+        maturedAmount,
+        walletBalance,
+        totalChitWinningAmount,
         savingBalance,
         fixedBalance,
-        totalBalance,
         totalInterest,
-        winningAmount: totalChitWinningAmount,
-        totalChitWinningAmount,
-        availableToWithdraw,
       },
       stats: {
-        totalInvestments: investments.length,
+        totalInvestments: activeInvestmentsCount,
+        activeInvestmentsCount,
         pendingRequests,
         totalPocketInvested: pocketInvested,
         totalPocketReleased: pocketReleased,

@@ -257,15 +257,16 @@ const getMyChits = async (req, res) => {
     const result = memberships.map((m) => {
       const chit = m.chitId;
       const isWeekly = chit?.isWeekly || false;
-      
-      const currentUnit = isWeekly ? m.currentWeek : m.currentMonth;
+      const paidUnits = paidMonthsByMember[m._id.toString()] || new Set();
+      const paidCount = paidUnits.size;
+      const currentUnit = m.status === 'active' ? Math.max(1, isWeekly ? (m.currentWeek || 0) : (m.currentMonth || 0), paidCount) : 0;
       const durationUnits = isWeekly ? (chit?.totalWeeks || 0) : (chit?.duration || 0);
 
       const progress = durationUnits
         ? Math.round((currentUnit / durationUnits) * 100)
         : 0;
 
-      const joinedDate = new Date(m.joinedAt);
+      const joinedDate = new Date(m.joinedAt || m.createdAt || Date.now());
       const currentDate = new Date();
       
       let expectedUnits = 0;
@@ -280,7 +281,6 @@ const getMyChits = async (req, res) => {
         expectedUnits = Math.max(0, fullMonthsElapsed + 1);
       }
       
-      const paidUnits = paidMonthsByMember[m._id.toString()] || new Set();
       let pendingInstallments = 0;
       for (let i = currentUnit + 1; i <= Math.min(expectedUnits, durationUnits); i++) {
         if (!paidUnits.has(i)) {
@@ -289,18 +289,20 @@ const getMyChits = async (req, res) => {
       }
 
       const nextDueDate = currentUnit < durationUnits
-        ? (isWeekly ? calcNextWeeklyDueDate(m.joinedAt, m.currentWeek) : calcNextDueDate(m.joinedAt, m.currentMonth))
+        ? (isWeekly ? calcNextWeeklyDueDate(m.joinedAt, currentUnit) : calcNextDueDate(m.joinedAt, currentUnit))
         : null;
 
       const baseAmount = isWeekly ? (chit?.weeklyAmount || 0) : (chit?.monthlyAmount || 0);
-      const processingFeeAmount = baseAmount * (chit?.processingFee || 0) / 100;
-      const amountWithFee = baseAmount + processingFeeAmount;
+      const amountWithFee = baseAmount; // NO processing fee!
       const nextDueAmount = pendingInstallments > 0 ? amountWithFee * pendingInstallments : amountWithFee;
 
       const totalMembers = chit?.totalMembers || 0;
       const availableSlots = chit?.availableSlots || 0;
       const filledMembers = Math.max(0, totalMembers - availableSlots);
       const remainingInstallments = Math.max(0, durationUnits - currentUnit);
+      const totalContribution = chit?.totalContribution || chit?.totalPot || (baseAmount * durationUnits);
+      const totalPaid = m.status === 'active' ? Math.max(baseAmount, m.totalPaid || 0, paidCount * baseAmount) : 0;
+      const remainingAmount = Math.max(0, totalContribution - totalPaid);
 
       return {
         _id: m._id,
@@ -315,16 +317,16 @@ const getMyChits = async (req, res) => {
         filledMembers,
         availableSlots,
         remainingSlots: availableSlots,
-        totalPot: chit?.totalContribution || chit?.totalPot || 0,
+        totalPot: totalContribution,
         memberNumber: m.memberNumber,
         status: m.status,
-        adminApprovalStatus: m.adminApprovalStatus || 'pending',
+        adminApprovalStatus: m.adminApprovalStatus || 'approved',
         rejectionReason: m.rejectionReason || '',
-        totalPaid: m.totalPaid,
-        remainingAmount: m.remainingAmount,
-        currentMonth: m.currentMonth,
-        currentWeek: m.currentWeek,
-        paidWeeks: m.paidWeeks,
+        totalPaid,
+        remainingAmount,
+        currentMonth: currentUnit,
+        currentWeek: currentUnit,
+        paidWeeks: currentUnit,
         unpaidWeeks: m.unpaidWeeks,
         withdrawalStatus: m.withdrawalStatus,
         withdrawalWeek: m.withdrawalWeek,
@@ -430,93 +432,27 @@ const joinChit = async (req, res) => {
       return res.status(400).json({ message: 'This chit is not accepting new members' });
     }
 
-    const existing = await ChitMember.findOne({ chitId, userId });
-    if (existing && existing.status !== 'cancelled') {
-      return res.status(400).json({ message: 'You are already a member of this chit' });
+    const existing = await ChitMember.findOne({ chitId, userId, status: { $ne: 'cancelled' } });
+    if (existing && existing.status === 'active') {
+      return res.status(400).json({ message: 'You are already an active member of this chit' });
     }
 
-    const memberCount = await ChitMember.countDocuments({ chitId, status: { $ne: 'cancelled' } });
-    const memberNumber = memberCount + 1;
+    const baseAmount = chit.isWeekly ? (chit.weeklyAmount || chit.monthlyAmount || 200) : chit.monthlyAmount;
+    const totalPayable = baseAmount; // NO processing fee!
 
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
-    let member, transaction;
-    try {
-      chit.availableSlots -= 1;
-      await chit.save({ session });
-
-      const weeklyAmount = chit.weeklyAmount || chit.monthlyAmount || 200;
-      const totalWeeks = chit.totalWeeks || chit.duration || 10;
-      const totalContribution = chit.totalContribution || chit.totalPot || (weeklyAmount * totalWeeks);
-
-      member = new ChitMember({
-        chitId,
-        userId,
-        memberNumber,
-        status: 'pending',
-        totalPaid: 0,
-        remainingAmount: totalContribution,
-        currentMonth: 0,
-        currentWeek: 0,
-        paidWeeks: 0,
-        unpaidWeeks: 0,
-        weeklyAmount,
-        totalWeeks,
-        totalContribution,
-        withdrawalStatus: 'pending',
-        hasWon: false,
-        joinedAt: new Date(),
-      });
-      await member.save({ session });
-
-      const baseAmount = chit.isWeekly ? weeklyAmount : chit.monthlyAmount;
-      const processingFeeAmount = (baseAmount * (chit.processingFee || 0)) / 100;
-      const totalPayable = baseAmount + processingFeeAmount;
-
-      transaction = new Transaction({
-        userId,
-        userEmail: req.user.email || 'no-email@growvest.com',
-        type: 'chit_join',
-        amount: totalPayable,
-        status: 'pending',
-        referenceId: member._id,
-        referenceType: 'ChitMember',
-        description: `Chit Fund join request - ${chit.name} (Week 1 + processing fee)`,
-      });
-      await transaction.save({ session });
-
-      await session.commitTransaction();
-      session.endSession();
-
-      try {
-        const { notifyAdmins } = require('../services/notificationHelper');
-        await notifyAdmins({
-          title: '🤝 New Chit Join Request',
-          description: `${req.user.name || req.user.username} requested to join chit "${chit.name}".`,
-          type: 'general',
-          metadata: { chitId: chit._id, memberId: member._id }
-        });
-      } catch (notifErr) {
-        console.warn('[Chit Join] Admin notification failed:', notifErr.message);
-      }
-
-      res.status(201).json({
-        member,
-        transaction,
-        chit: {
-          _id: chit._id,
-          name: chit.name,
-          monthlyAmount: baseAmount,
-          processingFee: chit.processingFee,
-          totalPayable,
-        },
-      });
-    } catch (err) {
-      await session.abortTransaction();
-      session.endSession();
-      throw err;
-    }
+    // Return pre-checkout confirmation data (member will be created upon payment verification)
+    res.status(200).json({
+      success: true,
+      chit: {
+        _id: chit._id,
+        name: chit.name,
+        monthlyAmount: baseAmount,
+        weeklyAmount: chit.weeklyAmount || baseAmount,
+        totalWeeks: chit.totalWeeks || chit.duration || 10,
+        processingFee: 0,
+        totalPayable,
+      },
+    });
   } catch (error) {
     console.error('[Chit Join] Error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });

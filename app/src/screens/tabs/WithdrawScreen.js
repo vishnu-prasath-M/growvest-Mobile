@@ -16,8 +16,10 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { userService } from '../../services/userService';
+import { authService } from '../../services/authService';
 import { withdrawalService } from '../../services/withdrawalService';
 import { investmentService } from '../../services/investmentService';
+import { chitFundService } from '../../services/chitFundService';
 import { colors } from '../../theme/theme';
 import { mapProfileToWithdrawUser } from '../../utils/userBalances';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
@@ -44,19 +46,48 @@ const WithdrawScreen = ({ navigation }) => {
 
   const fetchUserData = async () => {
     try {
-      const profile = await userService.getUserProfile();
-      setUserData(mapProfileToWithdrawUser(profile));
+      const [profile, user] = await Promise.all([
+        userService.getUserProfile().catch(() => null),
+        authService.getUserData().catch(() => null),
+      ]);
+      const currentUser = profile || user;
+      if (currentUser) {
+        setUserData(mapProfileToWithdrawUser(currentUser));
+      }
       
-      const allInvestments = await investmentService.getInvestments();
-      const userInvestments = allInvestments.filter(inv =>
-        inv.userEmail === profile.email || inv.mobileNumber === profile.mobileNumber
+      const [allInvestments, myChits] = await Promise.all([
+        investmentService.getInvestments().catch(() => []),
+        chitFundService.getMyChits().catch(() => []),
+      ]);
+
+      const userInvestments = (allInvestments || []).filter(inv =>
+        (inv.userId && user?._id && String(inv.userId) === String(user._id)) ||
+        (inv.userId && profile?._id && String(inv.userId) === String(profile._id)) ||
+        (inv.userEmail && profile?.email && inv.userEmail.toLowerCase() === profile.email.toLowerCase()) ||
+        (inv.userEmail && user?.email && inv.userEmail.toLowerCase() === user.email.toLowerCase()) ||
+        (inv.mobileNumber && profile?.mobileNumber && inv.mobileNumber === profile.mobileNumber) ||
+        (inv.mobileNumber && user?.mobileNumber && inv.mobileNumber === user.mobileNumber)
       );
-      // Filter only duration-based investments
-      const durationPlanTypes = ['15_days', '1_month', '3_months', '6_months', '1_year'];
-      const durationInvests = userInvestments.filter(inv => durationPlanTypes.includes(inv.type));
-      setInvestments(durationInvests);
+      const validInvestments = userInvestments.filter(inv => inv.status !== 'rejected');
+
+      const activeChitItems = (myChits || []).filter(c => c.status === 'active' || c.status === 'approved').map(c => ({
+        _id: c._id,
+        isChit: true,
+        type: 'chit',
+        chitName: c.chitName || 'Chit Fund Plan',
+        amount: c.totalPaid || (c.paidWeeks || 1) * (c.weeklyAmount || 0),
+        weeklyAmount: c.weeklyAmount || 0,
+        currentWeek: c.currentWeek || 1,
+        totalWeeks: c.totalWeeks || 10,
+        hasWon: c.hasWon || false,
+        winningAmount: c.winningAmount || 0,
+        status: 'approved',
+        joinedAt: c.joinedAt,
+      }));
+
+      setInvestments([...validInvestments, ...activeChitItems]);
     } catch (error) {
-      console.error('Error fetching user profile:', error);
+      console.error('Error fetching user profile & investments:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -105,15 +136,6 @@ const WithdrawScreen = ({ navigation }) => {
   };
 
   const handleWithdraw = async () => {
-    if (!amount || parseFloat(amount) <= 0) {
-      Alert.alert('Error', 'Please enter a valid amount');
-      return;
-    }
-    const availableBalance = withdrawType === 'saving' ? userData?.savingBalance : userData?.fixedBalance;
-    if (parseFloat(amount) > availableBalance) {
-      Alert.alert('Error', 'Insufficient balance');
-      return;
-    }
     if (!upiId.trim()) {
       Alert.alert('Error', 'Please enter your UPI ID');
       return;
@@ -128,18 +150,23 @@ const WithdrawScreen = ({ navigation }) => {
     
     setWithdrawing(true);
     try {
-      await withdrawalService.createWithdrawal({
-        amount: parseFloat(amount),
-        upiId,
-        userName: userData?.name || userData?.username,
-        userEmail: userData?.email,
-        withdrawType,
-      });
-      Alert.alert('Success', 'Withdrawal request submitted successfully');
+      if (withdrawType && withdrawType !== 'saving' && withdrawType !== 'fixed') {
+        await investmentService.withdrawInvestment(withdrawType, upiId);
+        Alert.alert('Withdrawal Successful 🎉', 'Your matured investment payout has been processed.');
+      } else {
+        await withdrawalService.createWithdrawal({
+          amount: parseFloat(amount),
+          upiId,
+          userName: userData?.name || userData?.username,
+          userEmail: userData?.email,
+          withdrawType,
+        });
+        Alert.alert('Success', 'Withdrawal request submitted successfully');
+      }
       setWithdrawModalVisible(false);
       fetchUserData();
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to submit withdrawal request');
+      Alert.alert('Withdrawal Failed', error.message || error.toString() || 'Failed to process withdrawal request');
     } finally {
       setWithdrawing(false);
     }
@@ -157,7 +184,21 @@ const WithdrawScreen = ({ navigation }) => {
     );
   }
 
-  const availableToWithdraw = userData?.availableToWithdraw || 0;
+  // Calculated totals for Top Summary Card
+  const totalInvestedValue = investments
+    .filter(i => i.status !== 'withdrawn')
+    .reduce((sum, inv) => sum + (inv.amount || 0), 0);
+
+  const activeInvestmentsCount = investments.filter(i => i.status !== 'withdrawn').length;
+
+  const availableToWithdrawValue = investments.reduce((acc, inv) => {
+    const isMatured = inv.maturityDate && new Date() >= new Date(inv.maturityDate);
+    const isWithdrawn = inv.status === 'withdrawn' || inv.withdrawalStatus === 'withdrawn';
+    if (isMatured && !isWithdrawn && inv.status === 'approved') {
+      return acc + (inv.maturityAmount || (inv.amount + (inv.totalInterest || 0)));
+    }
+    return acc;
+  }, 0);
 
   return (
     <View style={styles.container}>
@@ -180,7 +221,7 @@ const WithdrawScreen = ({ navigation }) => {
           />
         }
       >
-        {/* Available Balance Hero Card */}
+        {/* Hero Card */}
         <View style={styles.heroOuter}>
           <LinearGradient
             colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
@@ -189,141 +230,230 @@ const WithdrawScreen = ({ navigation }) => {
             style={styles.heroCard}
           >
             <View style={styles.heroBlobGold} />
-            <Text style={styles.heroLabel}>Available Balance</Text>
-            <Text style={styles.heroAmount}>{formatCurrency(availableToWithdraw)}</Text>
-            <Text style={styles.heroNote}>Instant withdrawal • No fees</Text>
+            <Text style={styles.heroLabel}>Total Investments Value</Text>
+            <Text style={styles.heroAmount}>{formatCurrency(totalInvestedValue)}</Text>
+            <Text style={styles.heroNote}>Direct UPI Payouts • Bank Level Security</Text>
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.15)', paddingTop: 12, marginTop: 12 }}>
               <View>
-                <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', fontWeight: '600', textTransform: 'uppercase' }}>Savings</Text>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: '#F8FAF9' }}>{formatCurrency(userData?.savingBalance)}</Text>
+                <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', fontWeight: '600', textTransform: 'uppercase' }}>Active Investments</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#F8FAF9' }}>{activeInvestmentsCount}</Text>
               </View>
               <View>
-                <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', fontWeight: '600', textTransform: 'uppercase' }}>Chit Winning</Text>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.gold }}>{formatCurrency(userData?.totalChitWinningAmount || userData?.winningAmount)}</Text>
-              </View>
-              <View>
-                <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', fontWeight: '600', textTransform: 'uppercase' }}>Fixed</Text>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: '#F8FAF9' }}>{formatCurrency(userData?.fixedBalance)}</Text>
+                <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', fontWeight: '600', textTransform: 'uppercase' }}>Available to Withdraw</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.gold }}>
+                  {formatCurrency(availableToWithdrawValue)}
+                </Text>
               </View>
             </View>
           </LinearGradient>
         </View>
 
-        {/* Balance Cards */}
+        {/* My Investments List */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Choose account</Text>
+          <Text style={styles.sectionLabel}>My Investments</Text>
 
-          {/* Saving */}
-          <View style={styles.balanceCard}>
-            <View style={styles.balanceCardLeft}>
-              <View style={[styles.balanceIconBox, { backgroundColor: colors.successLight }]}>
-                <MaterialCommunityIcons name="piggy-bank" size={24} color={colors.success} />
-              </View>
-              <View style={styles.balanceInfo}>
-                <Text style={styles.balanceCardLabel}>Saving Balance</Text>
-                <Text style={styles.balanceCardAmount}>{formatCurrency(userData?.savingBalance)}</Text>
-                <Text style={styles.balanceCardRate}>Withdraw anytime</Text>
-              </View>
-            </View>
-            <TouchableOpacity
-              style={styles.withdrawActionBtn}
-              activeOpacity={0.85}
-              onPress={() => openWithdrawModal('saving')}
-            >
-              <LinearGradient
-                colors={['#0E3D23', '#1A5C39']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.withdrawActionGradient}
+          {investments.length === 0 ? (
+            <View style={[styles.balanceCard, { flexDirection: 'column', padding: 24, alignItems: 'center', justifyContent: 'center', textAlign: 'center' }]}>
+              <MaterialCommunityIcons name="finance" size={40} color={themeColors.textTertiary} />
+              <Text style={{ color: themeColors.textSecondary, marginTop: 10, fontSize: 13, textAlign: 'center', lineHeight: 18 }}>
+                No active investments found. Invest in a plan to earn high returns!
+              </Text>
+              <TouchableOpacity
+                style={{ marginTop: 16, paddingHorizontal: 20, paddingVertical: 10, backgroundColor: themeColors.primary, borderRadius: 12, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' }}
+                onPress={() => navigation.navigate('Investments')}
               >
-                <Text style={styles.withdrawActionText}>Withdraw</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-
-          {/* Fixed */}
-          <View style={styles.balanceCard}>
-            <View style={styles.balanceCardLeft}>
-              <View style={[styles.balanceIconBox, { backgroundColor: colors.primaryLight }]}>
-                <MaterialCommunityIcons name="lock-outline" size={24} color={colors.primary} />
-              </View>
-              <View style={styles.balanceInfo}>
-                <Text style={styles.balanceCardLabel}>Fixed Balance</Text>
-                <Text style={styles.balanceCardAmount}>{formatCurrency(userData?.fixedBalance)}</Text>
-                <Text style={styles.balanceCardRate}>After lock period</Text>
-              </View>
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13, textAlign: 'center' }}>Explore Plans</Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              style={styles.withdrawActionBtn}
-              activeOpacity={0.85}
-              onPress={() => openWithdrawModal('fixed')}
-            >
-              <LinearGradient
-                colors={['#0E3D23', '#1A5C39']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.withdrawActionGradient}
-              >
-                <Text style={styles.withdrawActionText}>Withdraw</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </View>
+          ) : (
+            investments.map((inv) => {
+              if (inv.isChit) {
+                const isWinner = inv.hasWon;
+                const winningAmt = inv.winningAmount || 0;
+                return (
+                  <View key={inv._id} style={styles.planStatusCard}>
+                    <View style={styles.planStatusTop}>
+                      <View style={styles.planStatusInfo}>
+                        <Text style={styles.planStatusName}>{inv.chitName}</Text>
+                        <Text style={styles.planStatusSub}>
+                          Paid: {formatCurrency(inv.amount)} • Week {inv.currentWeek}/{inv.totalWeeks} (₹{inv.weeklyAmount}/wk)
+                        </Text>
+                      </View>
+                      <View style={[
+                        styles.statusBadge,
+                        isWinner ? styles.statusBadgeMatured : styles.statusBadgeLocked
+                      ]}>
+                        <MaterialCommunityIcons 
+                          name={isWinner ? 'trophy' : 'cash-check'} 
+                          size={14} 
+                          color={isWinner ? '#065F46' : '#047857'} 
+                        />
+                        <Text style={[
+                          styles.statusBadgeText, 
+                          { color: isWinner ? '#065F46' : '#047857' }
+                        ]}>
+                          {isWinner ? 'AUCTION WON' : 'ACTIVE CHIT'}
+                        </Text>
+                      </View>
+                    </View>
 
-        {/* Duration-based Plans Status */}
-        {investments.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Duration Investment Plans</Text>
-            {investments.map((inv) => {
-              const isMatured = new Date() >= new Date(inv.maturityDate);
-              const totalInterest = inv.totalInterest || (inv.amount * inv.interestRate / 100);
-              const totalVal = inv.amount + totalInterest;
+                    <View style={styles.planStatusDivider} />
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 4 }}>
+                      <View>
+                        <Text style={{ fontSize: 11, color: themeColors.textSecondary }}>Category</Text>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: themeColors.text }}>Chit Fund</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{ fontSize: 11, color: themeColors.textSecondary }}>Available to Withdraw</Text>
+                        <Text style={{ fontSize: 15, fontWeight: '800', color: isWinner ? themeColors.primary : themeColors.textSecondary }}>
+                          {isWinner ? formatCurrency(winningAmt) : '₹0.00'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={{ marginTop: 8 }}>
+                      {isWinner ? (
+                        <TouchableOpacity
+                          style={styles.withdrawActionBtn}
+                          activeOpacity={0.85}
+                          onPress={() => navigation.navigate('ChitFundHome')}
+                        >
+                          <LinearGradient
+                            colors={['#0E3D23', '#1A5C39']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.withdrawActionGradient}
+                          >
+                            <MaterialCommunityIcons name="trophy" size={16} color="#fff" />
+                            <Text style={styles.withdrawActionText}>Claim Payout {formatCurrency(winningAmt)}</Text>
+                          </LinearGradient>
+                        </TouchableOpacity>
+                      ) : (
+                        <View style={{ backgroundColor: themeColors.surface2, padding: 10, borderRadius: 10, alignItems: 'center' }}>
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: themeColors.textSecondary }}>
+                            ✓ Active Chit Member • Pot payout available upon winning auction
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                );
+              }
+
+              const isWithdrawn = inv.status === 'withdrawn' || inv.withdrawalStatus === 'withdrawn';
+              const isMatured = inv.maturityDate && new Date() >= new Date(inv.maturityDate);
+              const totalInterest = inv.totalInterest || inv.interestEarned || (inv.amount * (inv.interestRate || 12) / 100);
+              const maturityAmt = inv.maturityAmount || (inv.amount + totalInterest);
+              const matDateStr = inv.maturityDate 
+                ? new Date(inv.maturityDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                : 'N/A';
+
               return (
                 <View key={inv._id} style={styles.planStatusCard}>
                   <View style={styles.planStatusTop}>
                     <View style={styles.planStatusInfo}>
                       <Text style={styles.planStatusName}>{getPlanDisplayName(inv.type)}</Text>
                       <Text style={styles.planStatusSub}>
-                        {formatCurrency(inv.amount)} + {formatCurrency(totalInterest)} Interest
+                        Invested: {formatCurrency(inv.amount)} • Rate: {inv.interestRate}%
                       </Text>
                     </View>
-                    <View style={[styles.statusBadge, isMatured ? styles.statusBadgeMatured : styles.statusBadgeLocked]}>
-                      <MaterialCommunityIcons name={isMatured ? 'check-circle' : 'lock'} size={14} color={isMatured ? '#065F46' : '#B45309'} />
-                      <Text style={[styles.statusBadgeText, { color: isMatured ? '#065F46' : '#B45309' }]}>
-                        {isMatured ? 'Matured' : 'Locked'}
+                    <View style={[
+                      styles.statusBadge,
+                      isWithdrawn ? { backgroundColor: themeColors.surface2 } :
+                      isMatured ? styles.statusBadgeMatured : styles.statusBadgeLocked
+                    ]}>
+                      <MaterialCommunityIcons 
+                        name={isWithdrawn ? 'check-all' : isMatured ? 'check-circle' : 'lock'} 
+                        size={14} 
+                        color={isWithdrawn ? themeColors.textTertiary : isMatured ? '#065F46' : '#B45309'} 
+                      />
+                      <Text style={[
+                        styles.statusBadgeText, 
+                        { color: isWithdrawn ? themeColors.textTertiary : isMatured ? '#065F46' : '#B45309' }
+                      ]}>
+                        {isWithdrawn ? 'WITHDRAWN' : isMatured ? 'READY TO WITHDRAW' : 'LOCKED'}
                       </Text>
                     </View>
                   </View>
+
                   <View style={styles.planStatusDivider} />
-                  <Text style={styles.planStatusFooter}>
-                    {isMatured 
-                      ? 'Withdrawal Available (Merged in Saving Balance)' 
-                      : `Withdrawal available after ${new Date(inv.maturityDate).toLocaleDateString('en-IN')}`
-                    }
-                  </Text>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 4 }}>
+                    <View>
+                      <Text style={{ fontSize: 11, color: themeColors.textSecondary }}>
+                        {isMatured ? 'Interest Earned' : 'Maturity Date'}
+                      </Text>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: themeColors.text }}>
+                        {isMatured ? formatCurrency(totalInterest) : matDateStr}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ fontSize: 11, color: themeColors.textSecondary }}>Available to Withdraw</Text>
+                      <Text style={{ fontSize: 15, fontWeight: '800', color: isMatured && !isWithdrawn ? themeColors.primary : themeColors.textSecondary }}>
+                        {isMatured && !isWithdrawn ? formatCurrency(maturityAmt) : '₹0.00'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={{ marginTop: 8 }}>
+                    {isWithdrawn ? (
+                      <View style={{ backgroundColor: themeColors.surface2, padding: 10, borderRadius: 10, alignItems: 'center' }}>
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: themeColors.textSecondary }}>
+                          ✓ Maturity payout of {formatCurrency(maturityAmt)} has been processed.
+                        </Text>
+                      </View>
+                    ) : isMatured ? (
+                      <TouchableOpacity
+                        style={styles.withdrawActionBtn}
+                        activeOpacity={0.85}
+                        onPress={() => {
+                          setWithdrawType(inv._id);
+                          setAmount(String(maturityAmt));
+                          openWithdrawModal(inv._id);
+                        }}
+                      >
+                        <LinearGradient
+                          colors={['#0E3D23', '#1A5C39']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.withdrawActionGradient}
+                        >
+                          <MaterialCommunityIcons name="cash-fast" size={16} color="#fff" />
+                          <Text style={styles.withdrawActionText}>Withdraw {formatCurrency(maturityAmt)}</Text>
+                        </LinearGradient>
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={{ backgroundColor: themeColors.surface2, padding: 10, borderRadius: 10, alignItems: 'center' }}>
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: themeColors.textSecondary }}>
+                          🔒 Withdrawal available after maturity ({matDateStr})
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
               );
-            })}
-          </View>
-        )}
+            })
+          )}
+        </View>
 
         {/* Security Notice */}
         <View style={styles.securityNotice}>
           <MaterialCommunityIcons name="shield-check" size={16} color={colors.primary} />
-          <Text style={styles.securityText}>Protected by 256-bit encryption. Funds arrive within 24-48 hours.</Text>
+          <Text style={styles.securityText}>Protected by 256-bit encryption. Funds arrive directly to your account.</Text>
         </View>
 
         {/* Rules Card */}
         <View style={styles.rulesCard}>
           <View style={styles.rulesHeader}>
             <MaterialCommunityIcons name="information-outline" size={20} color={colors.primary} />
-            <Text style={styles.rulesTitle}>Withdrawal Rules</Text>
+            <Text style={styles.rulesTitle}>Investment Withdrawal Rules</Text>
           </View>
           {[
-            'Saving deposits: Withdraw anytime',
-            'Fixed deposits: Withdraw after 1 year lock period',
-            'Withdrawals processed within 24-48 hours',
+            'Duration plans: 15 Days, 1 Month, 3 Months, 6 Months, 1 Year',
+            'Full maturity payout (principal + interest) unlocked upon maturity date',
+            'Withdrawal requests are processed securely to your registered UPI ID',
           ].map((rule, i) => (
             <View key={i} style={styles.ruleRow}>
               <View style={styles.ruleDot} />

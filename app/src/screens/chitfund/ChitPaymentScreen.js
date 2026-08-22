@@ -61,10 +61,10 @@ const ChitPaymentScreen = ({ navigation, route }) => {
       onSuccess: (response) => {
         const nextScreen = returnScreen || 'MyChits';
         navigation.replace('PaymentSuccess', {
-          title: type === 'join' ? 'Join Request Submitted! 🎉' : 'Chit Due Paid!',
+          title: type === 'join' ? 'Chit Joined Successfully! 🎉' : 'Chit Due Paid!',
           message:
             type === 'join'
-              ? 'Your payment was received. Your Chit membership is now pending admin approval. You will be notified once it is approved.'
+              ? 'Your payment was verified and your Chit membership is now active.'
               : `Your monthly due for Month ${month} has been verified and recorded.`,
           nextScreen,
           amount: totalAmount,
@@ -72,7 +72,12 @@ const ChitPaymentScreen = ({ navigation, route }) => {
         });
       },
       onFailure: (error) => {
-        console.error('[ChitPayment] Payment failed:', error);
+        console.error('[ChitPayment] Payment failed or cancelled:', error);
+        Alert.alert(
+          'Payment Not Completed',
+          'Payment was cancelled or failed. Your Chit membership has not been created.',
+          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        );
       },
     });
   };

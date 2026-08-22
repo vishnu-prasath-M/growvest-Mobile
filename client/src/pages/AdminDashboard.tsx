@@ -153,7 +153,18 @@ const AdminDashboard = () => {
     typeof window !== "undefined" && "Notification" in window ? Notification.permission : "default"
   );
 
-  // Register Web FCM simulated token to MongoDB
+  // Register Service Worker for Mobile Web Push
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then((reg) => {
+        console.log('[WebPush] Service Worker registered:', reg.scope);
+      }).catch((err) => {
+        console.warn('[WebPush] Service Worker registration failed:', err);
+      });
+    }
+  }, []);
+
+  // Register Web Push token to MongoDB (Multi-device safe)
   const registerWebPush = async () => {
     if (!token) return;
     try {
@@ -163,6 +174,9 @@ const AdminDashboard = () => {
         localStorage.setItem('growvest_web_fcm_token', webFCMToken);
       }
       
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const deviceId = `web_${isMobile ? 'mobile' : 'desktop'}_${webFCMToken.slice(-8)}`;
+
       await fetch(`${API_URL}/api/users/fcm-token`, {
         method: 'PUT',
         headers: {
@@ -172,10 +186,10 @@ const AdminDashboard = () => {
         body: JSON.stringify({
           fcmToken: webFCMToken,
           platform: 'web',
-          deviceId: 'browser'
+          deviceId: deviceId
         })
       });
-      console.log('[WebPush] Web FCM Token successfully saved to MongoDB:', webFCMToken);
+      console.log('[WebPush] Web FCM Token successfully saved:', webFCMToken, 'DeviceId:', deviceId);
     } catch (err) {
       console.error('[WebPush] Error registering browser push token:', err);
     }
@@ -193,6 +207,7 @@ const AdminDashboard = () => {
         const permission = await Notification.requestPermission();
         setPermissionState(permission);
         if (permission === 'granted') {
+          registerWebPush();
           toast.success("Push notifications enabled successfully!");
         } else {
           toast.error("Permission denied. You can enable them in browser settings.");
@@ -220,6 +235,7 @@ const AdminDashboard = () => {
       document.body.style.overflow = "auto";
     };
   }, [sidebarOpen]);
+
   useEffect(() => {
     if (!token) return;
 
@@ -243,8 +259,30 @@ const AdminDashboard = () => {
                   const notifs = result?.notifications || [];
                   if (Array.isArray(notifs) && notifs.length > 0) {
                     const latest = notifs[0];
-                    if (Notification.permission === 'granted') {
-                      new Notification(latest.title, { body: latest.description });
+                    // Trigger web push notification using ServiceWorker if available (works on Mobile Chrome)
+                    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+                      if ('serviceWorker' in navigator) {
+                        navigator.serviceWorker.ready.then((reg) => {
+                          reg.showNotification(latest.title, {
+                            body: latest.description,
+                            icon: '/favicon.ico',
+                            badge: '/favicon.ico',
+                            vibrate: [200, 100, 200]
+                          });
+                        }).catch(() => {
+                          try {
+                            new Notification(latest.title, { body: latest.description });
+                          } catch (e) {
+                            console.warn('[WebPush] Fallback notification failed:', e);
+                          }
+                        });
+                      } else {
+                        try {
+                          new Notification(latest.title, { body: latest.description });
+                        } catch (e) {
+                          console.warn('[WebPush] Direct notification failed:', e);
+                        }
+                      }
                     }
                     // Always show local sonner toast as well for immediate visibility on mobile tabs
                     toast(latest.title, {
