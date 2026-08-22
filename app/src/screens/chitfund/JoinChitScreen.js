@@ -64,7 +64,6 @@ const JoinChitScreen = ({ navigation, route }) => {
       const baseAmount = chit.isWeekly ? (chit.weeklyAmount || chit.monthlyAmount) : chit.monthlyAmount;
       navigation.replace('ChitPayment', {
         chitId: chit._id,
-        memberId: res.member._id,
         month: 1,
         amount: baseAmount,
         lateFee: 0,
@@ -96,8 +95,8 @@ const JoinChitScreen = ({ navigation, route }) => {
   const formatCurrency = (amount) => `₹${amount?.toLocaleString('en-IN') || '0'}`;
   const isWeekly = chit.isWeekly || false;
   const baseAmount = isWeekly ? (chit.weeklyAmount || chit.monthlyAmount) : chit.monthlyAmount;
-  const processingFeeAmount = (baseAmount * (chit.processingFee || 2)) / 100;
-  const totalPayable = baseAmount + processingFeeAmount;
+  const processingFeeAmount = 0; // Processing Fee is ₹0
+  const totalPayable = baseAmount;
 
   return (
     <View style={styles.container}>
@@ -139,12 +138,8 @@ const JoinChitScreen = ({ navigation, route }) => {
         <View style={styles.feeCard}>
           <Text style={styles.feeTitle}>Payment Summary</Text>
           <View style={styles.feeRow}>
-            <Text style={styles.feeLabel}>{isWeekly ? 'Weekly Installment' : 'Monthly Installment'}</Text>
+            <Text style={styles.feeLabel}>{isWeekly ? 'First Week Installment' : 'First Month Installment'}</Text>
             <Text style={styles.feeValue}>{formatCurrency(baseAmount)}</Text>
-          </View>
-          <View style={styles.feeRow}>
-            <Text style={styles.feeLabel}>Processing Fee ({chit.processingFee}%)</Text>
-            <Text style={styles.feeValue}>{formatCurrency(processingFeeAmount)}</Text>
           </View>
           <View style={styles.feeDivider} />
           <View style={styles.feeRow}>
@@ -223,12 +218,8 @@ const JoinChitScreen = ({ navigation, route }) => {
             <Text style={styles.modalSubtitle}>Please verify the payment details</Text>
 
             <View style={styles.modalRow}>
-              <Text style={styles.modalLabel}>{isWeekly ? 'Weekly Due' : 'Monthly Due'}</Text>
+              <Text style={styles.modalLabel}>{isWeekly ? 'Week 1 Due' : 'Month 1 Due'}</Text>
               <Text style={styles.modalValue}>{formatCurrency(baseAmount)}</Text>
-            </View>
-            <View style={styles.modalRow}>
-              <Text style={styles.modalLabel}>Processing Fee</Text>
-              <Text style={styles.modalValue}>{formatCurrency(processingFeeAmount)}</Text>
             </View>
             <View style={styles.modalDivider} />
             <View style={styles.modalRow}>

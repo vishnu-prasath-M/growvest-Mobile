@@ -28,8 +28,8 @@ const ChitPaymentStatusScreen = ({ navigation, route }) => {
         // The member was already created in JoinChit with status: 'pending'.
         // Initial month 1 payment will be created/approved automatically when Admin approves the request.
         navigation.replace('PaymentSuccess', {
-          title: 'Join Request Submitted! 🎉',
-          message: 'Your payment and join request have been submitted and are pending admin approval.',
+          title: 'Chit Joined Successfully! 🎉',
+          message: 'Your payment was verified and your Chit membership is now active.',
           nextScreen: 'MyChits',
           amount,
           type: 'join',

@@ -75,7 +75,15 @@ exports.verifyPayment = async (req, res) => {
       payloadData,  // metadata (amount, type, chitId, memberId, month, etc.)
     } = req.body;
 
+    console.log('[CHIT_PAYMENT] verify payment initiated:', {
+      orderId: razorpay_order_id,
+      paymentId: razorpay_payment_id,
+      paymentType,
+      userId: req.user?._id,
+    });
+
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      console.warn('[CHIT_PAYMENT_ERROR] Missing Razorpay payment verification parameters');
       return res.status(400).json({ message: 'Missing Razorpay payment verification parameters' });
     }
 
@@ -90,30 +98,44 @@ exports.verifyPayment = async (req, res) => {
     const isValid = expectedSignature === razorpay_signature || razorpay_signature.startsWith('simulated_signature_');
 
     if (!isValid) {
-      console.error('[PaymentController] Invalid Razorpay signature');
+      console.error('[CHIT_PAYMENT_ERROR] Invalid Razorpay signature verification failed:', {
+        orderId: razorpay_order_id,
+        paymentId: razorpay_payment_id,
+      });
       return res.status(400).json({ success: false, message: 'Invalid payment signature. Verification failed.' });
     }
 
+    console.log('[CHIT_PAYMENT] payment verified successfully:', { orderId: razorpay_order_id, paymentId: razorpay_payment_id });
+
     // Payment Verified! Now complete the requested business operation automatically.
     const user = await User.findById(req.user._id);
+    if (!user) {
+      console.error('[CHIT_PAYMENT_ERROR] User not found:', req.user._id);
+      return res.status(404).json({ message: 'User record not found' });
+    }
 
     if (paymentType === 'investment') {
       const result = await completeInvestment(user, payloadData, razorpay_order_id, razorpay_payment_id, razorpay_signature);
+      console.log('[CHIT_PAYMENT] completed investment payout activation');
       return res.status(200).json({ success: true, message: 'Investment payment verified & approved automatically.', data: result });
     } else if (paymentType === 'chit_join') {
       const result = await completeChitJoin(user, payloadData, razorpay_order_id, razorpay_payment_id, razorpay_signature);
+      console.log('[CHIT_PAYMENT] completed chit join membership activation');
       return res.status(200).json({ success: true, message: 'Chit join payment verified & membership activated.', data: result });
     } else if (paymentType === 'chit_payment') {
       const result = await completeMonthlyDue(user, payloadData, razorpay_order_id, razorpay_payment_id, razorpay_signature);
+      console.log('[CHIT_PAYMENT] completed chit monthly/weekly due payment');
       return res.status(200).json({ success: true, message: 'Chit due payment verified & recorded successfully.', data: result });
     } else if (paymentType === 'pocket_money') {
       const result = await completePocketMoney(user, payloadData, razorpay_order_id, razorpay_payment_id, razorpay_signature);
+      console.log('[CHIT_PAYMENT] completed pocket money activation');
       return res.status(200).json({ success: true, message: 'Pocket Money payment verified & activated.', data: result });
     } else {
+      console.warn('[CHIT_PAYMENT_ERROR] Unknown payment type:', paymentType);
       return res.status(400).json({ message: 'Unknown payment type' });
     }
   } catch (error) {
-    console.error('[PaymentController] Payment verification error:', error);
+    console.error('[CHIT_PAYMENT_ERROR] Payment verification error:', error);
     res.status(500).json({ message: 'Payment verification failed', error: error.message });
   }
 };
@@ -123,6 +145,21 @@ exports.verifyPayment = async (req, res) => {
 // Complete Investment
 const completeInvestment = async (user, data, orderId, paymentId, signature) => {
   const { amount, type } = data;
+
+  // Idempotency check: if investment already processed for this paymentId/orderId, return existing
+  if (paymentId || orderId) {
+    const existingInvestment = await Investment.findOne({
+      $or: [
+        ...(paymentId ? [{ paymentId }] : []),
+        ...(orderId && orderId !== 'simulated' ? [{ orderId }] : [])
+      ]
+    });
+    if (existingInvestment) {
+      console.log(`[PaymentController] Investment payment ${paymentId} / ${orderId} already processed (idempotency check).`);
+      return existingInvestment;
+    }
+  }
+
   const refCode = `INV-${Date.now().toString().slice(-6)}`;
   
   // Resolve plan parameters
@@ -241,24 +278,86 @@ const completeInvestment = async (user, data, orderId, paymentId, signature) => 
 
 // Complete Chit Join
 const completeChitJoin = async (user, data, orderId, paymentId, signature) => {
-  const { chitId, memberId, amount } = data;
+  const { chitId, amount } = data;
+  const Chit = require('../models/Chit');
 
-  // 1. Activate member
-  const member = await ChitMember.findById(memberId);
-  if (member) {
+  // Idempotency check: if payment already processed, return existing records
+  const existingPayment = await ChitPayment.findOne({
+    $or: [
+      { paymentId: paymentId },
+      { orderId: orderId && orderId !== 'simulated' ? orderId : 'NON_EXISTENT_ORDER_ID' }
+    ]
+  });
+
+  if (existingPayment) {
+    console.log(`[PaymentController] Chit join payment ${paymentId} already processed (idempotency check).`);
+    const existingMember = await ChitMember.findById(existingPayment.memberId);
+    return { member: existingMember, payment: existingPayment };
+  }
+
+  const chit = await Chit.findById(chitId);
+  if (!chit) {
+    throw new Error('Chit plan not found');
+  }
+
+  const weeklyAmount = chit.weeklyAmount || chit.monthlyAmount || Number(amount) || 200;
+  const totalWeeks = chit.totalWeeks || chit.duration || 10;
+  const totalContribution = chit.totalContribution || chit.totalPot || (weeklyAmount * totalWeeks);
+
+  // 1. Find or Create active member
+  let member = await ChitMember.findOne({ chitId: chit._id, userId: user._id, status: { $ne: 'cancelled' } });
+
+  if (!member) {
+    const memberCount = await ChitMember.countDocuments({ chitId: chit._id, status: { $ne: 'cancelled' } });
+    const memberNumber = memberCount + 1;
+
+    member = new ChitMember({
+      chitId: chit._id,
+      userId: user._id,
+      memberNumber,
+      status: 'active',
+      adminApprovalStatus: 'approved',
+      approvedAt: new Date(),
+      totalPaid: Number(amount),
+      remainingAmount: totalContribution - Number(amount),
+      currentMonth: 1,
+      currentWeek: 1,
+      paidWeeks: 1,
+      unpaidWeeks: 0,
+      weeklyAmount,
+      totalWeeks,
+      totalContribution,
+      withdrawalStatus: 'pending',
+      hasWon: false,
+      joinedAt: new Date(),
+    });
+    await member.save();
+
+    // Decrement available slots
+    if (chit.availableSlots > 0) {
+      chit.availableSlots -= 1;
+      await chit.save();
+    }
+  } else {
+    // If member existed in pending state, activate & set Week 1
     member.status = 'active';
-    member.totalPaid = (member.totalPaid || 0) + Number(amount);
+    member.adminApprovalStatus = 'approved';
+    member.approvedAt = new Date();
+    member.totalPaid = Number(amount);
+    member.remainingAmount = totalContribution - Number(amount);
     member.currentMonth = 1;
+    member.currentWeek = 1;
+    member.paidWeeks = 1;
     await member.save();
   }
 
-  // 2. Create ChitPayment record as paid
+  // 2. Create ChitPayment record as paid for Week/Month 1
   const payment = new ChitPayment({
-    chitId,
+    chitId: chit._id,
     userId: user._id,
-    memberId: memberId || member?._id,
+    memberId: member._id,
     month: 1,
-    amount,
+    amount: Number(amount),
     lateFee: 0,
     status: 'paid',
     paidDate: new Date(),
@@ -274,21 +373,30 @@ const completeChitJoin = async (user, data, orderId, paymentId, signature) => {
     userId: user._id,
     userEmail: user.email,
     type: 'chit_join',
-    amount,
+    amount: Number(amount),
     status: 'approved',
     referenceId: payment._id,
     referenceType: 'ChitPayment',
-    description: `Razorpay Chit Join Fee (Txn ID: ${paymentId})`,
+    description: `Razorpay Chit Join Payment - ${chit.name} (Week 1)`,
   });
   await transaction.save();
 
   // 4. Send Notification
   try {
+    const { sendNotification, notifyAdmins } = require('../services/notificationHelper');
     await sendNotification({
       userId: user._id,
       title: 'Chit Joined Successfully',
-      description: `₹${amount} payment for joining Chit plan confirmed successfully!`,
-      type: 'chit_join_approved',
+      description: `You have successfully joined the ${chit.name} Chit Fund.`,
+      type: 'chit_joined',
+      metadata: { memberId: member._id, chitName: chit.name },
+      pushData: { screen: 'MyChits' },
+    });
+    await notifyAdmins({
+      title: '🎉 New Active Chit Member',
+      description: `${user.name || user.username} joined chit "${chit.name}" and completed Week 1 payment.`,
+      type: 'general',
+      metadata: { chitId: chit._id, memberId: member._id }
     });
   } catch (notifErr) {
     console.error('[PaymentController] Notification error:', notifErr);
@@ -299,25 +407,45 @@ const completeChitJoin = async (user, data, orderId, paymentId, signature) => {
 
 // Complete Monthly Due
 const completeMonthlyDue = async (user, data, orderId, paymentId, signature) => {
-  const { chitId, memberId, month, amount, lateFee = 0 } = data;
+  const { chitId, month, amount, lateFee = 0 } = data;
+  let { memberId } = data;
   const totalPaidAmt = Number(amount) + Number(lateFee);
 
-  // 1. Update member
-  const member = await ChitMember.findById(memberId);
+  // 1. Find member by memberId or chitId + userId
+  let member = null;
+  if (memberId) {
+    member = await ChitMember.findById(memberId);
+  }
+  if (!member && chitId) {
+    member = await ChitMember.findOne({ chitId, userId: user._id, status: { $ne: 'cancelled' } });
+  }
+
   if (member) {
+    memberId = member._id;
     member.totalPaid = (member.totalPaid || 0) + totalPaidAmt;
-    if (month >= member.currentMonth) {
-      member.currentMonth = month;
+    const paymentMonth = month || (member.paidWeeks || 0) + 1;
+    if (paymentMonth >= (member.currentMonth || 1)) {
+      member.currentMonth = paymentMonth;
+      member.currentWeek = paymentMonth;
     }
+    member.paidWeeks = (member.paidWeeks || 0) + 1;
+    member.unpaidWeeks = Math.max(0, (member.unpaidWeeks || 0) - 1);
     await member.save();
   }
 
+  if (!memberId) {
+    throw new Error('ChitMember record not found for user payment verification');
+  }
+
+  const resolvedChitId = chitId || member.chitId;
+  const resolvedMonth = month || member.paidWeeks || 1;
+
   // 2. Create paid ChitPayment record
   const payment = new ChitPayment({
-    chitId,
+    chitId: resolvedChitId,
     userId: user._id,
-    memberId,
-    month,
+    memberId: member._id,
+    month: resolvedMonth,
     amount: Number(amount),
     lateFee: Number(lateFee),
     status: 'paid',
@@ -338,16 +466,17 @@ const completeMonthlyDue = async (user, data, orderId, paymentId, signature) => 
     status: 'approved',
     referenceId: payment._id,
     referenceType: 'ChitPayment',
-    description: `Razorpay Monthly Due Month ${month} (Txn ID: ${paymentId})`,
+    description: `Razorpay Chit Due Payment Week/Month ${resolvedMonth} (Txn ID: ${paymentId})`,
   });
   await transaction.save();
 
   // 4. Send Notification
   try {
+    const { sendNotification } = require('../services/notificationHelper');
     await sendNotification({
       userId: user._id,
-      title: 'Monthly Due Paid',
-      description: `₹${totalPaidAmt} monthly installment for Month ${month} successfully paid!`,
+      title: 'Chit Due Paid',
+      description: `₹${totalPaidAmt} Chit installment for Week/Month ${resolvedMonth} successfully paid!`,
       type: 'chit_payment_approved',
     });
   } catch (notifErr) {

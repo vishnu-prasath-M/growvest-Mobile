@@ -668,7 +668,7 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
         </div>
       )}
 
-      {/* ─── JOIN REQUESTS ──────────────────────────────────────────── */}
+      {/* ─── JOINED MEMBERS ──────────────────────────────────────────── */}
       {subTab === "joins" && (
         <div>
           <div className="flex flex-col sm:flex-row gap-4 mb-4">
@@ -688,21 +688,15 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
           </div>
           <div className="space-y-4">
             {filteredJoins.map((j: any) => {
-              const isPending = j.status === 'pending';
-              const isApproved = j.status === 'active' || j.adminApprovalStatus === 'approved';
-              const isRejected = j.status === 'rejected' || j.adminApprovalStatus === 'rejected';
+              const isActive = j.status === 'active' || j.adminApprovalStatus === 'approved';
               return (
-                <div key={j._id} className={`card-premium p-4 ${isRejected ? 'opacity-70' : ''}`}>
+                <div key={j._id} className="card-premium p-4">
                   <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-1">
                         <h3 className="font-bold">{j.userName}</h3>
-                        <span className={`text-[10px] font-bold px-2 py-1 rounded-full border ${
-                          isApproved ? 'bg-green-50 text-green-700 border-green-200' :
-                          isRejected ? 'bg-red-50 text-red-600 border-red-200' :
-                          'bg-amber-50 text-amber-700 border-amber-200'
-                        }`}>
-                          {isApproved ? 'Approved' : isRejected ? 'Rejected' : 'Pending'}
+                        <span className="text-[10px] font-bold px-2 py-1 rounded-full border bg-green-50 text-green-700 border-green-200">
+                          Active Member (Auto-Approved)
                         </span>
                       </div>
                       <p className="text-sm text-muted-foreground">{j.userEmail}{j.userPhone ? ` • ${j.userPhone}` : ''}</p>
@@ -721,55 +715,24 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
                           <p className="font-bold">₹{(j.totalContribution || 0).toLocaleString('en-IN')}</p>
                         </div>
                         <div className="bg-gray-50 p-2 rounded">
-                          <p className="text-muted-foreground">1st Payment Due</p>
-                          <p className="font-bold">₹{(j.totalPayable || j.weeklyAmount || 0).toLocaleString('en-IN')}</p>
+                          <p className="text-muted-foreground">Week 1 Payment</p>
+                          <p className="font-bold text-green-600">₹{(j.weeklyAmount || 0).toLocaleString('en-IN')} Paid</p>
                         </div>
                         <div className="bg-gray-50 p-2 rounded">
                           <p className="text-muted-foreground">Member #</p>
                           <p className="font-bold">#{j.memberNumber}</p>
                         </div>
                         <div className="bg-gray-50 p-2 rounded">
-                          <p className="text-muted-foreground">Requested</p>
+                          <p className="text-muted-foreground">Joined Date</p>
                           <p className="font-bold">{new Date(j.joinedAt).toLocaleDateString('en-IN')}</p>
                         </div>
                       </div>
-                      {isRejected && j.rejectionReason && (
-                        <p className="text-xs text-red-500 mt-2 bg-red-50 p-2 rounded">Reason: {j.rejectionReason}</p>
-                      )}
-                      {isApproved && j.approvedAt && (
-                        <p className="text-xs text-green-600 mt-2">Approved on {new Date(j.approvedAt).toLocaleDateString('en-IN')}</p>
-                      )}
                     </div>
-                    {isPending && (
-                      <div className="flex flex-col gap-2 min-w-[120px]">
-                        <input
-                          type="text"
-                          placeholder="Rejection reason (optional)"
-                          className="px-2 py-1 border rounded text-xs"
-                          id={`reject-reason-${j._id}`}
-                        />
-                        <Button size="sm" onClick={() => handleAction('join', j._id, 'approved')} disabled={loading} className="w-full">
-                          <CheckCircle className="w-4 h-4 mr-1" /> Approve
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-red-600 border-red-200 w-full"
-                          onClick={() => {
-                            const reason = (document.getElementById(`reject-reason-${j._id}`) as HTMLInputElement)?.value || '';
-                            handleAction('join', j._id, 'rejected', reason);
-                          }}
-                          disabled={loading}
-                        >
-                          <XCircle className="w-4 h-4 mr-1" /> Reject
-                        </Button>
-                      </div>
-                    )}
                   </div>
                 </div>
               );
             })}
-            {filteredJoins.length === 0 && <p className="text-muted-foreground p-4">No chit join requests found.</p>}
+            {filteredJoins.length === 0 && <p className="text-muted-foreground p-4">No joined members recorded yet.</p>}
           </div>
         </div>
       )}

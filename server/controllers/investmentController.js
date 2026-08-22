@@ -47,23 +47,37 @@ exports.createInvestment = async (req, res) => {
     const startDate = new Date();
     const maturityDate = new Date(startDate.getTime() + durationDays * 24 * 60 * 60 * 1000);
 
-    // Find user to store userId
-    const user = await User.findOne({ 
-      $or: [
-        ...(userEmail ? [{ email: userEmail }] : []),
-        ...(mobileNumber ? [{ mobileNumber: mobileNumber }] : [])
-      ]
-    });
+    // Find user using req.user, email (case-insensitive), or mobile
+    let user = null;
+    if (req.user?._id || req.user?.id) {
+      user = await User.findById(req.user._id || req.user.id);
+    }
+    if (!user && (userEmail || mobileNumber)) {
+      const orConditions = [];
+      if (userEmail && String(userEmail).trim() !== '' && userEmail !== 'undefined') {
+        orConditions.push({ email: new RegExp(`^${String(userEmail).trim()}$`, 'i') });
+      }
+      if (mobileNumber && String(mobileNumber).trim() !== '' && mobileNumber !== 'undefined') {
+        orConditions.push({ mobileNumber: String(mobileNumber).trim() });
+      }
+      if (orConditions.length > 0) {
+        user = await User.findOne({ $or: orConditions });
+      }
+    }
+
+    const resolvedEmail = user?.email || userEmail || '';
+    const resolvedMobile = user?.mobileNumber || mobileNumber || '';
+    const resolvedName = user?.name || user?.username || userName || 'Investor';
 
     const newInvestment = new Investment({
-      amount,
+      amount: Number(amount),
       ref: refCode,
-      status: 'pending',
+      status: 'approved',
       type,
       userId: user?._id || null,
-      userName,
-      userEmail,
-      mobileNumber,
+      userName: resolvedName,
+      userEmail: resolvedEmail,
+      mobileNumber: resolvedMobile,
       interestRate,
       startDate,
       
@@ -79,14 +93,31 @@ exports.createInvestment = async (req, res) => {
 
     await newInvestment.save();
 
+    // Link any prior orphaned investments for this user
+    if (user && user._id) {
+      const orphanConditions = [];
+      if (user.email && user.email.trim() !== '') {
+        orphanConditions.push({ userEmail: new RegExp(`^${user.email.trim()}$`, 'i') });
+      }
+      if (user.mobileNumber && user.mobileNumber.trim() !== '') {
+        orphanConditions.push({ mobileNumber: user.mobileNumber.trim() });
+      }
+      if (orphanConditions.length > 0) {
+        await Investment.updateMany(
+          { userId: null, $or: orphanConditions },
+          { $set: { userId: user._id } }
+        );
+      }
+    }
+
     // Create transaction record
     if (user) {
       const transaction = new Transaction({
         userId: user._id,
-        userEmail: user.email || userEmail,
+        userEmail: user.email || resolvedEmail,
         type: 'investment',
-        amount,
-        status: 'pending',
+        amount: Number(amount),
+        status: 'approved',
         referenceId: newInvestment._id,
         referenceType: 'Investment',
         description: `Investment in ${type} deposit - ₹${amount}`
@@ -195,37 +226,62 @@ exports.withdrawInvestment = async (req, res) => {
       return res.status(404).json({ message: 'Investment not found' });
     }
 
+    if (investment.status === 'withdrawn' || investment.withdrawalStatus === 'withdrawn') {
+      return res.status(400).json({ message: 'This investment has already been withdrawn' });
+    }
+
     if (investment.status !== 'approved') {
       return res.status(400).json({ message: 'Only approved investments can be withdrawn' });
     }
 
-    if (investment.type === 'fixed') {
-      const now = new Date();
-      const diffTime = Math.abs(now - investment.startDate);
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-      
-      if (diffDays < 365) {
-        return res.status(400).json({ message: 'Withdrawal available after 1 year' });
-      }
+    const now = new Date();
+    if (investment.maturityDate && now < new Date(investment.maturityDate)) {
+      const matDateStr = new Date(investment.maturityDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+      return res.status(400).json({ 
+        message: `Withdrawal available after maturity date: ${matDateStr}` 
+      });
     }
 
-    const durationPlanTypes = ['15_days', '1_month', '3_months', '6_months', '1_year'];
-    const isDurationPlan = durationPlanTypes.includes(investment.type);
-    
-    if (isDurationPlan) {
-      const now = new Date();
-      if (now < new Date(investment.maturityDate)) {
-        return res.status(400).json({ 
-          message: `Investment is locked. Withdrawal available after maturity date: ${new Date(investment.maturityDate).toLocaleDateString('en-IN')}` 
-        });
-      }
-    }
+    const maturityAmt = investment.maturityAmount || (investment.amount + (investment.totalInterest || 0));
 
     investment.status = 'withdrawn';
+    investment.withdrawalStatus = 'withdrawn';
     await investment.save();
 
-    res.status(200).json({ message: 'Withdrawal successful', investment });
+    // Update user balance & record transaction
+    const user = await User.findById(investment.userId || req.user?._id);
+    if (user) {
+      user.balance = (user.balance || 0) + maturityAmt;
+      await user.save();
+
+      const transaction = new Transaction({
+        userId: user._id,
+        userEmail: user.email || 'user@growvest.com',
+        type: 'withdrawal',
+        amount: maturityAmt,
+        status: 'approved',
+        referenceId: investment._id,
+        referenceType: 'Investment',
+        description: `Investment Matured & Withdrawn (${investment.planType || investment.type}) - ₹${maturityAmt}`,
+      });
+      await transaction.save();
+
+      try {
+        await sendNotification({
+          userId: user._id,
+          title: '🎉 Investment Withdrawn',
+          description: `₹${maturityAmt} has been credited to your account from your matured ${investment.planType || investment.type} plan.`,
+          type: 'withdrawal_approved',
+          pushData: { screen: 'Withdraw' },
+        });
+      } catch (notifErr) {
+        console.warn('[Investment Withdrawal] Notification failed:', notifErr.message);
+      }
+    }
+
+    res.status(200).json({ success: true, message: 'Withdrawal successful', investment, maturityAmount: maturityAmt });
   } catch (error) {
+    console.error('Error processing investment withdrawal:', error);
     res.status(500).json({ message: 'Error processing withdrawal', error: error.message });
   }
 };

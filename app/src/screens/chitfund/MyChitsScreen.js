@@ -171,7 +171,7 @@ const MyChitsScreen = ({ navigation }) => {
                       <View style={styles.chitDetailItem}>
                         <Text style={styles.chitDetailLabel}>{chit.totalWeeks > 0 ? 'Week' : 'Month'}</Text>
                         <Text style={styles.chitDetailValue}>
-                          {chit.totalWeeks > 0 ? chit.currentWeek : chit.currentMonth}/{chit.duration}
+                          {chit.totalWeeks > 0 ? Math.max(1, chit.currentWeek || 1) : Math.max(1, chit.currentMonth || 1)}/{chit.duration}
                         </Text>
                       </View>
                       <View style={styles.chitDetailItem}>

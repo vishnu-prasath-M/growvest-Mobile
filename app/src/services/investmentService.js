@@ -41,4 +41,13 @@ export const investmentService = {
       throw error.response?.data || error.message;
     }
   },
+  // Withdraw investment
+  withdrawInvestment: async (id, upiId) => {
+    try {
+      const response = await api.post(`/api/investments/${id}/withdraw`, { upiId });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
 };

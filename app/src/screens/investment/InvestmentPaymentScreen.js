@@ -59,7 +59,12 @@ const InvestmentPaymentScreen = ({ navigation, route }) => {
         );
       },
       onFailure: (error) => {
-        console.error('[InvestmentPayment] Payment failed:', error);
+        console.error('[InvestmentPayment] Payment failed or cancelled:', error);
+        Alert.alert(
+          'Payment Not Completed',
+          'Payment was cancelled or failed. Your investment has not been created.',
+          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        );
       },
     });
   };

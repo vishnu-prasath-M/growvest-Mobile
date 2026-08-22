@@ -35,7 +35,9 @@ const InvestmentsScreen = ({ navigation }) => {
       const user = await authService.getUserData();
       const allInvestments = await investmentService.getInvestments();
       const userInvestments = allInvestments.filter(inv =>
-        inv.userEmail === user?.email || inv.mobileNumber === user?.mobileNumber
+        (inv.userId && user?._id && String(inv.userId) === String(user._id)) ||
+        (inv.userEmail && user?.email && inv.userEmail.toLowerCase() === user.email.toLowerCase()) ||
+        (inv.mobileNumber && user?.mobileNumber && inv.mobileNumber === user.mobileNumber)
       );
       setInvestments(userInvestments);
     } catch (error) {

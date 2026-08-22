@@ -36,8 +36,8 @@ const chitSchema = new mongoose.Schema({
     default: 'upcoming',
   },
   processingFee: {
-    type: Number, // percentage e.g. 2.5
-    default: 2,
+    type: Number, // percentage e.g. 0
+    default: 0,
   },
   startDate: {
     type: Date,

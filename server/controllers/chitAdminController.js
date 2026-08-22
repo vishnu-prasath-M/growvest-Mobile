@@ -53,9 +53,8 @@ const getJoinRequests = async (req, res) => {
       const baseAmount = isWeekly ? (m.chitId?.weeklyAmount || m.chitId?.monthlyAmount || 0) : (m.chitId?.monthlyAmount || 0);
       const totalWeeks = m.chitId?.totalWeeks || m.chitId?.duration || 0;
       const totalContribution = m.chitId?.totalContribution || m.chitId?.totalPot || (baseAmount * totalWeeks);
-      const processingFee = m.chitId?.processingFee || 0;
-      const processingFeeAmount = baseAmount * processingFee / 100;
-      const totalPayable = baseAmount + processingFeeAmount;
+      const processingFee = 0;
+      const totalPayable = baseAmount;
 
       return {
         _id: m._id,
@@ -65,17 +64,17 @@ const getJoinRequests = async (req, res) => {
         weeklyAmount: baseAmount,
         totalWeeks,
         totalContribution,
-        processingFee,
+        processingFee: 0,
         totalPayable,
         userName: m.userId?.name || m.userId?.username || 'Unknown',
         userEmail: m.userId?.email || '',
         userPhone: m.userId?.mobileNumber || '',
         memberNumber: m.memberNumber,
         status: m.status,
-        adminApprovalStatus: m.adminApprovalStatus || 'pending',
+        adminApprovalStatus: m.adminApprovalStatus || 'approved',
         rejectionReason: m.rejectionReason || '',
         joinedAt: m.joinedAt || m.createdAt,
-        approvedAt: m.approvedAt || null,
+        approvedAt: m.approvedAt || m.joinedAt,
         rejectedAt: m.rejectedAt || null,
       };
     });
