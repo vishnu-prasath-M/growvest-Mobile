@@ -369,7 +369,7 @@ const HomeScreen = ({ navigation }) => {
               </LinearGradient>
               <View style={[styles.summaryCard, styles.summaryCardSurface]}>
                 <Text style={styles.summaryCardLabel}>Total Earned</Text>
-                <Text style={styles.summaryCardValue}>{formatCurrency(balances?.totalInterest)}</Text>
+                <Text style={styles.summaryCardValue}>{formatCurrency(balances?.totalInterestEarned ?? balances?.totalEarned ?? balances?.totalInterest)}</Text>
                 <Text style={styles.summaryCardTrend}>Interest & returns</Text>
               </View>
             </View>

@@ -9,6 +9,7 @@ const getBaseUrl = () => {
   } catch (e) {
     console.warn('[api] process.env not available, using fallback URL');
   }
+
   return 'https://growvest-mobile.onrender.com/api';
 };
 
