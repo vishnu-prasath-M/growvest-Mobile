@@ -5,6 +5,9 @@ const seedChits = async () => {
     // Delete old chits first
     await Chit.deleteMany({ name: { $in: ['Silver Chit', 'Gold Chit', 'Premium Chit'] } });
 
+    // Migrate all existing Chits to 0% processing fee
+    await Chit.updateMany({}, { $set: { processingFee: 0, processingFeePercent: 0 } });
+
     const chitsToSeed = [
       {
         name: '₹200 Weekly Plan – 10 Weeks',
@@ -21,8 +24,8 @@ const seedChits = async () => {
         paymentDay: 'Sunday',
         settlementWeek: 11,
         status: 'active',
-        processingFee: 2,
-        features: ['Weekly Contribution', '10-week tenure', 'Flat processing fee'],
+        processingFee: 0,
+        features: ['Weekly Contribution', '10-week tenure', 'No Processing Fee'],
       },
       {
         name: '₹200 Weekly Plan – 20 Weeks',
@@ -39,8 +42,8 @@ const seedChits = async () => {
         paymentDay: 'Sunday',
         settlementWeek: 21,
         status: 'active',
-        processingFee: 2,
-        features: ['Weekly Contribution', '20-week tenure', 'Flat processing fee'],
+        processingFee: 0,
+        features: ['Weekly Contribution', '20-week tenure', 'No Processing Fee'],
       },
       {
         name: '₹500 Weekly Plan – 10 Weeks',
@@ -57,8 +60,8 @@ const seedChits = async () => {
         paymentDay: 'Sunday',
         settlementWeek: 11,
         status: 'active',
-        processingFee: 2,
-        features: ['Weekly Contribution', '10-week tenure', 'Flat processing fee'],
+        processingFee: 0,
+        features: ['Weekly Contribution', '10-week tenure', 'No Processing Fee'],
       },
       {
         name: '₹500 Weekly Plan – 20 Weeks',
@@ -75,8 +78,8 @@ const seedChits = async () => {
         paymentDay: 'Sunday',
         settlementWeek: 21,
         status: 'active',
-        processingFee: 2,
-        features: ['Weekly Contribution', '20-week tenure', 'Flat processing fee'],
+        processingFee: 0,
+        features: ['Weekly Contribution', '20-week tenure', 'No Processing Fee'],
       },
       {
         name: '₹1,000 Weekly Plan – 10 Weeks',
@@ -93,8 +96,8 @@ const seedChits = async () => {
         paymentDay: 'Sunday',
         settlementWeek: 11,
         status: 'active',
-        processingFee: 2,
-        features: ['Weekly Contribution', '10-week tenure', 'Flat processing fee'],
+        processingFee: 0,
+        features: ['Weekly Contribution', '10-week tenure', 'No Processing Fee'],
       },
       {
         name: '₹1,000 Weekly Plan – 20 Weeks',
@@ -111,8 +114,8 @@ const seedChits = async () => {
         paymentDay: 'Sunday',
         settlementWeek: 21,
         status: 'active',
-        processingFee: 2,
-        features: ['Weekly Contribution', '20-week tenure', 'Flat processing fee'],
+        processingFee: 0,
+        features: ['Weekly Contribution', '20-week tenure', 'No Processing Fee'],
       }
     ];
 

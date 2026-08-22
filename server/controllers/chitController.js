@@ -415,8 +415,12 @@ const joinChit = async (req, res) => {
       return res.status(404).json({ message: 'Chit not found' });
     }
 
-    if (chit.availableSlots <= 0) {
-      return res.status(400).json({ message: 'No available slots in this chit' });
+    // Compute available slots dynamically from actual active database memberships
+    const activeMembersCount = await ChitMember.countDocuments({ chitId, status: { $ne: 'cancelled' } });
+    const realAvailableSlots = Math.max(0, (chit.totalMembers || 9999) - activeMembersCount);
+
+    if (realAvailableSlots <= 0 || chit.availableSlots <= 0) {
+      return res.status(400).json({ message: 'This Chit is currently full. No available slots remain.' });
     }
 
     if (!['active', 'upcoming'].includes(chit.status)) {
@@ -424,7 +428,7 @@ const joinChit = async (req, res) => {
     }
 
     const existing = await ChitMember.findOne({ chitId, userId, status: { $ne: 'cancelled' } });
-    if (existing && existing.status === 'active') {
+    if (existing && (existing.status === 'active' || existing.status === 'approved')) {
       return res.status(400).json({ message: 'You are already an active member of this chit' });
     }
 

@@ -314,7 +314,7 @@ const HomeScreen = ({ navigation }) => {
                 <View style={styles.statsRow}>
                   {[
                     { icon: 'shield-lock-outline', label: 'INVESTED', value: formatCurrency(balances?.totalInvested) },
-                    { icon: 'trending-up', label: 'EARNED', value: formatCurrency(balances?.totalInterestEarned || balances?.totalEarned) },
+                    { icon: 'trending-up', label: 'EARNED', value: balances?.dailyInterest ? `${formatCurrency(balances.dailyInterest)}/day` : formatCurrency(balances?.totalInterestEarned || balances?.totalEarned) },
                     { icon: 'wallet-outline', label: 'AVAILABLE', value: formatCurrency(balances?.availableToWithdraw) },
                   ].map((s) => (
                     <View key={s.label} style={styles.statPill}>
