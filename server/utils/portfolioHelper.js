@@ -8,10 +8,11 @@ const Withdrawal = require('../models/Withdrawal');
  * Calculates exact database-backed financial metrics for a user:
  * - totalInvested: Sum of duration plan principals + active chit paid contributions
  * - totalLocked: Sum of non-matured duration plan principals + active chit paid contributions
- * - dailyInterest: Sum of per-day interest earnings across active duration plans
- * - totalInterestEarned: Sum of accrued interest across duration plans
- * - availableToWithdraw: Payout of matured non-withdrawn plans + won chit payouts + wallet balance
- * - totalBalance: totalInvested + totalInterestEarned + walletBalance + totalChitWinningAmount
+ * - dailyInterest: Sum of per-day interest earnings across active duration plans ((principal * rate% / 100) / 365)
+ * - totalInterestEarned: Sum of accrued interest across duration plans so far
+ * - availableToWithdraw: Invested + Earned so far for Home Page display
+ * - maturedAvailableOnly: Strict matured payout only for withdrawal execution
+ * - totalBalance: totalInvested + totalAccruedInterest + walletBalance + totalChitWinningAmount
  */
 async function getUserPortfolioSummary(userIdInput) {
   const user = await User.findById(userIdInput).select('-password');
@@ -58,9 +59,11 @@ async function getUserPortfolioSummary(userIdInput) {
     else if (inv.type === '6_months') { rate = 20; durationDays = 180; }
     else if (inv.type === '1_year') { rate = 24; durationDays = 365; }
 
-    // Interest calculations (Requirement 7, 8, 9)
-    const totalInterest = (principal * rate) / 100;
-    const dailyInterest = durationDays > 0 ? (totalInterest / durationDays) : 0;
+    // Rate% is annual interest rate (p.a.)
+    // Daily interest formula = (principal * rate / 100) / 365
+    // Example: ₹1,000 @ 15% p.a. -> (1000 * 15 / 100) / 365 = ₹0.4109589... per day
+    const dailyInterest = (principal * rate) / 100 / 365;
+    const totalInterest = dailyInterest * durationDays; // Total interest for full plan duration
     const maturityAmount = principal + totalInterest;
 
     // Elapsed days interest accrued so far
@@ -71,10 +74,10 @@ async function getUserPortfolioSummary(userIdInput) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const elapsedDays = Math.max(0, Math.min(durationDays, Math.floor((today - startDate) / (1000 * 60 * 60 * 24))));
-      accruedInterest = elapsedDays * dailyInterest;
+      accruedInterest = Math.max(accruedInterest, elapsedDays * dailyInterest);
     }
 
-    // Maturity check (Requirement 5 & 6)
+    // Maturity check
     const maturityDate = inv.maturityDate ? new Date(inv.maturityDate) : new Date(new Date(inv.startDate).getTime() + durationDays * 24 * 60 * 60 * 1000);
     const isMatured = now >= maturityDate;
 
@@ -146,10 +149,13 @@ async function getUserPortfolioSummary(userIdInput) {
   // 3. User Wallet Balance
   const walletBalance = Number(user.balance) || 0;
 
-  // 4. Final Aggregations (Requirement 1, 2, 3, 24)
+  // 4. Final Aggregations
   const totalInvested = totalDurationInvested + totalChitInvested;
   const totalLocked = totalDurationLocked + totalChitLocked;
-  const availableToWithdraw = maturedWithdrawalAvailable + chitWithdrawalAvailable + walletBalance;
+  
+  // Available balance for Home Page (Invested + Earned so far)
+  const availableToWithdraw = totalInvested + totalAccruedInterest + walletBalance + totalChitWinningAmount;
+  const maturedAvailableOnly = maturedWithdrawalAvailable + chitWithdrawalAvailable + walletBalance;
   const totalBalance = totalInvested + totalAccruedInterest + walletBalance + totalChitWinningAmount;
 
   return {
@@ -169,7 +175,8 @@ async function getUserPortfolioSummary(userIdInput) {
       dailyInterest: totalDailyInterest,
       totalInterestEarned: totalAccruedInterest,
       totalEarned: totalAccruedInterest,
-      availableToWithdraw,
+      availableToWithdraw, // Invested + Earned for Home Page Total Balance card
+      maturedAvailableOnly, // Strict matured payout for withdrawal execution
       maturedAmount: maturedWithdrawalAvailable,
       walletBalance,
       totalChitWinningAmount,
