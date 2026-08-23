@@ -121,7 +121,35 @@ const generateWeeklySchedule = (weeklyAmount, totalWeeks) => {
 const getAllChits = async (req, res) => {
   try {
     const chits = await Chit.find().sort({ createdAt: -1 });
-    res.json(chits);
+
+    // Calculate real-time available slots dynamically from MongoDB ChitMember records
+    const memberCounts = await ChitMember.aggregate([
+      { $match: { status: { $ne: 'cancelled' } } },
+      { $group: { _id: '$chitId', count: { $sum: 1 } } }
+    ]);
+
+    const countMap = {};
+    memberCounts.forEach(m => {
+      if (m._id) countMap[m._id.toString()] = m.count;
+    });
+
+    const enrichedChits = chits.map(chit => {
+      const total = Number(chit.totalMembers) || 100;
+      const joinedCount = countMap[chit._id.toString()] || 0;
+      const realAvailableSlots = Math.max(0, total - joinedCount);
+      const isFull = realAvailableSlots <= 0;
+
+      return {
+        ...chit.toObject(),
+        totalMembers: total,
+        joinedMembers: joinedCount,
+        availableSlots: realAvailableSlots,
+        isFull,
+        status: isFull ? 'full' : chit.status,
+      };
+    });
+
+    res.json(enrichedChits);
   } catch (error) {
     console.error('Error fetching all chits:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -354,8 +382,18 @@ const getChitById = async (req, res) => {
       userId: req.user._id,
     });
 
+    const joinedCount = await ChitMember.countDocuments({ chitId: req.params.id, status: { $ne: 'cancelled' } });
+    const total = Number(chit.totalMembers) || 100;
+    const realAvailableSlots = Math.max(0, total - joinedCount);
+    const isFull = realAvailableSlots <= 0;
+
     res.json({
       ...chit.toObject(),
+      totalMembers: total,
+      joinedMembers: joinedCount,
+      availableSlots: realAvailableSlots,
+      isFull,
+      status: isFull ? 'full' : chit.status,
       myMembership: membership || null,
     });
   } catch (error) {

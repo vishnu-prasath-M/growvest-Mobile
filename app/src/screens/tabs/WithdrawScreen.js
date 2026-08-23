@@ -26,6 +26,7 @@ import { mapProfileToWithdrawUser } from '../../utils/userBalances';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { Portal } from 'react-native-paper';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
+import DepositDetailModal from '../../components/DepositDetailModal';
 import { useTheme } from '../../context/ThemeContext';
 
 const QUICK_AMOUNTS = [1000, 5000, 10000, 25000];
@@ -35,6 +36,7 @@ const WithdrawScreen = ({ navigation }) => {
   const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const insets = useScreenInsets(8);
   const [userData, setUserData] = useState(null);
+  const [selectedDeposit, setSelectedDeposit] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [withdrawModalVisible, setWithdrawModalVisible] = useState(false);
@@ -69,6 +71,7 @@ const WithdrawScreen = ({ navigation }) => {
       // Chit Fund memberships
       const activeChitItems = (myChits || []).filter(c => c.status === 'active' || c.status === 'approved').map(c => ({
         _id: c._id,
+        chitId: c.chitId?._id || c.chitId || c._id,
         isChit: true,
         type: 'chit',
         chitName: c.chitName || 'Chit Fund Plan',
@@ -215,9 +218,9 @@ const WithdrawScreen = ({ navigation }) => {
 
   const activeInvestmentsCount = investments.filter(i => !['withdrawn', 'rejected'].includes(i.status)).length;
 
-  // availableToWithdraw: only matured savings + pocket money released + chit winnings
+  // availableToWithdraw: only matured savings + won chit auction payouts
   const availableToWithdrawValue = investments.reduce((acc, inv) => {
-    if (inv.isPocketMoney) return acc + (inv.totalPaidOut || 0);
+    if (inv.isPocketMoney) return acc; // Paid directly to user by Admin
     if (inv.isChit) return acc + (inv.hasWon && inv.withdrawalStatus !== 'completed' ? (inv.winningAmount || 0) : 0);
     // Savings/fixed: matured and not withdrawn
     const isMatured = inv.maturityDate && new Date() >= new Date(inv.maturityDate);
@@ -315,7 +318,12 @@ const WithdrawScreen = ({ navigation }) => {
                   ? new Date(inv.nextPayoutDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
                   : 'N/A';
                 return (
-                  <View key={String(inv._id)} style={styles.planStatusCard}>
+                  <TouchableOpacity
+                    key={String(inv._id)}
+                    style={styles.planStatusCard}
+                    activeOpacity={0.88}
+                    onPress={() => navigation.navigate('PocketMoney')}
+                  >
                     <View style={styles.planStatusTop}>
                       <View style={styles.planStatusInfo}>
                         <Text style={styles.planStatusName}>💼 Pocket Money</Text>
@@ -373,7 +381,7 @@ const WithdrawScreen = ({ navigation }) => {
                         </Text>
                       </View>
                     )}
-                  </View>
+                  </TouchableOpacity>
                 );
               }
 
@@ -381,7 +389,12 @@ const WithdrawScreen = ({ navigation }) => {
                 const isWinner = inv.hasWon;
                 const winningAmt = inv.winningAmount || 0;
                 return (
-                  <View key={inv._id} style={styles.planStatusCard}>
+                  <TouchableOpacity
+                    key={inv._id}
+                    style={styles.planStatusCard}
+                    activeOpacity={0.88}
+                    onPress={() => navigation.navigate('ChitDetails', { chitId: inv.chitId || inv._id })}
+                  >
                     <View style={styles.planStatusTop}>
                       <View style={styles.planStatusInfo}>
                         <Text style={styles.planStatusName}>{inv.chitName}</Text>
@@ -447,10 +460,11 @@ const WithdrawScreen = ({ navigation }) => {
                         </View>
                       )}
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 );
               }
 
+              // ── SAVINGS / FIXED CARD ──────────────────────────────────────
               const isWithdrawn = inv.status === 'withdrawn' || inv.withdrawalStatus === 'withdrawn';
               const isMatured = inv.maturityDate && new Date() >= new Date(inv.maturityDate);
               const totalInterest = inv.totalInterest || inv.interestEarned || (inv.amount * (inv.interestRate || 12) / 100);
@@ -460,7 +474,12 @@ const WithdrawScreen = ({ navigation }) => {
                 : 'N/A';
 
               return (
-                <View key={inv._id} style={styles.planStatusCard}>
+                <TouchableOpacity
+                  key={inv._id}
+                  style={styles.planStatusCard}
+                  activeOpacity={0.88}
+                  onPress={() => setSelectedDeposit(inv)}
+                >
                   <View style={styles.planStatusTop}>
                     <View style={styles.planStatusInfo}>
                       <Text style={styles.planStatusName}>{getPlanDisplayName(inv.type)}</Text>
@@ -541,7 +560,7 @@ const WithdrawScreen = ({ navigation }) => {
                       </View>
                     )}
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             })
           )}
@@ -725,6 +744,13 @@ const WithdrawScreen = ({ navigation }) => {
           </View>
         </View>
       </Modal>
+      {/* Deposit Detail Modal */}
+      <DepositDetailModal
+        visible={!!selectedDeposit}
+        item={selectedDeposit}
+        onClose={() => setSelectedDeposit(null)}
+        onWithdraw={(inv) => handleWithdrawSubmit(inv)}
+      />
     </View>
   );
 };

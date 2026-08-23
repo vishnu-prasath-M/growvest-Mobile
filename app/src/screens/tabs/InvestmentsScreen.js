@@ -20,6 +20,7 @@ import TopBar from '../../components/TopBar';
 import StatusChip from '../../components/StatusChip';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
 import { useTheme } from '../../context/ThemeContext';
+import DepositDetailModal from '../../components/DepositDetailModal';
 
 // All investment types shown on this screen
 const FILTERS = ['All', 'Active', 'Pending'];
@@ -33,6 +34,7 @@ const InvestmentsScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState('All');
+  const [selectedDeposit, setSelectedDeposit] = useState(null);
 
   const fetchAllInvestments = async () => {
     try {
@@ -54,6 +56,7 @@ const InvestmentsScreen = ({ navigation }) => {
         .filter(c => c.status === 'active' || c.status === 'approved' || c.status === 'pending')
         .map(c => ({
           _id: c._id,
+          chitId: c.chitId?._id || c.chitId || c._id,
           _itemType: 'chit',
           displayName: c.chitName || 'Chit Fund Plan',
           amount: c.totalPaid || (Number(c.paidWeeks || 0) * Number(c.weeklyAmount || 0)),
@@ -65,7 +68,6 @@ const InvestmentsScreen = ({ navigation }) => {
           joinedAt: c.joinedAt,
           hasWon: c.hasWon || false,
           winningAmount: c.winningAmount || 0,
-          // No maturityDate for chits — use totalWeeks × 7 days from joinedAt
         }));
 
       const pocketItems = ((pocketMoneyRes.status === 'fulfilled' ? pocketMoneyRes.value?.data : null) || [])
@@ -235,7 +237,12 @@ const InvestmentsScreen = ({ navigation }) => {
               // ── CHIT FUND CARD ────────────────────────────────────────────
               if (item._itemType === 'chit') {
                 return (
-                  <View key={String(item._id)} style={styles.investCard}>
+                  <TouchableOpacity
+                    key={String(item._id)}
+                    style={styles.investCard}
+                    activeOpacity={0.88}
+                    onPress={() => navigation.navigate('ChitDetails', { chitId: item.chitId || item._id })}
+                  >
                     <View style={styles.investCardTop}>
                       <View style={[styles.investIcon, { backgroundColor: '#E8F5E9' }]}>
                         <MaterialCommunityIcons name="handshake-outline" size={22} color="#1A5C39" />
@@ -256,6 +263,9 @@ const InvestmentsScreen = ({ navigation }) => {
                         <MaterialCommunityIcons name="calendar-start" size={13} color={colors.textMuted} />
                         <Text style={styles.investDateText}>Joined: {formatDate(item.joinedAt)}</Text>
                       </View>
+                      <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                        <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '600' }}>View Details →</Text>
+                      </View>
                     </View>
                     {item.hasWon && (
                       <View style={[styles.investEarningsRow, { backgroundColor: '#E8F5E9' }]}>
@@ -263,7 +273,7 @@ const InvestmentsScreen = ({ navigation }) => {
                         <Text style={[styles.investEarningsValue, { color: '#1A5C39' }]}>+{formatCurrency(item.winningAmount)}</Text>
                       </View>
                     )}
-                  </View>
+                  </TouchableOpacity>
                 );
               }
 
@@ -273,7 +283,12 @@ const InvestmentsScreen = ({ navigation }) => {
                   : item.frequency === 'every_2_days' ? 'Every 2 Days' : 'Weekly';
                 const progressPct = Math.min(100, ((item.payoutCount || 0) / 10) * 100);
                 return (
-                  <View key={String(item._id)} style={styles.investCard}>
+                  <TouchableOpacity
+                    key={String(item._id)}
+                    style={styles.investCard}
+                    activeOpacity={0.88}
+                    onPress={() => navigation.navigate('PocketMoney')}
+                  >
                     <View style={styles.investCardTop}>
                       <View style={[styles.investIcon, { backgroundColor: '#FFF8E1' }]}>
                         <MaterialCommunityIcons name="piggy-bank-outline" size={22} color="#B45309" />
@@ -310,15 +325,23 @@ const InvestmentsScreen = ({ navigation }) => {
                         <MaterialCommunityIcons name="calendar-start" size={13} color={colors.textMuted} />
                         <Text style={styles.investDateText}>Started: {formatDate(item.startDate)}</Text>
                       </View>
+                      <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                        <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '600' }}>Manage Payouts →</Text>
+                      </View>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 );
               }
 
               // ── SAVINGS / FIXED / DURATION PLAN CARD ─────────────────────
               const isSaving = item.type === 'saving';
               return (
-                <View key={item._id} style={styles.investCard}>
+                <TouchableOpacity
+                  key={item._id}
+                  style={styles.investCard}
+                  activeOpacity={0.88}
+                  onPress={() => setSelectedDeposit(item)}
+                >
                   <View style={styles.investCardTop}>
                     <View style={[styles.investIcon, isSaving ? styles.investIconSaving : styles.investIconFixed]}>
                       <MaterialCommunityIcons
@@ -365,7 +388,7 @@ const InvestmentsScreen = ({ navigation }) => {
                       <Text style={styles.investEarningsValue}>+{formatCurrency(item.interestEarned)}</Text>
                     </View>
                   )}
-                </View>
+                </TouchableOpacity>
               );
             })
           ) : (
@@ -383,6 +406,14 @@ const InvestmentsScreen = ({ navigation }) => {
 
         <View style={{ height: 110 }} />
       </ScrollView>
+
+      {/* Deposit Detail Breakdown Modal */}
+      <DepositDetailModal
+        visible={!!selectedDeposit}
+        item={selectedDeposit}
+        onClose={() => setSelectedDeposit(null)}
+        onWithdraw={() => navigation.navigate('Withdraw')}
+      />
     </View>
   );
 };
