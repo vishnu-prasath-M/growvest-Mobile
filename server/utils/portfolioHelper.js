@@ -202,8 +202,9 @@ async function getUserPortfolioSummary(userIdInput) {
   // Safest: exclude walletBalance from totalBalance entirely (it's in availableToWithdraw).
   const totalBalance = totalInvested + totalAccruedInterest;
 
-  // availableToWithdraw = truly liquid right now
-  const availableToWithdraw = maturedWithdrawalAvailable + walletBalance + chitWithdrawalAvailable + pocketMoneyReleased;
+  // availableToWithdraw = truly liquid right now in app (matured deposits + wallet cash + chit auction winnings)
+  // NOTE: pocketMoneyReleased is NOT included because Pocket Money payouts are paid directly to the user by Admin.
+  const availableToWithdraw = maturedWithdrawalAvailable + walletBalance + chitWithdrawalAvailable;
 
   // Next unlock date — earliest maturity date among locked investments
   const lockedInvestments = enrichedInvestments.filter(i => i.isLocked && i.maturityDate);

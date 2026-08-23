@@ -71,6 +71,7 @@ const WithdrawScreen = ({ navigation }) => {
       // Chit Fund memberships
       const activeChitItems = (myChits || []).filter(c => c.status === 'active' || c.status === 'approved').map(c => ({
         _id: c._id,
+        chitId: c.chitId?._id || c.chitId || c._id,
         isChit: true,
         type: 'chit',
         chitName: c.chitName || 'Chit Fund Plan',
@@ -217,9 +218,9 @@ const WithdrawScreen = ({ navigation }) => {
 
   const activeInvestmentsCount = investments.filter(i => !['withdrawn', 'rejected'].includes(i.status)).length;
 
-  // availableToWithdraw: only matured savings + pocket money released + chit winnings
+  // availableToWithdraw: only matured savings + won chit auction payouts
   const availableToWithdrawValue = investments.reduce((acc, inv) => {
-    if (inv.isPocketMoney) return acc + (inv.totalPaidOut || 0);
+    if (inv.isPocketMoney) return acc; // Paid directly to user by Admin
     if (inv.isChit) return acc + (inv.hasWon && inv.withdrawalStatus !== 'completed' ? (inv.winningAmount || 0) : 0);
     // Savings/fixed: matured and not withdrawn
     const isMatured = inv.maturityDate && new Date() >= new Date(inv.maturityDate);
@@ -392,7 +393,7 @@ const WithdrawScreen = ({ navigation }) => {
                     key={inv._id}
                     style={styles.planStatusCard}
                     activeOpacity={0.88}
-                    onPress={() => navigation.navigate('ChitDetails', { chitId: inv._id })}
+                    onPress={() => navigation.navigate('ChitDetails', { chitId: inv.chitId || inv._id })}
                   >
                     <View style={styles.planStatusTop}>
                       <View style={styles.planStatusInfo}>

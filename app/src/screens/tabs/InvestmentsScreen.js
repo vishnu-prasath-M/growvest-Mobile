@@ -56,6 +56,7 @@ const InvestmentsScreen = ({ navigation }) => {
         .filter(c => c.status === 'active' || c.status === 'approved' || c.status === 'pending')
         .map(c => ({
           _id: c._id,
+          chitId: c.chitId?._id || c.chitId || c._id,
           _itemType: 'chit',
           displayName: c.chitName || 'Chit Fund Plan',
           amount: c.totalPaid || (Number(c.paidWeeks || 0) * Number(c.weeklyAmount || 0)),
@@ -67,7 +68,6 @@ const InvestmentsScreen = ({ navigation }) => {
           joinedAt: c.joinedAt,
           hasWon: c.hasWon || false,
           winningAmount: c.winningAmount || 0,
-          // No maturityDate for chits — use totalWeeks × 7 days from joinedAt
         }));
 
       const pocketItems = ((pocketMoneyRes.status === 'fulfilled' ? pocketMoneyRes.value?.data : null) || [])
@@ -241,7 +241,7 @@ const InvestmentsScreen = ({ navigation }) => {
                     key={String(item._id)}
                     style={styles.investCard}
                     activeOpacity={0.88}
-                    onPress={() => navigation.navigate('ChitDetails', { chitId: item._id })}
+                    onPress={() => navigation.navigate('ChitDetails', { chitId: item.chitId || item._id })}
                   >
                     <View style={styles.investCardTop}>
                       <View style={[styles.investIcon, { backgroundColor: '#E8F5E9' }]}>
