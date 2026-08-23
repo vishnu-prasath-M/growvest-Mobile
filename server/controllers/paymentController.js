@@ -487,14 +487,27 @@ const completeMonthlyDue = async (user, data, orderId, paymentId, signature) => 
 };
 
 // Complete Pocket Money Investment
+// IMPORTANT: This ONLY creates the investment record.
+// NO payout is created here. Payout flow is:
+//   User requests via requestPayout → Admin approves via confirmReleasePayout → ONLY THEN payout is released.
 const completePocketMoney = async (user, data, orderId, paymentId, signature) => {
   const { amount, frequency } = data;
-  
-  const payoutAmount = Number(amount) / 10;
+
+  // Idempotency check: if already processed for this paymentId, return existing
+  if (paymentId) {
+    const existing = await PocketMoney.findOne({ paymentId });
+    if (existing) {
+      console.log(`[PaymentController] Pocket Money payment ${paymentId} already processed (idempotency).`);
+      return existing;
+    }
+  }
+
+  const payoutAmount = Number(amount) / 10;       // Each of the 10 payouts = amount/10
   const bonusRate = 6;
-  const bonusAmount = Number(amount) * 6 / 100;
+  const bonusAmount = Number(amount) * 6 / 100;   // 6% bonus on full amount
   const totalFinalValue = Number(amount) + bonusAmount;
-  
+
+  // Next payout date: first payout becomes eligible after one frequency cycle
   const nextPayoutDate = new Date();
   if (frequency === 'daily') {
     nextPayoutDate.setDate(nextPayoutDate.getDate() + 1);
@@ -503,7 +516,8 @@ const completePocketMoney = async (user, data, orderId, paymentId, signature) =>
   } else if (frequency === 'weekly') {
     nextPayoutDate.setDate(nextPayoutDate.getDate() + 7);
   }
-  
+
+  // Final payout date = after 10 cycles
   const finalPayoutDate = new Date();
   if (frequency === 'daily') {
     finalPayoutDate.setDate(finalPayoutDate.getDate() + 9);
@@ -512,21 +526,25 @@ const completePocketMoney = async (user, data, orderId, paymentId, signature) =>
   } else if (frequency === 'weekly') {
     finalPayoutDate.setDate(finalPayoutDate.getDate() + 63);
   }
-  
+
+  // Create the PocketMoney investment record.
+  // remainingAmount = full investedAmount (no payout deducted yet)
+  // totalPaidOut = 0 (nothing has been paid out yet)
+  // payoutCount = 0 (no payout completed yet)
   const pocketMoney = new PocketMoney({
     userId: user._id,
     userEmail: user.email,
     userName: user.name || user.username,
     mobileNumber: user.mobileNumber,
     investedAmount: Number(amount),
-    remainingAmount: Number(amount) - payoutAmount,
+    remainingAmount: Number(amount),  // FULL amount — no deduction at investment time
     payoutAmount,
     frequency,
     startDate: new Date(),
     nextPayoutDate,
     finalPayoutDate,
-    totalPaidOut: payoutAmount,
-    payoutCount: 1,
+    totalPaidOut: 0,      // Nothing paid out yet
+    payoutCount: 0,       // No payout completed yet
     status: 'active',
     bonusRate,
     bonusAmount,
@@ -536,23 +554,12 @@ const completePocketMoney = async (user, data, orderId, paymentId, signature) =>
     orderId,
     paymentId,
     signature,
-    paidAt: new Date()
+    paidAt: new Date(),
   });
-  
+
   await pocketMoney.save();
-  
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const payout = new PocketMoneyPayout({
-    pocketMoneyId: pocketMoney._id,
-    userId: user._id,
-    amount: payoutAmount,
-    payoutDate: new Date(),
-    payoutNumber: 1,
-    idempotencyKey: `PM_${pocketMoney._id}_${todayStr}`
-  });
-  
-  await payout.save();
-  
+
+  // Only create the INVESTMENT transaction (not payout transaction)
   const investTx = new Transaction({
     userId: user._id,
     userEmail: user.email,
@@ -561,44 +568,32 @@ const completePocketMoney = async (user, data, orderId, paymentId, signature) =>
     status: 'approved',
     referenceId: pocketMoney._id,
     referenceType: 'PocketMoney',
-    description: `Pocket Money Plan Investment (Txn ID: ${paymentId})`
+    description: `Pocket Money Plan Invested - ₹${amount} (${frequency}) (Txn: ${paymentId})`,
   });
   await investTx.save();
-  
-  const payoutTx = new Transaction({
-    userId: user._id,
-    userEmail: user.email,
-    type: 'pocket_money_payout',
-    amount: payoutAmount,
-    status: 'approved',
-    referenceId: pocketMoney._id,
-    referenceType: 'PocketMoney',
-    description: `Pocket Money Payout Release #1 (${frequency})`
-  });
-  await payoutTx.save();
-  
-  payout.transactionId = payoutTx._id;
-  await payout.save();
-  
+
+  // Notify user: activation (NOT payout credited)
   try {
+    const { sendNotification } = require('../services/notificationHelper');
     await sendNotification({
       userId: user._id,
-      title: '💼 Pocket Money Activated',
-      description: `Your ₹${amount} Pocket Money investment is active. Day 1 payout of ₹${payoutAmount} is credited!`,
+      title: '💼 Pocket Money Plan Activated',
+      description: `Your ₹${amount} Pocket Money plan is now active! Your first payout of ₹${payoutAmount} will be available ${frequency === 'daily' ? 'tomorrow' : frequency === 'weekly' ? 'next week' : 'in 2 days'}. Request it from the Pocket Money screen.`,
       type: 'pocket_money_approved',
-      metadata: { pocketMoneyId: pocketMoney._id }
+      metadata: { pocketMoneyId: pocketMoney._id },
     });
   } catch (notifErr) {
-    console.error('[PaymentController] Notification error:', notifErr);
+    console.error('[PaymentController] Pocket Money activation notification error:', notifErr);
   }
-  
+
+  // Notify admins
   try {
     const { notifyAdmins } = require('../services/notificationHelper');
     await notifyAdmins({
       title: '🔔 New Pocket Money Investment',
-      description: `${user.name || user.username} invested ₹${amount} in Pocket Money.`,
+      description: `${user.name || user.username} invested ₹${amount} in Pocket Money (${frequency}).`,
       type: 'general',
-      metadata: { pocketMoneyId: pocketMoney._id }
+      metadata: { pocketMoneyId: pocketMoney._id },
     });
   } catch (adminNotifErr) {
     console.error('[PaymentController] Admin notification error:', adminNotifErr);

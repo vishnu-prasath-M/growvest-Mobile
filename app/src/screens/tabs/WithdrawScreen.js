@@ -20,6 +20,7 @@ import { authService } from '../../services/authService';
 import { withdrawalService } from '../../services/withdrawalService';
 import { investmentService } from '../../services/investmentService';
 import { chitFundService } from '../../services/chitFundService';
+import api from '../../services/apiService';
 import { colors } from '../../theme/theme';
 import { mapProfileToWithdrawUser } from '../../utils/userBalances';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
@@ -54,28 +55,24 @@ const WithdrawScreen = ({ navigation }) => {
       if (currentUser) {
         setUserData(mapProfileToWithdrawUser(currentUser));
       }
-      
-      const [allInvestments, myChits] = await Promise.all([
+
+      // Fetch all investment types in parallel
+      const [allInvestments, myChits, pocketMoneyRes] = await Promise.all([
         investmentService.getInvestments().catch(() => []),
         chitFundService.getMyChits().catch(() => []),
+        api.get('/pocket-money/my').catch(() => ({ data: [] })),
       ]);
 
-      const userInvestments = (allInvestments || []).filter(inv =>
-        (inv.userId && user?._id && String(inv.userId) === String(user._id)) ||
-        (inv.userId && profile?._id && String(inv.userId) === String(profile._id)) ||
-        (inv.userEmail && profile?.email && inv.userEmail.toLowerCase() === profile.email.toLowerCase()) ||
-        (inv.userEmail && user?.email && inv.userEmail.toLowerCase() === user.email.toLowerCase()) ||
-        (inv.mobileNumber && profile?.mobileNumber && inv.mobileNumber === profile.mobileNumber) ||
-        (inv.mobileNumber && user?.mobileNumber && inv.mobileNumber === user.mobileNumber)
-      );
-      const validInvestments = userInvestments.filter(inv => inv.status !== 'rejected');
+      // Savings/Fixed investments — already scoped to logged-in user by backend
+      const validInvestments = (allInvestments || []).filter(inv => inv.status !== 'rejected');
 
+      // Chit Fund memberships
       const activeChitItems = (myChits || []).filter(c => c.status === 'active' || c.status === 'approved').map(c => ({
         _id: c._id,
         isChit: true,
         type: 'chit',
         chitName: c.chitName || 'Chit Fund Plan',
-        amount: c.totalPaid || (c.paidWeeks || 1) * (c.weeklyAmount || 0),
+        amount: c.totalPaid || (Number(c.paidWeeks || 0) * Number(c.weeklyAmount || 0)),
         weeklyAmount: c.weeklyAmount || 0,
         currentWeek: c.currentWeek || 1,
         totalWeeks: c.totalWeeks || 10,
@@ -85,7 +82,30 @@ const WithdrawScreen = ({ navigation }) => {
         joinedAt: c.joinedAt,
       }));
 
-      setInvestments([...validInvestments, ...activeChitItems]);
+      // Pocket Money investments
+      const pocketMoneyPlans = (pocketMoneyRes?.data || []);
+      const pocketMoneyItems = pocketMoneyPlans
+        .filter(pm => pm.status === 'active' || pm.status === 'completed')
+        .map(pm => ({
+          _id: pm._id,
+          isPocketMoney: true,
+          type: 'pocket_money',
+          amount: pm.investedAmount || 0,
+          investedAmount: pm.investedAmount || 0,
+          remainingAmount: pm.remainingAmount || 0,
+          totalPaidOut: pm.totalPaidOut || 0,
+          payoutAmount: pm.payoutAmount || 0,
+          payoutCount: pm.payoutCount || 0,
+          frequency: pm.frequency || 'daily',
+          nextPayoutDate: pm.nextPayoutDate,
+          finalPayoutDate: pm.finalPayoutDate,
+          status: pm.status,
+          startDate: pm.startDate,
+          bonusAmount: pm.bonusAmount || 0,
+          totalFinalValue: pm.totalFinalValue || 0,
+        }));
+
+      setInvestments([...validInvestments, ...activeChitItems, ...pocketMoneyItems]);
     } catch (error) {
       console.error('Error fetching user profile & investments:', error);
     } finally {
@@ -268,6 +288,79 @@ const WithdrawScreen = ({ navigation }) => {
             </View>
           ) : (
             investments.map((inv) => {
+              // ── POCKET MONEY CARD ─────────────────────────────────────────
+              if (inv.isPocketMoney) {
+                const totalPayouts = 10;
+                const completedPayouts = inv.payoutCount || 0;
+                const progressPct = Math.min(100, (completedPayouts / totalPayouts) * 100);
+                const isCompleted = inv.status === 'completed';
+                const freqLabel = inv.frequency === 'daily' ? 'Daily' : inv.frequency === 'every_2_days' ? 'Every 2 Days' : 'Weekly';
+                const nextDate = inv.nextPayoutDate
+                  ? new Date(inv.nextPayoutDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                  : 'N/A';
+                return (
+                  <View key={String(inv._id)} style={styles.planStatusCard}>
+                    <View style={styles.planStatusTop}>
+                      <View style={styles.planStatusInfo}>
+                        <Text style={styles.planStatusName}>💼 Pocket Money</Text>
+                        <Text style={styles.planStatusSub}>
+                          {freqLabel} · {completedPayouts}/{totalPayouts} payouts released
+                        </Text>
+                      </View>
+                      <View style={[styles.statusBadge, isCompleted ? styles.statusBadgeMatured : styles.statusBadgeLocked]}>
+                        <MaterialCommunityIcons
+                          name={isCompleted ? 'check-circle' : 'piggy-bank'}
+                          size={14}
+                          color={isCompleted ? '#065F46' : '#B45309'}
+                        />
+                        <Text style={[styles.statusBadgeText, { color: isCompleted ? '#065F46' : '#B45309' }]}>
+                          {isCompleted ? 'COMPLETED' : 'ACTIVE'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.planStatusDivider} />
+
+                    {/* Progress bar */}
+                    <View style={{ marginBottom: 10 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <Text style={{ fontSize: 11, color: themeColors.textSecondary }}>Progress</Text>
+                        <Text style={{ fontSize: 11, color: themeColors.textSecondary }}>{completedPayouts}/{totalPayouts} payouts</Text>
+                      </View>
+                      <View style={{ height: 6, backgroundColor: themeColors.surface2, borderRadius: 3 }}>
+                        <View style={{ height: 6, width: `${progressPct}%`, backgroundColor: '#1A5C39', borderRadius: 3 }} />
+                      </View>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <View>
+                        <Text style={{ fontSize: 11, color: themeColors.textSecondary }}>Invested</Text>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: themeColors.text }}>{formatCurrency(inv.investedAmount)}</Text>
+                      </View>
+                      <View style={{ alignItems: 'center' }}>
+                        <Text style={{ fontSize: 11, color: themeColors.textSecondary }}>Released</Text>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#1A5C39' }}>{formatCurrency(inv.totalPaidOut)}</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{ fontSize: 11, color: themeColors.textSecondary }}>Remaining</Text>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: themeColors.text }}>{formatCurrency(inv.remainingAmount)}</Text>
+                      </View>
+                    </View>
+
+                    {!isCompleted && (
+                      <View style={{ backgroundColor: themeColors.surface2, padding: 10, borderRadius: 10, alignItems: 'center' }}>
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: themeColors.textSecondary }}>
+                          🗓 Next payout eligible: {nextDate}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: themeColors.textTertiary, marginTop: 4, textAlign: 'center' }}>
+                          Go to Pocket Money screen to request your next payout
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              }
+
               if (inv.isChit) {
                 const isWinner = inv.hasWon;
                 const winningAmt = inv.winningAmount || 0;

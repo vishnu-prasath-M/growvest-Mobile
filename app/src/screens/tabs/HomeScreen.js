@@ -314,7 +314,7 @@ const HomeScreen = ({ navigation }) => {
                 <View style={styles.statsRow}>
                   {[
                     { icon: 'shield-lock-outline', label: 'INVESTED', value: formatCurrency(balances?.totalInvested) },
-                    { icon: 'trending-up', label: 'EARNED', value: balances?.dailyInterest ? `${formatCurrency(balances.dailyInterest)}/day` : formatCurrency(balances?.totalInterestEarned || balances?.totalEarned) },
+                    { icon: 'trending-up', label: 'EARNED', value: balances?.dailyInterest ? `${formatCurrency(balances.dailyInterest)}/day` : formatCurrency(0) },
                     { icon: 'wallet-outline', label: 'AVAILABLE', value: formatCurrency(balances?.availableToWithdraw) },
                   ].map((s) => (
                     <View key={s.label} style={styles.statPill}>
@@ -365,7 +365,9 @@ const HomeScreen = ({ navigation }) => {
               >
                 <Text style={styles.summaryCardLabelLight}>Available</Text>
                 <Text style={styles.summaryCardValueLight}>{formatCurrency(balances?.availableToWithdraw)}</Text>
-                <Text style={styles.summaryCardTrendGold}>Ready to withdraw</Text>
+                <Text style={styles.summaryCardTrendGold}>
+                  {(balances?.availableToWithdraw || 0) > 0 ? 'Ready to withdraw' : '🔒 Investments locked'}
+                </Text>
               </LinearGradient>
               <View style={[styles.summaryCard, styles.summaryCardSurface]}>
                 <Text style={styles.summaryCardLabel}>Total Earned</Text>
