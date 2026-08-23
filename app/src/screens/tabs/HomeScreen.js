@@ -66,48 +66,10 @@ const HomeScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [userName, setUserName] = useState('');
-  const [investModalVisible, setInvestModalVisible] = useState(false);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [kycModalVisible, setKycModalVisible] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
-
-  // Custom Modal Animations
-  const [modalVisible, setModalVisible] = useState(false);
-  const modalAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (investModalVisible) {
-      setModalVisible(true);
-      Animated.spring(modalAnim, {
-        toValue: 1,
-        friction: 8,
-        tension: 40,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [investModalVisible]);
-
-  const closeModal = () => {
-    Animated.timing(modalAnim, {
-      toValue: 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start(() => {
-      setModalVisible(false);
-      setInvestModalVisible(false);
-    });
-  };
-
-  const overlayOpacity = modalAnim;
-  const contentTranslateY = modalAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [150, 0],
-  });
-  const contentScale = modalAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.92, 1],
-  });
 
   const fetchUserAndDashboard = async () => {
     try {
@@ -234,13 +196,32 @@ const HomeScreen = ({ navigation }) => {
         if (!isSubmitted) {
           setKycModalVisible(true);
         } else {
-          setInvestModalVisible(true);
+          navigation.navigate('InvestmentAmount');
         }
       },
     },
-    { label: 'My Investments', image: require('../../../assets/earning.png'), onPress: () => navigation.navigate('Investments') },
-    { label: 'Withdraw', image: require('../../../assets/withdrawal.png'), onPress: () => navigation.navigate('Withdraw') },
-    { label: 'History', image: require('../../../assets/history.png'), onPress: () => navigation.navigate('Transactions') },
+    {
+      label: 'My Investments',
+      image: require('../../../assets/earning.png'),
+      onPress: () => navigation.navigate('Investments'),
+    },
+    {
+      label: 'Chit Fund',
+      image: require('../../../assets/my-chits.png'),
+      onPress: () => navigation.navigate('ChitFundHome'),
+    },
+    {
+      label: 'Pocket Money',
+      image: require('../../../assets/pocket.png'),
+      onPress: async () => {
+        const isSubmitted = await kycService.isKYCSubmittedForInvestment();
+        if (!isSubmitted) {
+          setKycModalVisible(true);
+        } else {
+          navigation.navigate('PocketMoney');
+        }
+      },
+    },
   ];
 
   return (
@@ -442,78 +423,6 @@ const HomeScreen = ({ navigation }) => {
           <View style={{ height: 110 }} />
         </Animated.View>
       </ScrollView>
-
-      {/* ── Invest Now Modal ── */}
-      <Modal
-        visible={modalVisible}
-        transparent
-        animationType="none"
-        onRequestClose={closeModal}
-      >
-        <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            activeOpacity={1}
-            onPress={closeModal}
-          />
-          <Animated.View
-            style={[
-              styles.modalContent,
-              {
-                transform: [
-                  { translateY: contentTranslateY },
-                  { scale: contentScale }
-                ]
-              }
-            ]}
-          >
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Invest Now</Text>
-              <TouchableOpacity onPress={closeModal} style={styles.modalCloseBtn}>
-                <MaterialCommunityIcons name="close" size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            {[
-              { image: require('../../../assets/add.png'), label: 'New Investment', sub: 'Start a new deposit', screen: 'InvestmentAmount' },
-              { image: require('../../../assets/earning.png'), label: 'My Investments', sub: 'View your deposits', screen: 'Investments' },
-              { image: require('../../../assets/my-chits.png'), label: 'Chit Fund', sub: 'Join a savings community', screen: 'ChitFundHome' },
-              { image: require('../../../assets/pocket.png'), label: 'Pocket Money', sub: 'Setup regular release payouts', screen: 'PocketMoney' },
-            ].map((opt) => (
-              <TouchableOpacity
-                key={opt.label}
-                style={styles.modalOption}
-                activeOpacity={0.85}
-                onPress={async () => {
-                  closeModal();
-                  const isInvestmentFlow = ['InvestmentAmount', 'PocketMoney', 'PocketMoneyAmount'].includes(opt.screen);
-                  if (isInvestmentFlow) {
-                    const isSubmitted = await kycService.isKYCSubmittedForInvestment();
-                    if (!isSubmitted) {
-                      setTimeout(() => {
-                        setKycModalVisible(true);
-                      }, 250);
-                      return;
-                    }
-                  }
-                  setTimeout(() => {
-                    navigation.navigate(opt.screen);
-                  }, 220);
-                }}
-              >
-                <View style={styles.modalOptionImageWrap}>
-                  <Image source={opt.image} style={styles.modalOptionImage} resizeMode="contain" />
-                </View>
-                <View style={styles.modalOptionText}>
-                  <Text style={styles.modalOptionTitle}>{opt.label}</Text>
-                  <Text style={styles.modalOptionSub}>{opt.sub}</Text>
-                </View>
-                <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textMuted} />
-              </TouchableOpacity>
-            ))}
-          </Animated.View>
-        </Animated.View>
-      </Modal>
 
       {/* ── KYC Required Modal ── */}
       <KycRequiredModal

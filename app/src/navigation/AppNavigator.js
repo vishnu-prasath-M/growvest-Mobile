@@ -38,6 +38,8 @@ import PocketMoneyAmountScreen from '../screens/investment/PocketMoneyAmountScre
 
 // Investment List Screen
 import InvestmentsScreen from '../screens/tabs/InvestmentsScreen';
+import WalletScreen from '../screens/wallet/WalletScreen';
+import ReferralScreen from '../screens/referral/ReferralScreen';
 
 // Additional Screens
 import AboutUsScreen from '../screens/tabs/AboutUsScreen';
@@ -79,14 +81,14 @@ const TABS = [
     inactiveIcon: 'home-outline',
   },
   {
-    name: 'ChitFund',
-    label: 'Chit Fund',
-    activeIcon: 'layers',
-    inactiveIcon: 'layers-outline',
+    name: 'History',
+    label: 'History',
+    activeIcon: 'time',
+    inactiveIcon: 'time-outline',
   },
   {
     name: 'Withdraw',
-    label: 'Withdraw',
+    label: 'Withdrawal',
     activeIcon: 'arrow-up-circle',
     inactiveIcon: 'arrow-up-circle-outline',
   },
@@ -328,11 +330,11 @@ const TabNavigator = () => {
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen
-        name="ChitFund"
-        component={ChitFundScreen}
-        options={{ tabBarLabel: 'Chit Fund' }}
+        name="History"
+        component={TransactionsScreen}
+        options={{ tabBarLabel: 'History' }}
       />
-      <Tab.Screen name="Withdraw" component={WithdrawScreen} />
+      <Tab.Screen name="Withdraw" component={WithdrawScreen} options={{ tabBarLabel: 'Withdrawal' }} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
@@ -464,6 +466,8 @@ const AppNavigator = () => {
           <Stack.Screen name="PocketMoney" component={PocketMoneyScreen} options={{ headerShown: false }} />
           <Stack.Screen name="PocketMoneyAmount" component={PocketMoneyAmountScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Investments" component={InvestmentsScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Wallet" component={WalletScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Referral" component={ReferralScreen} options={{ headerShown: false }} />
           <Stack.Screen name="AboutUs" component={AboutUsScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Terms" component={TermsScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Privacy" component={PrivacyScreen} options={{ headerShown: false }} />

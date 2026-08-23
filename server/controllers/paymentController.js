@@ -5,6 +5,7 @@ const ChitMember = require('../models/ChitMember');
 const ChitPayment = require('../models/ChitPayment');
 const Transaction = require('../models/Transaction');
 const User = require('../models/User');
+const { triggerReferralRewardOnInvestment } = require('../utils/referralHelper');
 const { sendNotification } = require('../services/notificationHelper');
 const PocketMoney = require('../models/PocketMoney');
 const PocketMoneyPayout = require('../models/PocketMoneyPayout');
@@ -123,18 +124,22 @@ exports.verifyPayment = async (req, res) => {
 
     if (paymentType === 'investment') {
       const result = await completeInvestment(user, payloadData, razorpay_order_id, razorpay_payment_id, razorpay_signature);
+      await triggerReferralRewardOnInvestment(user._id, result?._id);
       console.log('[CHIT_PAYMENT] completed investment payout activation');
       return res.status(200).json({ success: true, message: 'Investment payment verified & approved automatically.', data: result });
     } else if (paymentType === 'chit_join') {
       const result = await completeChitJoin(user, payloadData, razorpay_order_id, razorpay_payment_id, razorpay_signature);
+      await triggerReferralRewardOnInvestment(user._id, result?._id);
       console.log('[CHIT_PAYMENT] completed chit join membership activation');
       return res.status(200).json({ success: true, message: 'Chit join payment verified & membership activated.', data: result });
     } else if (paymentType === 'chit_payment') {
       const result = await completeMonthlyDue(user, payloadData, razorpay_order_id, razorpay_payment_id, razorpay_signature);
+      await triggerReferralRewardOnInvestment(user._id, result?._id);
       console.log('[CHIT_PAYMENT] completed chit monthly/weekly due payment');
       return res.status(200).json({ success: true, message: 'Chit due payment verified & recorded successfully.', data: result });
     } else if (paymentType === 'pocket_money') {
       const result = await completePocketMoney(user, payloadData, razorpay_order_id, razorpay_payment_id, razorpay_signature);
+      await triggerReferralRewardOnInvestment(user._id, result?._id);
       console.log('[CHIT_PAYMENT] completed pocket money activation');
       return res.status(200).json({ success: true, message: 'Pocket Money payment verified & activated.', data: result });
     } else {

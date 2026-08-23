@@ -276,6 +276,11 @@ app.get('/reset-password', (req, res) => {
   res.sendFile(require('path').join(__dirname, 'public', 'reset-password.html'));
 });
 
+// Web referral landing page route
+app.get('/ref/:code', (req, res) => {
+  res.sendFile(require('path').join(__dirname, 'public', 'ref-landing.html'));
+});
+
 const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://vishnuprasath:8925699005@grow-clust.bynj9dx.mongodb.net/growvest?appName=Grow-Clust';
 
 // Fix for Node.js DNS SRV lookup issues on Windows
@@ -331,6 +336,7 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 
 const paymentRoutes = require('./routes/paymentRoutes');
 const pocketMoneyRoutes = require('./routes/pocketMoneyRoutes');
+const referralRoutes = require('./routes/referralRoutes');
 
 app.use('/api/investments', investmentRoutes);
 app.use('/api/auth', authRoutes);
@@ -345,6 +351,8 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/kyc', kycRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/pocket-money', pocketMoneyRoutes);
+app.use('/api/referral', referralRoutes);
+app.use('/api/wallet', referralRoutes);
 
 
 const PORT = process.env.PORT || 5000;

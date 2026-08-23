@@ -29,6 +29,7 @@ const SignupScreen = ({ navigation }) => {
   const [mobileNumber, setMobileNumber] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
@@ -67,6 +68,7 @@ const SignupScreen = ({ navigation }) => {
         mobileNumber,
         email: email.trim(),
         password,
+        referralCode: referralCode.trim(),
       });
       await login(res.token, res);
     } catch (error) {
@@ -189,6 +191,22 @@ const SignupScreen = ({ navigation }) => {
                   }
                 />
                 {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Referral Code (Optional)</Text>
+                <TextInput
+                  value={referralCode}
+                  onChangeText={setReferralCode}
+                  mode="flat"
+                  style={styles.input}
+                  underlineColor="transparent"
+                  activeUnderlineColor="transparent"
+                  placeholder="Enter referral code if any"
+                  placeholderTextColor={colors.textTertiary}
+                  autoCapitalize="characters"
+                  left={<TextInput.Icon icon="gift-outline" color={colors.textMuted} />}
+                />
               </View>
 
               <TouchableOpacity
