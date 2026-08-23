@@ -11,7 +11,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { investmentService } from '../../services/investmentService';
+import { chitFundService } from '../../services/chitFundService';
 import { authService } from '../../services/authService';
+import api from '../../services/apiService';
 import { colors } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import TopBar from '../../components/TopBar';
@@ -19,91 +21,136 @@ import StatusChip from '../../components/StatusChip';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
 import { useTheme } from '../../context/ThemeContext';
 
+// All investment types shown on this screen
 const FILTERS = ['All', 'Active', 'Pending'];
 
 const InvestmentsScreen = ({ navigation }) => {
   const { colors: themeColors } = useTheme();
   const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const insets = useScreenInsets(8);
-  const [investments, setInvestments] = useState([]);
+  // Combined list of all investment types
+  const [allItems, setAllItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState('All');
 
-  const fetchInvestments = async () => {
+  const fetchAllInvestments = async () => {
     try {
-      const user = await authService.getUserData();
-      const allInvestments = await investmentService.getInvestments();
-      const userInvestments = allInvestments.filter(inv =>
-        (inv.userId && user?._id && String(inv.userId) === String(user._id)) ||
-        (inv.userEmail && user?.email && inv.userEmail.toLowerCase() === user.email.toLowerCase()) ||
-        (inv.mobileNumber && user?.mobileNumber && inv.mobileNumber === user.mobileNumber)
-      );
-      setInvestments(userInvestments);
+      // Fetch ALL investment types in parallel — all come from backend/DB
+      const [savingsRes, myChitsRes, pocketMoneyRes] = await Promise.allSettled([
+        investmentService.getInvestments(),
+        chitFundService.getMyChits(),
+        api.get('/pocket-money/my'),
+      ]);
+
+      const savingsItems = (savingsRes.status === 'fulfilled' ? (savingsRes.value || []) : [])
+        .map(inv => ({
+          ...inv,
+          _itemType: 'savings',
+          displayName: getPlanDisplayName(inv.type),
+        }));
+
+      const chitItems = (myChitsRes.status === 'fulfilled' ? (myChitsRes.value || []) : [])
+        .filter(c => c.status === 'active' || c.status === 'approved' || c.status === 'pending')
+        .map(c => ({
+          _id: c._id,
+          _itemType: 'chit',
+          displayName: c.chitName || 'Chit Fund Plan',
+          amount: c.totalPaid || (Number(c.paidWeeks || 0) * Number(c.weeklyAmount || 0)),
+          weeklyAmount: c.weeklyAmount || 0,
+          currentWeek: c.currentWeek || 1,
+          totalWeeks: c.totalWeeks || 10,
+          paidWeeks: c.paidWeeks || 1,
+          status: c.status === 'active' ? 'approved' : c.status,
+          joinedAt: c.joinedAt,
+          hasWon: c.hasWon || false,
+          winningAmount: c.winningAmount || 0,
+          // No maturityDate for chits — use totalWeeks × 7 days from joinedAt
+        }));
+
+      const pocketItems = ((pocketMoneyRes.status === 'fulfilled' ? pocketMoneyRes.value?.data : null) || [])
+        .map(pm => ({
+          _id: pm._id,
+          _itemType: 'pocket_money',
+          displayName: 'Pocket Money',
+          amount: pm.investedAmount || 0,
+          investedAmount: pm.investedAmount || 0,
+          remainingAmount: pm.remainingAmount || 0,
+          totalPaidOut: pm.totalPaidOut || 0,
+          payoutAmount: pm.payoutAmount || 0,
+          payoutCount: pm.payoutCount || 0,
+          frequency: pm.frequency,
+          nextPayoutDate: pm.nextPayoutDate,
+          status: pm.status === 'active' ? 'approved' : pm.status,
+          startDate: pm.startDate,
+        }));
+
+      setAllItems([...savingsItems, ...chitItems, ...pocketItems]);
     } catch (error) {
-      console.error('Error fetching investments:', error);
+      console.error('Error fetching all investments:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  useFocusEffect(useCallback(() => { fetchInvestments(); }, []));
+  useFocusEffect(useCallback(() => { fetchAllInvestments(); }, []));
 
-  // Polling for auto-updating UI
   React.useEffect(() => {
-    const interval = setInterval(() => {
-      fetchInvestments();
-    }, 10000);
+    const interval = setInterval(fetchAllInvestments, 15000);
     return () => clearInterval(interval);
   }, []);
 
-  const onRefresh = () => { setRefreshing(true); fetchInvestments(); };
+  const onRefresh = () => { setRefreshing(true); fetchAllInvestments(); };
 
   const formatCurrency = (amount) =>
-    `₹${amount?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`;
+    `₹${(Number(amount) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const formatDate = (dateString) => {
-    if (!dateString) return '';
+    if (!dateString) return '—';
     const date = new Date(dateString);
     return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
-  const getPlanDisplayName = (type) => {
-    if (type === 'saving') return 'Saving Deposit';
-    if (type === 'fixed') return 'Fixed Deposit';
-    if (type === '15_days') return '15 Days Plan';
-    if (type === '1_month') return '1 Month Plan';
-    if (type === '3_months') return '3 Months Plan';
-    if (type === '6_months') return '6 Months Plan';
-    if (type === '1_year') return '1 Year Plan';
-    return 'Investment';
-  };
-
-  const getStatusLabel = (inv) => {
-    if (inv.status === 'pending') return 'Pending';
-    if (inv.status === 'rejected') return 'Failed';
-    if (inv.status === 'withdrawn') return 'Withdrawn';
-    if (inv.status === 'approved') {
-      const isDurationPlan = ['15_days', '1_month', '3_months', '6_months', '1_year'].includes(inv.type);
-      if (isDurationPlan) {
-        return new Date() >= new Date(inv.maturityDate) ? 'Matured' : 'Locked';
+  const getStatusLabel = (item) => {
+    if (item._itemType === 'chit') {
+      return item.hasWon ? 'Won' : 'Active';
+    }
+    if (item._itemType === 'pocket_money') {
+      if (item.status === 'completed') return 'Completed';
+      return 'Active';
+    }
+    // Savings/Fixed
+    if (item.status === 'pending') return 'Pending';
+    if (item.status === 'rejected') return 'Failed';
+    if (item.status === 'withdrawn') return 'Withdrawn';
+    if (item.status === 'approved') {
+      const isDuration = ['15_days', '1_month', '3_months', '6_months', '1_year'].includes(item.type);
+      if (isDuration) {
+        return item.maturityDate && new Date() >= new Date(item.maturityDate) ? 'Matured' : 'Locked';
       }
       return 'Active';
     }
     return 'Pending';
   };
 
-  const filteredInvestments = investments.filter((inv) => {
+  const filteredItems = allItems.filter((item) => {
     if (activeFilter === 'All') return true;
-    if (activeFilter === 'Active') return inv.status === 'approved';
-    if (activeFilter === 'Pending') return inv.status === 'pending';
+    if (activeFilter === 'Active') return item.status === 'approved' || item.status === 'active';
+    if (activeFilter === 'Pending') return item.status === 'pending';
     return true;
   });
 
-  const totalInvested = investments.reduce((s, i) => s + (i.amount || 0), 0);
-  const totalEarned = investments.reduce((s, i) => s + (i.interestEarned || 0), 0);
-  const activePlans = investments.filter((i) => i.status === 'approved').length;
+  // Summary totals
+  const totalInvested = allItems.reduce((s, i) => {
+    if (i._itemType === 'savings') return s + (i.status !== 'rejected' ? (i.amount || 0) : 0);
+    if (i._itemType === 'chit') return s + (i.amount || 0);
+    if (i._itemType === 'pocket_money') return s + (i.investedAmount || 0);
+    return s;
+  }, 0);
+
+  const totalEarned = allItems.reduce((s, i) => s + (i.interestEarned || 0), 0);
+  const activePlans = allItems.filter((i) => i.status === 'approved' || i.status === 'active').length;
 
   if (loading) {
     return (
@@ -140,7 +187,7 @@ const InvestmentsScreen = ({ navigation }) => {
             style={styles.bannerCard}
           >
             <View style={styles.bannerBlob} />
-            <Text style={styles.bannerLabel}>Total Invested</Text>
+            <Text style={styles.bannerLabel}>Total Invested (All Types)</Text>
             <Text style={styles.bannerAmount}>{formatCurrency(totalInvested)}</Text>
             <View style={styles.bannerRow}>
               <View style={styles.bannerStat}>
@@ -160,11 +207,7 @@ const InvestmentsScreen = ({ navigation }) => {
           style={styles.filterScroll}
         >
           {FILTERS.map((f) => (
-            <TouchableOpacity
-              key={f}
-              onPress={() => setActiveFilter(f)}
-              activeOpacity={0.8}
-            >
+            <TouchableOpacity key={f} onPress={() => setActiveFilter(f)} activeOpacity={0.8}>
               {activeFilter === f ? (
                 <LinearGradient
                   colors={['#0E3D23', '#1A5C39']}
@@ -185,12 +228,97 @@ const InvestmentsScreen = ({ navigation }) => {
 
         {/* Investment Cards */}
         <View style={styles.cardsList}>
-          {filteredInvestments.length > 0 ? (
-            filteredInvestments.map((inv) => {
-              const isSaving = inv.type === 'saving';
-              const statusLabel = getStatusLabel(inv);
+          {filteredItems.length > 0 ? (
+            filteredItems.map((item) => {
+              const statusLabel = getStatusLabel(item);
+
+              // ── CHIT FUND CARD ────────────────────────────────────────────
+              if (item._itemType === 'chit') {
+                return (
+                  <View key={String(item._id)} style={styles.investCard}>
+                    <View style={styles.investCardTop}>
+                      <View style={[styles.investIcon, { backgroundColor: '#E8F5E9' }]}>
+                        <MaterialCommunityIcons name="handshake-outline" size={22} color="#1A5C39" />
+                      </View>
+                      <View style={styles.investCardInfo}>
+                        <View style={styles.investNameRow}>
+                          <Text style={styles.investName} numberOfLines={1}>{item.displayName}</Text>
+                          <StatusChip status={statusLabel} />
+                        </View>
+                        <Text style={styles.investRate}>
+                          Week {item.paidWeeks}/{item.totalWeeks} • ₹{item.weeklyAmount}/wk
+                        </Text>
+                      </View>
+                      <Text style={styles.investAmount}>{formatCurrency(item.amount)}</Text>
+                    </View>
+                    <View style={styles.investDateRow}>
+                      <View style={styles.investDateItem}>
+                        <MaterialCommunityIcons name="calendar-start" size={13} color={colors.textMuted} />
+                        <Text style={styles.investDateText}>Joined: {formatDate(item.joinedAt)}</Text>
+                      </View>
+                    </View>
+                    {item.hasWon && (
+                      <View style={[styles.investEarningsRow, { backgroundColor: '#E8F5E9' }]}>
+                        <Text style={[styles.investEarningsLabel, { color: '#1A5C39' }]}>🏆 Auction Won</Text>
+                        <Text style={[styles.investEarningsValue, { color: '#1A5C39' }]}>+{formatCurrency(item.winningAmount)}</Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              }
+
+              // ── POCKET MONEY CARD ────────────────────────────────────────
+              if (item._itemType === 'pocket_money') {
+                const freqLabel = item.frequency === 'daily' ? 'Daily'
+                  : item.frequency === 'every_2_days' ? 'Every 2 Days' : 'Weekly';
+                const progressPct = Math.min(100, ((item.payoutCount || 0) / 10) * 100);
+                return (
+                  <View key={String(item._id)} style={styles.investCard}>
+                    <View style={styles.investCardTop}>
+                      <View style={[styles.investIcon, { backgroundColor: '#FFF8E1' }]}>
+                        <MaterialCommunityIcons name="piggy-bank-outline" size={22} color="#B45309" />
+                      </View>
+                      <View style={styles.investCardInfo}>
+                        <View style={styles.investNameRow}>
+                          <Text style={styles.investName} numberOfLines={1}>{item.displayName}</Text>
+                          <StatusChip status={statusLabel} />
+                        </View>
+                        <Text style={styles.investRate}>
+                          {freqLabel} • {item.payoutCount || 0}/10 payouts released
+                        </Text>
+                      </View>
+                      <Text style={styles.investAmount}>{formatCurrency(item.investedAmount)}</Text>
+                    </View>
+
+                    {/* Progress bar */}
+                    <View style={{ marginTop: 10 }}>
+                      <View style={{ height: 5, backgroundColor: themeColors.surface2, borderRadius: 3 }}>
+                        <View style={{ height: 5, width: `${progressPct}%`, backgroundColor: '#1A5C39', borderRadius: 3 }} />
+                      </View>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+                        <Text style={{ fontSize: 11, color: themeColors.textSecondary }}>
+                          Released: {formatCurrency(item.totalPaidOut)}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: themeColors.textSecondary }}>
+                          Remaining: {formatCurrency(item.remainingAmount)}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.investDateRow}>
+                      <View style={styles.investDateItem}>
+                        <MaterialCommunityIcons name="calendar-start" size={13} color={colors.textMuted} />
+                        <Text style={styles.investDateText}>Started: {formatDate(item.startDate)}</Text>
+                      </View>
+                    </View>
+                  </View>
+                );
+              }
+
+              // ── SAVINGS / FIXED / DURATION PLAN CARD ─────────────────────
+              const isSaving = item.type === 'saving';
               return (
-                <View key={inv._id} style={styles.investCard}>
+                <View key={item._id} style={styles.investCard}>
                   <View style={styles.investCardTop}>
                     <View style={[styles.investIcon, isSaving ? styles.investIconSaving : styles.investIconFixed]}>
                       <MaterialCommunityIcons
@@ -202,39 +330,39 @@ const InvestmentsScreen = ({ navigation }) => {
                     <View style={styles.investCardInfo}>
                       <View style={styles.investNameRow}>
                         <Text style={styles.investName} numberOfLines={1}>
-                          {getPlanDisplayName(inv.type)}
+                          {item.displayName}
                         </Text>
                         <StatusChip status={statusLabel} />
                       </View>
                       <Text style={styles.investRate}>
-                        {inv.interestRate}%{['saving', 'fixed'].includes(inv.type) ? ' p.a.' : ''}{inv.ref ? ` • Ref: ${inv.ref}` : ''}
+                        {item.interestRate}%{['saving', 'fixed'].includes(item.type) ? ' p.a.' : ''}{item.ref ? ` • Ref: ${item.ref}` : ''}
                       </Text>
                     </View>
-                    <Text style={styles.investAmount}>{formatCurrency(inv.amount)}</Text>
+                    <Text style={styles.investAmount}>{formatCurrency(item.amount)}</Text>
                   </View>
 
                   {/* Date row */}
                   <View style={styles.investDateRow}>
                     <View style={styles.investDateItem}>
                       <MaterialCommunityIcons name="calendar-start" size={13} color={colors.textMuted} />
-                      <Text style={styles.investDateText}>{formatDate(inv.startDate)}</Text>
+                      <Text style={styles.investDateText}>{formatDate(item.startDate)}</Text>
                     </View>
-                    {inv.maturityDate && (
+                    {item.maturityDate && (
                       <>
                         <Text style={styles.investDateArrow}>→</Text>
                         <View style={styles.investDateItem}>
                           <MaterialCommunityIcons name="calendar-end" size={13} color={colors.textMuted} />
-                          <Text style={styles.investDateText}>{formatDate(inv.maturityDate)}</Text>
+                          <Text style={styles.investDateText}>{formatDate(item.maturityDate)}</Text>
                         </View>
                       </>
                     )}
                   </View>
 
                   {/* Earnings */}
-                  {(inv.interestEarned || 0) > 0 && (
+                  {(item.interestEarned || 0) > 0 && (
                     <View style={styles.investEarningsRow}>
                       <Text style={styles.investEarningsLabel}>Interest earned</Text>
-                      <Text style={styles.investEarningsValue}>+{formatCurrency(inv.interestEarned)}</Text>
+                      <Text style={styles.investEarningsValue}>+{formatCurrency(item.interestEarned)}</Text>
                     </View>
                   )}
                 </View>
@@ -247,7 +375,7 @@ const InvestmentsScreen = ({ navigation }) => {
               </View>
               <Text style={styles.emptyTitle}>No Investments Found</Text>
               <Text style={styles.emptyBody}>
-                {activeFilter !== 'All' ? `No ${activeFilter.toLowerCase()} deposits` : 'Start investing to see your deposits here'}
+                {activeFilter !== 'All' ? `No ${activeFilter.toLowerCase()} investments` : 'Start investing to see your plans here'}
               </Text>
             </View>
           )}
@@ -259,12 +387,21 @@ const InvestmentsScreen = ({ navigation }) => {
   );
 };
 
+function getPlanDisplayName(type) {
+  if (type === 'saving') return 'Saving Deposit';
+  if (type === 'fixed') return 'Fixed Deposit';
+  if (type === '15_days') return '15 Days Plan';
+  if (type === '1_month') return '1 Month Plan';
+  if (type === '3_months') return '3 Months Plan';
+  if (type === '6_months') return '6 Months Plan';
+  if (type === '1_year') return '1 Year Plan';
+  return 'Investment';
+}
+
 const getStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 20 },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { fontSize: 14, color: colors.textMuted, marginTop: 12 },
 
   // Banner
   bannerOuter: { margin: 16 },
