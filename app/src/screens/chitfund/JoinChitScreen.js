@@ -15,6 +15,8 @@ import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { useTheme } from '../../context/ThemeContext';
 import { chitFundService } from '../../services/chitFundService';
 import { authService } from '../../services/authService';
+import KycRequiredModal from '../../components/KycRequiredModal';
+import { kycService } from '../../services/kycService';
 
 const JoinChitScreen = ({ navigation, route }) => {
   const { colors: themeColors } = useTheme();
@@ -28,6 +30,7 @@ const JoinChitScreen = ({ navigation, route }) => {
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [userData, setUserData] = useState(null);
+  const [kycModalVisible, setKycModalVisible] = useState(false);
 
   React.useEffect(() => {
     fetchChitDetails();
@@ -57,6 +60,15 @@ const JoinChitScreen = ({ navigation, route }) => {
 
   const handleJoin = async () => {
     if (!agreed) return;
+
+    // KYC Check
+    const isSubmitted = await kycService.isKYCSubmittedForInvestment();
+    if (!isSubmitted) {
+      setShowConfirm(false);
+      setKycModalVisible(true);
+      return;
+    }
+
     setProcessing(true);
     try {
       const res = await chitFundService.joinChit({ chitId });
@@ -291,6 +303,12 @@ const JoinChitScreen = ({ navigation, route }) => {
           </View>
         </View>
       </Modal>
+      {/* KYC Required Modal */}
+      <KycRequiredModal
+        visible={kycModalVisible}
+        onClose={() => setKycModalVisible(false)}
+        onNavigateToKYC={() => navigation.navigate('KYC')}
+      />
     </View>
   );
 };

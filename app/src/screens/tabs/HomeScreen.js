@@ -27,6 +27,8 @@ import { useTheme } from '../../context/ThemeContext';
 import api from '../../services/apiService';
 import { API_ENDPOINTS } from '../../config/api';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
+import KycRequiredModal from '../../components/KycRequiredModal';
+import { kycService } from '../../services/kycService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -66,6 +68,7 @@ const HomeScreen = ({ navigation }) => {
   const [userName, setUserName] = useState('');
   const [investModalVisible, setInvestModalVisible] = useState(false);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const [kycModalVisible, setKycModalVisible] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -223,7 +226,18 @@ const HomeScreen = ({ navigation }) => {
   const availableIcon = isAvailable ? 'wallet-outline' : 'lock-outline';
 
   const quickActions = [
-    { label: 'New Investment', image: require('../../../assets/add.png'), onPress: () => setInvestModalVisible(true) },
+    {
+      label: 'New Investment',
+      image: require('../../../assets/add.png'),
+      onPress: async () => {
+        const isSubmitted = await kycService.isKYCSubmittedForInvestment();
+        if (!isSubmitted) {
+          setKycModalVisible(true);
+        } else {
+          setInvestModalVisible(true);
+        }
+      },
+    },
     { label: 'My Investments', image: require('../../../assets/earning.png'), onPress: () => navigation.navigate('Investments') },
     { label: 'Withdraw', image: require('../../../assets/withdrawal.png'), onPress: () => navigation.navigate('Withdraw') },
     { label: 'History', image: require('../../../assets/history.png'), onPress: () => navigation.navigate('Transactions') },
@@ -470,8 +484,18 @@ const HomeScreen = ({ navigation }) => {
                 key={opt.label}
                 style={styles.modalOption}
                 activeOpacity={0.85}
-                onPress={() => {
+                onPress={async () => {
                   closeModal();
+                  const isInvestmentFlow = ['InvestmentAmount', 'PocketMoney', 'PocketMoneyAmount'].includes(opt.screen);
+                  if (isInvestmentFlow) {
+                    const isSubmitted = await kycService.isKYCSubmittedForInvestment();
+                    if (!isSubmitted) {
+                      setTimeout(() => {
+                        setKycModalVisible(true);
+                      }, 250);
+                      return;
+                    }
+                  }
                   setTimeout(() => {
                     navigation.navigate(opt.screen);
                   }, 220);
@@ -490,6 +514,13 @@ const HomeScreen = ({ navigation }) => {
           </Animated.View>
         </Animated.View>
       </Modal>
+
+      {/* ── KYC Required Modal ── */}
+      <KycRequiredModal
+        visible={kycModalVisible}
+        onClose={() => setKycModalVisible(false)}
+        onNavigateToKYC={() => navigation.navigate('KYC')}
+      />
     </SafeAreaView>
   );
 };

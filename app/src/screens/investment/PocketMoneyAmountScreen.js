@@ -15,6 +15,8 @@ import { authService } from '../../services/authService';
 import { colors, typography } from '../../theme/theme';
 import TopBar from '../../components/TopBar';
 import { useTheme } from '../../context/ThemeContext';
+import KycRequiredModal from '../../components/KycRequiredModal';
+import { kycService } from '../../services/kycService';
 
 const PocketMoneyAmountScreen = ({ navigation }) => {
   const { colors: themeColors } = useTheme();
@@ -23,6 +25,7 @@ const PocketMoneyAmountScreen = ({ navigation }) => {
   const [frequency, setFrequency] = useState('daily');
   const [userData, setUserData] = useState(null);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const [kycModalVisible, setKycModalVisible] = useState(false);
 
   useEffect(() => {
     loadUserData();
@@ -42,7 +45,7 @@ const PocketMoneyAmountScreen = ({ navigation }) => {
     setAmount(numericValue);
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!amount || parseFloat(amount) <= 0) {
       Alert.alert('Error', 'Please enter a valid amount');
       return;
@@ -50,6 +53,13 @@ const PocketMoneyAmountScreen = ({ navigation }) => {
 
     if (parseFloat(amount) < 1000) {
       Alert.alert('Error', 'Minimum investment amount is ₹1,000');
+      return;
+    }
+
+    // KYC Check
+    const isSubmitted = await kycService.isKYCSubmittedForInvestment();
+    if (!isSubmitted) {
+      setKycModalVisible(true);
       return;
     }
 
@@ -292,6 +302,12 @@ const PocketMoneyAmountScreen = ({ navigation }) => {
           </View>
         </View>
       </Modal>
+      {/* KYC Required Modal */}
+      <KycRequiredModal
+        visible={kycModalVisible}
+        onClose={() => setKycModalVisible(false)}
+        onNavigateToKYC={() => navigation.navigate('KYC')}
+      />
     </View>
   );
 };
