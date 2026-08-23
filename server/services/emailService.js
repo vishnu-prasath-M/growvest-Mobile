@@ -28,7 +28,7 @@ const buildPasswordResetHtml = (resetUrl, expiryMinutes = 15) => `
           <tr>
             <td>
               <div style="background:#ffffff;border-radius:16px 16px 0 0;padding:32px 40px;text-align:center;border-bottom:1px solid #e4e9e4;border-left:1px solid #e4e9e4;border-right:1px solid #e4e9e4;">
-                <img src="cid:growvestlogo" alt="Growvest Logo" style="height:60px;width:auto;display:block;margin:0 auto;" />
+                <img src="https://growvest-mobile.onrender.com/assets/growvest-logo.png" alt="Growvest Logo" style="height:60px;width:auto;display:block;margin:0 auto;border:0;" />
               </div>
             </td>
           </tr>
@@ -125,33 +125,12 @@ const sendPasswordResetEmail = async (toEmail, resetUrl, expiryMin = 15) => {
   // Sender email (Resend default testing sender: 'onboarding@resend.dev' unless custom domain is verified)
   const fromEmail = process.env.FROM_EMAIL || 'onboarding@resend.dev';
 
-  // Read local logo file and prepare inline CID attachment
-  let attachments = [];
-  try {
-    const fs = require('fs');
-    const path = require('path');
-    const logoPath = path.join(__dirname, '../../app/assets/growvest-logo.png');
-    if (fs.existsSync(logoPath)) {
-      const logoBuffer = fs.readFileSync(logoPath);
-      attachments = [
-        {
-          filename: 'growvest-logo.png',
-          content: logoBuffer,
-          cid: 'growvestlogo',
-        }
-      ];
-    }
-  } catch (err) {
-    console.warn('[Resend] Logo attachment failed (non-fatal):', err.message);
-  }
-
   const { data, error } = await resend.emails.send({
     from: `Growvest Security <${fromEmail}>`,
     to: [toEmail],
     subject: '🔐 Reset Your Growvest Password',
     text: `Reset your Growvest password by visiting this link (expires in ${expiryMin} minutes):\n\n${resetUrl}\n\nIf you did not request this, ignore this email.`,
     html: buildPasswordResetHtml(resetUrl, expiryMin),
-    attachments,
   });
 
   if (error) {

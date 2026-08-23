@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>You're Invited to Growvest</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+    body {
+      background-color: #0B1C13;
+      color: #FFFFFF;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .card {
+      background: linear-gradient(145deg, #12281C, #183827);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 28px;
+      max-width: 420px;
+      width: 100%;
+      padding: 32px 24px;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    }
+    .logo {
+      width: 80px;
+      height: 80px;
+      border-radius: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+    }
+    .title {
+      font-size: 26px;
+      font-weight: 800;
+      color: #FFFFFF;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      font-size: 14px;
+      color: #9CA3AF;
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+    .invite-box {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px dashed rgba(255, 255, 255, 0.2);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 24px;
+    }
+    .invite-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #D1FAE5;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+    .code-val {
+      font-size: 28px;
+      font-weight: 900;
+      color: #EAB308;
+      letter-spacing: 2px;
+    }
+    .btn-download {
+      display: block;
+      width: 100%;
+      background: linear-gradient(135deg, #10B981, #059669);
+      color: #FFFFFF;
+      text-decoration: none;
+      font-size: 16px;
+      font-weight: 800;
+      padding: 16px 20px;
+      border-radius: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 6px 16px rgba(16, 185, 129, 0.3);
+      transition: transform 0.2s;
+    }
+    .btn-download:active {
+      transform: scale(0.98);
+    }
+    .btn-open {
+      display: block;
+      width: 100%;
+      background: rgba(255, 255, 255, 0.1);
+      color: #E5E7EB;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 700;
+      padding: 14px 20px;
+      border-radius: 16px;
+      margin-bottom: 20px;
+    }
+    .notice {
+      font-size: 12px;
+      color: #9CA3AF;
+      line-height: 1.4;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 12px;
+      border-radius: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img src="/assets/growvest-logo.png" alt="Growvest Logo" class="logo">
+    <h1 class="title">Growvest</h1>
+    <p class="subtitle">Grow your money. Invest smarter with high-yield savings & chit fund plans.</p>
+
+    <div class="invite-box">
+      <div class="invite-label">🎁 You've Been Invited!</div>
+      <div class="subtitle" style="margin-bottom:8px;">Your Referral Code</div>
+      <div class="code-val" id="refCodeDisplay">ABC123</div>
+    </div>
+
+    <a href="/downloads/growvest-latest.apk" class="btn-download" id="downloadBtn">
+      📱 Download Android App
+    </a>
+
+    <a href="#" class="btn-open" id="openAppBtn">
+      Already have the app? Open Growvest
+    </a>
+
+    <div class="notice">
+      ℹ️ <strong>Android Users:</strong> You may need to allow "Installation from unknown sources" if downloading the APK directly.
+    </div>
+  </div>
+
+  <script>
+    const pathParts = window.location.pathname.split('/');
+    const code = pathParts[pathParts.length - 1] || 'GVREF';
+    document.getElementById('refCodeDisplay').innerText = code;
+
+    const openAppBtn = document.getElementById('openAppBtn');
+    openAppBtn.href = 'growvest://ref/' + code;
+  </script>
+</body>
+</html>

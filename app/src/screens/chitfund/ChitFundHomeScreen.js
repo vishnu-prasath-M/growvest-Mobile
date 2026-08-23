@@ -293,30 +293,8 @@ const ChitFundHomeScreen = ({ navigation }) => {
               </LinearGradient>
             </View>
 
-            {/* Available Banner */}
-            <Pressable
-              style={styles.availableBanner}
-              onPress={() => navigation.navigate('ExploreChits')}
-              onPressIn={() => { bannerScale.value = withSpring(0.97, PRESS_SPRING); }}
-              onPressOut={() => { bannerScale.value = withSpring(1, PRESS_SPRING); }}
-            >
-                <View style={styles.availableBannerLeft}>
-                  <View style={styles.availableIconWrap}>
-                    <Ionicons name="layers-outline" size={24} color={colors.primary} />
-                  </View>
-                  <View style={styles.availableTextWrap}>
-                    <Text style={styles.availableTitle}>
-                      {dashboard.availableChits} New Chits Available
-                    </Text>
-                    <Text style={styles.availableSub}>Explore and join new groups</Text>
-                  </View>
-                </View>
-                <Ionicons name="chevron-forward-outline" size={22} color={colors.textSecondary} />
-            </Pressable>
-
-            {/* Quick Actions + Stats */}
-            <View>
-              {/* Quick Actions Grid */}
+            {/* Quick Actions Section */}
+            <View style={{ marginTop: 16 }}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Quick Actions</Text>
               </View>
@@ -337,14 +315,11 @@ const ChitFundHomeScreen = ({ navigation }) => {
                   onPress={() => navigation.navigate('MonthlyDue')}
                   badge={dashboard.upcomingDue > 0 ? dashboard.pendingDueCount || '!' : null}
                 />
-                <QuickAction
-                  image={require('../../../assets/auction.png')}
-                  label="Auction"
-                  onPress={() => navigation.navigate('Auction')}
-                />
               </View>
+            </View>
 
-              {/* Stats Grid */}
+            {/* Overview Section */}
+            <View style={{ marginTop: 8 }}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Overview</Text>
               </View>
@@ -362,20 +337,6 @@ const ChitFundHomeScreen = ({ navigation }) => {
                   value={formatCurrency(dashboard.upcomingDue)}
                   tint="#fef3c7"
                   iconColor="#d97706"
-                />
-                <StatCard
-                  icon="hammer-outline"
-                  label="Auction Date"
-                  value={dashboard.nextAuctionDate?.slice(5) || 'N/A'}
-                  tint="#ede9fe"
-                  iconColor="#7c3aed"
-                />
-                <StatCard
-                  icon="trophy-outline"
-                  label="Winning Status"
-                  value={dashboard.winningStatus}
-                  tint={colors.successLight}
-                  iconColor={colors.success}
                 />
               </View>
             </View>
@@ -552,7 +513,7 @@ const getStyles = (colors) => StyleSheet.create({
     paddingHorizontal: 12,
     marginBottom: 24,
   },
-  quickAction: { width: '25%', alignItems: 'center', marginBottom: 16 },
+  quickAction: { width: '33.33%', alignItems: 'center', marginBottom: 16 },
   quickActionIconWrap: {
     width: 56,
     height: 56,

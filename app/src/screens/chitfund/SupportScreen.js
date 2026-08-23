@@ -6,8 +6,8 @@ import { colors, typography } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { useTheme } from '../../context/ThemeContext';
 const SUPPORT_DATA = {
-  whatsapp: '+91 98765 43210',
-  phone: '+91 98765 43210',
+  whatsapp: '+91 8300278515',
+  phone: '+91 7418662750',
   email: 'camohanrajbullbear@gmail.com',
   workingHours: 'Mon - Sat, 9:00 AM - 8:00 PM',
 };

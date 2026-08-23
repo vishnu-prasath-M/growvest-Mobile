@@ -36,6 +36,22 @@ exports.registerUser = async (req, res) => {
       return res.status(400).json({ message: 'User with this username, mobile number or email already exists' });
     }
 
+    // Generate unique referral code for new user
+    let userReferralCode = '';
+    let isUnique = false;
+    while (!isUnique) {
+      userReferralCode = 'GV' + Math.random().toString(36).substring(2, 6).toUpperCase();
+      const count = await User.countDocuments({ referralCode: userReferralCode });
+      if (count === 0) isUnique = true;
+    }
+
+    // Check optional referral code passed during registration
+    const inputRefCode = (req.body.referralCode || req.body.ref || '').toString().trim().toUpperCase();
+    let referrer = null;
+    if (inputRefCode) {
+      referrer = await User.findOne({ referralCode: inputRefCode });
+    }
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
@@ -45,15 +61,29 @@ exports.registerUser = async (req, res) => {
       mobileNumber,
       email,
       password: hashedPassword,
+      referralCode: userReferralCode,
+      referredBy: referrer ? referrer._id : null,
     });
 
     if (user) {
+      // Create pending Referral record if valid referrer found
+      if (referrer && referrer._id.toString() !== user._id.toString()) {
+        const Referral = require('../models/Referral');
+        await Referral.create({
+          referrerUserId: referrer._id,
+          referredUserId: user._id,
+          referralCode: inputRefCode,
+          status: 'REGISTERED',
+        }).catch(err => console.error('[Referral Attribution Error]', err.message));
+      }
+
       res.status(201).json({
         _id: user._id,
         username: user.username,
         name: user.name,
         email: user.email,
         mobileNumber: user.mobileNumber,
+        referralCode: user.referralCode,
         createdAt: user.createdAt,
         token: generateToken(user._id),
       });

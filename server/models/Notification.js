@@ -24,6 +24,7 @@ const notificationSchema = new mongoose.Schema({
     'pocket_money_payout',
     'pocket_money_reminder',
     'pocket_money_completed',
+    'referral_reward',
     'general'
   ]},
   icon: { type: String, default: 'bell-outline' },

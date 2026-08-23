@@ -180,6 +180,8 @@ const ProfileScreen = ({ navigation }) => {
     { icon: 'account-edit', label: 'Edit Profile', tint: colors.primaryLight, iconColor: colors.primary, onPress: handleEditUsername },
     { icon: 'email-edit', label: 'Edit Email', tint: '#e0f2fe', iconColor: '#0284c7', onPress: handleEditEmail },
     { icon: kycInfo.icon, label: 'KYC Verification', tint: kycInfo.tint, iconColor: kycInfo.iconColor, badge: kycInfo.badge, onPress: () => navigation.navigate('KYC') },
+    { icon: 'wallet-outline', label: 'Wallet', tint: '#fef3c7', iconColor: '#d97706', onPress: () => navigation.navigate('Wallet') },
+    { icon: 'gift-outline', label: 'Refer & Earn', tint: '#d1fae5', iconColor: '#059669', onPress: () => navigation.navigate('Referral') },
   ];
 
   // Only add Bank Details when KYC bank data exists in MongoDB

@@ -14,6 +14,11 @@ const userSchema = new mongoose.Schema({
     deviceId: { type: String },
     updatedAt: { type: Date, default: Date.now },
   }],
+  // Referral & Coin Wallet fields
+  referralCode: { type: String, unique: true, sparse: true },
+  referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  coinBalance: { type: Number, default: 0 },
+
   // Password reset — token stored as SHA-256 hash, never plain text
   passwordResetToken: { type: String, default: null },
   passwordResetExpires: { type: Date, default: null },
