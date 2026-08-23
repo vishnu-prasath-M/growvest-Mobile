@@ -29,19 +29,54 @@ cron.schedule("0 0 * * *", async () => {
   }
 });
 
-// Daily Pocket Money Payout Cron Job (runs daily at 12:05 AM) - Commented out for manual admin releases
+// Daily Pocket Money Payout Cron (admin-controlled) — kept commented out on purpose.
+// Payouts are released ONLY when admin approves via /api/pocket-money/admin/release/:id
 const { runPocketMoneyPayouts } = require('./controllers/pocketMoneyController');
-/*
-cron.schedule("5 0 * * *", async () => {
-  console.log("Running Daily Pocket Money Payout Cron Job...");
+
+// 🔔 DAILY POCKET MONEY REMINDER — runs every morning at 8:00 AM
+// Sends push notification to all users with a pocket money payout due today.
+// Works even when the app is in background/killed because it's server-side push (Expo API).
+cron.schedule("0 8 * * *", async () => {
+  console.log("[PocketMoneyReminder] Running daily pocket money notification cron...");
   try {
-    const processed = await runPocketMoneyPayouts();
-    console.log(`Pocket Money Payout Cron Job Finished: processed ${processed} payouts.`);
+    const PocketMoney = require('./models/PocketMoney');
+    const { sendNotification } = require('./services/notificationHelper');
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    // Find active plans whose nextPayoutDate is today or overdue
+    const eligiblePlans = await PocketMoney.find({
+      status: 'active',
+      nextPayoutDate: { $lte: new Date() },
+    });
+
+    let notifCount = 0;
+    for (const plan of eligiblePlans) {
+      try {
+        const freqLabel = plan.frequency === 'daily' ? 'daily'
+          : plan.frequency === 'every_2_days' ? 'every 2 days' : 'weekly';
+        const remaining = plan.remainingAmount || 0;
+        const payoutAmt = plan.payoutAmount || 0;
+
+        await sendNotification({
+          userId: plan.userId,
+          title: '💰 Pocket Money Ready to Claim!',
+          description: `Your ${freqLabel} pocket money payout of ₹${payoutAmt} is ready! Open the Pocket Money section and request your payout. Remaining pot: ₹${remaining}.`,
+          type: 'pocket_money_payout',
+          metadata: { pocketMoneyId: plan._id, amount: payoutAmt },
+          pushData: { screen: 'PocketMoney' },
+        });
+        notifCount++;
+      } catch (err) {
+        console.error(`[PocketMoneyReminder] Failed to notify userId ${plan.userId}:`, err.message);
+      }
+    }
+    console.log(`[PocketMoneyReminder] Sent ${notifCount} pocket money reminder notifications.`);
   } catch (error) {
-    console.error("Pocket Money Payout Cron Job Error:", error);
+    console.error("[PocketMoneyReminder] Cron error:", error);
   }
 });
-*/
+
 
 // Due Reminder & Penalty Cron Job (runs daily at 8:00 AM)
 const calcNextWeeklyDueDate = (joinedAt, weekIndex) => {

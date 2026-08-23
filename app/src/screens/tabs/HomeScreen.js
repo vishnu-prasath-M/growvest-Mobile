@@ -212,6 +212,16 @@ const HomeScreen = ({ navigation }) => {
   const initials = getInitials(displayName);
   const tipOfTheDay = getTipOfTheDay();
 
+  // Lock / Availability helpers
+  const isAvailable = (balances?.availableToWithdraw || 0) > 0;
+  const nextUnlockDate = balances?.nextUnlockDate
+    ? new Date(balances.nextUnlockDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+    : null;
+  const availableLabel = isAvailable
+    ? formatCurrency(balances?.availableToWithdraw)
+    : nextUnlockDate ? `Unlocks ${nextUnlockDate}` : '₹0.00';
+  const availableIcon = isAvailable ? 'wallet-outline' : 'lock-outline';
+
   const quickActions = [
     { label: 'New Investment', image: require('../../../assets/add.png'), onPress: () => setInvestModalVisible(true) },
     { label: 'My Investments', image: require('../../../assets/earning.png'), onPress: () => navigation.navigate('Investments') },
@@ -315,12 +325,12 @@ const HomeScreen = ({ navigation }) => {
                   {[
                     { icon: 'shield-lock-outline', label: 'INVESTED', value: formatCurrency(balances?.totalInvested) },
                     { icon: 'trending-up', label: 'EARNED', value: balances?.dailyInterest ? `${formatCurrency(balances.dailyInterest)}/day` : formatCurrency(0) },
-                    { icon: 'wallet-outline', label: 'AVAILABLE', value: formatCurrency(balances?.availableToWithdraw) },
+                    { icon: availableIcon, label: 'AVAILABLE', value: availableLabel },
                   ].map((s) => (
                     <View key={s.label} style={styles.statPill}>
                       <MaterialCommunityIcons name={s.icon} size={16} color={colors.gold} />
                       <Text style={styles.statLabel}>{s.label}</Text>
-                      <Text style={styles.statValue}>{s.value}</Text>
+                      <Text style={[styles.statValue, s.label === 'AVAILABLE' && !isAvailable && { fontSize: 9 }]}>{s.value}</Text>
                     </View>
                   ))}
                 </View>
@@ -364,9 +374,11 @@ const HomeScreen = ({ navigation }) => {
                 style={[styles.summaryCard, styles.summaryCardAccent]}
               >
                 <Text style={styles.summaryCardLabelLight}>Available</Text>
-                <Text style={styles.summaryCardValueLight}>{formatCurrency(balances?.availableToWithdraw)}</Text>
+                <Text style={[styles.summaryCardValueLight, !isAvailable && { fontSize: 14 }]}>
+                  {availableLabel}
+                </Text>
                 <Text style={styles.summaryCardTrendGold}>
-                  {(balances?.availableToWithdraw || 0) > 0 ? 'Ready to withdraw' : '🔒 Investments locked'}
+                  {isAvailable ? '✅ Ready to withdraw' : `🔒 ${nextUnlockDate ? `Unlocks ${nextUnlockDate}` : 'Investments locked'}`}
                 </Text>
               </LinearGradient>
               <View style={[styles.summaryCard, styles.summaryCardSurface]}>
