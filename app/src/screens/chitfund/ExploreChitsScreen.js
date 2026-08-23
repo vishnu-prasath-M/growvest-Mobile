@@ -16,6 +16,8 @@ import { useTheme } from '../../context/ThemeContext';
 import { chitFundService } from '../../services/chitFundService';
 import TopBar from '../../components/TopBar';
 import StatusChip from '../../components/StatusChip';
+import KycRequiredModal from '../../components/KycRequiredModal';
+import { kycService } from '../../services/kycService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -29,6 +31,7 @@ const ExploreChitsScreen = ({ navigation }) => {
   const [chits, setChits] = useState([]);
   const [myChits, setMyChits] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [kycModalVisible, setKycModalVisible] = useState(false);
 
   useEffect(() => {
     fetchChits();
@@ -195,9 +198,14 @@ const ExploreChitsScreen = ({ navigation }) => {
                 <TouchableOpacity
                   style={[styles.joinBtnOuter, (isFull || hasJoined || isClosed) && styles.joinBtnDisabled]}
                   activeOpacity={0.85}
-                  onPress={() => {
+                  onPress={async () => {
                     if (!isFull && !hasJoined && !isClosed) {
-                      navigation.navigate('JoinChit', { chitId: chit._id });
+                      const isSubmitted = await kycService.isKYCSubmittedForInvestment();
+                      if (!isSubmitted) {
+                        setKycModalVisible(true);
+                      } else {
+                        navigation.navigate('JoinChit', { chitId: chit._id });
+                      }
                     }
                   }}
                   disabled={isFull || hasJoined || isClosed}
@@ -220,6 +228,13 @@ const ExploreChitsScreen = ({ navigation }) => {
         )}
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* KYC Required Modal */}
+      <KycRequiredModal
+        visible={kycModalVisible}
+        onClose={() => setKycModalVisible(false)}
+        onNavigateToKYC={() => navigation.navigate('KYC')}
+      />
     </View>
   );
 };

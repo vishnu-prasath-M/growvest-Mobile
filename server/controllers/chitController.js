@@ -410,6 +410,13 @@ const joinChit = async (req, res) => {
     const { chitId } = req.body;
     const userId = req.user._id;
 
+    // Backend KYC Security Check: Only users with submitted KYC (pending or approved) can join chits
+    const KYC = require('../models/KYC');
+    const kyc = await KYC.findOne({ userId });
+    if (!kyc || (kyc.status !== 'pending' && kyc.status !== 'approved')) {
+      return res.status(403).json({ message: 'Submit KYC before Investment' });
+    }
+
     const chit = await Chit.findById(chitId);
     if (!chit) {
       return res.status(404).json({ message: 'Chit not found' });
