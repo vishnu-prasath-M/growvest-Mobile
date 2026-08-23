@@ -207,22 +207,21 @@ exports.updateInvestmentStatus = async (req, res) => {
       { new: true }
     );
 
-    // Update user balance when investment is approved
+    // When investment is approved, send notification — but do NOT touch user.balance.
+    // The principal is LOCKED in the investment; balance is only credited on actual withdrawal.
     if (status === 'approved' && investment.status !== 'approved') {
-      const user = await User.findOne({ 
+      const user = await User.findOne({
         $or: [
           ...(investment.userEmail ? [{ email: investment.userEmail }] : []),
+          ...(investment.userId ? [{ _id: investment.userId }] : []),
           ...(investment.mobileNumber ? [{ mobileNumber: investment.mobileNumber }] : [])
         ]
       });
       if (user) {
-        user.balance += investment.amount;
-        await user.save();
-
         await sendNotification({
           userId: user._id,
           title: '✅ Investment Approved',
-          description: `Your ₹${investment.amount} ${investment.type} deposit investment has been approved. Your balance has been updated.`,
+          description: `Your ₹${investment.amount} ${investment.type} plan has been approved and is now locked earning interest. You can withdraw after maturity.`,
           type: 'investment_approved',
           metadata: { investmentId: investment._id, amount: investment.amount },
           pushData: { screen: 'Investments' },

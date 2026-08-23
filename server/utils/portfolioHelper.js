@@ -6,20 +6,29 @@ const PocketMoney = require('../models/PocketMoney');
 /**
  * Single authoritative portfolio calculation service for Growvest.
  *
- * Returns:
- *   balances.totalInvested           — sum of all principal committed (savings + chit paid + pocket money invested)
- *   balances.totalLocked             — sum of all locked (not yet matured / not yet won) principal
- *   balances.dailyInterest           — current per-day interest from active (non-matured, non-withdrawn) savings plans
- *   balances.totalInterestEarned     — accrued interest so far across all active savings plans (dynamic, calculated from elapsed days)
- *   balances.availableToWithdraw     — TRULY withdrawable RIGHT NOW: matured savings + wallet + chit winnings + pocket money released
- *   balances.totalBalance            — totalInvested + totalInterestEarned + walletBalance
- *   balances.pocketMoneyInvested     — total pocket money principal
- *   balances.pocketMoneyReleased     — total pocket money paid out so far (admin approved)
- *   balances.pocketMoneyRemaining    — total pocket money still to be paid out
+ * ─── FINANCIAL MODEL ────────────────────────────────────────────────────────
  *
- * Interest rate rule: all plan rates are ANNUAL (p.a.).
- *   dailyInterest = (principal × rate%) / (100 × 365)
- *   Example: ₹1,000 @ 15% p.a. → 1000 × 0.15 / 365 = ₹0.4109/day
+ *  user.balance (walletBalance)
+ *    = liquid cash ONLY — credited when:
+ *        (a) a matured investment is withdrawn  → +maturityAmount
+ *        (b) admin approves a withdrawal request  (NOT when investment is approved)
+ *        (c) pocket money payout is released  → +payoutAmount
+ *    NOT incremented when an investment is created/approved (money is LOCKED).
+ *
+ *  totalInvested  = sum of all principal committed to savings, chit, pocket money
+ *                   (includes locked + not-yet-withdrawn matured)
+ *
+ *  totalBalance   = totalInvested + totalAccruedInterest + walletBalance
+ *    walletBalance here is ONLY liquid cash from maturities / payouts already withdrawn
+ *    (should NOT double-count active investment principal)
+ *
+ *  availableToWithdraw  = TRULY liquid right now:
+ *      = matured investments (not yet withdrawn) + walletBalance + chit winnings + pocket money released
+ *
+ * ─── INTEREST FORMULA ───────────────────────────────────────────────────────
+ *  All plan rates are ANNUAL (p.a.).
+ *  dailyInterest = (principal × rate%) / (100 × 365)
+ *  Example: ₹1,000 @ 15% p.a. → 1000 × 0.15 / 365 = ₹0.4109/day
  */
 async function getUserPortfolioSummary(userIdInput) {
   const user = await User.findById(userIdInput).select('-password');
@@ -36,8 +45,10 @@ async function getUserPortfolioSummary(userIdInput) {
     userOrConditions.push({ mobileNumber: String(user.mobileNumber).trim() });
   }
 
-  const now = new Date();
-  now.setHours(0, 0, 0, 0); // Use start of today for elapsed day calculation
+  const nowDate = new Date();
+  // Normalise to midnight for consistent elapsed-day calculation
+  const nowMidnight = new Date(nowDate);
+  nowMidnight.setHours(0, 0, 0, 0);
 
   // ─── 1. SAVINGS / FIXED DURATION INVESTMENTS ────────────────────────────────
   const investments = await Investment.find({ $or: userOrConditions });
@@ -52,12 +63,13 @@ async function getUserPortfolioSummary(userIdInput) {
     const principal = Number(inv.amount) || 0;
     const isWithdrawn = inv.status === 'withdrawn' || inv.withdrawalStatus === 'withdrawn';
     const isRejected = inv.status === 'rejected';
+    const isPending = inv.status === 'pending';
 
     if (isRejected) {
       return { ...inv.toObject(), availableToWithdraw: 0, isMatured: false, isLocked: false };
     }
 
-    // All interest rates are annual (p.a.). Map by plan type.
+    // ── Interest rate & duration by plan type (all p.a.) ──
     let rate = Number(inv.interestRate) || 12;
     let durationDays = Number(inv.durationDays) || 365;
     if (inv.type === '15_days')   { rate = 12;  durationDays = 15;  }
@@ -65,28 +77,29 @@ async function getUserPortfolioSummary(userIdInput) {
     else if (inv.type === '3_months') { rate = 18;  durationDays = 90;  }
     else if (inv.type === '6_months') { rate = 20;  durationDays = 180; }
     else if (inv.type === '1_year')   { rate = 24;  durationDays = 365; }
+    else if (inv.type === 'saving')   { rate = 12;  durationDays = 365; }
+    else if (inv.type === 'fixed')    { rate = 24;  durationDays = 365; }
 
-    // Annual rate formula: dailyInterest = (principal × rate/100) / 365
     const dailyInterest = (principal * rate) / 100 / 365;
     const totalInterestForDuration = dailyInterest * durationDays;
-    const maturityAmount = principal + totalInterestForDuration;
+    const maturityAmount = inv.maturityAmount || (principal + totalInterestForDuration);
 
-    // Accrue interest based on elapsed days since startDate (capped at durationDays)
-    let accruedInterest = 0;
-    if (inv.startDate && !isWithdrawn) {
-      const startDay = new Date(inv.startDate);
-      startDay.setHours(0, 0, 0, 0);
-      const elapsedDays = Math.max(0, Math.min(durationDays, Math.floor((now - startDay) / 86400000)));
-      accruedInterest = elapsedDays * dailyInterest;
-    }
-    // Fall back to stored value if higher (e.g. from previous syncs)
-    accruedInterest = Math.max(accruedInterest, Number(inv.interestEarned) || 0);
-
-    // Determine maturity date
+    // Maturity date
     const maturityDate = inv.maturityDate
       ? new Date(inv.maturityDate)
-      : new Date(new Date(inv.startDate || Date.now()).getTime() + durationDays * 86400000);
-    const isMatured = new Date() >= maturityDate;
+      : new Date((inv.startDate ? new Date(inv.startDate) : new Date()).getTime() + durationDays * 86400000);
+
+    const isMatured = !isPending && !isWithdrawn && nowDate >= maturityDate;
+
+    // Accrue interest from startDate to today (capped at durationDays)
+    let accruedInterest = 0;
+    if (inv.startDate && !isWithdrawn && !isPending) {
+      const startDay = new Date(inv.startDate);
+      startDay.setHours(0, 0, 0, 0);
+      const elapsedDays = Math.max(0, Math.min(durationDays, Math.floor((nowMidnight - startDay) / 86400000)));
+      accruedInterest = elapsedDays * dailyInterest;
+    }
+    accruedInterest = Math.max(accruedInterest, Number(inv.interestEarned) || 0);
 
     let availableToWithdraw = 0;
     let withdrawalStatus = 'locked';
@@ -94,24 +107,23 @@ async function getUserPortfolioSummary(userIdInput) {
     if (isWithdrawn) {
       withdrawalStatus = 'withdrawn';
       availableToWithdraw = 0;
-      // Withdrawn — counts toward invested but not currently locked
-      totalDurationInvested += principal;
+      // Withdrawn investment is no longer active — don't count in totalDurationInvested
+      // (its maturity amount is already in user.balance)
     } else if (isMatured) {
-      // Matured and not yet withdrawn → fully available
       withdrawalStatus = 'available';
-      availableToWithdraw = inv.maturityAmount || maturityAmount;
-      maturedWithdrawalAvailable += availableToWithdraw;
+      availableToWithdraw = maturityAmount;
+      maturedWithdrawalAvailable += maturityAmount;
       totalDurationInvested += principal;
-      totalAccruedInterest += totalInterestForDuration; // Full plan interest earned
-    } else {
-      // Locked (before maturity)
+      totalAccruedInterest += totalInterestForDuration;
+    } else if (!isPending) {
       withdrawalStatus = 'locked';
       availableToWithdraw = 0;
       totalDurationInvested += principal;
       totalDurationLocked += principal;
       totalDailyInterest += dailyInterest;
-      totalAccruedInterest += accruedInterest; // Only elapsed portion
+      totalAccruedInterest += accruedInterest;
     }
+    // pending — don't count in any total until approved
 
     return {
       ...inv.toObject(),
@@ -119,13 +131,14 @@ async function getUserPortfolioSummary(userIdInput) {
       durationDays,
       dailyInterest,
       totalInterest: totalInterestForDuration,
-      maturityAmount: inv.maturityAmount || maturityAmount,
+      maturityAmount,
       maturityDate,
       accruedInterest,
       availableToWithdraw,
       withdrawalStatus,
       isMatured,
-      isLocked: !isMatured && !isWithdrawn,
+      isLocked: !isMatured && !isWithdrawn && !isPending,
+      lockUnlockDate: maturityDate.toISOString(),
     };
   });
 
@@ -141,10 +154,9 @@ async function getUserPortfolioSummary(userIdInput) {
   chitMemberships.forEach(cm => {
     if (cm.status === 'active' || cm.status === 'approved') {
       activeChitsCount++;
-      // Only count what has actually been PAID so far (not future weeks)
       const paidAmt = Number(cm.totalPaid) || (Number(cm.paidWeeks || 0) * Number(cm.weeklyAmount || 0));
       totalChitInvested += paidAmt;
-      totalChitLocked += paidAmt; // Chit contributions are locked until auction win
+      totalChitLocked += paidAmt;
 
       if (cm.hasWon) {
         const winning = Number(cm.winningAmount) || 0;
@@ -172,18 +184,34 @@ async function getUserPortfolioSummary(userIdInput) {
   });
 
   // ─── 4. WALLET BALANCE ───────────────────────────────────────────────────────
+  // user.balance is ONLY liquid cash (from maturity withdrawals, not from investment approval)
+  // If the old code incorrectly credited user.balance on approval, those records will
+  // show inflated wallet. The correct fix is to NOT add walletBalance to totalBalance.
+  // walletBalance is used ONLY for availableToWithdraw.
   const walletBalance = Number(user.balance) || 0;
 
   // ─── 5. AGGREGATION ─────────────────────────────────────────────────────────
   const totalInvested = totalDurationInvested + totalChitInvested + pocketMoneyInvested;
   const totalLocked = totalDurationLocked + totalChitLocked + pocketMoneyRemaining;
 
-  // availableToWithdraw = ONLY amounts actually withdrawable RIGHT NOW
-  // = matured savings payouts + wallet balance + chit winnings + pocket money already released by admin
+  // totalBalance = what the user has committed + accrued interest
+  // NOTE: Do NOT add walletBalance here — walletBalance from investment approval is
+  // already reflected in totalDurationInvested (double-counting guard).
+  // walletBalance from maturity withdrawals is separate liquid cash — add it ONLY
+  // if user.balance does NOT overlap with active investment principal.
+  // Safest: exclude walletBalance from totalBalance entirely (it's in availableToWithdraw).
+  const totalBalance = totalInvested + totalAccruedInterest;
+
+  // availableToWithdraw = truly liquid right now
   const availableToWithdraw = maturedWithdrawalAvailable + walletBalance + chitWithdrawalAvailable + pocketMoneyReleased;
 
-  // totalBalance = everything the user has committed + what they've earned so far
-  const totalBalance = totalInvested + totalAccruedInterest + walletBalance;
+  // Next unlock date — earliest maturity date among locked investments
+  const lockedInvestments = enrichedInvestments.filter(i => i.isLocked && i.maturityDate);
+  let nextUnlockDate = null;
+  if (lockedInvestments.length > 0) {
+    const sorted = lockedInvestments.slice().sort((a, b) => new Date(a.maturityDate) - new Date(b.maturityDate));
+    nextUnlockDate = sorted[0].maturityDate;
+  }
 
   return {
     user: {
@@ -203,9 +231,10 @@ async function getUserPortfolioSummary(userIdInput) {
       totalInterestEarned: totalAccruedInterest,
       totalEarned: totalAccruedInterest,
       totalInterest: totalAccruedInterest,
-      availableToWithdraw,         // Real withdrawable amount (matured + wallet + winnings)
+      availableToWithdraw,
       maturedAvailableOnly: maturedWithdrawalAvailable,
       walletBalance,
+      nextUnlockDate,   // ISO string of next investment maturity date
       // Chit breakdowns
       totalChitInvested,
       totalChitWinningAmount,
@@ -217,7 +246,7 @@ async function getUserPortfolioSummary(userIdInput) {
     },
     stats: {
       totalInvestments: enrichedInvestments.filter(i => i.status === 'approved').length + activeChitsCount + pocketMonies.filter(pm => pm.status === 'active').length,
-      activeInvestmentsCount: enrichedInvestments.filter(i => i.status === 'approved' && i.withdrawalStatus !== 'withdrawn').length + activeChitsCount + pocketMonies.filter(pm => pm.status === 'active').length,
+      activeInvestmentsCount: enrichedInvestments.filter(i => !['rejected', 'withdrawn'].includes(i.status)).length + activeChitsCount + pocketMonies.filter(pm => pm.status === 'active').length,
       activeChitsCount,
       activePocketMoneyCount: pocketMonies.filter(pm => pm.status === 'active').length,
     },

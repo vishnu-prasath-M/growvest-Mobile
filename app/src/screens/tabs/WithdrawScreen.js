@@ -204,14 +204,22 @@ const WithdrawScreen = ({ navigation }) => {
     );
   }
 
-  // Calculated totals for Top Summary Card
+  // ── Totals for Top Hero Card ─────────────────────────────────────────────
   const totalInvestedValue = investments
-    .filter(i => i.status !== 'withdrawn')
-    .reduce((sum, inv) => sum + (inv.amount || 0), 0);
+    .filter(i => !['withdrawn', 'rejected'].includes(i.status))
+    .reduce((sum, inv) => {
+      if (inv.isPocketMoney) return sum + (inv.investedAmount || 0);
+      if (inv.isChit) return sum + (inv.amount || 0);
+      return sum + (inv.amount || 0);
+    }, 0);
 
-  const activeInvestmentsCount = investments.filter(i => i.status !== 'withdrawn').length;
+  const activeInvestmentsCount = investments.filter(i => !['withdrawn', 'rejected'].includes(i.status)).length;
 
+  // availableToWithdraw: only matured savings + pocket money released + chit winnings
   const availableToWithdrawValue = investments.reduce((acc, inv) => {
+    if (inv.isPocketMoney) return acc + (inv.totalPaidOut || 0);
+    if (inv.isChit) return acc + (inv.hasWon && inv.withdrawalStatus !== 'completed' ? (inv.winningAmount || 0) : 0);
+    // Savings/fixed: matured and not withdrawn
     const isMatured = inv.maturityDate && new Date() >= new Date(inv.maturityDate);
     const isWithdrawn = inv.status === 'withdrawn' || inv.withdrawalStatus === 'withdrawn';
     if (isMatured && !isWithdrawn && inv.status === 'approved') {
@@ -219,6 +227,12 @@ const WithdrawScreen = ({ navigation }) => {
     }
     return acc;
   }, 0);
+
+  // Earliest unlock date among locked savings plans
+  const lockedPlans = investments.filter(i => !i.isPocketMoney && !i.isChit && i.maturityDate && new Date() < new Date(i.maturityDate) && !['withdrawn', 'rejected'].includes(i.status));
+  const nextUnlockMs = lockedPlans.length > 0 ? Math.min(...lockedPlans.map(i => new Date(i.maturityDate).getTime())) : null;
+  const nextUnlockStr = nextUnlockMs ? new Date(nextUnlockMs).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
+
 
   return (
     <View style={styles.container}>
@@ -259,10 +273,12 @@ const WithdrawScreen = ({ navigation }) => {
                 <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', fontWeight: '600', textTransform: 'uppercase' }}>Active Investments</Text>
                 <Text style={{ fontSize: 13, fontWeight: '700', color: '#F8FAF9' }}>{activeInvestmentsCount}</Text>
               </View>
-              <View>
-                <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', fontWeight: '600', textTransform: 'uppercase' }}>Available to Withdraw</Text>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.gold }}>
-                  {formatCurrency(availableToWithdrawValue)}
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', fontWeight: '600', textTransform: 'uppercase' }}>
+                  {availableToWithdrawValue > 0 ? 'Available to Withdraw' : '🔒 Locked'}
+                </Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: availableToWithdrawValue > 0 ? colors.gold : 'rgba(255,255,255,0.6)' }}>
+                  {availableToWithdrawValue > 0 ? formatCurrency(availableToWithdrawValue) : nextUnlockStr ? `Unlocks ${nextUnlockStr}` : 'No matured plans'}
                 </Text>
               </View>
             </View>
