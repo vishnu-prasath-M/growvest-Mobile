@@ -67,6 +67,7 @@ import RulesScreen from '../screens/chitfund/RulesScreen';
 import FAQScreen from '../screens/chitfund/FAQScreen';
 import SupportScreen from '../screens/chitfund/SupportScreen';
 import NotificationsScreen from '../screens/tabs/NotificationsScreen';
+import { notificationService } from '../services/notificationService';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -451,6 +452,8 @@ const AppNavigator = () => {
   const { isAuthenticated, loading } = useAuth();
 
   useEffect(() => {
+    notificationService.requestPermission();
+
     const handleDeepLink = async (url) => {
       if (!url) return;
       try {
