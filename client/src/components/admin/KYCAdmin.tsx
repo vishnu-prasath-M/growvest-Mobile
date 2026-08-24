@@ -288,26 +288,42 @@ const KYCAdmin = ({ token }: { token: string | null }) => {
                           </div>
                         </div>
 
-                        {/* Documents */}
-                        {(kyc.aadhaarFrontImage || kyc.aadhaarBackImage || kyc.panImage || kyc.profilePhoto) && (
-                          <div className="mt-6">
-                            <h4 className="text-xs font-body font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                              Documents
-                            </h4>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                              {kyc.aadhaarFrontImage && (
-                                <ImageViewer title="Aadhaar Front" base64={kyc.aadhaarFrontImage} />
-                              )}
-                              {kyc.aadhaarBackImage && (
-                                <ImageViewer title="Aadhaar Back" base64={kyc.aadhaarBackImage} />
-                              )}
-                              {kyc.panImage && <ImageViewer title="PAN Card" base64={kyc.panImage} />}
-                              {kyc.profilePhoto && (
-                                <ImageViewer title="Profile Photo" base64={kyc.profilePhoto} />
-                              )}
-                            </div>
+                        {/* Documents Section — Always displays all 4 document cards with fallbacks */}
+                        <div className="mt-6">
+                          <h4 className="text-xs font-body font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                            Uploaded Documents
+                          </h4>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <ImageViewer
+                              title="Aadhaar Front"
+                              docType="aadhaarFront"
+                              kycId={kyc._id}
+                              token={token}
+                              data={kyc.aadhaarFrontImage}
+                            />
+                            <ImageViewer
+                              title="Aadhaar Back"
+                              docType="aadhaarBack"
+                              kycId={kyc._id}
+                              token={token}
+                              data={kyc.aadhaarBackImage}
+                            />
+                            <ImageViewer
+                              title="PAN Card"
+                              docType="pan"
+                              kycId={kyc._id}
+                              token={token}
+                              data={kyc.panImage}
+                            />
+                            <ImageViewer
+                              title="Selfie"
+                              docType="profilePhoto"
+                              kycId={kyc._id}
+                              token={token}
+                              data={kyc.profilePhoto}
+                            />
                           </div>
-                        )}
+                        </div>
 
                         {/* Rejection Reason */}
                         {kyc.status === "rejected" && kyc.rejectionReason && (
@@ -430,39 +446,143 @@ const InfoRow = ({ label, value }: { label: string; value?: string }) => (
   </div>
 );
 
-const ImageViewer = ({ title, base64 }: { title: string; base64: string }) => {
+const ImageViewer = ({
+  title,
+  docType,
+  kycId,
+  token,
+  data,
+}: {
+  title: string;
+  docType: string;
+  kycId: string;
+  token: string | null;
+  data?: string;
+}) => {
   const [viewerOpen, setViewerOpen] = useState(false);
+  const [imgError, setImgError] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  // Determine correct image URL or Base64 URI
+  const getSrc = () => {
+    if (!data || data.trim() === "") return "";
+    if (data.startsWith("http://") || data.startsWith("https://")) return data;
+    if (data.startsWith("data:image/")) return data;
+    // If we have token & kycId, try authenticated backend streaming route
+    if (kycId && token) {
+      return `${API_URL}/api/kyc/document/${kycId}/${docType}?token=${token}`;
+    }
+    // Clean raw base64 string
+    const cleanBase64 = data.replace(/^data:image\/[a-z]+;base64,/, "").trim();
+    return `data:image/jpeg;base64,${cleanBase64}`;
+  };
+
+  const src = getSrc();
+  const hasDoc = Boolean(src && !imgError);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setViewerOpen(false);
+    };
+    if (viewerOpen) {
+      window.addEventListener("keydown", handleKeyDown);
+    }
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [viewerOpen]);
+
   return (
     <>
-      <button
-        onClick={() => setViewerOpen(true)}
-        className="relative group overflow-hidden rounded-xl border border-border bg-card h-28"
-      >
-        <img
-          src={`data:image/jpeg;base64,${base64}`}
-          alt={title}
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center">
-          <Eye className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-all" />
+      {hasDoc ? (
+        <button
+          onClick={() => {
+            setZoomLevel(1);
+            setViewerOpen(true);
+          }}
+          className="relative group overflow-hidden rounded-xl border border-border bg-card h-28 w-full text-left transition-all hover:border-primary"
+        >
+          <img
+            src={src}
+            alt={title}
+            onError={() => setImgError(true)}
+            className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+          />
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center">
+            <Eye className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-all" />
+          </div>
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
+            <p className="text-[11px] font-body font-medium text-white truncate">{title}</p>
+          </div>
+        </button>
+      ) : (
+        <div className="rounded-xl border border-dashed border-border bg-muted/30 h-28 p-3 flex flex-col items-center justify-center text-center">
+          <AlertCircle className="h-5 w-5 text-muted-foreground/60 mb-1" />
+          <p className="text-[11px] font-body font-semibold text-muted-foreground">{title}</p>
+          <p className="text-[10px] font-body text-muted-foreground/80 mt-0.5">Document not uploaded</p>
         </div>
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-1.5">
-          <p className="text-[10px] font-body font-medium text-white">{title}</p>
-        </div>
-      </button>
+      )}
 
+      {/* Full-screen Zoomable Image Viewer Modal */}
       {viewerOpen && (
         <div
-          className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-4 cursor-pointer"
+          className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex flex-col items-center justify-between p-4 sm:p-6 animate-in fade-in duration-200"
           onClick={() => setViewerOpen(false)}
         >
-          <div className="relative max-w-2xl max-h-[80vh] w-full">
+          {/* Header Bar */}
+          <div
+            className="w-full max-w-4xl flex items-center justify-between z-10 py-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div>
+              <h3 className="text-base font-heading font-bold text-white">{title}</h3>
+              <p className="text-xs font-body text-gray-400">Click outside or press Esc to close</p>
+            </div>
+
+            {/* Zoom Controls */}
+            <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md rounded-xl p-1 border border-white/10">
+              <button
+                onClick={() => setZoomLevel((z) => Math.max(0.5, z - 0.25))}
+                className="px-2.5 py-1 text-xs font-body font-bold text-white hover:bg-white/20 rounded-lg"
+                title="Zoom Out"
+              >
+                -
+              </button>
+              <span className="text-xs font-body text-white font-medium px-1">
+                {Math.round(zoomLevel * 100)}%
+              </span>
+              <button
+                onClick={() => setZoomLevel((z) => Math.min(3, z + 0.25))}
+                className="px-2.5 py-1 text-xs font-body font-bold text-white hover:bg-white/20 rounded-lg"
+                title="Zoom In"
+              >
+                +
+              </button>
+              <button
+                onClick={() => setZoomLevel(1)}
+                className="px-2 py-1 text-[11px] font-body text-gray-300 hover:text-white hover:bg-white/20 rounded-lg ml-1"
+              >
+                Reset
+              </button>
+            </div>
+
+            <button
+              onClick={() => setViewerOpen(false)}
+              className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Full Size Image Display */}
+          <div
+            className="flex-1 w-full max-w-4xl flex items-center justify-center overflow-auto py-4"
+            onClick={(e) => e.stopPropagation()}
+          >
             <img
-              src={`data:image/jpeg;base64,${base64}`}
+              src={src}
               alt={title}
-              className="w-full h-auto max-h-[80vh] object-contain rounded-2xl"
+              style={{ transform: `scale(${zoomLevel})` }}
+              className="max-h-[75vh] max-w-full object-contain rounded-xl shadow-2xl transition-transform duration-200 ease-out"
             />
-            <p className="text-center text-sm font-body text-white mt-3">{title}</p>
           </div>
         </div>
       )}

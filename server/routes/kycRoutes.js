@@ -5,6 +5,7 @@ const {
   getKYCStatus,
   getAllKYC,
   getKYCDetail,
+  getKYCDocument,
   reviewKYC,
   getKYCStats,
   updateBankDetails,
@@ -14,6 +15,7 @@ const { protect, admin } = require('../middleware/authMiddleware');
 router.post('/submit', protect, submitKYC);
 router.get('/status', protect, getKYCStatus);
 router.put('/bank-details', protect, updateBankDetails);
+router.get('/document/:id/:docType', getKYCDocument);
 router.get('/stats', protect, admin, getKYCStats);
 router.get('/all', protect, admin, getAllKYC);
 router.get('/:id', protect, admin, getKYCDetail);

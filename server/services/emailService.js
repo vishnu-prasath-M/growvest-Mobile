@@ -28,7 +28,7 @@ const buildPasswordResetHtml = (resetUrl, expiryMinutes = 15) => `
           <tr>
             <td>
               <div style="background:#ffffff;border-radius:16px 16px 0 0;padding:32px 40px;text-align:center;border-bottom:1px solid #e4e9e4;border-left:1px solid #e4e9e4;border-right:1px solid #e4e9e4;">
-                <img src="https://growvest-mobile.onrender.com/assets/growvest-logo.png" alt="Growvest Logo" style="height:60px;width:auto;display:block;margin:0 auto;border:0;" />
+                <img src="https://growvest-mobile.onrender.com/assets/growvest-logo-big.png" alt="Growvest Logo" style="height:60px;width:auto;display:block;margin:0 auto;border:0;" />
               </div>
             </td>
           </tr>

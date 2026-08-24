@@ -27,10 +27,31 @@
         ]
       }
     },
+    "scheme": "growvest",
     "android": {
       "package": "com.growvest.mobile",
       "permissions": [
         "POST_NOTIFICATIONS"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "growvest"
+            },
+            {
+              "scheme": "https",
+              "host": "growvest-mobile.onrender.com",
+              "pathPrefix": "/ref"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/growvest-logo.png",

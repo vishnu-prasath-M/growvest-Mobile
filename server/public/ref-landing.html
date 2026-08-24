@@ -140,7 +140,21 @@
     document.getElementById('refCodeDisplay').innerText = code;
 
     const openAppBtn = document.getElementById('openAppBtn');
-    openAppBtn.href = 'growvest://ref/' + code;
+    const schemeUrl = 'growvest://ref/' + code;
+    const intentUrl = 'intent://ref/' + code + '#Intent;scheme=growvest;package=com.growvest.mobile;end;';
+
+    openAppBtn.href = schemeUrl;
+
+    openAppBtn.addEventListener('click', function (e) {
+      e.preventDefault();
+      // Try custom scheme first
+      window.location.href = schemeUrl;
+
+      // Fallback to Android Intent after 500ms
+      setTimeout(function () {
+        window.location.href = intentUrl;
+      }, 500);
+    });
   </script>
 </body>
 </html>
