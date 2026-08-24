@@ -12,6 +12,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/theme';
 import { executeRazorpayPayment } from '../../services/razorpayHandler';
+import { useTheme } from '../../context/ThemeContext';
 import KycRequiredModal from '../../components/KycRequiredModal';
 import { kycService } from '../../services/kycService';
 
