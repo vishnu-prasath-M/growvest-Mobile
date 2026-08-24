@@ -29,6 +29,7 @@ import { API_ENDPOINTS } from '../../config/api';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
 import KycRequiredModal from '../../components/KycRequiredModal';
 import { kycService } from '../../services/kycService';
+import { notificationService } from '../../services/notificationService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -97,6 +98,11 @@ const HomeScreen = ({ navigation }) => {
 
       if (data?.user?.name || data?.user?.username) {
         setUserName(data?.user?.name || data?.user?.username);
+      }
+
+      // Register device token for Standalone APK push notifications
+      if (data?.user?._id) {
+        notificationService.registerDevice(data.user._id, data.user.username || data.user.name);
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);

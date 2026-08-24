@@ -379,6 +379,20 @@ app.use('/api/pocket-money', pocketMoneyRoutes);
 app.use('/api/referral', referralRoutes);
 app.use('/api/wallet', referralRoutes);
 
+// Admin Manual Trigger for Daily Notifications
+const { protect, admin } = require('./middleware/authMiddleware');
+const cronService = require('./services/cronService');
+cronService.initCronJobs();
+
+app.post('/api/admin/trigger-daily-notifications', protect, admin, async (req, res) => {
+  try {
+    await cronService.sendDailyPocketMoneyNotifications();
+    await cronService.sendDailyEngagingNotifications();
+    res.json({ message: 'Daily notifications triggered and dispatched successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Error triggering notifications', error: err.message });
+  }
+});
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
