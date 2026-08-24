@@ -13,7 +13,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/theme';
 import { executeRazorpayPayment } from '../../services/razorpayHandler';
 import { authService } from '../../services/authService';
-import { useTheme } from '../../context/ThemeContext';
+import KycRequiredModal from '../../components/KycRequiredModal';
+import { kycService } from '../../services/kycService';
 
 const ChitPaymentScreen = ({ navigation, route }) => {
   const { colors: themeColors } = useTheme();
@@ -21,6 +22,7 @@ const ChitPaymentScreen = ({ navigation, route }) => {
   const { chitId, memberId, month, amount, lateFee = 0, type, chitName, returnScreen } = route.params;
   const [loading, setLoading] = useState(false);
   const [userData, setUserData] = useState(null);
+  const [kycModalVisible, setKycModalVisible] = useState(false);
 
   const totalAmount = amount + lateFee;
 
@@ -41,6 +43,13 @@ const ChitPaymentScreen = ({ navigation, route }) => {
     `₹${value?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`;
 
   const handleRazorpayPay = async () => {
+    // KYC Check when clicking Pay with Razorpay button
+    const isSubmitted = await kycService.isKYCSubmittedForInvestment();
+    if (!isSubmitted) {
+      setKycModalVisible(true);
+      return;
+    }
+
     const paymentType = type === 'join' ? 'chit_join' : 'chit_payment';
     const payloadData = {
       chitId,
@@ -178,6 +187,12 @@ const ChitPaymentScreen = ({ navigation, route }) => {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <KycRequiredModal
+        visible={kycModalVisible}
+        onClose={() => setKycModalVisible(false)}
+        onNavigateToKYC={() => navigation.navigate('KYC')}
+      />
     </View>
   );
 };

@@ -191,14 +191,7 @@ const HomeScreen = ({ navigation }) => {
     {
       label: 'New Investment',
       image: require('../../../assets/add.png'),
-      onPress: async () => {
-        const isSubmitted = await kycService.isKYCSubmittedForInvestment();
-        if (!isSubmitted) {
-          setKycModalVisible(true);
-        } else {
-          navigation.navigate('InvestmentAmount');
-        }
-      },
+      onPress: () => navigation.navigate('InvestmentAmount'),
     },
     {
       label: 'My Investments',
@@ -213,14 +206,7 @@ const HomeScreen = ({ navigation }) => {
     {
       label: 'Pocket Money',
       image: require('../../../assets/pocket.png'),
-      onPress: async () => {
-        const isSubmitted = await kycService.isKYCSubmittedForInvestment();
-        if (!isSubmitted) {
-          setKycModalVisible(true);
-        } else {
-          navigation.navigate('PocketMoney');
-        }
-      },
+      onPress: () => navigation.navigate('PocketMoney'),
     },
   ];
 

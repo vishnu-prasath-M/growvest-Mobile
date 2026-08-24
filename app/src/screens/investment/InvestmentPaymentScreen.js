@@ -12,13 +12,15 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/theme';
 import { executeRazorpayPayment } from '../../services/razorpayHandler';
-import { useTheme } from '../../context/ThemeContext';
+import KycRequiredModal from '../../components/KycRequiredModal';
+import { kycService } from '../../services/kycService';
 
 const InvestmentPaymentScreen = ({ navigation, route }) => {
   const { colors: themeColors } = useTheme();
   const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const { amount, type, userData, frequency } = route.params;
   const [loading, setLoading] = useState(false);
+  const [kycModalVisible, setKycModalVisible] = useState(false);
 
   const formatCurrency = (value) => {
     return `₹${value?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`;
@@ -36,6 +38,12 @@ const InvestmentPaymentScreen = ({ navigation, route }) => {
   };
 
   const handlePayNow = async () => {
+    // KYC Check when clicking Pay with Razorpay button
+    const isSubmitted = await kycService.isKYCSubmittedForInvestment();
+    if (!isSubmitted) {
+      setKycModalVisible(true);
+      return;
+    }
     await executeRazorpayPayment({
       amount,
       paymentType: type === 'pocket_money' ? 'pocket_money' : 'investment',
@@ -150,6 +158,12 @@ const InvestmentPaymentScreen = ({ navigation, route }) => {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <KycRequiredModal
+        visible={kycModalVisible}
+        onClose={() => setKycModalVisible(false)}
+        onNavigateToKYC={() => navigation.navigate('KYC')}
+      />
     </View>
   );
 };
