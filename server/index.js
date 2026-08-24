@@ -363,6 +363,8 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const pocketMoneyRoutes = require('./routes/pocketMoneyRoutes');
 const referralRoutes = require('./routes/referralRoutes');
 
+const cronRoutes = require('./routes/cronRoutes');
+
 app.use('/api/investments', investmentRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/mobile/auth', authRoutes);
@@ -378,6 +380,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/pocket-money', pocketMoneyRoutes);
 app.use('/api/referral', referralRoutes);
 app.use('/api/wallet', referralRoutes);
+app.use('/api/cron', cronRoutes);
 
 // Admin Manual Trigger for Daily Notifications
 const { protect, admin } = require('./middleware/authMiddleware');
