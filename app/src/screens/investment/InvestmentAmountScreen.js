@@ -82,8 +82,8 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
       return;
     }
 
-    if (parseFloat(amount) < 1000) {
-      Alert.alert('Error', 'Minimum investment amount is ₹1,000');
+    if (parseFloat(amount) < 100) {
+      Alert.alert('Error', 'Minimum investment amount is ₹100');
       return;
     }
 
@@ -204,7 +204,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
               textColor={themeColors.text}
             />
           </View>
-          <Text style={styles.minAmount}>Minimum: ₹1,000</Text>
+          <Text style={styles.minAmount}>Minimum: ₹100</Text>
         </View>
 
         {/* Investment Summary */}
