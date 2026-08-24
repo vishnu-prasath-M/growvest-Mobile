@@ -13,12 +13,14 @@ exports.uploadAPK = async (req, res) => {
     const adminId = req.user._id || req.user.id;
     const { fileName, base64Data, version } = req.body;
 
-    if (!fileName || (!base64Data && !req.file)) {
+    const fileObj = req.file;
+    const name = (fileName || fileObj?.originalname || 'growvest.apk').toString().trim();
+
+    if (!fileObj && !base64Data) {
       return res.status(400).json({ message: 'APK file data is required' });
     }
 
     // Validate extension
-    const name = fileName || req.file?.originalname || 'growvest.apk';
     if (!name.toLowerCase().endsWith('.apk')) {
       return res.status(400).json({ message: 'Invalid file format. Only .apk files are allowed.' });
     }
@@ -26,13 +28,13 @@ exports.uploadAPK = async (req, res) => {
     let fileSize = 0;
     let apkData = '';
 
-    if (base64Data) {
-      apkData = base64Data.replace(/^data:application\/[a-z\-]+;base64,/, '').replace(/\s/g, '');
+    if (fileObj && fileObj.buffer) {
+      fileSize = fileObj.size;
+      apkData = fileObj.buffer.toString('base64');
+    } else if (base64Data) {
+      apkData = base64Data.replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '');
       const buffer = Buffer.from(apkData, 'base64');
       fileSize = buffer.length;
-    } else if (req.file) {
-      fileSize = req.file.size;
-      apkData = req.file.buffer.toString('base64');
     }
 
     if (fileSize < 100) {
