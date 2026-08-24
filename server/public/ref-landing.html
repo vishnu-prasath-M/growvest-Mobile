@@ -121,7 +121,7 @@
       <div class="code-val" id="refCodeDisplay">ABC123</div>
     </div>
 
-    <a href="/downloads/growvest-latest.apk" class="btn-download" id="downloadBtn">
+    <a href="/api/referral/apk/download" class="btn-download" id="downloadBtn" download>
       📱 Download Android App
     </a>
 
@@ -138,6 +138,24 @@
     const pathParts = window.location.pathname.split('/');
     const code = pathParts[pathParts.length - 1] || 'GVREF';
     document.getElementById('refCodeDisplay').innerText = code;
+
+    // Fetch active APK release uploaded from Admin Dashboard
+    fetch('/api/referral/apk')
+      .then(res => res.json())
+      .then(data => {
+        const downloadBtn = document.getElementById('downloadBtn');
+        if (data.hasActiveApk) {
+          downloadBtn.href = data.downloadUrl || '/api/referral/apk/download';
+          if (data.fileName) {
+            downloadBtn.setAttribute('download', data.fileName);
+            downloadBtn.innerHTML = '📱 Download Android App (' + data.fileName + ')';
+          }
+        } else {
+          downloadBtn.innerHTML = '⏳ APK Update Pending';
+          downloadBtn.style.opacity = '0.6';
+        }
+      })
+      .catch(err => console.warn('Could not fetch active APK metadata:', err));
 
     const openAppBtn = document.getElementById('openAppBtn');
     const schemeUrl = 'growvest://ref/' + code;
