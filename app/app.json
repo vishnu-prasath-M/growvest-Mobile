@@ -30,6 +30,7 @@
     "scheme": "growvest",
     "android": {
       "package": "com.growvest.mobile",
+      "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "POST_NOTIFICATIONS"
       ],

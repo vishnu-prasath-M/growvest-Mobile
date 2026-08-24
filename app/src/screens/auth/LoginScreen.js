@@ -58,14 +58,13 @@ const LoginScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
-          bounces={false}
           keyboardShouldPersistTaps="handled"
         >
           {/* Gradient Top Section */}
@@ -184,7 +183,7 @@ const LoginScreen = ({ navigation }) => {
 const getStyles = (colors) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#0E3D23' }, // match gradient top
   container: { flex: 1, backgroundColor: colors.background },
-  scrollContent: { flexGrow: 1, minHeight: height },
+  scrollContent: { flexGrow: 1, paddingBottom: 40 },
 
   // Header Area
   headerArea: {

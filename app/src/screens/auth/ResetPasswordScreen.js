@@ -363,7 +363,7 @@ const ResetPasswordScreen = ({ navigation, route }) => {
 const getStyles = (colors) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#0E3D23' },
   container: { flex: 1, backgroundColor: colors.background },
-  scrollContent: { flexGrow: 1, minHeight: height },
+  scrollContent: { flexGrow: 1, paddingBottom: 40 },
 
   headerArea: {
     height: height * 0.35,
