@@ -29,6 +29,7 @@ import { API_ENDPOINTS } from '../../config/api';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
 import KycRequiredModal from '../../components/KycRequiredModal';
 import { kycService } from '../../services/kycService';
+import { notificationService } from '../../services/notificationService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -97,6 +98,11 @@ const HomeScreen = ({ navigation }) => {
 
       if (data?.user?.name || data?.user?.username) {
         setUserName(data?.user?.name || data?.user?.username);
+      }
+
+      // Register device token for Standalone APK push notifications
+      if (data?.user?._id) {
+        notificationService.registerDevice(data.user._id, data.user.username || data.user.name);
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -191,14 +197,7 @@ const HomeScreen = ({ navigation }) => {
     {
       label: 'New Investment',
       image: require('../../../assets/add.png'),
-      onPress: async () => {
-        const isSubmitted = await kycService.isKYCSubmittedForInvestment();
-        if (!isSubmitted) {
-          setKycModalVisible(true);
-        } else {
-          navigation.navigate('InvestmentAmount');
-        }
-      },
+      onPress: () => navigation.navigate('InvestmentAmount'),
     },
     {
       label: 'My Investments',
@@ -213,14 +212,7 @@ const HomeScreen = ({ navigation }) => {
     {
       label: 'Pocket Money',
       image: require('../../../assets/pocket.png'),
-      onPress: async () => {
-        const isSubmitted = await kycService.isKYCSubmittedForInvestment();
-        if (!isSubmitted) {
-          setKycModalVisible(true);
-        } else {
-          navigation.navigate('PocketMoney');
-        }
-      },
+      onPress: () => navigation.navigate('PocketMoney'),
     },
   ];
 

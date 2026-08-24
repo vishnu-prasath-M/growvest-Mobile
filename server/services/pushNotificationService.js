@@ -14,6 +14,8 @@ const buildMessage = (token, { title, body, data = {} }) => ({
   data,
   priority: 'high',
   channelId: 'default',
+  badge: 1,
+  _displayInForeground: true,
 });
 
 /**
