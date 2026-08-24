@@ -29,6 +29,9 @@ import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "@/context/AuthContext";
 import ChitFundAdmin from "@/components/admin/ChitFundAdmin";
 import PocketMoneyAdmin from "@/components/admin/PocketMoneyAdmin";
+import KYCAdmin from "@/components/admin/KYCAdmin";
+import ReferralAdmin from "@/components/admin/ReferralAdmin";
+import { Gift } from "lucide-react";
 
 import { toast } from "sonner";
 
@@ -97,7 +100,7 @@ const getPlanDisplayName = (type: string) => {
   return type + ' Plan';
 };
 
-type AdminTab = "overview" | "pending" | "users" | "withdrawals" | "kyc" | "chits" | "settings" | "pocket";
+type AdminTab = "overview" | "pending" | "users" | "withdrawals" | "kyc" | "chits" | "settings" | "pocket" | "referral";
 
 const AdminDashboard = () => {
   const { user: authUser, token, logout } = useAuth();
@@ -121,6 +124,7 @@ const AdminDashboard = () => {
     { label: "KYC Verification", tab: "kyc", icon: Shield, badge: 0 },
     { label: "Chit Funds", tab: "chits", icon: TrendingUp, badge: 0 },
     { label: "Pocket Money", tab: "pocket", icon: Wallet },
+    { label: "Referral & APK", tab: "referral", icon: Gift },
     { label: "Settings", tab: "settings", icon: Settings },
   ]);
 
@@ -1358,110 +1362,21 @@ const AdminDashboard = () => {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4 }}
+              className="w-full"
             >
-              <div className="mb-6">
-                <h2 className="font-heading text-2xl text-foreground">KYC Verification</h2>
-                <p className="text-sm font-body text-muted-foreground mt-0.5">
-                  Review and verify user KYC submissions
-                </p>
-              </div>
+              <KYCAdmin token={token} />
+            </motion.div>
+          )}
 
-              {/* Filter Tabs */}
-              <div className="flex gap-2 mb-6">
-                {(['all', 'pending', 'approved', 'rejected'] as const).map((filter) => (
-                  <button
-                    key={filter}
-                    onClick={() => setKycFilter(filter)}
-                    className={`px-4 py-2 rounded-xl text-sm font-body font-medium transition-colors ${kycFilter === filter
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground hover:bg-muted/80"
-                      }`}
-                  >
-                    {filter.charAt(0).toUpperCase() + filter.slice(1)}
-                  </button>
-                ))}
-              </div>
-
-              {/* KYC List */}
-              <div className="space-y-4">
-                {kycList
-                  .filter(k => kycFilter === 'all' || k.status === kycFilter)
-                  .map((kyc) => (
-                    <motion.div
-                      key={kyc._id}
-                      layout
-                      className="card-premium p-5"
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="flex items-start gap-4">
-                          <div
-                            className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${kyc.status === 'approved' ? 'bg-accent' :
-                              kyc.status === 'pending' ? 'bg-amber-50' : 'bg-red-50'
-                              }`}
-                          >
-                            {kyc.status === 'approved' && <CheckCircle className="h-5 w-5 text-secondary" />}
-                            {kyc.status === 'pending' && <Clock className="h-5 w-5 text-amber-600" />}
-                            {kyc.status === 'rejected' && <XCircle className="h-5 w-5 text-red-500" />}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-3 flex-wrap">
-                              <p className="text-sm font-body font-bold text-foreground">{kyc.fullName}</p>
-                              <span className={`text-[10px] font-body font-semibold px-2 py-0.5 rounded-full border ${statusStyle[kyc.status]}`}>
-                                {kyc.status.charAt(0).toUpperCase() + kyc.status.slice(1)}
-                              </span>
-                            </div>
-                            <p className="text-xs font-body text-muted-foreground mt-0.5">
-                              {kyc.aadhaarNumber} • {kyc.panNumber}
-                            </p>
-                            <p className="text-xs font-body text-muted-foreground">
-                              Submitted: {new Date(kyc.submittedAt).toLocaleDateString()}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex gap-2 shrink-0">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="rounded-xl font-body h-10 px-4"
-                            onClick={() => handleViewKYC(kyc)}
-                          >
-                            <Eye className="mr-1.5 h-3.5 w-3.5" />
-                            View
-                          </Button>
-                          {kyc.status === 'pending' && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="rounded-xl font-body border-red-200 text-red-600 hover:bg-red-50 h-10 px-4"
-                                onClick={() => {
-                                  const reason = prompt("Enter rejection reason (optional):");
-                                  handleKYCAction(kyc._id, 'rejected', reason || undefined);
-                                }}
-                              >
-                                <XCircle className="mr-1.5 h-3.5 w-3.5" />
-                                Reject
-                              </Button>
-                              <Button
-                                size="sm"
-                                className="rounded-xl font-body h-10 px-4"
-                                onClick={() => handleKYCAction(kyc._id, 'approved')}
-                              >
-                                <CheckCircle className="mr-1.5 h-3.5 w-3.5" />
-                                Approve
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
-                {kycList.filter(k => kycFilter === 'all' || k.status === kycFilter).length === 0 && (
-                  <div className="text-center py-12">
-                    <p className="text-sm font-body text-muted-foreground">No KYC submissions found</p>
-                  </div>
-                )}
-              </div>
+          {/* ── REFERRAL & APK MANAGEMENT ── */}
+          {activeTab === "referral" && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="w-full"
+            >
+              <ReferralAdmin token={token} />
             </motion.div>
           )}
 
