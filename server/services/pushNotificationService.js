@@ -128,8 +128,15 @@ const sendToUser = async (userId, payload) => {
       return { success: false, reason: 'no_tokens' };
     }
 
-    const expoTokens = user.fcmTokens.filter(t => t.platform !== 'web').map(t => t.token).filter(Boolean);
-    const webTokens = user.fcmTokens.filter(t => t.platform === 'web').map(t => t.token).filter(Boolean);
+    const expoTokens = (user.fcmTokens || [])
+      .filter(t => t.platform !== 'web')
+      .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
+      .map(t => t.token)
+      .filter(Boolean);
+    const webTokens = (user.fcmTokens || [])
+      .filter(t => t.platform === 'web')
+      .map(t => t.token)
+      .filter(Boolean);
     
     console.log(`[PushService] sendToUser: Retrieved ${expoTokens.length} Expo token(s) and ${webTokens.length} Web token(s) for user "${userId}".`);
 

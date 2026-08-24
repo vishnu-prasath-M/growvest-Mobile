@@ -496,28 +496,34 @@ exports.registerDevice = async (req, res) => {
       });
     }
 
-    // CRITICAL FIX: Also save to User.fcmTokens so sendToUser() can find it
-    // This is the root cause of push notifications not being delivered
+    const { isStandalone } = req.body;
+
+    // CRITICAL FIX: Save to User.fcmTokens and ensure Standalone APK tokens overwrite stale tokens
     const user = await User.findById(userId);
     if (user) {
       const now = new Date();
-      const tokens = Array.isArray(user.fcmTokens) ? [...user.fcmTokens] : [];
+      let tokens = Array.isArray(user.fcmTokens) ? [...user.fcmTokens] : [];
       
-      const existingIndex = tokens.findIndex((entry) => entry.token === deviceToken);
       const tokenEntry = {
         token: deviceToken.trim(),
         platform: normalizedPlatform,
-        deviceId: null,
+        deviceId: isStandalone ? 'standalone_apk' : 'expo_go',
         updatedAt: now,
       };
 
+      if (isStandalone) {
+        // If registering from Standalone APK, remove stale Expo Go tokens for clean delivery
+        tokens = tokens.filter(t => t.deviceId !== 'expo_go' && !t.token.includes('ExpoGo'));
+      }
+
+      const existingIndex = tokens.findIndex((entry) => entry.token === deviceToken.trim());
       if (existingIndex >= 0) {
         tokens[existingIndex] = tokenEntry;
       } else {
         tokens.push(tokenEntry);
       }
 
-      // Deduplicate
+      // Deduplicate keeping newest first
       const dedupedTokens = [];
       const seen = new Set();
       for (let i = tokens.length - 1; i >= 0; i -= 1) {
@@ -530,7 +536,7 @@ exports.registerDevice = async (req, res) => {
 
       user.fcmTokens = dedupedTokens.slice(-10);
       await user.save();
-      console.log(`[PushNotification] Device token saved to User.fcmTokens for user ${userId}`);
+      console.log(`[PushNotification] Active device token saved for user ${userId} (Standalone: ${!!isStandalone})`);
     }
 
     res.status(200).json({ message: 'Device registered successfully' });

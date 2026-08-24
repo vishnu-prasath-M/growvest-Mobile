@@ -150,11 +150,14 @@ export const notificationService = {
         return null;
       }
 
+      const isStandalone = Constants.appOwnership === 'standalone' || Constants.executionEnvironment === 'standalone' || !__DEV__;
+
       await api.post('/users/register-device', {
         userId,
         username,
         deviceToken,
         platform: Platform.OS,
+        isStandalone,
       });
 
       await AsyncStorage.setItem(DEVICE_TOKEN_KEY, deviceToken);
