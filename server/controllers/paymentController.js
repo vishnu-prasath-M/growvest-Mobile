@@ -269,6 +269,8 @@ const completeInvestment = async (user, data, orderId, paymentId, signature) => 
   // 4. Send Push Notification & Save to DB
   try {
     const { sendNotification, notifyAdmins } = require('../services/notificationHelper');
+    const { triggerReferralRewardOnInvestment } = require('../utils/referralHelper');
+
     await sendNotification({
       userId: user._id,
       title: 'Payment Successful',
@@ -281,6 +283,11 @@ const completeInvestment = async (user, data, orderId, paymentId, signature) => 
       type: 'general',
       metadata: { investmentId: investment._id }
     });
+
+    // Trigger Referral Reward for referrer
+    await triggerReferralRewardOnInvestment(user._id, investment._id).catch(err =>
+      console.warn('[ReferralTrigger Error]', err.message)
+    );
   } catch (notifErr) {
     console.error('[PaymentController] Notification error:', notifErr);
   }
@@ -396,6 +403,8 @@ const completeChitJoin = async (user, data, orderId, paymentId, signature) => {
   // 4. Send Notification
   try {
     const { sendNotification, notifyAdmins } = require('../services/notificationHelper');
+    const { triggerReferralRewardOnInvestment } = require('../utils/referralHelper');
+
     await sendNotification({
       userId: user._id,
       title: 'Chit Joined Successfully',
@@ -410,6 +419,11 @@ const completeChitJoin = async (user, data, orderId, paymentId, signature) => {
       type: 'general',
       metadata: { chitId: chit._id, memberId: member._id }
     });
+
+    // Trigger Referral Reward for referrer
+    await triggerReferralRewardOnInvestment(user._id, member._id).catch(err =>
+      console.warn('[ReferralTrigger Error]', err.message)
+    );
   } catch (notifErr) {
     console.error('[PaymentController] Notification error:', notifErr);
   }
