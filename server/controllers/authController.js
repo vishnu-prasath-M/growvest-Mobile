@@ -131,12 +131,26 @@ exports.loginUser = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
+    if (!user.referralCode) {
+      let code = '';
+      let isUnique = false;
+      while (!isUnique) {
+        code = 'GV' + Math.random().toString(36).substring(2, 6).toUpperCase();
+        const count = await User.countDocuments({ referralCode: code });
+        if (count === 0) isUnique = true;
+      }
+      user.referralCode = code;
+      await user.save();
+    }
+
     res.json({
       _id: user._id,
       name: user.name,
       username: user.username,
       email: user.email,
       mobileNumber: user.mobileNumber,
+      referralCode: user.referralCode,
+      coinBalance: user.coinBalance || 0,
       role: user.role,
       createdAt: user.createdAt,
       token: generateToken(user._id),
@@ -151,12 +165,26 @@ exports.getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
     if (user) {
+      if (!user.referralCode) {
+        let code = '';
+        let isUnique = false;
+        while (!isUnique) {
+          code = 'GV' + Math.random().toString(36).substring(2, 6).toUpperCase();
+          const count = await User.countDocuments({ referralCode: code });
+          if (count === 0) isUnique = true;
+        }
+        user.referralCode = code;
+        await user.save();
+      }
+
       res.json({
         _id: user._id,
         name: user.name,
         username: user.username,
         email: user.email,
         mobileNumber: user.mobileNumber,
+        referralCode: user.referralCode,
+        coinBalance: user.coinBalance || 0,
         role: user.role,
         balance: user.balance,
         createdAt: user.createdAt,

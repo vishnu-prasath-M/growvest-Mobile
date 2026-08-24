@@ -277,7 +277,7 @@ app.get('/reset-password', (req, res) => {
 });
 
 // Web referral landing page route
-app.get('/ref/:code', (req, res) => {
+app.get(['/ref', '/ref/', '/ref/:code'], (req, res) => {
   res.sendFile(require('path').join(__dirname, 'public', 'ref-landing.html'));
 });
 
