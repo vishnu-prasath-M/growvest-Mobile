@@ -19,7 +19,7 @@ import { kycService } from '../../services/kycService';
 const ChitPaymentScreen = ({ navigation, route }) => {
   const { colors: themeColors } = useTheme();
   const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
-  const { chitId, memberId, month, amount, lateFee = 0, type, chitName, returnScreen } = route.params;
+  const { chitId, memberId, month, amount, lateFee = 0, type, chitName, returnScreen, isWeekly } = route.params;
   const [loading, setLoading] = useState(false);
   const [userData, setUserData] = useState(null);
   const [kycModalVisible, setKycModalVisible] = useState(false);
@@ -108,7 +108,7 @@ const ChitPaymentScreen = ({ navigation, route }) => {
                 <MaterialCommunityIcons name="cash-multiple" size={20} color={colors.gold} />
               </View>
               <Text style={styles.summaryType}>
-                {type === 'join' ? `Join Chit - ${chitName}` : `Chit Payment - Month ${month}`}
+                {type === 'join' ? `Join Chit - ${chitName}` : `Chit Payment - ${isWeekly ? 'Week' : 'Month'} ${month}`}
               </Text>
             </View>
             <View style={styles.summaryAmountRow}>

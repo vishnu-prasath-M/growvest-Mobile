@@ -9,7 +9,6 @@ import {
   TouchableOpacity,
   Dimensions,
   ActivityIndicator,
-  Keyboard,
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -60,20 +59,6 @@ const ResetPasswordScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [resetSuccess, setResetSuccess] = useState(false);
-  const [scrollEnabled, setScrollEnabled] = useState(false);
-
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-
-    const showSub = Keyboard.addListener(showEvent, () => setScrollEnabled(true));
-    const hideSub = Keyboard.addListener(hideEvent, () => setScrollEnabled(false));
-
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
 
   // Verify token on mount
   useEffect(() => {
@@ -150,221 +135,231 @@ const ResetPasswordScreen = ({ navigation, route }) => {
   return (
     <View style={styles.rootContainer}>
       <StatusBar barStyle="light-content" backgroundColor="#0E3D23" />
-      <SafeAreaView style={styles.safeAreaTop} edges={['top']}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.container}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      <SafeAreaView style={styles.headerSafeArea} edges={['top']}>
+        <View style={styles.headerGradientBg}>
+          <LinearGradient
+            colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+        </View>
+      </SafeAreaView>
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          scrollEnabled={true}
+          bounces={true}
         >
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            scrollEnabled={scrollEnabled}
-            bounces={false}
+          {/* Header */}
+          <LinearGradient
+            colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.headerArea}
           >
-            {/* Header */}
-            <LinearGradient
-              colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.headerArea}
-            >
-              <View style={styles.blobTopRight} />
-              <View style={styles.blobBottomGold} />
+            <View style={styles.blobTopRight} />
+            <View style={styles.blobBottomGold} />
 
-              <View style={styles.logoWrapper}>
-                <MaterialCommunityIcons name="shield-key-outline" size={40} color="#ffffff" />
+            <View style={styles.logoWrapper}>
+              <MaterialCommunityIcons name="shield-key-outline" size={40} color="#ffffff" />
+            </View>
+            <Text style={styles.appName}>Set New Password</Text>
+            <Text style={styles.tagline}>Create a strong, secure password for your account.</Text>
+          </LinearGradient>
+
+          {/* Form Card */}
+          <View style={styles.formCard}>
+            {verifying ? (
+              <View style={styles.centeredState}>
+                <ActivityIndicator size="large" color={themeColors.primary || colors.primary} />
+                <Text style={styles.verifyingText}>Verifying your reset link...</Text>
               </View>
-              <Text style={styles.appName}>Set New Password</Text>
-              <Text style={styles.tagline}>Create a strong, secure password for your account.</Text>
-            </LinearGradient>
+            ) : !tokenValid ? (
+              /* Invalid / Expired Token State */
+              <View style={styles.centeredState}>
+                <View style={styles.errorIconWrapper}>
+                  <MaterialCommunityIcons name="alert-circle-outline" size={48} color={colors.error} />
+                </View>
+                <Text style={styles.invalidTitle}>Link Invalid or Expired</Text>
+                <Text style={styles.invalidMessage}>{invalidReason}</Text>
+                <TouchableOpacity
+                  style={styles.requestNewBtn}
+                  onPress={() => navigation.navigate('ForgotPassword')}
+                  activeOpacity={0.85}
+                >
+                  <LinearGradient
+                    colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+                    style={styles.requestNewGradient}
+                  >
+                    <Text style={styles.requestNewText}>Request New Link</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.backToLoginTextBtn}
+                  onPress={() => navigation.navigate('Login')}
+                >
+                  <Text style={styles.backToLoginTextOnly}>Back to Sign In</Text>
+                </TouchableOpacity>
+              </View>
+            ) : resetSuccess ? (
+              /* Success State */
+              <View style={styles.centeredState}>
+                <View style={styles.successIconWrapper}>
+                  <MaterialCommunityIcons name="check-circle-outline" size={56} color="#10b981" />
+                </View>
+                <Text style={styles.invalidTitle}>Password Reset Complete!</Text>
+                <Text style={styles.invalidMessage}>
+                  Your password has been updated successfully. You can now sign in with your new credentials.
+                </Text>
+                <TouchableOpacity
+                  style={styles.requestNewBtn}
+                  onPress={() => navigation.navigate('Login')}
+                  activeOpacity={0.85}
+                >
+                  <LinearGradient
+                    colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+                    style={styles.requestNewGradient}
+                  >
+                    <Text style={styles.requestNewText}>Sign In Now</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              /* Active Form */
+              <>
+                <View style={styles.welcomeSection}>
+                  <Text style={styles.welcomeTitle}>New Password</Text>
+                  {!!email && <Text style={styles.welcomeSubtitle}>Resetting password for {email}</Text>}
+                </View>
 
-            {/* Form Card */}
-            <View style={styles.formCard}>
-              {verifying ? (
-                <View style={styles.centeredState}>
-                  <ActivityIndicator size="large" color={themeColors.primary || colors.primary} />
-                  <Text style={styles.verifyingText}>Verifying your reset link...</Text>
-                </View>
-              ) : !tokenValid ? (
-                /* Invalid / Expired Token State */
-                <View style={styles.centeredState}>
-                  <View style={styles.errorIconWrapper}>
-                    <MaterialCommunityIcons name="alert-circle-outline" size={48} color={colors.error} />
+                {!!errors.form && (
+                  <View style={styles.formErrorBanner}>
+                    <MaterialCommunityIcons name="alert-circle" size={18} color={colors.error} />
+                    <Text style={styles.formErrorText}>{errors.form}</Text>
                   </View>
-                  <Text style={styles.invalidTitle}>Link Invalid or Expired</Text>
-                  <Text style={styles.invalidMessage}>{invalidReason}</Text>
-                  <TouchableOpacity
-                    style={styles.requestNewBtn}
-                    onPress={() => navigation.navigate('ForgotPassword')}
-                    activeOpacity={0.85}
-                  >
-                    <LinearGradient
-                      colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
-                      style={styles.requestNewGradient}
-                    >
-                      <Text style={styles.requestNewText}>Request New Link</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.backToLoginTextBtn}
-                    onPress={() => navigation.navigate('Login')}
-                  >
-                    <Text style={styles.backToLoginTextOnly}>Back to Sign In</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : resetSuccess ? (
-                /* Success State */
-                <View style={styles.centeredState}>
-                  <View style={styles.successIconWrapper}>
-                    <MaterialCommunityIcons name="check-circle-outline" size={56} color="#10b981" />
-                  </View>
-                  <Text style={styles.invalidTitle}>Password Reset Complete!</Text>
-                  <Text style={styles.invalidMessage}>
-                    Your password has been updated successfully. You can now sign in with your new credentials.
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.requestNewBtn}
-                    onPress={() => navigation.navigate('Login')}
-                    activeOpacity={0.85}
-                  >
-                    <LinearGradient
-                      colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
-                      style={styles.requestNewGradient}
-                    >
-                      <Text style={styles.requestNewText}>Sign In Now</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                /* Active Form */
-                <>
-                  <View style={styles.welcomeSection}>
-                    <Text style={styles.welcomeTitle}>New Password</Text>
-                    {!!email && <Text style={styles.welcomeSubtitle}>Resetting password for {email}</Text>}
-                  </View>
+                )}
 
-                  {!!errors.form && (
-                    <View style={styles.formErrorBanner}>
-                      <MaterialCommunityIcons name="alert-circle" size={18} color={colors.error} />
-                      <Text style={styles.formErrorText}>{errors.form}</Text>
+                {/* Password Input */}
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>New Password</Text>
+                  <TextInput
+                    value={password}
+                    onChangeText={(v) => { setPassword(v); setErrors((e) => ({ ...e, password: undefined })); }}
+                    mode="flat"
+                    style={styles.input}
+                    underlineColor="transparent"
+                    activeUnderlineColor="transparent"
+                    placeholder="Min. 8 characters"
+                    placeholderTextColor={colors.textTertiary}
+                    secureTextEntry={!showPassword}
+                    error={!!errors.password}
+                    left={<TextInput.Icon icon="lock-outline" color={colors.textMuted} />}
+                    right={
+                      <TextInput.Icon
+                        icon={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                        onPress={() => setShowPassword(!showPassword)}
+                        color={colors.textMuted}
+                      />
+                    }
+                  />
+                  {/* Strength Bar */}
+                  {!!password && (
+                    <View style={styles.strengthContainer}>
+                      <View style={styles.strengthTrack}>
+                        <View
+                          style={[
+                            styles.strengthFill,
+                            {
+                              width: `${(strength / 4) * 100}%`,
+                              backgroundColor: STRENGTH_COLORS[strength - 1] || '#9ca3af',
+                            },
+                          ]}
+                        />
+                      </View>
+                      <Text style={[styles.strengthLabel, { color: STRENGTH_COLORS[strength - 1] || '#9ca3af' }]}>
+                        {STRENGTH_LABELS[strength - 1] || ''}
+                      </Text>
                     </View>
                   )}
+                  {!!errors.password && (
+                    <View style={styles.errorRow}>
+                      <MaterialCommunityIcons name="alert-circle-outline" size={14} color={colors.error} />
+                      <Text style={styles.errorText}>{errors.password}</Text>
+                    </View>
+                  )}
+                </View>
 
-                  {/* Password Input */}
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.inputLabel}>New Password</Text>
-                    <TextInput
-                      value={password}
-                      onChangeText={(v) => { setPassword(v); setErrors((e) => ({ ...e, password: undefined })); }}
-                      mode="flat"
-                      style={styles.input}
-                      underlineColor="transparent"
-                      activeUnderlineColor="transparent"
-                      placeholder="Min. 8 characters"
-                      placeholderTextColor={colors.textTertiary}
-                      secureTextEntry={!showPassword}
-                      error={!!errors.password}
-                      left={<TextInput.Icon icon="lock-outline" color={colors.textMuted} />}
-                      right={
-                        <TextInput.Icon
-                          icon={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                          onPress={() => setShowPassword(!showPassword)}
-                          color={colors.textMuted}
-                        />
-                      }
-                    />
-                    {/* Strength Bar */}
-                    {!!password && (
-                      <View style={styles.strengthContainer}>
-                        <View style={styles.strengthTrack}>
-                          <View
-                            style={[
-                              styles.strengthFill,
-                              {
-                                width: `${(strength / 4) * 100}%`,
-                                backgroundColor: STRENGTH_COLORS[strength - 1] || '#9ca3af',
-                              },
-                            ]}
-                          />
-                        </View>
-                        <Text style={[styles.strengthLabel, { color: STRENGTH_COLORS[strength - 1] || '#9ca3af' }]}>
-                          {STRENGTH_LABELS[strength - 1] || ''}
-                        </Text>
-                      </View>
-                    )}
-                    {!!errors.password && (
-                      <View style={styles.errorRow}>
-                        <MaterialCommunityIcons name="alert-circle-outline" size={14} color={colors.error} />
-                        <Text style={styles.errorText}>{errors.password}</Text>
-                      </View>
-                    )}
-                  </View>
+                {/* Confirm Password Input */}
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>Confirm Password</Text>
+                  <TextInput
+                    value={confirm}
+                    onChangeText={(v) => { setConfirm(v); setErrors((e) => ({ ...e, confirm: undefined })); }}
+                    mode="flat"
+                    style={styles.input}
+                    underlineColor="transparent"
+                    activeUnderlineColor="transparent"
+                    placeholder="Re-enter new password"
+                    placeholderTextColor={colors.textTertiary}
+                    secureTextEntry={!showConfirm}
+                    error={!!errors.confirm}
+                    left={<TextInput.Icon icon="lock-check-outline" color={colors.textMuted} />}
+                    right={
+                      <TextInput.Icon
+                        icon={showConfirm ? 'eye-off-outline' : 'eye-outline'}
+                        onPress={() => setShowConfirm(!showConfirm)}
+                        color={colors.textMuted}
+                      />
+                    }
+                  />
+                  {!!errors.confirm && (
+                    <View style={styles.errorRow}>
+                      <MaterialCommunityIcons name="alert-circle-outline" size={14} color={colors.error} />
+                      <Text style={styles.errorText}>{errors.confirm}</Text>
+                    </View>
+                  )}
+                </View>
 
-                  {/* Confirm Password Input */}
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.inputLabel}>Confirm Password</Text>
-                    <TextInput
-                      value={confirm}
-                      onChangeText={(v) => { setConfirm(v); setErrors((e) => ({ ...e, confirm: undefined })); }}
-                      mode="flat"
-                      style={styles.input}
-                      underlineColor="transparent"
-                      activeUnderlineColor="transparent"
-                      placeholder="Re-enter new password"
-                      placeholderTextColor={colors.textTertiary}
-                      secureTextEntry={!showConfirm}
-                      error={!!errors.confirm}
-                      left={<TextInput.Icon icon="lock-check-outline" color={colors.textMuted} />}
-                      right={
-                        <TextInput.Icon
-                          icon={showConfirm ? 'eye-off-outline' : 'eye-outline'}
-                          onPress={() => setShowConfirm(!showConfirm)}
-                          color={colors.textMuted}
-                        />
-                      }
-                    />
-                    {!!errors.confirm && (
-                      <View style={styles.errorRow}>
-                        <MaterialCommunityIcons name="alert-circle-outline" size={14} color={colors.error} />
-                        <Text style={styles.errorText}>{errors.confirm}</Text>
-                      </View>
-                    )}
-                  </View>
-
-                  {/* Submit Button */}
-                  <TouchableOpacity
-                    style={[styles.submitBtn, loading && styles.submitBtnDisabled]}
-                    activeOpacity={0.85}
-                    onPress={handleReset}
-                    disabled={loading}
+                {/* Submit Button */}
+                <TouchableOpacity
+                  style={[styles.submitBtn, loading && styles.submitBtnDisabled]}
+                  activeOpacity={0.85}
+                  onPress={handleReset}
+                  disabled={loading}
+                >
+                  <LinearGradient
+                    colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.submitBtnGradient}
                   >
-                    <LinearGradient
-                      colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.submitBtnGradient}
-                    >
-                      {loading ? (
-                        <>
-                          <ActivityIndicator size="small" color="#fff" />
-                          <Text style={styles.submitBtnText}>Resetting...</Text>
-                        </>
-                      ) : (
-                        <>
-                          <Text style={styles.submitBtnText}>Update Password</Text>
-                          <MaterialCommunityIcons name="check" size={20} color="#fff" />
-                        </>
-                      )}
-                    </LinearGradient>
-                  </TouchableOpacity>
-                </>
-              )}
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+                    {loading ? (
+                      <>
+                        <ActivityIndicator size="small" color="#fff" />
+                        <Text style={styles.submitBtnText}>Resetting...</Text>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={styles.submitBtnText}>Update Password</Text>
+                        <MaterialCommunityIcons name="check" size={20} color="#fff" />
+                      </>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
       <SafeAreaView style={styles.safeAreaBottom} edges={['bottom']} />
     </View>
   );
@@ -372,9 +367,11 @@ const ResetPasswordScreen = ({ navigation, route }) => {
 
 const getStyles = (themeColors) => StyleSheet.create({
   rootContainer: { flex: 1, backgroundColor: themeColors.surface || colors.surface },
-  safeAreaTop: { flex: 1, backgroundColor: '#0E3D23' },
+  headerSafeArea: { backgroundColor: '#0E3D23' },
+  headerGradientBg: { height: 0 },
   safeAreaBottom: { backgroundColor: themeColors.surface || colors.surface },
-  container: { flex: 1, backgroundColor: themeColors.surface || colors.surface },
+  keyboardView: { flex: 1, backgroundColor: themeColors.surface || colors.surface },
+  scrollView: { flex: 1, backgroundColor: themeColors.surface || colors.surface },
   scrollContent: { flexGrow: 1, backgroundColor: themeColors.surface || colors.surface },
 
   headerArea: {
@@ -407,7 +404,7 @@ const getStyles = (themeColors) => StyleSheet.create({
     backgroundColor: themeColors.surface || colors.surface,
     borderTopLeftRadius: 32, borderTopRightRadius: 32,
     marginTop: -28, flex: 1,
-    paddingHorizontal: 24, paddingTop: 28, paddingBottom: 40,
+    paddingHorizontal: 24, paddingTop: 28, paddingBottom: 50,
     minHeight: height * 0.68,
   },
 

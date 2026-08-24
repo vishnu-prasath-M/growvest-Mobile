@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,6 @@ import {
   TouchableOpacity,
   Dimensions,
   Image,
-  Keyboard,
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -32,22 +31,8 @@ const LoginScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
-  const [scrollEnabled, setScrollEnabled] = useState(false);
 
   const { login } = useAuth();
-
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-
-    const showSub = Keyboard.addListener(showEvent, () => setScrollEnabled(true));
-    const hideSub = Keyboard.addListener(hideEvent, () => setScrollEnabled(false));
-
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
 
   const validateForm = () => {
     const newErrors = {};
@@ -74,129 +59,139 @@ const LoginScreen = ({ navigation }) => {
   return (
     <View style={styles.rootContainer}>
       <StatusBar barStyle="light-content" backgroundColor="#0E3D23" />
-      <SafeAreaView style={styles.safeAreaTop} edges={['top']}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.container}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      <SafeAreaView style={styles.headerSafeArea} edges={['top']}>
+        <View style={styles.headerGradientBg}>
+          <LinearGradient
+            colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+        </View>
+      </SafeAreaView>
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          scrollEnabled={true}
+          bounces={true}
         >
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            scrollEnabled={scrollEnabled}
-            bounces={false}
+          {/* Gradient Top Section */}
+          <LinearGradient
+            colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.headerArea}
           >
-            {/* Gradient Top Section */}
-            <LinearGradient
-              colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.headerArea}
-            >
-              <View style={styles.blobTopRight} />
-              <View style={styles.blobBottomGold} />
+            <View style={styles.blobTopRight} />
+            <View style={styles.blobBottomGold} />
 
-              <View style={styles.logoWrapper}>
-                <Image
-                  source={require('../../../assets/growvest-logo.png')}
-                  style={{ width: 56, height: 56, borderRadius: 14 }}
+            <View style={styles.logoWrapper}>
+              <Image
+                source={require('../../../assets/growvest-logo.png')}
+                style={{ width: 56, height: 56, borderRadius: 14 }}
+              />
+            </View>
+            <Text style={styles.appName}>Growvest</Text>
+            <Text style={styles.tagline}>Premium Investments</Text>
+          </LinearGradient>
+
+          {/* Form Section (Surface Card overlapping header) */}
+          <View style={styles.formCard}>
+            <View style={styles.welcomeSection}>
+              <Text style={styles.welcomeTitle}>Welcome Back</Text>
+              <Text style={styles.welcomeSubtitle}>Sign in to your account</Text>
+            </View>
+
+            <View style={styles.formSection}>
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Email Address or Mobile Number</Text>
+                <TextInput
+                  value={email}
+                  onChangeText={setEmail}
+                  mode="flat"
+                  style={styles.input}
+                  underlineColor="transparent"
+                  activeUnderlineColor="transparent"
+                  placeholder="Enter your email or Phone Number"
+                  placeholderTextColor={colors.textTertiary}
+                  error={!!errors.email}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  left={<TextInput.Icon icon="email-outline" color={colors.textMuted} />}
                 />
-              </View>
-              <Text style={styles.appName}>Growvest</Text>
-              <Text style={styles.tagline}>Premium Investments</Text>
-            </LinearGradient>
-
-            {/* Form Section (Surface Card overlapping header) */}
-            <View style={styles.formCard}>
-              <View style={styles.welcomeSection}>
-                <Text style={styles.welcomeTitle}>Welcome Back</Text>
-                <Text style={styles.welcomeSubtitle}>Sign in to your account</Text>
+                {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
               </View>
 
-              <View style={styles.formSection}>
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>Email Address or Mobile Number</Text>
-                  <TextInput
-                    value={email}
-                    onChangeText={setEmail}
-                    mode="flat"
-                    style={styles.input}
-                    underlineColor="transparent"
-                    activeUnderlineColor="transparent"
-                    placeholder="Enter your email or Phone Number"
-                    placeholderTextColor={colors.textTertiary}
-                    error={!!errors.email}
-                    autoCapitalize="none"
-                    keyboardType="email-address"
-                    left={<TextInput.Icon icon="email-outline" color={colors.textMuted} />}
-                  />
-                  {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
-                </View>
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Password</Text>
+                <TextInput
+                  value={password}
+                  onChangeText={setPassword}
+                  mode="flat"
+                  style={styles.input}
+                  underlineColor="transparent"
+                  activeUnderlineColor="transparent"
+                  placeholder="Enter your password"
+                  placeholderTextColor={colors.textTertiary}
+                  secureTextEntry={!showPassword}
+                  error={!!errors.password}
+                  left={<TextInput.Icon icon="lock-outline" color={colors.textMuted} />}
+                  right={
+                    <TextInput.Icon
+                      icon={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                      onPress={() => setShowPassword(!showPassword)}
+                      color={colors.textMuted}
+                    />
+                  }
+                />
+                {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+              </View>
 
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>Password</Text>
-                  <TextInput
-                    value={password}
-                    onChangeText={setPassword}
-                    mode="flat"
-                    style={styles.input}
-                    underlineColor="transparent"
-                    activeUnderlineColor="transparent"
-                    placeholder="Enter your password"
-                    placeholderTextColor={colors.textTertiary}
-                    secureTextEntry={!showPassword}
-                    error={!!errors.password}
-                    left={<TextInput.Icon icon="lock-outline" color={colors.textMuted} />}
-                    right={
-                      <TextInput.Icon
-                        icon={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                        onPress={() => setShowPassword(!showPassword)}
-                        color={colors.textMuted}
-                      />
-                    }
-                  />
-                  {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
-                </View>
+              <TouchableOpacity style={styles.forgotBtn} activeOpacity={0.8} onPress={() => navigation.navigate('ForgotPassword')}>
+                <Text style={styles.forgotText}>Forgot Password?</Text>
+              </TouchableOpacity>
 
-                <TouchableOpacity style={styles.forgotBtn} activeOpacity={0.8} onPress={() => navigation.navigate('ForgotPassword')}>
-                  <Text style={styles.forgotText}>Forgot Password?</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.loginBtnOuter, loading && styles.loginBtnDisabled]}
-                  activeOpacity={0.85}
-                  onPress={handleLogin}
-                  disabled={loading}
+              <TouchableOpacity
+                style={[styles.loginBtnOuter, loading && styles.loginBtnDisabled]}
+                activeOpacity={0.85}
+                onPress={handleLogin}
+                disabled={loading}
+              >
+                <LinearGradient
+                  colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.loginBtnGradient}
                 >
-                  <LinearGradient
-                    colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.loginBtnGradient}
-                  >
-                    {loading ? (
-                      <Text style={styles.loginBtnText}>Signing in...</Text>
-                    ) : (
-                      <>
-                        <Text style={styles.loginBtnText}>Sign In</Text>
-                        <MaterialCommunityIcons name="arrow-right" size={20} color={colors.white} />
-                      </>
-                    )}
-                  </LinearGradient>
-                </TouchableOpacity>
+                  {loading ? (
+                    <Text style={styles.loginBtnText}>Signing in...</Text>
+                  ) : (
+                    <>
+                      <Text style={styles.loginBtnText}>Sign In</Text>
+                      <MaterialCommunityIcons name="arrow-right" size={20} color={colors.white} />
+                    </>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
 
-                <View style={styles.signupRow}>
-                  <Text style={styles.signupText}>Don't have an account? </Text>
-                  <TouchableOpacity onPress={() => navigation.navigate('Signup')} activeOpacity={0.7}>
-                    <Text style={styles.signupLink}>Create one</Text>
-                  </TouchableOpacity>
-                </View>
+              <View style={styles.signupRow}>
+                <Text style={styles.signupText}>Don't have an account? </Text>
+                <TouchableOpacity onPress={() => navigation.navigate('Signup')} activeOpacity={0.7}>
+                  <Text style={styles.signupLink}>Create one</Text>
+                </TouchableOpacity>
               </View>
             </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
       <SafeAreaView style={styles.safeAreaBottom} edges={['bottom']} />
     </View>
   );
@@ -204,9 +199,11 @@ const LoginScreen = ({ navigation }) => {
 
 const getStyles = (themeColors) => StyleSheet.create({
   rootContainer: { flex: 1, backgroundColor: themeColors.surface || colors.surface },
-  safeAreaTop: { flex: 1, backgroundColor: '#0E3D23' },
+  headerSafeArea: { backgroundColor: '#0E3D23' },
+  headerGradientBg: { height: 0 },
   safeAreaBottom: { backgroundColor: themeColors.surface || colors.surface },
-  container: { flex: 1, backgroundColor: themeColors.surface || colors.surface },
+  keyboardView: { flex: 1, backgroundColor: themeColors.surface || colors.surface },
+  scrollView: { flex: 1, backgroundColor: themeColors.surface || colors.surface },
   scrollContent: { flexGrow: 1, backgroundColor: themeColors.surface || colors.surface },
 
   // Header Area
@@ -241,7 +238,7 @@ const getStyles = (themeColors) => StyleSheet.create({
     backgroundColor: themeColors.surface || colors.surface,
     borderTopLeftRadius: 32, borderTopRightRadius: 32,
     marginTop: -28, flex: 1,
-    paddingHorizontal: 24, paddingTop: 28, paddingBottom: 40,
+    paddingHorizontal: 24, paddingTop: 28, paddingBottom: 50,
     minHeight: height * 0.68,
   },
   welcomeSection: { marginBottom: 20 },

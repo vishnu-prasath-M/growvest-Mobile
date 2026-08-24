@@ -148,7 +148,7 @@
           downloadBtn.href = data.downloadUrl || '/api/referral/apk/download';
           if (data.fileName) {
             downloadBtn.setAttribute('download', data.fileName);
-            downloadBtn.innerHTML = '📱 Download Android App (' + data.fileName + ')';
+            downloadBtn.innerHTML = '📱 Download Android App';
           }
         } else {
           downloadBtn.innerHTML = '⏳ APK Update Pending';

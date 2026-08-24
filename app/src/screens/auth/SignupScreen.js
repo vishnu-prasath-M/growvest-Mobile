@@ -10,7 +10,6 @@ import {
   TouchableOpacity,
   Dimensions,
   Image,
-  Keyboard,
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -36,22 +35,8 @@ const SignupScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
-  const [scrollEnabled, setScrollEnabled] = useState(false);
 
   const { login } = useAuth();
-
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-
-    const showSub = Keyboard.addListener(showEvent, () => setScrollEnabled(true));
-    const hideSub = Keyboard.addListener(hideEvent, () => setScrollEnabled(false));
-
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
 
   useEffect(() => {
     const checkPendingRefCode = async () => {
@@ -112,183 +97,193 @@ const SignupScreen = ({ navigation }) => {
   return (
     <View style={styles.rootContainer}>
       <StatusBar barStyle="light-content" backgroundColor="#0E3D23" />
-      <SafeAreaView style={styles.safeAreaTop} edges={['top']}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.container}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-        >
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            scrollEnabled={scrollEnabled}
-            bounces={false}
-          >
-            {/* Gradient Top Section */}
-            <LinearGradient
-              colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.headerArea}
-            >
-              <View style={styles.blobTopRight} />
+      <SafeAreaView style={styles.headerSafeArea} edges={['top']}>
+        <View style={styles.headerGradientBg}>
+          <LinearGradient
+            colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+        </View>
+      </SafeAreaView>
 
-              <View style={styles.logoWrapper}>
-                <Image
-                  source={require('../../../assets/growvest-logo.png')}
-                  style={{ width: 48, height: 48, borderRadius: 12 }}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          scrollEnabled={true}
+          bounces={true}
+        >
+          {/* Top Header Card */}
+          <LinearGradient
+            colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.headerArea}
+          >
+            <View style={styles.blobTopRight} />
+
+            <View style={styles.logoWrapper}>
+              <Image
+                source={require('../../../assets/growvest-logo.png')}
+                style={{ width: 48, height: 48, borderRadius: 12 }}
+              />
+            </View>
+            <Text style={styles.appName}>Join Growvest</Text>
+            <Text style={styles.tagline}>Smart Wealth Creation</Text>
+          </LinearGradient>
+
+          {/* Form Card */}
+          <View style={styles.formCard}>
+            <View style={styles.welcomeSection}>
+              <Text style={styles.welcomeTitle}>Create Account</Text>
+              <Text style={styles.welcomeSubtitle}>Start your investment journey</Text>
+            </View>
+
+            <View style={styles.formSection}>
+              {/* Username */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Username</Text>
+                <TextInput
+                  value={username}
+                  onChangeText={setUsername}
+                  mode="flat"
+                  style={styles.input}
+                  underlineColor="transparent"
+                  activeUnderlineColor="transparent"
+                  placeholder="Choose a username"
+                  placeholderTextColor={colors.textTertiary}
+                  error={!!errors.username}
+                  autoCapitalize="none"
+                  left={<TextInput.Icon icon="account-outline" color={colors.textMuted} />}
+                />
+                {errors.username && <Text style={styles.errorText}>{errors.username}</Text>}
+              </View>
+
+              {/* Mobile Number */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Mobile Number</Text>
+                <TextInput
+                  value={mobileNumber}
+                  onChangeText={setMobileNumber}
+                  mode="flat"
+                  style={styles.input}
+                  underlineColor="transparent"
+                  activeUnderlineColor="transparent"
+                  placeholder="10-digit mobile number"
+                  placeholderTextColor={colors.textTertiary}
+                  keyboardType="number-pad"
+                  maxLength={10}
+                  error={!!errors.mobileNumber}
+                  left={<TextInput.Icon icon="phone-outline" color={colors.textMuted} />}
+                />
+                {errors.mobileNumber && <Text style={styles.errorText}>{errors.mobileNumber}</Text>}
+              </View>
+
+              {/* Email */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Email</Text>
+                <TextInput
+                  value={email}
+                  onChangeText={setEmail}
+                  mode="flat"
+                  style={styles.input}
+                  underlineColor="transparent"
+                  activeUnderlineColor="transparent"
+                  placeholder="Enter your email"
+                  placeholderTextColor={colors.textTertiary}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  error={!!errors.email}
+                  left={<TextInput.Icon icon="email-outline" color={colors.textMuted} />}
+                />
+                {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+              </View>
+
+              {/* Password */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Password</Text>
+                <TextInput
+                  value={password}
+                  onChangeText={setPassword}
+                  mode="flat"
+                  style={styles.input}
+                  underlineColor="transparent"
+                  activeUnderlineColor="transparent"
+                  placeholder="Create a password"
+                  placeholderTextColor={colors.textTertiary}
+                  secureTextEntry={!showPassword}
+                  error={!!errors.password}
+                  left={<TextInput.Icon icon="lock-outline" color={colors.textMuted} />}
+                  right={
+                    <TextInput.Icon
+                      icon={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                      onPress={() => setShowPassword(!showPassword)}
+                      color={colors.textMuted}
+                    />
+                  }
+                />
+                {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+              </View>
+
+              {/* Referral Code (Optional) */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Referral Code (Optional)</Text>
+                <TextInput
+                  value={referralCode}
+                  onChangeText={(val) => setReferralCode(val.toUpperCase())}
+                  mode="flat"
+                  style={styles.input}
+                  underlineColor="transparent"
+                  activeUnderlineColor="transparent"
+                  placeholder="Enter referral code if any"
+                  placeholderTextColor={colors.textTertiary}
+                  autoCapitalize="characters"
+                  left={<TextInput.Icon icon="gift-outline" color={colors.textMuted} />}
                 />
               </View>
-              <Text style={styles.appName}>Join Growvest</Text>
-              <Text style={styles.tagline}>Smart Wealth Creation</Text>
-            </LinearGradient>
 
-            {/* Form Section */}
-            <View style={styles.formCard}>
-              <View style={styles.welcomeSection}>
-                <Text style={styles.welcomeTitle}>Create Account</Text>
-                <Text style={styles.welcomeSubtitle}>Start your investment journey</Text>
-              </View>
-
-              <View style={styles.formSection}>
-                {/* Username */}
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>Username</Text>
-                  <TextInput
-                    value={username}
-                    onChangeText={setUsername}
-                    mode="flat"
-                    style={styles.input}
-                    underlineColor="transparent"
-                    activeUnderlineColor="transparent"
-                    placeholder="Choose a username"
-                    placeholderTextColor={colors.textTertiary}
-                    error={!!errors.username}
-                    autoCapitalize="none"
-                    left={<TextInput.Icon icon="account-outline" color={colors.textMuted} />}
-                  />
-                  {errors.username && <Text style={styles.errorText}>{errors.username}</Text>}
-                </View>
-
-                {/* Mobile Number */}
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>Mobile Number</Text>
-                  <TextInput
-                    value={mobileNumber}
-                    onChangeText={setMobileNumber}
-                    mode="flat"
-                    style={styles.input}
-                    underlineColor="transparent"
-                    activeUnderlineColor="transparent"
-                    placeholder="10-digit mobile number"
-                    placeholderTextColor={colors.textTertiary}
-                    keyboardType="number-pad"
-                    maxLength={10}
-                    error={!!errors.mobileNumber}
-                    left={<TextInput.Icon icon="phone-outline" color={colors.textMuted} />}
-                  />
-                  {errors.mobileNumber && <Text style={styles.errorText}>{errors.mobileNumber}</Text>}
-                </View>
-
-                {/* Email */}
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>Email</Text>
-                  <TextInput
-                    value={email}
-                    onChangeText={setEmail}
-                    mode="flat"
-                    style={styles.input}
-                    underlineColor="transparent"
-                    activeUnderlineColor="transparent"
-                    placeholder="Enter your email"
-                    placeholderTextColor={colors.textTertiary}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    error={!!errors.email}
-                    left={<TextInput.Icon icon="email-outline" color={colors.textMuted} />}
-                  />
-                  {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
-                </View>
-
-                {/* Password */}
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>Password</Text>
-                  <TextInput
-                    value={password}
-                    onChangeText={setPassword}
-                    mode="flat"
-                    style={styles.input}
-                    underlineColor="transparent"
-                    activeUnderlineColor="transparent"
-                    placeholder="Create a password"
-                    placeholderTextColor={colors.textTertiary}
-                    secureTextEntry={!showPassword}
-                    error={!!errors.password}
-                    left={<TextInput.Icon icon="lock-outline" color={colors.textMuted} />}
-                    right={
-                      <TextInput.Icon
-                        icon={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                        onPress={() => setShowPassword(!showPassword)}
-                        color={colors.textMuted}
-                      />
-                    }
-                  />
-                  {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
-                </View>
-
-                {/* Referral Code (Optional) */}
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>Referral Code (Optional)</Text>
-                  <TextInput
-                    value={referralCode}
-                    onChangeText={(val) => setReferralCode(val.toUpperCase())}
-                    mode="flat"
-                    style={styles.input}
-                    underlineColor="transparent"
-                    activeUnderlineColor="transparent"
-                    placeholder="Enter referral code if any"
-                    placeholderTextColor={colors.textTertiary}
-                    autoCapitalize="characters"
-                    left={<TextInput.Icon icon="gift-outline" color={colors.textMuted} />}
-                  />
-                </View>
-
-                {/* Submit Button */}
-                <TouchableOpacity
-                  style={[styles.signupBtnOuter, loading && styles.signupBtnDisabled]}
-                  activeOpacity={0.85}
-                  onPress={handleSignup}
-                  disabled={loading}
+              {/* Submit Button */}
+              <TouchableOpacity
+                style={[styles.signupBtnOuter, loading && styles.signupBtnDisabled]}
+                activeOpacity={0.85}
+                onPress={handleSignup}
+                disabled={loading}
+              >
+                <LinearGradient
+                  colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.signupBtnGradient}
                 >
-                  <LinearGradient
-                    colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.signupBtnGradient}
-                  >
-                    {loading ? (
-                      <Text style={styles.signupBtnText}>Creating account...</Text>
-                    ) : (
-                      <>
-                        <Text style={styles.signupBtnText}>Create Account</Text>
-                        <MaterialCommunityIcons name="arrow-right" size={20} color={colors.white} />
-                      </>
-                    )}
-                  </LinearGradient>
-                </TouchableOpacity>
+                  {loading ? (
+                    <Text style={styles.signupBtnText}>Creating account...</Text>
+                  ) : (
+                    <>
+                      <Text style={styles.signupBtnText}>Create Account</Text>
+                      <MaterialCommunityIcons name="arrow-right" size={20} color={colors.white} />
+                    </>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
 
-                <View style={styles.loginRow}>
-                  <Text style={styles.loginText}>Already have an account? </Text>
-                  <TouchableOpacity onPress={() => navigation.navigate('Login')} activeOpacity={0.7}>
-                    <Text style={styles.loginLink}>Sign In</Text>
-                  </TouchableOpacity>
-                </View>
+              <View style={styles.loginRow}>
+                <Text style={styles.loginText}>Already have an account? </Text>
+                <TouchableOpacity onPress={() => navigation.navigate('Login')} activeOpacity={0.7}>
+                  <Text style={styles.loginLink}>Sign In</Text>
+                </TouchableOpacity>
               </View>
             </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
       <SafeAreaView style={styles.safeAreaBottom} edges={['bottom']} />
     </View>
   );
@@ -296,9 +291,11 @@ const SignupScreen = ({ navigation }) => {
 
 const getStyles = (themeColors) => StyleSheet.create({
   rootContainer: { flex: 1, backgroundColor: themeColors.surface || colors.surface },
-  safeAreaTop: { flex: 1, backgroundColor: '#0E3D23' },
+  headerSafeArea: { backgroundColor: '#0E3D23' },
+  headerGradientBg: { height: 0 },
   safeAreaBottom: { backgroundColor: themeColors.surface || colors.surface },
-  container: { flex: 1, backgroundColor: themeColors.surface || colors.surface },
+  keyboardView: { flex: 1, backgroundColor: themeColors.surface || colors.surface },
+  scrollView: { flex: 1, backgroundColor: themeColors.surface || colors.surface },
   scrollContent: { flexGrow: 1, backgroundColor: themeColors.surface || colors.surface },
 
   // Header Area
@@ -328,7 +325,7 @@ const getStyles = (themeColors) => StyleSheet.create({
     backgroundColor: themeColors.surface || colors.surface,
     borderTopLeftRadius: 32, borderTopRightRadius: 32,
     marginTop: -24, flex: 1,
-    paddingHorizontal: 24, paddingTop: 24, paddingBottom: 40,
+    paddingHorizontal: 24, paddingTop: 24, paddingBottom: 60,
     minHeight: height * 0.76,
   },
   welcomeSection: { marginBottom: 18 },

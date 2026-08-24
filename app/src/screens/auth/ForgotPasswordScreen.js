@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,6 @@ import {
   TouchableOpacity,
   Dimensions,
   ActivityIndicator,
-  Keyboard,
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -30,20 +29,6 @@ const ForgotPasswordScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [submitted, setSubmitted] = useState(false);
-  const [scrollEnabled, setScrollEnabled] = useState(false);
-
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-
-    const showSub = Keyboard.addListener(showEvent, () => setScrollEnabled(true));
-    const hideSub = Keyboard.addListener(hideEvent, () => setScrollEnabled(false));
-
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
 
   const validate = () => {
     const trimmed = email.trim();
@@ -76,179 +61,189 @@ const ForgotPasswordScreen = ({ navigation }) => {
   return (
     <View style={styles.rootContainer}>
       <StatusBar barStyle="light-content" backgroundColor="#0E3D23" />
-      <SafeAreaView style={styles.safeAreaTop} edges={['top']}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.container}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      <SafeAreaView style={styles.headerSafeArea} edges={['top']}>
+        <View style={styles.headerGradientBg}>
+          <LinearGradient
+            colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+        </View>
+      </SafeAreaView>
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          scrollEnabled={true}
+          bounces={true}
         >
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            scrollEnabled={scrollEnabled}
-            bounces={false}
+          {/* Header */}
+          <LinearGradient
+            colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.headerArea}
           >
-            {/* Header */}
-            <LinearGradient
-              colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.headerArea}
+            <View style={styles.blobTopRight} />
+            <View style={styles.blobBottomGold} />
+
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={() => navigation.goBack()}
+              activeOpacity={0.8}
             >
-              <View style={styles.blobTopRight} />
-              <View style={styles.blobBottomGold} />
+              <MaterialCommunityIcons name="arrow-left" size={22} color="#ffffff" />
+            </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.backBtn}
-                onPress={() => navigation.goBack()}
-                activeOpacity={0.8}
-              >
-                <MaterialCommunityIcons name="arrow-left" size={22} color="#ffffff" />
-              </TouchableOpacity>
+            <View style={styles.logoWrapper}>
+              <MaterialCommunityIcons name="lock-reset" size={40} color="#ffffff" />
+            </View>
+            <Text style={styles.appName}>Forgot Password?</Text>
+            <Text style={styles.tagline}>
+              No worries! Enter your email and we'll send reset instructions.
+            </Text>
+          </LinearGradient>
 
-              <View style={styles.logoWrapper}>
-                <MaterialCommunityIcons name="lock-reset" size={40} color="#ffffff" />
-              </View>
-              <Text style={styles.appName}>Forgot Password?</Text>
-              <Text style={styles.tagline}>
-                No worries! Enter your email and we'll send reset instructions.
-              </Text>
-            </LinearGradient>
-
-            {/* Form Card */}
-            <View style={styles.formCard}>
-              {!submitted ? (
-                <>
-                  <View style={styles.welcomeSection}>
-                    <Text style={styles.welcomeTitle}>Reset Password</Text>
-                    <Text style={styles.welcomeSubtitle}>
-                      Enter the email address associated with your Growvest account.
-                    </Text>
-                  </View>
-
-                  <View style={styles.infoBanner}>
-                    <MaterialCommunityIcons name="information-outline" size={20} color="#065f46" />
-                    <Text style={styles.infoText}>
-                      We will send a password reset link to your email address. Please check your spam folder if you don't see it.
-                    </Text>
-                  </View>
-
-                  <View style={styles.formSection}>
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.inputLabel}>Email Address</Text>
-                      <TextInput
-                        value={email}
-                        onChangeText={(v) => {
-                          setEmail(v);
-                          if (emailError) setEmailError('');
-                        }}
-                        mode="flat"
-                        style={styles.input}
-                        underlineColor="transparent"
-                        activeUnderlineColor="transparent"
-                        placeholder="Enter your registered email"
-                        placeholderTextColor={colors.textTertiary}
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                        error={!!emailError}
-                        left={<TextInput.Icon icon="email-outline" color={colors.textMuted} />}
-                      />
-                      {!!emailError && (
-                        <View style={styles.errorRow}>
-                          <MaterialCommunityIcons name="alert-circle-outline" size={14} color={colors.error} />
-                          <Text style={styles.errorText}>{emailError}</Text>
-                        </View>
-                      )}
-                    </View>
-
-                    <TouchableOpacity
-                      style={[styles.submitBtn, loading && styles.submitBtnDisabled]}
-                      activeOpacity={0.85}
-                      onPress={handleSend}
-                      disabled={loading}
-                    >
-                      <LinearGradient
-                        colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.submitBtnGradient}
-                      >
-                        {loading ? (
-                          <>
-                            <ActivityIndicator size="small" color="#fff" />
-                            <Text style={styles.submitBtnText}>Sending...</Text>
-                          </>
-                        ) : (
-                          <>
-                            <Text style={styles.submitBtnText}>Send Reset Link</Text>
-                            <MaterialCommunityIcons name="send" size={18} color="#fff" />
-                          </>
-                        )}
-                      </LinearGradient>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.backToLogin}
-                      onPress={() => navigation.goBack()}
-                      activeOpacity={0.7}
-                    >
-                      <MaterialCommunityIcons name="arrow-left" size={16} color={themeColors.primary || colors.primary} />
-                      <Text style={styles.backToLoginText}>Back to Login</Text>
-                    </TouchableOpacity>
-                  </View>
-                </>
-              ) : (
-                /* Success State */
-                <View style={styles.successContainer}>
-                  <View style={styles.successIconWrapper}>
-                    <LinearGradient
-                      colors={['#d1fae5', '#a7f3d0']}
-                      style={styles.successIconBg}
-                    >
-                      <MaterialCommunityIcons name="email-check-outline" size={48} color="#065f46" />
-                    </LinearGradient>
-                  </View>
-                  <Text style={styles.successTitle}>Check Your Email</Text>
-                  <Text style={styles.successMessage}>
-                    We've sent a password reset link to{'\n'}
-                    <Text style={styles.successEmail}>{email.trim().toLowerCase()}</Text>
+          {/* Form Card */}
+          <View style={styles.formCard}>
+            {!submitted ? (
+              <>
+                <View style={styles.welcomeSection}>
+                  <Text style={styles.welcomeTitle}>Reset Password</Text>
+                  <Text style={styles.welcomeSubtitle}>
+                    Enter the email address associated with your Growvest account.
                   </Text>
-                  <View style={styles.successTips}>
-                    <View style={styles.tipRow}>
-                      <MaterialCommunityIcons name="clock-outline" size={15} color={colors.textMuted} />
-                      <Text style={styles.tipText}>The link expires in 15 minutes.</Text>
-                    </View>
-                    <View style={styles.tipRow}>
-                      <MaterialCommunityIcons name="email-search-outline" size={15} color={colors.textMuted} />
-                      <Text style={styles.tipText}>Check your spam or junk folder if you don't see it.</Text>
-                    </View>
+                </View>
+
+                <View style={styles.infoBanner}>
+                  <MaterialCommunityIcons name="information-outline" size={20} color="#065f46" />
+                  <Text style={styles.infoText}>
+                    We will send a password reset link to your email address. Please check your spam folder if you don't see it.
+                  </Text>
+                </View>
+
+                <View style={styles.formSection}>
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Email Address</Text>
+                    <TextInput
+                      value={email}
+                      onChangeText={(v) => {
+                        setEmail(v);
+                        if (emailError) setEmailError('');
+                      }}
+                      mode="flat"
+                      style={styles.input}
+                      underlineColor="transparent"
+                      activeUnderlineColor="transparent"
+                      placeholder="Enter your registered email"
+                      placeholderTextColor={colors.textTertiary}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      error={!!emailError}
+                      left={<TextInput.Icon icon="email-outline" color={colors.textMuted} />}
+                    />
+                    {!!emailError && (
+                      <View style={styles.errorRow}>
+                        <MaterialCommunityIcons name="alert-circle-outline" size={14} color={colors.error} />
+                        <Text style={styles.errorText}>{emailError}</Text>
+                      </View>
+                    )}
                   </View>
 
                   <TouchableOpacity
-                    style={styles.resendBtn}
-                    onPress={() => {
-                      setSubmitted(false);
-                      handleSend();
-                    }}
+                    style={[styles.submitBtn, loading && styles.submitBtnDisabled]}
+                    activeOpacity={0.85}
+                    onPress={handleSend}
+                    disabled={loading}
+                  >
+                    <LinearGradient
+                      colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.submitBtnGradient}
+                    >
+                      {loading ? (
+                        <>
+                          <ActivityIndicator size="small" color="#fff" />
+                          <Text style={styles.submitBtnText}>Sending...</Text>
+                        </>
+                      ) : (
+                        <>
+                          <Text style={styles.submitBtnText}>Send Reset Link</Text>
+                          <MaterialCommunityIcons name="send" size={18} color="#fff" />
+                        </>
+                      )}
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.backToLogin}
+                    onPress={() => navigation.goBack()}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.resendBtnText}>Didn't receive email? Resend</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.backToLoginSuccess}
-                    onPress={() => navigation.navigate('Login')}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.backToLoginSuccessText}>Return to Sign In</Text>
+                    <MaterialCommunityIcons name="arrow-left" size={16} color={themeColors.primary || colors.primary} />
+                    <Text style={styles.backToLoginText}>Back to Login</Text>
                   </TouchableOpacity>
                 </View>
-              )}
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+              </>
+            ) : (
+              /* Success State */
+              <View style={styles.successContainer}>
+                <View style={styles.successIconWrapper}>
+                  <LinearGradient
+                    colors={['#d1fae5', '#a7f3d0']}
+                    style={styles.successIconBg}
+                  >
+                    <MaterialCommunityIcons name="email-check-outline" size={48} color="#065f46" />
+                  </LinearGradient>
+                </View>
+                <Text style={styles.successTitle}>Check Your Email</Text>
+                <Text style={styles.successMessage}>
+                  We've sent a password reset link to{'\n'}
+                  <Text style={styles.successEmail}>{email.trim().toLowerCase()}</Text>
+                </Text>
+                <View style={styles.successTips}>
+                  <View style={styles.tipRow}>
+                    <MaterialCommunityIcons name="clock-outline" size={15} color={colors.textMuted} />
+                    <Text style={styles.tipText}>The link expires in 15 minutes.</Text>
+                  </View>
+                  <View style={styles.tipRow}>
+                    <MaterialCommunityIcons name="email-search-outline" size={15} color={colors.textMuted} />
+                    <Text style={styles.tipText}>Check your spam or junk folder if you don't see it.</Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.resendBtn}
+                  onPress={() => {
+                    setSubmitted(false);
+                    handleSend();
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.resendBtnText}>Didn't receive email? Resend</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.backToLoginSuccess}
+                  onPress={() => navigation.navigate('Login')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.backToLoginSuccessText}>Return to Sign In</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
       <SafeAreaView style={styles.safeAreaBottom} edges={['bottom']} />
     </View>
   );
@@ -256,9 +251,11 @@ const ForgotPasswordScreen = ({ navigation }) => {
 
 const getStyles = (themeColors) => StyleSheet.create({
   rootContainer: { flex: 1, backgroundColor: themeColors.surface || colors.surface },
-  safeAreaTop: { flex: 1, backgroundColor: '#0E3D23' },
+  headerSafeArea: { backgroundColor: '#0E3D23' },
+  headerGradientBg: { height: 0 },
   safeAreaBottom: { backgroundColor: themeColors.surface || colors.surface },
-  container: { flex: 1, backgroundColor: themeColors.surface || colors.surface },
+  keyboardView: { flex: 1, backgroundColor: themeColors.surface || colors.surface },
+  scrollView: { flex: 1, backgroundColor: themeColors.surface || colors.surface },
   scrollContent: { flexGrow: 1, backgroundColor: themeColors.surface || colors.surface },
 
   // Header
@@ -299,7 +296,7 @@ const getStyles = (themeColors) => StyleSheet.create({
     backgroundColor: themeColors.surface || colors.surface,
     borderTopLeftRadius: 32, borderTopRightRadius: 32,
     marginTop: -28, flex: 1,
-    paddingHorizontal: 24, paddingTop: 28, paddingBottom: 40,
+    paddingHorizontal: 24, paddingTop: 28, paddingBottom: 50,
     minHeight: height * 0.68,
   },
   welcomeSection: { marginBottom: 18 },

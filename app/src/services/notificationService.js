@@ -15,21 +15,24 @@ Notifications.setNotificationHandler({
 
 const DEVICE_TOKEN_KEY = 'deviceToken';
 const LAST_SEEN_NOTIF_KEY = 'lastSeenNotificationId';
-const POLL_INTERVAL_MS = 30000; // Poll every 30 seconds
+const POLL_INTERVAL_MS = 10000; // Poll every 10 seconds for instant delivery
 
 let pollingInterval = null;
 let currentUserId = null;
 
-async function showLocalNotification(title, body) {
+async function showLocalNotification(title, body, data = {}) {
   try {
     await Notifications.scheduleNotificationAsync({
       content: {
         title: title || 'Growvest',
         body: body || 'You have a new update.',
         sound: 'default',
+        badge: 1,
+        data,
       },
       trigger: null,
     });
+    console.log('[NotificationService] Local system notification dispatched:', title);
   } catch (error) {
     console.error('[NotificationService] Error showing local notification:', error);
   }
@@ -58,9 +61,7 @@ async function pollForNotifications() {
     // Find which notifications are NEW since last seen
     const lastSeenIndex = allNotifications.findIndex(n => n._id === lastSeenId);
     if (lastSeenIndex <= 0) {
-      // lastSeenId not found (pruned) or is already the latest — nothing new
       if (lastSeenIndex < 0) {
-        // ID no longer in last 100 — update baseline to current latest
         await AsyncStorage.setItem(LAST_SEEN_NOTIF_KEY, allNotifications[0]._id);
       }
       return;
@@ -69,7 +70,7 @@ async function pollForNotifications() {
     // Everything BEFORE lastSeenIndex is newer than what we last saw
     const newNotifications = allNotifications.slice(0, lastSeenIndex);
 
-    // Update last seen to the newest notification immediately to prevent infinite notification loops
+    // Update last seen to the newest notification immediately
     const newestId = allNotifications[0]?._id;
     if (newestId) {
       await AsyncStorage.setItem(LAST_SEEN_NOTIF_KEY, newestId);
@@ -77,7 +78,7 @@ async function pollForNotifications() {
 
     // Show notifications oldest-first so they appear in order
     for (const notif of newNotifications.reverse()) {
-      await showLocalNotification(notif.title, notif.description);
+      await showLocalNotification(notif.title, notif.description, { notifId: notif._id });
     }
   } catch (error) {
     // Silently fail - polling is best-effort
@@ -92,6 +93,8 @@ export const notificationService = {
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#085428',
+        sound: 'default',
+        showBadge: true,
       });
     }
 
@@ -113,7 +116,57 @@ export const notificationService = {
       return false;
     }
 
+    // Schedule native daily local notifications directly in Android OS
+    this.scheduleDailyLocalNotifications();
+
     return true;
+  },
+
+  /**
+   * Schedules recurring daily local notifications directly in Android OS.
+   * Runs natively on the device even when the app is closed or killed!
+   */
+  async scheduleDailyLocalNotifications() {
+    try {
+      // Cancel existing scheduled notifications to prevent duplicates
+      await Notifications.cancelAllScheduledNotificationsAsync();
+
+      // 1. Morning Pocket Money & Investment Payout Alert (9:00 AM IST)
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '💰 Daily Pocket Money Ready!',
+          body: 'Your daily payout and returns are ready to claim! Log in now to check your balance.',
+          sound: 'default',
+          badge: 1,
+          data: { screen: 'PocketMoney' },
+        },
+        trigger: {
+          hour: 9,
+          minute: 0,
+          repeats: true,
+        },
+      });
+
+      // 2. Evening Wealth & Chit Fund Reminder (6:00 PM IST)
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '📈 Grow Your Money Every Day!',
+          body: 'Check today\'s earnings, claim coin rewards, and explore high-yield chit funds on Growvest!',
+          sound: 'default',
+          badge: 1,
+          data: { screen: 'Home' },
+        },
+        trigger: {
+          hour: 18,
+          minute: 0,
+          repeats: true,
+        },
+      });
+
+      console.log('[NotificationService] Natively scheduled daily local notifications for 9:00 AM & 6:00 PM IST.');
+    } catch (error) {
+      console.error('[NotificationService] Error scheduling daily local notifications:', error);
+    }
   },
 
   async getDeviceToken() {
@@ -148,7 +201,7 @@ export const notificationService = {
         return null;
       }
 
-      const response = await api.post('/users/register-device', {
+      await api.post('/users/register-device', {
         userId,
         username,
         deviceToken,
@@ -156,7 +209,7 @@ export const notificationService = {
       });
 
       await AsyncStorage.setItem(DEVICE_TOKEN_KEY, deviceToken);
-      console.log('[NotificationService] Device registered successfully');
+      console.log('[NotificationService] Device registered successfully:', deviceToken);
       
       // Start polling for server-side notifications
       this.startPolling(userId);
@@ -168,12 +221,6 @@ export const notificationService = {
     }
   },
 
-  /**
-   * Start polling for new server-side notifications.
-   * This bridges the gap between admin actions (which create in-app DB notifications)
-   * and the app by showing them as local notifications using the same pattern
-   * as sendWelcomeNotification().
-   */
   startPolling(userId) {
     this.stopPolling();
     currentUserId = userId;
@@ -202,6 +249,7 @@ export const notificationService = {
           title: 'Welcome 🎉',
           body: 'Welcome to Growvest. We\'re happy to have you with us.',
           sound: 'default',
+          badge: 1,
         },
         trigger: null,
       });
@@ -218,9 +266,6 @@ export const notificationService = {
     await AsyncStorage.removeItem(DEVICE_TOKEN_KEY);
   },
 
-  /**
-   * Listen for user tapping a push notification and navigate accordingly.
-   */
   setupNotificationListeners(navigateFn) {
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       try {

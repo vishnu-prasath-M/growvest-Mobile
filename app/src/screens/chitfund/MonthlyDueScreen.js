@@ -12,12 +12,19 @@ import * as Notifications from 'expo-notifications';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
-import { colors, typography } from '../../theme/theme';
+import { colors } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { chitFundService } from '../../services/chitFundService';
 import { authService } from '../../services/authService';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
 import { useTheme } from '../../context/ThemeContext';
+
+const getUnitLabel = (isWeekly, count = 1) => {
+  if (isWeekly) {
+    return count === 1 ? 'Week' : 'weeks';
+  }
+  return count === 1 ? 'Month' : 'months';
+};
 
 const MonthlyDueScreen = ({ navigation }) => {
   const { colors: themeColors } = useTheme();
@@ -36,20 +43,20 @@ const MonthlyDueScreen = ({ navigation }) => {
     try {
       setShowReminderModal(false);
       
-      // Request notification permissions
       const { status } = await Notifications.requestPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission Denied', 'Please enable notifications in settings to receive reminders.');
         return;
       }
 
-      // Clear any previously scheduled local notifications to stop loops/duplicates
       await Notifications.cancelAllScheduledNotificationsAsync();
 
       const now = new Date();
       let targetDate = new Date();
       let timeLabel = "";
       let trigger = null;
+
+      const isWeekly = reminderChit?.isWeekly || (reminderChit?.totalWeeks && reminderChit?.totalWeeks > 0);
 
       if (type === '10_seconds') {
         timeLabel = "in 10 seconds";
@@ -59,7 +66,6 @@ const MonthlyDueScreen = ({ navigation }) => {
           repeats: false,
         };
       } else if (type === 'tomorrow_morning') {
-        // Tomorrow at 9:00 AM
         targetDate.setDate(now.getDate() + 1);
         targetDate.setHours(9, 0, 0, 0);
         timeLabel = "tomorrow morning at 9:00 AM";
@@ -69,7 +75,6 @@ const MonthlyDueScreen = ({ navigation }) => {
           repeats: false,
         };
       } else if (type === 'two_days') {
-        // 2 days from now at 9:00 AM
         targetDate.setDate(now.getDate() + 2);
         targetDate.setHours(9, 0, 0, 0);
         timeLabel = "in 2 days at 9:00 AM";
@@ -79,17 +84,19 @@ const MonthlyDueScreen = ({ navigation }) => {
           repeats: false,
         };
       } else if (type === 'due_date') {
-        // 9:00 AM on the due date
-        const joinedDate = new Date(reminderChit?.joinedAt);
+        const joinedDate = new Date(reminderChit?.joinedAt || Date.now());
         targetDate = new Date(joinedDate);
-        targetDate.setMonth(joinedDate.getMonth() + (reminderChit?.nextUnpaidMonth - 1));
-        targetDate.setDate(1);
+        if (isWeekly) {
+          targetDate.setDate(joinedDate.getDate() + (reminderChit?.nextUnpaidMonth - 1) * 7);
+        } else {
+          targetDate.setMonth(joinedDate.getMonth() + (reminderChit?.nextUnpaidMonth - 1));
+          targetDate.setDate(1);
+        }
         targetDate.setHours(9, 0, 0, 0);
         timeLabel = `on your Due Date (${reminderChit?.nextDueDateFormatted} at 9:00 AM)`;
         
-        // Fallback if calculated due date has already passed
         if (targetDate.getTime() <= now.getTime()) {
-          targetDate = new Date(now.getTime() + 10 * 1000); // 10 seconds from now
+          targetDate = new Date(now.getTime() + 10 * 1000);
           timeLabel = "in 10 seconds (as your due date is in the past)";
         }
 
@@ -103,7 +110,7 @@ const MonthlyDueScreen = ({ navigation }) => {
       await Notifications.scheduleNotificationAsync({
         content: {
           title: '📅 Growvest Due Reminder',
-          body: `Reminder: Your monthly due of ${formatCurrency(reminderChit?.nextDueAmount)} for "${reminderChit?.chitName}" is due soon.`,
+          body: `Reminder: Your ${isWeekly ? 'weekly' : 'monthly'} due of ${formatCurrency(reminderChit?.nextDueAmount)} for "${reminderChit?.chitName}" is due soon.`,
           sound: 'default',
           data: { screen: 'MonthlyDue' },
         },
@@ -123,10 +130,8 @@ const MonthlyDueScreen = ({ navigation }) => {
   const fetchMyChits = async () => {
     try {
       const data = await chitFundService.getMyChits();
-      // Get payment history to check which months are paid
       const allPayments = await chitFundService.getPaymentHistory();
       
-      // Build a map of paid months per chit
       const paidMonthsMap = {};
       allPayments.forEach(p => {
         const chitId = p.chitId;
@@ -136,35 +141,40 @@ const MonthlyDueScreen = ({ navigation }) => {
         }
       });
 
-      // Enrich chits with payment status (filter ONLY active memberships)
       const activeOnly = data.filter(c => c.status === 'active');
       const enriched = activeOnly.map(c => {
+        const isWeekly = c.isWeekly || (c.totalWeeks && c.totalWeeks > 0);
         const paidMonths = paidMonthsMap[c.chitId] || new Set();
         const currentMonthDue = c.currentMonth + 1;
         const isCurrentPaid = paidMonths.has(currentMonthDue);
         
-        // Calculate next unpaid month
+        const durationLimit = isWeekly ? (c.totalWeeks || c.duration) : c.duration;
+
         let nextUnpaidMonth = currentMonthDue;
-        while (paidMonths.has(nextUnpaidMonth) && nextUnpaidMonth <= c.duration) {
+        while (paidMonths.has(nextUnpaidMonth) && nextUnpaidMonth <= durationLimit) {
           nextUnpaidMonth++;
         }
         
-        const isFullyPaid = nextUnpaidMonth > c.duration;
+        const isFullyPaid = nextUnpaidMonth > durationLimit;
         const isClosed = c.status === 'closed' || c.status === 'completed' || c.status === 'archived';
         
-        // Calculate next due date
-        const joinedDate = new Date(c.joinedAt);
+        const joinedDate = new Date(c.joinedAt || Date.now());
         const nextDue = new Date(joinedDate);
-        nextDue.setMonth(joinedDate.getMonth() + (nextUnpaidMonth - 1));
-        nextDue.setDate(1);
+        if (isWeekly) {
+          nextDue.setDate(joinedDate.getDate() + (nextUnpaidMonth - 1) * 7);
+        } else {
+          nextDue.setMonth(joinedDate.getMonth() + (nextUnpaidMonth - 1));
+          nextDue.setDate(1);
+        }
         
-        // Calculate remaining days
         const today = new Date();
         const diffTime = nextDue.getTime() - today.getTime();
         const remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         
         return {
           ...c,
+          isWeekly,
+          duration: durationLimit,
           isCurrentPaid,
           isFullyPaid,
           isClosed,
@@ -212,7 +222,6 @@ const MonthlyDueScreen = ({ navigation }) => {
 
   const handlePaymentSuccess = () => {
     setShowConfirm(false);
-    // Navigate to MyChits -> ChitDetails -> MonthlyDue
     navigation.navigate('ChitPayment', {
       chitId: selectedChit?.chitId,
       memberId: selectedChit?._id,
@@ -221,6 +230,7 @@ const MonthlyDueScreen = ({ navigation }) => {
       lateFee: 0,
       type: 'due',
       chitName: selectedChit?.chitName,
+      isWeekly: selectedChit?.isWeekly || (selectedChit?.totalWeeks && selectedChit?.totalWeeks > 0),
       returnScreen: 'MonthlyDue',
     });
   };
@@ -228,32 +238,27 @@ const MonthlyDueScreen = ({ navigation }) => {
   const renderChitCard = (chit) => {
     const isPaid = chit.isCurrentPaid || chit.isFullyPaid;
     const isClosed = chit.isClosed;
+    const isWeekly = chit.isWeekly || (chit.totalWeeks && chit.totalWeeks > 0);
+    const unitTitle = getUnitLabel(isWeekly, 1);
     
-    // Determine whether the NEXT installment is actually due today or overdue
-    // (so we only show Pay Now when the due date has arrived)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    // Parse nextDueDateFormatted back to a Date for comparison
-    // nextUnpaidMonth is already calculated in fetchMyChits
-    const joinedDate = new Date(chit.joinedAt);
+    const joinedDate = new Date(chit.joinedAt || Date.now());
     const nextDueDate = new Date(joinedDate);
-    nextDueDate.setMonth(joinedDate.getMonth() + (chit.nextUnpaidMonth - 1));
-    nextDueDate.setDate(1);
+    if (isWeekly) {
+      nextDueDate.setDate(joinedDate.getDate() + (chit.nextUnpaidMonth - 1) * 7);
+    } else {
+      nextDueDate.setMonth(joinedDate.getMonth() + (chit.nextUnpaidMonth - 1));
+      nextDueDate.setDate(1);
+    }
     nextDueDate.setHours(0, 0, 0, 0);
     
-    // Can pay ONLY if:
-    // 1. Not already fully paid / closed
-    // 2. The next unpaid month has NOT already been paid
-    // 3. Today is within 5 days of nextDueDate (or overdue)
     const diffTime = nextDueDate.getTime() - today.getTime();
     const daysUntilDue = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
-    // Enable Pay Now only when within 5 days of due date (daysUntilDue <= 5)
     const isWithin5DaysWindow = daysUntilDue <= 5;
     const canPay = !isPaid && !isClosed && !chit.isFullyPaid && isWithin5DaysWindow;
-    
-    // Next installment is pending (future cycle beyond 5 days)
     const nextInstallmentPending = !isPaid && !isClosed && !chit.isFullyPaid && !isWithin5DaysWindow;
 
     return (
@@ -269,7 +274,7 @@ const MonthlyDueScreen = ({ navigation }) => {
           <View style={styles.dueInfo}>
             <Text style={styles.dueChitName}>{chit.chitName}</Text>
             <Text style={styles.dueChitDetail}>
-              {isClosed ? 'Chit Closed' : `Month ${chit.currentMonth} of ${chit.duration}`}
+              {isClosed ? 'Chit Closed' : `${unitTitle} ${chit.currentMonth || 1} of ${chit.duration}`}
             </Text>
           </View>
         </View>
@@ -281,7 +286,7 @@ const MonthlyDueScreen = ({ navigation }) => {
             <View style={styles.paidSection}>
               <View style={styles.paidBadge}>
                 <MaterialCommunityIcons name="check-circle" size={20} color={colors.success} />
-                <Text style={styles.paidText}>✓ Month {chit.currentMonth} Paid</Text>
+                <Text style={styles.paidText}>✓ {unitTitle} {chit.currentMonth || 1} Paid</Text>
               </View>
 
               {chit.isFullyPaid ? (
@@ -290,7 +295,6 @@ const MonthlyDueScreen = ({ navigation }) => {
                   <Text style={styles.fullyPaidText}>All installments completed!</Text>
                 </View>
               ) : chit.nextUnpaidMonth <= chit.duration ? (
-                // Show next due info (next installment is scheduled but not yet payable)
                 <>
                   <View style={styles.dueAmountRow}>
                     <View>
@@ -314,20 +318,6 @@ const MonthlyDueScreen = ({ navigation }) => {
               ) : null}
             </View>
 
-            {/* Show Pay Now ONLY when next installment due date has arrived */}
-            {nextInstallmentDueNow && (
-              <View style={styles.dueActions}>
-                <TouchableOpacity
-                  style={styles.payNowBtnEnabled}
-                  activeOpacity={0.85}
-                  onPress={() => handlePayNow(chit)}
-                >
-                  <Text style={styles.payNowBtnText}>Pay Now</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Waiting for next cycle — show disabled state */}
             {nextInstallmentPending && (
               <View style={styles.dueActions}>
                 <View style={[styles.payNowBtnEnabled, { backgroundColor: colors.muted }]}>
@@ -353,7 +343,7 @@ const MonthlyDueScreen = ({ navigation }) => {
             <View style={styles.dueAmountRow}>
               <View>
                 <Text style={styles.dueLabel}>
-                  {chit.pendingInstallments > 1 ? `Due (${chit.pendingInstallments} months)` : 'Current Due'}
+                  {chit.pendingInstallments > 1 ? `Due (${chit.pendingInstallments} ${getUnitLabel(isWeekly, chit.pendingInstallments)})` : 'Current Due'}
                 </Text>
                 <Text style={styles.dueAmount}>{formatCurrency(chit.nextDueAmount)}</Text>
               </View>
@@ -419,7 +409,7 @@ const MonthlyDueScreen = ({ navigation }) => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <MaterialCommunityIcons name="arrow-left" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Monthly Dues</Text>
+        <Text style={styles.headerTitle}>Chit Dues</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -585,19 +575,16 @@ const getStyles = (colors) => StyleSheet.create({
   payNowBtnText: { fontSize: 16, fontWeight: '700', color: colors.white },
   reminderBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: colors.primaryLight, paddingVertical: 14, borderRadius: 14 },
   reminderBtnText: { fontSize: 13, fontWeight: '700', color: colors.primary },
-  // Paid section
   paidSection: { marginBottom: 16 },
   paidBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12, backgroundColor: colors.successLight, borderRadius: 12, marginBottom: 16 },
   paidText: { fontSize: 18, fontWeight: '800', color: colors.success },
   fullyPaidBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12, backgroundColor: colors.warningLight, borderRadius: 12, borderWidth: 1, borderColor: colors.borderLight },
   fullyPaidText: { fontSize: 14, fontWeight: '700', color: '#d97706' },
-  // Closed section
   closedSection: { alignItems: 'center', marginBottom: 16 },
   closedBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, backgroundColor: colors.surface, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: colors.borderLight },
   closedText: { fontSize: 16, fontWeight: '700', color: colors.textTertiary },
   closedBtn: { backgroundColor: colors.muted, paddingVertical: 14, borderRadius: 14, alignItems: 'center', width: '100%' },
   closedBtnText: { fontSize: 16, fontWeight: '700', color: colors.textTertiary },
-  // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { width: '85%', backgroundColor: colors.surface, borderRadius: 24, padding: 24, borderWidth: 1, borderColor: colors.border, ...colors.shadow.elevated },
   modalIconWrap: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center', alignSelf: 'center', marginBottom: 16 },
@@ -617,7 +604,6 @@ const getStyles = (colors) => StyleSheet.create({
   loadingText: { color: colors.textSecondary, fontSize: 14 },
   emptyContainer: { padding: 40, alignItems: 'center' },
   emptyText: { color: colors.textSecondary, fontSize: 14 },
-  // Email Modal
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   modalTitleEmail: { fontSize: 19, fontWeight: '700', color: colors.text, letterSpacing: -0.4 },
   modalCloseBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },
