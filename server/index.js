@@ -281,6 +281,31 @@ app.get('/ref/:code', (req, res) => {
   res.sendFile(require('path').join(__dirname, 'public', 'ref-landing.html'));
 });
 
+// Android APK Download Route
+app.get('/downloads/growvest-latest.apk', (req, res) => {
+  const path = require('path');
+  const fs = require('fs');
+  const apkPath = path.join(__dirname, 'public', 'downloads', 'growvest-latest.apk');
+
+  if (fs.existsSync(apkPath)) {
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+    res.setHeader('Content-Disposition', 'attachment; filename="growvest-latest.apk"');
+    return res.sendFile(apkPath);
+  } else if (process.env.APK_DOWNLOAD_URL) {
+    return res.redirect(process.env.APK_DOWNLOAD_URL);
+  } else {
+    return res.status(404).send('APK file currently updating');
+  }
+});
+
+// Android App Links Digital Asset Links Route
+app.get('/.well-known/assetlinks.json', (req, res) => {
+  const path = require('path');
+  const assetPath = path.join(__dirname, 'public', '.well-known', 'assetlinks.json');
+  res.setHeader('Content-Type', 'application/json');
+  return res.sendFile(assetPath);
+});
+
 const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://vishnuprasath:8925699005@grow-clust.bynj9dx.mongodb.net/growvest?appName=Grow-Clust';
 
 // Fix for Node.js DNS SRV lookup issues on Windows

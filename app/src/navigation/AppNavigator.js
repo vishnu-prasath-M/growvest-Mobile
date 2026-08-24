@@ -4,6 +4,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 import { colors } from '../theme/theme';
 import { useTheme } from '../context/ThemeContext';
@@ -448,6 +449,29 @@ const screenTransitionOptions = {
 // ---------- Main Navigator ----------
 const AppNavigator = () => {
   const { isAuthenticated, loading } = useAuth();
+
+  useEffect(() => {
+    const handleDeepLink = async (url) => {
+      if (!url) return;
+      try {
+        const match = url.match(/\/ref\/([A-Za-z0-9]+)/);
+        if (match && match[1]) {
+          const code = match[1].toUpperCase();
+          await AsyncStorage.setItem('pendingReferralCode', code);
+          console.log('[DeepLink] Stored pending referral code:', code);
+        }
+      } catch (e) {
+        console.warn('[DeepLink Error]', e.message);
+      }
+    };
+
+    const Linking = require('react-native').Linking;
+    Linking.getInitialURL().then(handleDeepLink);
+    const subscription = Linking.addEventListener('url', (event) => handleDeepLink(event.url));
+    return () => {
+      if (subscription && subscription.remove) subscription.remove();
+    };
+  }, []);
 
   if (loading) {
     return <SplashScreen />;

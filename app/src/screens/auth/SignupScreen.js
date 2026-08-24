@@ -22,6 +22,8 @@ import { useTheme } from '../../context/ThemeContext';
 
 const { width, height } = Dimensions.get('window');
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 const SignupScreen = ({ navigation }) => {
   const { colors: themeColors } = useTheme();
   const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
@@ -35,6 +37,20 @@ const SignupScreen = ({ navigation }) => {
   const [showPassword, setShowPassword] = useState(false);
 
   const { login } = useAuth();
+
+  useEffect(() => {
+    const checkPendingRefCode = async () => {
+      try {
+        const savedCode = await AsyncStorage.getItem('pendingReferralCode');
+        if (savedCode) {
+          setReferralCode(savedCode.trim().toUpperCase());
+        }
+      } catch (e) {
+        console.warn('Error reading pending referral code:', e);
+      }
+    };
+    checkPendingRefCode();
+  }, []);
 
   const validateForm = () => {
     const newErrors = {};

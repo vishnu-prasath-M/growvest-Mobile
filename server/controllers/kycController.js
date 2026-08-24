@@ -175,6 +175,91 @@ exports.getKYCDetail = async (req, res) => {
   }
 };
 
+// @desc    Get single KYC document image securely (Admin/Owner)
+// @route   GET /api/kyc/document/:id/:docType
+// @access  Private
+exports.getKYCDocument = async (req, res) => {
+  try {
+    const { id, docType } = req.params;
+    const jwt = require('jsonwebtoken');
+
+    // Handle token from query string if not in header (for <img> src tags)
+    let token = null;
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+      token = req.headers.authorization.split(' ')[1];
+    } else if (req.query.token) {
+      token = req.query.token;
+    }
+
+    if (!token) {
+      return res.status(401).json({ message: 'Not authorized, token missing' });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret123');
+    const requestor = await User.findById(decoded.id);
+
+    if (!requestor) {
+      return res.status(401).json({ message: 'Invalid authentication user' });
+    }
+
+    const kyc = await KYC.findById(id);
+    if (!kyc) {
+      return res.status(404).json({ message: 'KYC record not found' });
+    }
+
+    // Verify ownership or Admin role
+    const isOwner = kyc.userId.toString() === requestor._id.toString();
+    const isAdmin = requestor.role === 'admin';
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ message: 'Forbidden: Access to KYC document denied' });
+    }
+
+    let fieldMap = {
+      aadhaarFront: kyc.aadhaarFrontImage,
+      aadhaarBack: kyc.aadhaarBackImage,
+      pan: kyc.panImage,
+      profilePhoto: kyc.profilePhoto,
+    };
+
+    let docData = fieldMap[docType];
+    if (!docData) {
+      return res.status(404).json({ message: 'Document image not found' });
+    }
+
+    // If docData is an external URL, redirect
+    if (docData.startsWith('http://') || docData.startsWith('https://')) {
+      return res.redirect(docData);
+    }
+
+    // Determine MIME type and extract clean base64 data
+    let mimeType = 'image/jpeg';
+    let base64String = docData.trim();
+
+    if (base64String.startsWith('data:')) {
+      const parts = base64String.split(';');
+      mimeType = parts[0].replace('data:', '') || 'image/jpeg';
+      base64String = parts[1] ? parts[1].replace('base64,', '') : base64String;
+    }
+
+    // Clean any remaining prefixes or white spaces
+    base64String = base64String.replace(/^data:image\/[a-z]+;base64,/, '').replace(/\s/g, '');
+
+    const imgBuffer = Buffer.from(base64String, 'base64');
+
+    if (!imgBuffer || imgBuffer.length === 0) {
+      return res.status(404).json({ message: 'Corrupt or empty image buffer' });
+    }
+
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Length', imgBuffer.length);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.send(imgBuffer);
+  } catch (error) {
+    console.error('Error serving KYC document image:', error.message);
+    return res.status(500).json({ message: 'Error serving document image' });
+  }
+};
+
 // @desc    Approve or Reject KYC (Admin)
 // @route   PUT /api/kyc/:id/review
 // @access  Private/Admin
