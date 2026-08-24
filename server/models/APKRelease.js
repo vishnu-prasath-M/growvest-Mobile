@@ -3,8 +3,8 @@ const mongoose = require('mongoose');
 const apkReleaseSchema = new mongoose.Schema({
   fileName: { type: String, required: true },
   fileSize: { type: Number, required: true }, // size in bytes
-  storagePath: { type: String, default: '' },
-  apkData: { type: String }, // Base64 representation for persistent storage across deployments
+  storagePath: { type: String, default: '/downloads/growvest-latest.apk' },
+  externalUrl: { type: String, default: '' },
   version: { type: String, default: '1.0.0' },
   uploadedAt: { type: Date, default: Date.now },
   uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

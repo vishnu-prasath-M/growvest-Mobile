@@ -108,7 +108,7 @@ const ReferralAdmin = ({ token }: ReferralAdminProps) => {
     fetchApkDetails();
   }, [token]);
 
-  const handleFileUpload = async (file: File) => {
+  const handleFileUpload = (file: File) => {
     if (!token) return;
     setUploadError("");
 
@@ -123,56 +123,51 @@ const ReferralAdmin = ({ token }: ReferralAdminProps) => {
     }
 
     setUploading(true);
-    setUploadProgress(20);
+    setUploadProgress(0);
 
-    try {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        try {
-          const base64Data = reader.result as string;
-          setUploadProgress(60);
+    const formData = new FormData();
+    formData.append("apkFile", file);
+    formData.append("fileName", file.name);
+    formData.append("version", `v1.0.${Date.now().toString().slice(-3)}`);
 
-          const res = await fetch(`${API_URL}/api/referral/admin/apk`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              fileName: file.name,
-              fileSize: file.size,
-              base64Data,
-              version: `v1.0.${Date.now().toString().slice(-3)}`,
-            }),
-          });
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${API_URL}/api/referral/admin/apk`);
+    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
 
-          setUploadProgress(90);
+    // Real-time smooth progress tracking
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const percent = Math.round((e.loaded / e.total) * 95);
+        setUploadProgress(percent);
+      }
+    };
 
-          if (res.ok) {
-            setUploadProgress(100);
-            setTimeout(() => {
-              setUploading(false);
-              setUploadProgress(0);
-              fetchApkDetails();
-              fetchReferralOverview();
-            }, 600);
-          } else {
-            const err = await res.json();
-            setUploadError(err.message || "Failed to upload APK");
-            setUploading(false);
-          }
-        } catch (err) {
-          console.error("Upload process error:", err);
-          setUploadError("Error processing file for upload");
+    xhr.onload = () => {
+      setUploadProgress(100);
+      if (xhr.status === 200 || xhr.status === 201) {
+        setTimeout(() => {
           setUploading(false);
+          setUploadProgress(0);
+          fetchApkDetails();
+          fetchReferralOverview();
+        }, 500);
+      } else {
+        try {
+          const err = JSON.parse(xhr.responseText);
+          setUploadError(err.message || "Failed to upload APK");
+        } catch {
+          setUploadError(`Upload failed with status code ${xhr.status}`);
         }
-      };
-      reader.readAsDataURL(file);
-    } catch (err) {
-      console.error("File reader error:", err);
-      setUploadError("Failed to read file");
+        setUploading(false);
+      }
+    };
+
+    xhr.onerror = () => {
+      setUploadError("Network error occurred during APK upload");
       setUploading(false);
-    }
+    };
+
+    xhr.send(formData);
   };
 
   const handleCopyApkUrl = () => {

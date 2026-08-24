@@ -267,9 +267,9 @@ const app = express();
 app.use(cors());
 // Serve static files (web reset-password page)
 app.use(express.static(require('path').join(__dirname, 'public')));
-// FIX 1: Increase JSON body limit to 50mb to handle base64 image uploads for KYC
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+// Increase JSON and urlencoded body limit to 150mb for APK uploads and image data
+app.use(express.json({ limit: '150mb' }));
+app.use(express.urlencoded({ limit: '150mb', extended: true }));
 
 // Web reset-password page route — serves the HTML file
 app.get('/reset-password', (req, res) => {
