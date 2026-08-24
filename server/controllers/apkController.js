@@ -26,41 +26,38 @@ exports.uploadAPK = async (req, res) => {
     }
 
     let fileSize = 0;
-    let apkData = '';
+    let fileBuffer = null;
 
     if (fileObj && fileObj.buffer) {
       fileSize = fileObj.size;
-      apkData = fileObj.buffer.toString('base64');
+      fileBuffer = fileObj.buffer;
     } else if (base64Data) {
-      apkData = base64Data.replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '');
-      const buffer = Buffer.from(apkData, 'base64');
-      fileSize = buffer.length;
+      const cleanBase64 = base64Data.replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '');
+      fileBuffer = Buffer.from(cleanBase64, 'base64');
+      fileSize = fileBuffer.length;
     }
 
-    if (fileSize < 100) {
+    if (!fileBuffer || fileSize < 100) {
       return res.status(400).json({ message: 'Invalid APK file content or empty file' });
     }
 
-    // Save physical file as secondary storage if directory writable
+    // Ensure downloads directory exists
     const downloadsDir = path.join(__dirname, '../public/downloads');
     if (!fs.existsSync(downloadsDir)) {
       fs.mkdirSync(downloadsDir, { recursive: true });
     }
+
+    // Write file directly to public downloads folder
     const physicalPath = path.join(downloadsDir, 'growvest-latest.apk');
-    try {
-      fs.writeFileSync(physicalPath, Buffer.from(apkData, 'base64'));
-    } catch (fsErr) {
-      console.warn('[APK Upload] Could not write to physical disk (using DB storage):', fsErr.message);
-    }
+    fs.writeFileSync(physicalPath, fileBuffer);
 
     // Mark all existing active APKs as inactive
     await APKRelease.updateMany({ status: 'active' }, { status: 'inactive' });
 
-    // Create new active APK release
+    // Create new active APK metadata record in DB
     const newAPK = await APKRelease.create({
       fileName: name,
       fileSize,
-      apkData,
       storagePath: '/downloads/growvest-latest.apk',
       version: version || '1.0.0',
       uploadedBy: adminId,
@@ -127,24 +124,17 @@ exports.downloadActiveAPK = async (req, res) => {
     // Increment download count atomically
     await APKRelease.findByIdAndUpdate(activeApk._id, { $inc: { downloadCount: 1 } });
 
-    // Try serving physical file if it exists
+    // Check physical file
     const physicalPath = path.join(__dirname, '../public/downloads/growvest-latest.apk');
     if (fs.existsSync(physicalPath)) {
       res.setHeader('Content-Type', 'application/vnd.android.package-archive');
       res.setHeader('Content-Disposition', `attachment; filename="${activeApk.fileName || 'growvest.apk'}"`);
       return res.sendFile(physicalPath);
+    } else if (activeApk.externalUrl) {
+      return res.redirect(activeApk.externalUrl);
     }
 
-    // Stream from DB base64 string
-    if (activeApk.apkData) {
-      const buffer = Buffer.from(activeApk.apkData, 'base64');
-      res.setHeader('Content-Type', 'application/vnd.android.package-archive');
-      res.setHeader('Content-Disposition', `attachment; filename="${activeApk.fileName || 'growvest.apk'}"`);
-      res.setHeader('Content-Length', buffer.length);
-      return res.send(buffer);
-    }
-
-    return res.status(404).send('APK file content missing');
+    return res.status(404).send('APK file currently updating');
   } catch (error) {
     console.error('Error downloading APK:', error);
     res.status(500).send('Error streaming APK file');
