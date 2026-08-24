@@ -14,11 +14,12 @@ Notifications.setNotificationHandler({
 });
 
 const DEVICE_TOKEN_KEY = 'deviceToken';
-const LAST_SEEN_NOTIF_KEY = 'lastSeenNotificationId';
-const POLL_INTERVAL_MS = 10000; // Poll every 10 seconds for instant delivery
+const LAST_SEEN_TIMESTAMP_KEY = 'lastSeenNotificationTimestamp';
+const POLL_INTERVAL_MS = 30000; // Poll every 30 seconds
 
 let pollingInterval = null;
 let currentUserId = null;
+let lastPolledTime = Date.now();
 
 async function showLocalNotification(title, body, data = {}) {
   try {
@@ -32,7 +33,7 @@ async function showLocalNotification(title, body, data = {}) {
       },
       trigger: null,
     });
-    console.log('[NotificationService] Local system notification dispatched:', title);
+    console.log('[NotificationService] Single local notification displayed:', title);
   } catch (error) {
     console.error('[NotificationService] Error showing local notification:', error);
   }
@@ -42,42 +43,33 @@ async function pollForNotifications() {
   if (!currentUserId) return;
 
   try {
-    const lastSeenId = await AsyncStorage.getItem(LAST_SEEN_NOTIF_KEY);
-    
+    const savedTimeStr = await AsyncStorage.getItem(LAST_SEEN_TIMESTAMP_KEY);
+    const lastSeenTime = savedTimeStr ? parseInt(savedTimeStr, 10) : lastPolledTime;
+
     const response = await api.get('/notifications');
     const allNotifications = response.data?.notifications || [];
 
     if (allNotifications.length === 0) return;
 
-    // On FIRST poll (no lastSeenId stored), silently set the baseline to the
-    // current latest notification and return WITHOUT showing any alerts.
-    // This prevents all historical notifications from firing at once on login.
-    if (!lastSeenId) {
-      await AsyncStorage.setItem(LAST_SEEN_NOTIF_KEY, allNotifications[0]._id);
-      console.log('[NotificationService] Baseline set to latest notification, no alerts fired on first poll.');
+    // Filter only notifications created AFTER our last seen timestamp
+    const brandNewNotifications = allNotifications.filter(n => {
+      const createdTime = new Date(n.createdAt).getTime();
+      return createdTime > lastSeenTime;
+    });
+
+    // Update last seen timestamp to NOW
+    const nowTime = Date.now();
+    await AsyncStorage.setItem(LAST_SEEN_TIMESTAMP_KEY, nowTime.toString());
+    lastPolledTime = nowTime;
+
+    // If initial baseline was just set or no new notifications, exit
+    if (!savedTimeStr || brandNewNotifications.length === 0) {
       return;
     }
 
-    // Find which notifications are NEW since last seen
-    const lastSeenIndex = allNotifications.findIndex(n => n._id === lastSeenId);
-    if (lastSeenIndex <= 0) {
-      if (lastSeenIndex < 0) {
-        await AsyncStorage.setItem(LAST_SEEN_NOTIF_KEY, allNotifications[0]._id);
-      }
-      return;
-    }
-
-    // Everything BEFORE lastSeenIndex is newer than what we last saw
-    const newNotifications = allNotifications.slice(0, lastSeenIndex);
-
-    // Update last seen to the newest notification immediately
-    const newestId = allNotifications[0]?._id;
-    if (newestId) {
-      await AsyncStorage.setItem(LAST_SEEN_NOTIF_KEY, newestId);
-    }
-
-    // Show notifications oldest-first so they appear in order
-    for (const notif of newNotifications.reverse()) {
+    // Show only brand new notifications (max 3 at once to prevent spam)
+    const toShow = brandNewNotifications.slice(0, 3).reverse();
+    for (const notif of toShow) {
       await showLocalNotification(notif.title, notif.description, { notifId: notif._id });
     }
   } catch (error) {
@@ -87,6 +79,13 @@ async function pollForNotifications() {
 
 export const notificationService = {
   async requestPermission() {
+    try {
+      // Instantly cancel any existing stuck or repeating local scheduled notifications on device
+      await Notifications.cancelAllScheduledNotificationsAsync();
+    } catch (e) {
+      // ignore
+    }
+
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
         name: 'Default',
@@ -116,57 +115,7 @@ export const notificationService = {
       return false;
     }
 
-    // Schedule native daily local notifications directly in Android OS
-    this.scheduleDailyLocalNotifications();
-
     return true;
-  },
-
-  /**
-   * Schedules recurring daily local notifications directly in Android OS.
-   * Runs natively on the device even when the app is closed or killed!
-   */
-  async scheduleDailyLocalNotifications() {
-    try {
-      // Cancel existing scheduled notifications to prevent duplicates
-      await Notifications.cancelAllScheduledNotificationsAsync();
-
-      // 1. Morning Pocket Money & Investment Payout Alert (9:00 AM IST)
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: '💰 Daily Pocket Money Ready!',
-          body: 'Your daily payout and returns are ready to claim! Log in now to check your balance.',
-          sound: 'default',
-          badge: 1,
-          data: { screen: 'PocketMoney' },
-        },
-        trigger: {
-          hour: 9,
-          minute: 0,
-          repeats: true,
-        },
-      });
-
-      // 2. Evening Wealth & Chit Fund Reminder (6:00 PM IST)
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: '📈 Grow Your Money Every Day!',
-          body: 'Check today\'s earnings, claim coin rewards, and explore high-yield chit funds on Growvest!',
-          sound: 'default',
-          badge: 1,
-          data: { screen: 'Home' },
-        },
-        trigger: {
-          hour: 18,
-          minute: 0,
-          repeats: true,
-        },
-      });
-
-      console.log('[NotificationService] Natively scheduled daily local notifications for 9:00 AM & 6:00 PM IST.');
-    } catch (error) {
-      console.error('[NotificationService] Error scheduling daily local notifications:', error);
-    }
   },
 
   async getDeviceToken() {
@@ -209,7 +158,7 @@ export const notificationService = {
       });
 
       await AsyncStorage.setItem(DEVICE_TOKEN_KEY, deviceToken);
-      console.log('[NotificationService] Device registered successfully:', deviceToken);
+      console.log('[NotificationService] Device registered successfully');
       
       // Start polling for server-side notifications
       this.startPolling(userId);
@@ -224,13 +173,12 @@ export const notificationService = {
   startPolling(userId) {
     this.stopPolling();
     currentUserId = userId;
+    lastPolledTime = Date.now();
+    AsyncStorage.setItem(LAST_SEEN_TIMESTAMP_KEY, Date.now().toString());
     
-    // Poll immediately on start
-    pollForNotifications();
-    
-    // Then poll at regular intervals
+    // Start interval polling
     pollingInterval = setInterval(pollForNotifications, POLL_INTERVAL_MS);
-    console.log('[NotificationService] Started polling for notifications');
+    console.log('[NotificationService] Started clean polling for notifications');
   },
 
   stopPolling() {
