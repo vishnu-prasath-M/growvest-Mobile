@@ -15,6 +15,7 @@ import { executeRazorpayPayment } from '../../services/razorpayHandler';
 import { authService } from '../../services/authService';
 import KycRequiredModal from '../../components/KycRequiredModal';
 import { kycService } from '../../services/kycService';
+import { useTheme } from '../../context/ThemeContext';
 
 const ChitPaymentScreen = ({ navigation, route }) => {
   const { colors: themeColors } = useTheme();
