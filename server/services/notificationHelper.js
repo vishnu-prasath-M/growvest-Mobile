@@ -140,9 +140,35 @@ async function notifyAdmins({ title, description, type = 'general', metadata }) 
         metadata
       });
     }
+/**
+ * Send a notification to all active users.
+ * 
+ * @param {Object} options
+ * @param {string} options.title - Notification title
+ * @param {string} options.description - Notification body/description
+ * @param {string} options.type - Notification type
+ * @param {Object} [options.metadata] - Additional metadata
+ * @param {Object} [options.pushData] - Extra push payload data
+ * @returns {Promise<void>}
+ */
+async function notifyAllUsers({ title, description, type = 'general', metadata, pushData }) {
+  try {
+    const User = require('../models/User');
+    const users = await User.find({ role: 'user' });
+    console.log(`[NotificationHelper] Broadcasting notification to ${users.length} users: ${title}`);
+    for (const user of users) {
+      await sendNotification({
+        userId: user._id,
+        title,
+        description,
+        type,
+        metadata,
+        pushData,
+      });
+    }
   } catch (err) {
-    console.error('[NotificationHelper] Error in notifyAdmins:', err);
+    console.error('[NotificationHelper] Error in notifyAllUsers:', err);
   }
 }
 
-module.exports = { sendNotification, notifyAdmins };
+module.exports = { sendNotification, notifyAdmins, notifyAllUsers };

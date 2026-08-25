@@ -132,12 +132,11 @@ export const notificationService = {
 
   async getDeviceToken() {
     try {
-      const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-      
-      if (!projectId) {
-        console.log('[NotificationService] No EAS project ID found');
-        return null;
-      }
+      const projectId =
+        Constants.expoConfig?.extra?.eas?.projectId ||
+        Constants.easConfig?.projectId ||
+        Constants.manifest?.extra?.eas?.projectId ||
+        'f4211c90-3448-400b-9e0c-82933dd6dbed';
 
       const token = await Notifications.getExpoPushTokenAsync({
         projectId,

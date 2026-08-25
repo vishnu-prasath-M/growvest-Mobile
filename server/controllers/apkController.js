@@ -54,12 +54,15 @@ exports.uploadAPK = async (req, res) => {
     // Mark all existing active APKs as inactive
     await APKRelease.updateMany({ status: 'active' }, { status: 'inactive' });
 
-    // Create new active APK metadata record in DB (including binary buffer in MongoDB for zero-loss persistence)
+    // Store raw buffer in MongoDB ONLY if file size is <= 14 MB to prevent MongoDB 16MB BSON document limit crash
+    const safeBufferInDb = fileSize <= 14 * 1024 * 1024 ? fileBuffer : null;
+
+    // Create new active APK metadata record in DB
     const newAPK = await APKRelease.create({
       fileName: name,
       fileSize,
       storagePath: '/downloads/growvest-latest.apk',
-      apkData: fileBuffer,
+      apkData: safeBufferInDb,
       version: version || '1.0.0',
       uploadedBy: adminId,
       status: 'active',

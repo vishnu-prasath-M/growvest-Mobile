@@ -212,50 +212,78 @@ cron.schedule("0 8 * * *", async () => {
         }
       }
       
-      // 2. Regular Reminders
+      // 2. Regular Reminders for Last 4 Days
       const baseAmt = isWeekly ? (member.chitId.weeklyAmount || 200) : (member.chitId.monthlyAmount || 1000);
       const unitLabel = isWeekly ? 'weekly' : 'monthly';
-      const screenName = isWeekly ? 'MonthlyDue' : 'MonthlyDue'; // Unified navigation
+      const screenName = 'MonthlyDue';
       
-      if (diffDays >= 0 && diffDays <= 3) {
+      if (diffDays >= 0 && diffDays <= 4) {
         const dueDateStr = nextDue.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+        const daysText = diffDays === 0 ? 'today' : diffDays === 1 ? 'tomorrow' : `in ${diffDays} days`;
         
         await sendNotification({
           userId: member.userId._id,
-          title: `📅 ${unitLabel.toUpperCase()} Due Reminder`,
-          description: `Your ${unitLabel} installment for "${member.chitId.name}" is due on ${dueDateStr}. Please complete your payment.`,
+          title: `⏳ Chit Due Reminder (${daysText})`,
+          description: `Your ${unitLabel} installment of ₹${baseAmt} for "${member.chitId.name}" is due ${daysText} (on ${dueDateStr}). Please complete your payment.`,
           type: 'due_reminder',
           metadata: { chitId: member.chitId._id, memberId: member._id, dueDate: nextDue },
           pushData: { screen: screenName },
         });
         reminderCount++;
       }
-
-      if (diffDays === 2) {
-        await sendNotification({
-          userId: member.userId._id,
-          title: `⚠️ Payment Due in 2 Days`,
-          description: `Your ${unitLabel} due of ₹${baseAmt} for "${member.chitId.name}" is due in 2 days.`,
-          type: 'due_reminder_2_days',
-          metadata: { chitId: member.chitId._id, memberId: member._id, dueDate: nextDue },
-          pushData: { screen: screenName },
-        });
-      }
-
-      if (diffDays === 1) {
-        await sendNotification({
-          userId: member.userId._id,
-          title: `🚨 Payment Due Tomorrow`,
-          description: `Your ${unitLabel} due of ₹${baseAmt} for "${member.chitId.name}" is due tomorrow. Please pay to avoid late fees.`,
-          type: 'due_reminder_1_day',
-          metadata: { chitId: member.chitId._id, memberId: member._id, dueDate: nextDue },
-          pushData: { screen: screenName },
-        });
-      }
     }
-    console.log(`Due Reminder & Penalty Cron Job Finished: Sent reminders and checked penalties.`);
+    console.log(`Due Reminder & Penalty Cron Job Finished: Sent ${reminderCount} reminders and checked penalties.`);
   } catch (error) {
     console.error("Due Reminder Cron Job Error:", error);
+  }
+});
+
+// Daily User Attraction & Engagement Push Notification Cron (Runs daily at 9:00 AM & 6:00 PM IST)
+const DAILY_ENGAGEMENT_MESSAGES = [
+  {
+    title: '🌱 Grow Your Money Every Day!',
+    body: 'Check your active investments and claim today’s rewards in Growvest.',
+    type: 'pocket_money_reminder'
+  },
+  {
+    title: '💼 Daily Pocket Money Ready!',
+    body: 'Your daily payout is waiting for you! Open the Pocket Money section to request today’s payout.',
+    type: 'pocket_money_reminder'
+  },
+  {
+    title: '📈 Compounding Savings Alert',
+    body: 'Small consistent daily savings lead to huge financial freedom. Explore high-yield chit plans today!',
+    type: 'general'
+  },
+  {
+    title: '🎁 Refer & Earn Extra Cash!',
+    body: 'Invite your friends to Growvest and get instant bonus rewards on every referral!',
+    type: 'general'
+  },
+  {
+    title: '🏆 Weekly Chit Draw Approving Soon',
+    body: 'Keep your chit dues updated to stay eligible for this week’s auction winnings!',
+    type: 'due_reminder'
+  }
+];
+
+cron.schedule("0 9,18 * * *", async () => {
+  console.log("[Cron] Running Daily User Attraction & Engagement Push Broadcast...");
+  try {
+    const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
+    const msgIndex = dayOfYear % DAILY_ENGAGEMENT_MESSAGES.length;
+    const msg = DAILY_ENGAGEMENT_MESSAGES[msgIndex];
+
+    const { notifyAllUsers } = require('./services/notificationHelper');
+    await notifyAllUsers({
+      title: msg.title,
+      description: msg.body,
+      type: msg.type,
+      pushData: { screen: 'Home' }
+    });
+    console.log(`[Cron] Engagement push broadcast completed: "${msg.title}"`);
+  } catch (err) {
+    console.error("[Cron] Daily engagement push error:", err);
   }
 });
 const investmentRoutes = require('./routes/investmentRoutes');
