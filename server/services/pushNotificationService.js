@@ -129,23 +129,18 @@ const sendToUser = async (userId, payload) => {
       return { success: false, reason: 'no_tokens' };
     }
 
-    const allMobileTokens = (user.fcmTokens || []).filter(t => t.platform !== 'web');
-    const standaloneTokens = allMobileTokens.filter(t => t.deviceId === 'standalone_apk');
-    
-    let targetTokens = [];
-    if (standaloneTokens.length > 0) {
-      // User has registered a Standalone APK device: Deliver to ALL Standalone APK tokens
-      targetTokens = standaloneTokens
-        .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
-        .map(t => t.token)
-        .filter(Boolean);
-      console.log(`[PushService] User "${userId}" has ${standaloneTokens.length} Standalone APK token(s). Dispatching to Standalone APK tokens.`);
-    } else {
-      // Fallback: Deliver to all mobile tokens for user
-      targetTokens = allMobileTokens
-        .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
-        .map(t => t.token)
-        .filter(Boolean);
+    // Collect ALL valid ExponentPushToken[...] entries stored for this user (deduplicated)
+    const mobileTokenEntries = (user.fcmTokens || [])
+      .filter(t => t.token && typeof t.token === 'string' && t.token.startsWith('ExponentPushToken'))
+      .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+
+    const seenTokens = new Set();
+    const targetTokens = [];
+    for (const entry of mobileTokenEntries) {
+      if (!seenTokens.has(entry.token)) {
+        seenTokens.add(entry.token);
+        targetTokens.push(entry.token);
+      }
     }
 
     const webTokens = (user.fcmTokens || [])

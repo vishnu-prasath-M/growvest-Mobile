@@ -13,7 +13,7 @@ const ChitMember = require('./models/ChitMember');
 const Chit = require('./models/Chit');
 const { sendNotification } = require('./services/notificationHelper');
 
-// Feature 7: Daily Interest Cron Setup (12:00 AM)
+// Feature 7: Daily Interest Cron Setup (12:00 AM IST)
 cron.schedule("0 0 * * *", async () => {
   console.log("Running Daily Interest Calculation Cron Job...");
   try {
@@ -27,17 +27,16 @@ cron.schedule("0 0 * * *", async () => {
   } catch (error) {
     console.error("Cron Job Error:", error);
   }
-});
+}, { timezone: "Asia/Kolkata" });
 
 // Daily Pocket Money Payout Cron (admin-controlled) — kept commented out on purpose.
 // Payouts are released ONLY when admin approves via /api/pocket-money/admin/release/:id
 const { runPocketMoneyPayouts } = require('./controllers/pocketMoneyController');
 
-// 🔔 DAILY POCKET MONEY REMINDER — runs every morning at 8:00 AM
+// 🔔 DAILY POCKET MONEY REMINDER — runs every morning at 8:30 AM IST
 // Sends push notification to all users with a pocket money payout due today.
-// Works even when the app is in background/killed because it's server-side push (Expo API).
-cron.schedule("0 8 * * *", async () => {
-  console.log("[PocketMoneyReminder] Running daily pocket money notification cron...");
+cron.schedule("30 8 * * *", async () => {
+  console.log("[PocketMoneyReminder] Running daily pocket money notification cron (8:30 AM IST)...");
   try {
     const PocketMoney = require('./models/PocketMoney');
     const { sendNotification } = require('./services/notificationHelper');
@@ -60,8 +59,8 @@ cron.schedule("0 8 * * *", async () => {
 
         await sendNotification({
           userId: plan.userId,
-          title: '💰 Pocket Money Ready to Claim!',
-          description: `Your ${freqLabel} pocket money payout of ₹${payoutAmt} is ready! Open the Pocket Money section and request your payout. Remaining pot: ₹${remaining}.`,
+          title: '☀️ Daily Pocket Money Ready to Claim!',
+          description: `Good morning! Your ${freqLabel} pocket money payout of ₹${payoutAmt} is ready. Request your payout now in the Pocket Money section.`,
           type: 'pocket_money_payout',
           metadata: { pocketMoneyId: plan._id, amount: payoutAmt },
           pushData: { screen: 'PocketMoney' },
@@ -75,10 +74,10 @@ cron.schedule("0 8 * * *", async () => {
   } catch (error) {
     console.error("[PocketMoneyReminder] Cron error:", error);
   }
-});
+}, { timezone: "Asia/Kolkata" });
 
 
-// Due Reminder & Penalty Cron Job (runs daily at 8:00 AM)
+// Due Reminder & Penalty Cron Job (runs daily at 8:45 AM IST)
 const calcNextWeeklyDueDate = (joinedAt, weekIndex) => {
   const base = new Date(joinedAt);
   const day = base.getDay();
@@ -89,8 +88,8 @@ const calcNextWeeklyDueDate = (joinedAt, weekIndex) => {
   return targetDueDate;
 };
 
-cron.schedule("0 8 * * *", async () => {
-  console.log("Running Due Reminder & Penalty Cron Job...");
+cron.schedule("45 8 * * *", async () => {
+  console.log("Running Due Reminder & Penalty Cron Job (8:45 AM IST)...");
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -236,43 +235,32 @@ cron.schedule("0 8 * * *", async () => {
   } catch (error) {
     console.error("Due Reminder Cron Job Error:", error);
   }
-});
+}, { timezone: "Asia/Kolkata" });
 
-// Daily User Attraction & Engagement Push Notification Cron (Runs daily at 9:00 AM & 6:00 PM IST)
-const DAILY_ENGAGEMENT_MESSAGES = [
+// 🌅 Morning Financial Tip & Growth Push (Runs daily at 9:15 AM IST)
+const MORNING_TIPS = [
   {
-    title: '🌱 Grow Your Money Every Day!',
-    body: 'Check your active investments and claim today’s rewards in Growvest.',
-    type: 'pocket_money_reminder'
-  },
-  {
-    title: '💼 Daily Pocket Money Ready!',
-    body: 'Your daily payout is waiting for you! Open the Pocket Money section to request today’s payout.',
-    type: 'pocket_money_reminder'
-  },
-  {
-    title: '📈 Compounding Savings Alert',
-    body: 'Small consistent daily savings lead to huge financial freedom. Explore high-yield chit plans today!',
+    title: '🌱 Morning Wealth Booster',
+    body: 'Consistent daily savings grow into wealth. Check your active plans in Growvest today!',
     type: 'general'
   },
   {
-    title: '🎁 Refer & Earn Extra Cash!',
-    body: 'Invite your friends to Growvest and get instant bonus rewards on every referral!',
+    title: '📈 The Magic of Compounding',
+    body: 'Investing even a small amount regularly creates high compound returns. Explore Growvest investment plans!',
     type: 'general'
   },
   {
-    title: '🏆 Weekly Chit Draw Approving Soon',
-    body: 'Keep your chit dues updated to stay eligible for this week’s auction winnings!',
-    type: 'due_reminder'
+    title: '💡 Financial Freedom Goal',
+    body: 'Build your emergency fund and wealth pot effortlessly with low-risk chit savings.',
+    type: 'general'
   }
 ];
 
-cron.schedule("0 9,18 * * *", async () => {
-  console.log("[Cron] Running Daily User Attraction & Engagement Push Broadcast...");
+cron.schedule("15 9 * * *", async () => {
+  console.log("[Cron] Running Morning Financial Tip Push Broadcast (9:15 AM IST)...");
   try {
     const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
-    const msgIndex = dayOfYear % DAILY_ENGAGEMENT_MESSAGES.length;
-    const msg = DAILY_ENGAGEMENT_MESSAGES[msgIndex];
+    const msg = MORNING_TIPS[dayOfYear % MORNING_TIPS.length];
 
     const { notifyAllUsers } = require('./services/notificationHelper');
     await notifyAllUsers({
@@ -281,11 +269,47 @@ cron.schedule("0 9,18 * * *", async () => {
       type: msg.type,
       pushData: { screen: 'Home' }
     });
-    console.log(`[Cron] Engagement push broadcast completed: "${msg.title}"`);
   } catch (err) {
-    console.error("[Cron] Daily engagement push error:", err);
+    console.error("[Cron] Morning push error:", err);
   }
-});
+}, { timezone: "Asia/Kolkata" });
+
+// 🌇 Evening Referral & Rewards Engagement Push (Runs daily at 6:00 PM IST)
+const EVENING_PROMOS = [
+  {
+    title: '🎁 Refer Friends & Earn Bonus Cash!',
+    body: 'Share your Growvest referral link with family & friends to earn instant cash rewards!',
+    type: 'general'
+  },
+  {
+    title: '🏆 Auction Winnings & Chit Draws',
+    body: 'Keep your monthly chit dues current so you can participate in upcoming chit auction draws!',
+    type: 'due_reminder'
+  },
+  {
+    title: '✨ Smart Savings Reminder',
+    body: 'End your day on a prosperous note by reviewing your growing financial portfolio on Growvest.',
+    type: 'general'
+  }
+];
+
+cron.schedule("0 18 * * *", async () => {
+  console.log("[Cron] Running Evening Referral & Rewards Push Broadcast (6:00 PM IST)...");
+  try {
+    const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
+    const msg = EVENING_PROMOS[dayOfYear % EVENING_PROMOS.length];
+
+    const { notifyAllUsers } = require('./services/notificationHelper');
+    await notifyAllUsers({
+      title: msg.title,
+      description: msg.body,
+      type: msg.type,
+      pushData: { screen: 'Home' }
+    });
+  } catch (err) {
+    console.error("[Cron] Evening push error:", err);
+  }
+}, { timezone: "Asia/Kolkata" });
 const investmentRoutes = require('./routes/investmentRoutes');
 const chitAdminRoutes = require('./routes/chitAdminRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');

@@ -161,7 +161,7 @@ export const notificationService = {
         return null;
       }
 
-      const isStandalone = Constants.appOwnership === 'standalone' || Constants.executionEnvironment === 'standalone' || !__DEV__;
+      const isStandalone = true;
 
       await api.post('/users/register-device', {
         userId,
