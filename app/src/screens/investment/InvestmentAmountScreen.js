@@ -31,6 +31,14 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [kycModalVisible, setKycModalVisible] = useState(false);
 
+  // Date-based withdrawal & 5-week benefit eligibility dates
+  const today = new Date();
+  const defaultWithdrawalDate = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const fifthWeekDate = new Date(today.getTime() + 35 * 24 * 60 * 60 * 1000);
+
+  const [selectedWithdrawalDate, setSelectedWithdrawalDate] = useState(defaultWithdrawalDate.toISOString().split('T')[0]);
+  const [datePickerModalVisible, setDatePickerModalVisible] = useState(false);
+
   useEffect(() => {
     loadUserData();
     loadPlans();
@@ -103,6 +111,8 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
       amount: parseFloat(amount),
       type: investmentType,
       userData,
+      selectedWithdrawalDate,
+      benefitEligibilityDate: fifthWeekDate.toISOString(),
     });
   };
 
@@ -207,6 +217,59 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
           <Text style={styles.minAmount}>Minimum: ₹100</Text>
         </View>
 
+        {/* Intended Withdrawal Date Selection */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Choose Intended Withdrawal Date</Text>
+          <View style={styles.datePickerRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 12, color: themeColors.textSecondary }}>Selected Withdrawal Date</Text>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: themeColors.text, marginTop: 2 }}>
+                {new Date(selectedWithdrawalDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.changeDateBtn}
+              onPress={() => setDatePickerModalVisible(true)}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons name="calendar-edit" size={20} color={themeColors.primary} />
+              <Text style={{ color: themeColors.primary, fontWeight: '700', fontSize: 13, marginLeft: 4 }}>Change Date</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* 5-Week Benefit Rule Explanation Box */}
+        {(() => {
+          const formattedEligibilityDate = fifthWeekDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+          const formattedWithdrawalDate = new Date(selectedWithdrawalDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+          const formattedAmount = parseFloat(amount || 0).toLocaleString('en-IN');
+
+          return (
+            <View style={styles.ruleCard}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                <MaterialCommunityIcons name="alert-decagram" size={20} color="#D97706" style={{ marginRight: 6 }} />
+                <Text style={{ fontSize: 14, fontWeight: '800', color: themeColors.text }}>Withdrawal & 5-Week Benefit Rule</Text>
+              </View>
+              
+              <Text style={{ fontSize: 12, color: themeColors.textSecondary, marginBottom: 4 }}>
+                • <Text style={{ fontWeight: '700', color: themeColors.text }}>Intended Withdrawal Date:</Text> {formattedWithdrawalDate}
+              </Text>
+              <Text style={{ fontSize: 12, color: themeColors.textSecondary, marginBottom: 8 }}>
+                • <Text style={{ fontWeight: '700', color: themeColors.primary }}>5th-Week Benefit Eligibility Date:</Text> {formattedEligibilityDate}
+              </Text>
+
+              <View style={styles.ruleWarningBox}>
+                <Text style={{ fontSize: 12, color: '#92400E', lineHeight: 17 }}>
+                  ⚠️ <Text style={{ fontWeight: '700' }}>Important:</Text> If you withdraw BEFORE the 5th-week benefit eligibility date ({formattedEligibilityDate}), ONLY your original invested principal amount (₹{formattedAmount}) will be available for withdrawal. Interest/earnings and extra benefits will not be included.
+                </Text>
+                <Text style={{ fontSize: 12, color: '#065F46', lineHeight: 17, marginTop: 6 }}>
+                  ✓ If you wait until the 5th-week eligibility date ({formattedEligibilityDate}) and complete the required 5th-week payment, your applicable interest, earnings, and benefits will become eligible for withdrawal.
+                </Text>
+              </View>
+            </View>
+          );
+        })()}
+
         {/* Investment Summary */}
         {amount && parseFloat(amount) > 0 && (
           <View style={styles.summaryContainer}>
@@ -309,6 +372,70 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Intended Withdrawal Date Selection Modal */}
+      <Modal visible={datePickerModalVisible} transparent animationType="slide" onRequestClose={() => setDatePickerModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Choose Intended Withdrawal Date</Text>
+              <TouchableOpacity onPress={() => setDatePickerModalVisible(false)} style={styles.modalCloseBtn}>
+                <MaterialCommunityIcons name="close" size={18} color={themeColors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 13, color: themeColors.textSecondary, marginVertical: 8 }}>
+              Select your intended target withdrawal date:
+            </Text>
+
+            <ScrollView style={{ maxHeight: 260 }} showsVerticalScrollIndicator={false}>
+              {[15, 30, 35, 45, 60, 90, 180, 365].map((days) => {
+                const d = new Date(today.getTime() + days * 24 * 60 * 60 * 1000);
+                const isoDate = d.toISOString().split('T')[0];
+                const isSel = selectedWithdrawalDate === isoDate;
+                const is5thWeekOrLater = days >= 35;
+                return (
+                  <TouchableOpacity
+                    key={days}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: 12,
+                      borderRadius: 10,
+                      backgroundColor: isSel ? themeColors.primaryLight : themeColors.surface,
+                      marginBottom: 8,
+                      borderWidth: 1,
+                      borderColor: isSel ? themeColors.primary : themeColors.border,
+                    }}
+                    onPress={() => {
+                      setSelectedWithdrawalDate(isoDate);
+                      setDatePickerModalVisible(false);
+                    }}
+                  >
+                    <View>
+                      <Text style={{ fontWeight: '700', color: themeColors.text, fontSize: 14 }}>
+                        {d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} ({days} Days)
+                      </Text>
+                      <Text style={{ fontSize: 11, color: is5thWeekOrLater ? '#065F46' : '#B45309', marginTop: 2, fontWeight: '600' }}>
+                        {is5thWeekOrLater ? '✓ Full Principal + Interest + Benefits Eligible' : '⚠️ Early Withdrawal: Principal Only'}
+                      </Text>
+                    </View>
+                    {isSel && <MaterialCommunityIcons name="check-circle" size={20} color={themeColors.primary} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.continueBtn, { marginTop: 12 }]}
+              onPress={() => setDatePickerModalVisible(false)}
+            >
+              <Text style={styles.continueBtnText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Email Required Modal */}
       <Modal visible={showEmailModal} transparent animationType="fade" onRequestClose={() => setShowEmailModal(false)}>
@@ -471,7 +598,42 @@ const getStyles = (colors) => StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
     marginTop: 8,
-    fontWeight: '500',
+    marginHorizontal: 4,
+  },
+  // Date Picker & Rule Card
+  datePickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  changeDateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: colors.background,
+  },
+  ruleCard: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: '#F59E0B',
+  },
+  ruleWarningBox: {
+    marginTop: 6,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FCD34D',
   },
   // Summary
   summaryContainer: {

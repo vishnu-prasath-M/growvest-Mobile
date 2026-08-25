@@ -466,11 +466,13 @@ const WithdrawScreen = ({ navigation }) => {
 
               // ── SAVINGS / FIXED CARD ──────────────────────────────────────
               const isWithdrawn = inv.status === 'withdrawn' || inv.withdrawalStatus === 'withdrawn';
-              const isMatured = inv.maturityDate && new Date() >= new Date(inv.maturityDate);
-              const totalInterest = inv.totalInterest || inv.interestEarned || (inv.amount * (inv.interestRate || 12) / 100);
-              const maturityAmt = inv.maturityAmount || (inv.amount + totalInterest);
-              const matDateStr = inv.maturityDate 
-                ? new Date(inv.maturityDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+              const isFullEligible = inv.isEligibleForFullBenefits === true;
+              const principalAmt = inv.earlyPrincipalOnlyAmount || inv.amount || 0;
+              const fullAmt = inv.fullBenefitAmount || inv.availableToWithdraw || principalAmt;
+              const withdrawableAmt = inv.availableToWithdraw || (isFullEligible ? fullAmt : principalAmt);
+              
+              const benefitDateStr = inv.benefitEligibilityDate
+                ? new Date(inv.benefitEligibilityDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
                 : 'N/A';
 
               return (
@@ -490,18 +492,18 @@ const WithdrawScreen = ({ navigation }) => {
                     <View style={[
                       styles.statusBadge,
                       isWithdrawn ? { backgroundColor: themeColors.surface2 } :
-                      isMatured ? styles.statusBadgeMatured : styles.statusBadgeLocked
+                      isFullEligible ? styles.statusBadgeMatured : styles.statusBadgeLocked
                     ]}>
                       <MaterialCommunityIcons 
-                        name={isWithdrawn ? 'check-all' : isMatured ? 'check-circle' : 'lock'} 
+                        name={isWithdrawn ? 'check-all' : isFullEligible ? 'check-circle' : 'alert-circle'} 
                         size={14} 
-                        color={isWithdrawn ? themeColors.textTertiary : isMatured ? '#065F46' : '#B45309'} 
+                        color={isWithdrawn ? themeColors.textTertiary : isFullEligible ? '#065F46' : '#B45309'} 
                       />
                       <Text style={[
                         styles.statusBadgeText, 
-                        { color: isWithdrawn ? themeColors.textTertiary : isMatured ? '#065F46' : '#B45309' }
+                        { color: isWithdrawn ? themeColors.textTertiary : isFullEligible ? '#065F46' : '#B45309' }
                       ]}>
-                        {isWithdrawn ? 'WITHDRAWN' : isMatured ? 'READY TO WITHDRAW' : 'LOCKED'}
+                        {isWithdrawn ? 'WITHDRAWN' : isFullEligible ? 'FULL BENEFITS ELIGIBLE' : 'EARLY (PRINCIPAL ONLY)'}
                       </Text>
                     </View>
                   </View>
@@ -510,17 +512,13 @@ const WithdrawScreen = ({ navigation }) => {
 
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 4 }}>
                     <View>
-                      <Text style={{ fontSize: 11, color: themeColors.textSecondary }}>
-                        {isMatured ? 'Interest Earned' : 'Maturity Date'}
-                      </Text>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: themeColors.text }}>
-                        {isMatured ? formatCurrency(totalInterest) : matDateStr}
-                      </Text>
+                      <Text style={{ fontSize: 11, color: themeColors.textSecondary }}>5th-Week Benefit Date</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: themeColors.text }}>{benefitDateStr}</Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
                       <Text style={{ fontSize: 11, color: themeColors.textSecondary }}>Available to Withdraw</Text>
-                      <Text style={{ fontSize: 15, fontWeight: '800', color: isMatured && !isWithdrawn ? themeColors.primary : themeColors.textSecondary }}>
-                        {isMatured && !isWithdrawn ? formatCurrency(maturityAmt) : '₹0.00'}
+                      <Text style={{ fontSize: 15, fontWeight: '800', color: themeColors.primary }}>
+                        {formatCurrency(withdrawableAmt)}
                       </Text>
                     </View>
                   </View>
@@ -529,16 +527,16 @@ const WithdrawScreen = ({ navigation }) => {
                     {isWithdrawn ? (
                       <View style={{ backgroundColor: themeColors.surface2, padding: 10, borderRadius: 10, alignItems: 'center' }}>
                         <Text style={{ fontSize: 12, fontWeight: '600', color: themeColors.textSecondary }}>
-                          ✓ Maturity payout of {formatCurrency(maturityAmt)} has been processed.
+                          ✓ Payout of {formatCurrency(withdrawableAmt)} has been processed.
                         </Text>
                       </View>
-                    ) : isMatured ? (
+                    ) : (
                       <TouchableOpacity
                         style={styles.withdrawActionBtn}
                         activeOpacity={0.85}
                         onPress={() => {
                           setWithdrawType(inv._id);
-                          setAmount(String(maturityAmt));
+                          setAmount(String(withdrawableAmt));
                           openWithdrawModal(inv._id);
                         }}
                       >
@@ -549,15 +547,19 @@ const WithdrawScreen = ({ navigation }) => {
                           style={styles.withdrawActionGradient}
                         >
                           <MaterialCommunityIcons name="cash-fast" size={16} color="#fff" />
-                          <Text style={styles.withdrawActionText}>Withdraw {formatCurrency(maturityAmt)}</Text>
+                          <Text style={styles.withdrawActionText}>
+                            {isFullEligible
+                              ? `Withdraw Full Amount (${formatCurrency(fullAmt)})`
+                              : `Early Withdraw Principal Only (${formatCurrency(principalAmt)})`}
+                          </Text>
                         </LinearGradient>
                       </TouchableOpacity>
-                    ) : (
-                      <View style={{ backgroundColor: themeColors.surface2, padding: 10, borderRadius: 10, alignItems: 'center' }}>
-                        <Text style={{ fontSize: 12, fontWeight: '600', color: themeColors.textSecondary }}>
-                          🔒 Withdrawal available after maturity ({matDateStr})
-                        </Text>
-                      </View>
+                    )}
+
+                    {!isFullEligible && !isWithdrawn && (
+                      <Text style={{ fontSize: 11, color: '#B45309', marginTop: 6, textAlign: 'center', fontStyle: 'italic' }}>
+                        🔒 Interest & extra benefits are locked until 5th-week eligibility date ({benefitDateStr}).
+                      </Text>
                     )}
                   </View>
                 </TouchableOpacity>

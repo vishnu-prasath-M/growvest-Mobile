@@ -19,7 +19,7 @@ import { kycService } from '../../services/kycService';
 const InvestmentPaymentScreen = ({ navigation, route }) => {
   const { colors: themeColors } = useTheme();
   const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
-  const { amount, type, userData, frequency } = route.params;
+  const { amount, type, userData, frequency, selectedWithdrawalDate, benefitEligibilityDate } = route.params;
   const [loading, setLoading] = useState(false);
   const [kycModalVisible, setKycModalVisible] = useState(false);
 
@@ -48,7 +48,9 @@ const InvestmentPaymentScreen = ({ navigation, route }) => {
     await executeRazorpayPayment({
       amount,
       paymentType: type === 'pocket_money' ? 'pocket_money' : 'investment',
-      payloadData: type === 'pocket_money' ? { amount, type, frequency } : { amount, type },
+      payloadData: type === 'pocket_money'
+        ? { amount, type, frequency }
+        : { amount, type, selectedWithdrawalDate, benefitEligibilityDate },
       user: userData,
       setLoading,
       onSuccess: (response) => {

@@ -19,13 +19,43 @@ exports.createWithdrawal = async (req, res) => {
     const { getEnrichedUserData } = require('./userController');
     const enrichedUser = await getEnrichedUserData({ _id: user._id });
     
-    // Validate balance before proceeding
-    const available = withdrawType === 'fixed' 
-      ? enrichedUser.fixedBalance 
-      : enrichedUser.availableToWithdraw;
+    // Check if withdrawing against a specific investment ID
+    const Investment = require('../models/Investment');
+    let targetInv = null;
+    if (withdrawType && withdrawType !== 'saving' && withdrawType !== 'fixed') {
+      targetInv = await Investment.findById(withdrawType);
+    }
 
-    if (amount > available) {
-      return res.status(400).json({ message: `Insufficient balance. Available to withdraw: ₹${available.toLocaleString('en-IN')}` });
+    let available = enrichedUser.availableToWithdraw;
+    if (targetInv) {
+      const now = new Date();
+      const startDateObj = targetInv.startDate ? new Date(targetInv.startDate) : new Date();
+      const benefitEligibilityDate = targetInv.benefitEligibilityDate
+        ? new Date(targetInv.benefitEligibilityDate)
+        : new Date(startDateObj.getTime() + 35 * 24 * 60 * 60 * 1000);
+      benefitEligibilityDate.setHours(0, 0, 0, 0);
+
+      const isEligibleForFullBenefits = now >= benefitEligibilityDate && targetInv.fifthWeekPaymentCompleted !== false;
+      const principal = Number(targetInv.amount) || 0;
+      const accruedInterest = Number(targetInv.interestEarned) || 0;
+      const benefits = Number(targetInv.benefits) || 0;
+
+      if (!isEligibleForFullBenefits) {
+        // EARLY WITHDRAWAL: Principal ONLY allowed!
+        available = principal;
+        if (Number(amount) > principal) {
+          const formattedDate = benefitEligibilityDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+          return res.status(400).json({
+            message: `Early withdrawal before 5th-week benefit eligibility date (${formattedDate}) is restricted to original principal amount (₹${principal.toLocaleString('en-IN')}) only. Interest & extra benefits remain locked.`
+          });
+        }
+      } else {
+        available = principal + accruedInterest + benefits;
+      }
+    }
+
+    if (Number(amount) > available) {
+      return res.status(400).json({ message: `Insufficient eligible balance. Available to withdraw: ₹${available.toLocaleString('en-IN')}` });
     }
 
     const newWithdrawal = new Withdrawal({

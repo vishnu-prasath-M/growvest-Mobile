@@ -68,6 +68,7 @@ const HomeScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [userName, setUserName] = useState('');
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const [coinsBalance, setCoinsBalance] = useState(0);
   const [kycModalVisible, setKycModalVisible] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -98,6 +99,14 @@ const HomeScreen = ({ navigation }) => {
 
       if (data?.user?.name || data?.user?.username) {
         setUserName(data?.user?.name || data?.user?.username);
+      }
+
+      // Fetch user's actual earned coins balance from backend DB
+      try {
+        const coinsRes = await api.get('/referral/coins');
+        setCoinsBalance(coinsRes.data?.totalCoins ?? coinsRes.data?.coins ?? 0);
+      } catch (coinErr) {
+        setCoinsBalance(data?.user?.coins || authUser?.coins || 0);
       }
 
       // Register device token for Standalone APK push notifications
@@ -251,15 +260,12 @@ const HomeScreen = ({ navigation }) => {
             </View>
             <View style={styles.headerRight}>
               <TouchableOpacity
-                style={styles.themeBtn}
-                onPress={toggleTheme}
+                style={styles.walletHeaderBtn}
+                onPress={() => navigation.navigate('Wallet')}
                 activeOpacity={0.8}
               >
-                <MaterialCommunityIcons 
-                  name={isDarkMode ? "weather-sunny" : "weather-night"} 
-                  size={22} 
-                  color={themeColors.text} 
-                />
+                <MaterialCommunityIcons name="database" size={16} color="#F59E0B" />
+                <Text style={styles.walletCoinText}>🪙 {coinsBalance} Coins</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -474,6 +480,28 @@ const getStyles = (colors) => StyleSheet.create({
   greetingStack: { flex: 1 },
   greetingLabel: { fontSize: 12, color: colors.textMuted, fontWeight: '500' },
   greetingName: { fontSize: 15, fontWeight: '700', color: colors.text, letterSpacing: -0.3 },
+  walletHeaderBtn: {
+    height: 38,
+    paddingHorizontal: 12,
+    borderRadius: 19,
+    backgroundColor: colors.surface,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  walletCoinText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.text,
+  },
   notifBtn: {
     width: 44, height: 44, borderRadius: 22,
     backgroundColor: colors.surface,

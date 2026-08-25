@@ -86,6 +86,26 @@ const investmentSchema = new mongoose.Schema({
   interestLogicVersion: {
     type: Number,
     default: 1, // 1 is old/wrong, 2 is correct (Feature 2)
+  },
+  // Date-based withdrawal & 5-week benefit eligibility fields
+  selectedWithdrawalDate: {
+    type: Date,
+  },
+  benefitEligibilityDate: {
+    type: Date,
+  },
+  benefits: {
+    type: Number,
+    default: 0,
+  },
+  fifthWeekPaymentCompleted: {
+    type: Boolean,
+    default: true,
+  },
+  eligibilityStatus: {
+    type: String,
+    enum: ['early_principal_only', 'full_eligible', 'withdrawn'],
+    default: 'early_principal_only',
   }
 }, { timestamps: true });
 
