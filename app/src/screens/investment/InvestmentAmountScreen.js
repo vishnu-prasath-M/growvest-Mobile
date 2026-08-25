@@ -231,28 +231,36 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
         </View>
 
         {/* 5-Week Benefit Rule Explanation Box */}
-        <View style={styles.ruleCard}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-            <MaterialCommunityIcons name="alert-decagram" size={20} color="#D97706" style={{ marginRight: 6 }} />
-            <Text style={{ fontSize: 14, fontWeight: '800', color: themeColors.text }}>Withdrawal & 5-Week Benefit Rule</Text>
-          </View>
-          
-          <Text style={{ fontSize: 12, color: themeColors.textSecondary, marginBottom: 4 }}>
-            • <Text style={{ fontWeight: '700', color: themeColors.text }}>Intended Withdrawal Date:</Text> {new Date(selectedWithdrawalDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-          </Text>
-          <Text style={{ fontSize: 12, color: themeColors.textSecondary, marginBottom: 8 }}>
-            • <Text style={{ fontWeight: '700', color: themeColors.primary }}>5th-Week Benefit Eligibility Date:</Text> {fifthWeekDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-          </Text>
+        {(() => {
+          const formattedEligibilityDate = fifthWeekDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+          const formattedWithdrawalDate = new Date(selectedWithdrawalDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+          const formattedAmount = parseFloat(amount || 0).toLocaleString('en-IN');
 
-          <View style={styles.ruleWarningBox}>
-            <Text style={{ fontSize: 12, color: '#92400E', lineHeight: 17 }}>
-              ⚠️ <Text style={{ fontWeight: '700' }}>Important:</Text> If you withdraw BEFORE the 5th-week benefit eligibility date ({fifthWeekDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })), ONLY your original invested principal amount (₹{parseFloat(amount || 0).toLocaleString('en-IN')}) will be available for withdrawal. Interest/earnings and extra benefits will not be included.
-            </Text>
-            <Text style={{ fontSize: 12, color: '#065F46', lineHeight: 17, marginTop: 6 }}>
-              ✓ If you wait until the 5th-week eligibility date ({fifthWeekDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })) and complete the required 5th-week payment, your applicable interest, earnings, and benefits will become eligible for withdrawal.
-            </Text>
-          </View>
-        </View>
+          return (
+            <View style={styles.ruleCard}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                <MaterialCommunityIcons name="alert-decagram" size={20} color="#D97706" style={{ marginRight: 6 }} />
+                <Text style={{ fontSize: 14, fontWeight: '800', color: themeColors.text }}>Withdrawal & 5-Week Benefit Rule</Text>
+              </View>
+              
+              <Text style={{ fontSize: 12, color: themeColors.textSecondary, marginBottom: 4 }}>
+                • <Text style={{ fontWeight: '700', color: themeColors.text }}>Intended Withdrawal Date:</Text> {formattedWithdrawalDate}
+              </Text>
+              <Text style={{ fontSize: 12, color: themeColors.textSecondary, marginBottom: 8 }}>
+                • <Text style={{ fontWeight: '700', color: themeColors.primary }}>5th-Week Benefit Eligibility Date:</Text> {formattedEligibilityDate}
+              </Text>
+
+              <View style={styles.ruleWarningBox}>
+                <Text style={{ fontSize: 12, color: '#92400E', lineHeight: 17 }}>
+                  ⚠️ <Text style={{ fontWeight: '700' }}>Important:</Text> If you withdraw BEFORE the 5th-week benefit eligibility date ({formattedEligibilityDate}), ONLY your original invested principal amount (₹{formattedAmount}) will be available for withdrawal. Interest/earnings and extra benefits will not be included.
+                </Text>
+                <Text style={{ fontSize: 12, color: '#065F46', lineHeight: 17, marginTop: 6 }}>
+                  ✓ If you wait until the 5th-week eligibility date ({formattedEligibilityDate}) and complete the required 5th-week payment, your applicable interest, earnings, and benefits will become eligible for withdrawal.
+                </Text>
+              </View>
+            </View>
+          );
+        })()}
 
         {/* Investment Summary */}
         {amount && parseFloat(amount) > 0 && (

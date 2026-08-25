@@ -261,7 +261,7 @@ const HomeScreen = ({ navigation }) => {
             <View style={styles.headerRight}>
               <TouchableOpacity
                 style={styles.walletHeaderBtn}
-                onPress={() => navigation.navigate('CoinWallet')}
+                onPress={() => navigation.navigate('Wallet')}
                 activeOpacity={0.8}
               >
                 <MaterialCommunityIcons name="database" size={16} color="#F59E0B" />

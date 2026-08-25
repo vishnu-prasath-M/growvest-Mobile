@@ -22,7 +22,7 @@ import { SkeletonLoader } from '../../components/SkeletonLoader';
 import { useTheme } from '../../context/ThemeContext';
 
 const ProfileScreen = ({ navigation }) => {
-  const { colors: themeColors } = useTheme();
+  const { isDarkMode, toggleTheme, colors: themeColors } = useTheme();
   const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const insets = useScreenInsets(8);
   const [userData, setUserData] = useState(null);
