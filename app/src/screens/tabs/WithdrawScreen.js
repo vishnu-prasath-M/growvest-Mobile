@@ -153,7 +153,13 @@ const WithdrawScreen = ({ navigation }) => {
 
   const openWithdrawModal = (type) => {
     setWithdrawType(type);
-    setAmount('');
+    const targetInv = investments.find(inv => String(inv._id) === String(type));
+    if (targetInv) {
+      const defaultAmt = targetInv.availableToWithdraw || targetInv.earlyPrincipalOnlyAmount || targetInv.amount || 0;
+      setAmount(String(defaultAmt || ''));
+    } else {
+      setAmount('');
+    }
     setUpiId('');
     setWithdrawModalVisible(true);
   };
@@ -610,22 +616,36 @@ const WithdrawScreen = ({ navigation }) => {
           />
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
-            <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalTitle}>
-                Withdraw from {withdrawType === 'saving' ? 'Saving' : 'Fixed'}
-              </Text>
-              <TouchableOpacity onPress={() => setWithdrawModalVisible(false)} style={styles.modalCloseBtn}>
-                <MaterialCommunityIcons name="close" size={18} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
+            {(() => {
+              const modalSelectedInv = investments.find(inv => String(inv._id) === String(withdrawType));
+              const modalTitleName = modalSelectedInv
+                ? getPlanDisplayName(modalSelectedInv.type)
+                : (withdrawType === 'saving' ? 'Saving' : 'Fixed');
+              const modalAvailableAmount = modalSelectedInv
+                ? (modalSelectedInv.availableToWithdraw || modalSelectedInv.earlyPrincipalOnlyAmount || modalSelectedInv.amount || 0)
+                : (withdrawType === 'saving' ? (userData?.savingBalance || 0) : (userData?.fixedBalance || 0));
 
-            {/* Balance display */}
-            <View style={styles.modalBalanceBox}>
-              <Text style={styles.modalBalanceLabel}>Available Balance</Text>
-              <Text style={styles.modalBalanceAmount}>
-                {formatCurrency(withdrawType === 'saving' ? userData?.savingBalance : userData?.fixedBalance)}
-              </Text>
-            </View>
+              return (
+                <>
+                  <View style={styles.modalHeaderRow}>
+                    <Text style={styles.modalTitle}>
+                      Withdraw from {modalTitleName}
+                    </Text>
+                    <TouchableOpacity onPress={() => setWithdrawModalVisible(false)} style={styles.modalCloseBtn}>
+                      <MaterialCommunityIcons name="close" size={18} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Balance display */}
+                  <View style={styles.modalBalanceBox}>
+                    <Text style={styles.modalBalanceLabel}>Available Balance</Text>
+                    <Text style={styles.modalBalanceAmount}>
+                      {formatCurrency(modalAvailableAmount)}
+                    </Text>
+                  </View>
+                </>
+              );
+            })()}
 
             {/* Amount input */}
             <Text style={styles.inputLabel}>Amount to Withdraw</Text>

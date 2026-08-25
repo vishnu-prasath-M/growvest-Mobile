@@ -242,7 +242,8 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
         {(() => {
           const formattedEligibilityDate = fifthWeekDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
           const formattedWithdrawalDate = new Date(selectedWithdrawalDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-          const formattedAmount = parseFloat(amount || 0).toLocaleString('en-IN');
+          const hasAmount = amount && parseFloat(amount) > 0;
+          const formattedAmountText = hasAmount ? ` (₹${parseFloat(amount).toLocaleString('en-IN')})` : '';
 
           return (
             <View style={styles.ruleCard}>
@@ -260,7 +261,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
 
               <View style={styles.ruleWarningBox}>
                 <Text style={{ fontSize: 12, color: '#92400E', lineHeight: 17 }}>
-                  ⚠️ <Text style={{ fontWeight: '700' }}>Important:</Text> If you withdraw BEFORE the 5th-week benefit eligibility date ({formattedEligibilityDate}), ONLY your original invested principal amount (₹{formattedAmount}) will be available for withdrawal. Interest/earnings and extra benefits will not be included.
+                  ⚠️ <Text style={{ fontWeight: '700' }}>Important:</Text> If you withdraw BEFORE the 5th-week benefit eligibility date ({formattedEligibilityDate}), ONLY your original invested principal amount{formattedAmountText} will be available for withdrawal. Interest/earnings and extra benefits will not be included.
                 </Text>
                 <Text style={{ fontSize: 12, color: '#065F46', lineHeight: 17, marginTop: 6 }}>
                   ✓ If you wait until the 5th-week eligibility date ({formattedEligibilityDate}) and complete the required 5th-week payment, your applicable interest, earnings, and benefits will become eligible for withdrawal.
