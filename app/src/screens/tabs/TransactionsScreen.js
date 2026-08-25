@@ -28,16 +28,6 @@ const FILTER_OPTIONS = [
   { id: 'last_week', label: 'Last Week' },
   { id: 'last_month', label: 'Last Month' },
   { id: 'last_3_months', label: 'Last 3 Months' },
-  { id: 'investment', label: 'Investment Deposits' },
-  { id: 'withdrawal', label: 'Withdrawals' },
-  { id: 'chit_join', label: 'Chit Join' },
-  { id: 'chit_payment', label: 'Monthly Due Payments' },
-  { id: 'chit_winning', label: 'Chit Winning Credit' },
-  { id: 'fixed', label: 'Fixed Deposit' },
-  { id: 'savings', label: 'Savings Deposit' },
-  { id: 'approved', label: 'Success' },
-  { id: 'pending', label: 'Pending' },
-  { id: 'rejected', label: 'Failed' },
 ];
 
 const TransactionsScreen = ({ navigation }) => {
@@ -146,15 +136,7 @@ const TransactionsScreen = ({ navigation }) => {
         const last3Months = new Date();
         last3Months.setMonth(today.getMonth() - 3);
         if (txDate < last3Months) return false;
-      } else if (selectedFilter === 'investment' && tx.type !== 'investment') return false;
-      else if (selectedFilter === 'withdrawal' && tx.type !== 'withdrawal') return false;
-      else if (selectedFilter === 'chit_join' && tx.type !== 'chit_join') return false;
-      else if (selectedFilter === 'chit_payment' && tx.type !== 'chit_payment') return false;
-      else if (selectedFilter === 'fixed' && !(tx.type === 'investment' && desc.includes('fixed'))) return false;
-      else if (selectedFilter === 'savings' && !(tx.type === 'investment' && desc.includes('saving'))) return false;
-      else if (selectedFilter === 'approved' && statusLabel !== 'success') return false;
-      else if (selectedFilter === 'pending' && statusLabel !== 'pending') return false;
-      else if (selectedFilter === 'rejected' && statusLabel !== 'failed') return false;
+      }
     }
 
     // Search query check
