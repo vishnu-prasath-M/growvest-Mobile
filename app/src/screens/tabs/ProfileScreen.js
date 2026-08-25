@@ -180,7 +180,6 @@ const ProfileScreen = ({ navigation }) => {
     { icon: 'account-edit', label: 'Edit Profile', tint: colors.primaryLight, iconColor: colors.primary, onPress: handleEditUsername },
     { icon: 'email-edit', label: 'Edit Email', tint: '#e0f2fe', iconColor: '#0284c7', onPress: handleEditEmail },
     { icon: kycInfo.icon, label: 'KYC Verification', tint: kycInfo.tint, iconColor: kycInfo.iconColor, badge: kycInfo.badge, onPress: () => navigation.navigate('KYC') },
-    { icon: 'wallet-outline', label: 'Wallet', tint: '#fef3c7', iconColor: '#d97706', onPress: () => navigation.navigate('Wallet') },
     { icon: 'gift-outline', label: 'Refer & Earn', tint: '#d1fae5', iconColor: '#059669', onPress: () => navigation.navigate('Referral') },
   ];
 
@@ -193,6 +192,19 @@ const ProfileScreen = ({ navigation }) => {
     {
       title: 'Account',
       items: accountItems,
+    },
+    {
+      title: 'Appearance',
+      items: [
+        {
+          icon: isDarkMode ? 'weather-sunny' : 'weather-night',
+          label: 'App Theme',
+          badge: isDarkMode ? 'Dark Mode 🌙' : 'Light Mode ☀️',
+          tint: isDarkMode ? '#312e81' : '#fef3c7',
+          iconColor: isDarkMode ? '#818cf8' : '#d97706',
+          onPress: toggleTheme,
+        },
+      ],
     },
     {
       title: 'General',

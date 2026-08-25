@@ -46,6 +46,14 @@ exports.createInvestment = async (req, res) => {
     
     const startDate = new Date();
     const maturityDate = new Date(startDate.getTime() + durationDays * 24 * 60 * 60 * 1000);
+    
+    // 5th week / Benefit eligibility date = 35 days (5 weeks) from startDate
+    const benefitEligibilityDate = new Date(startDate.getTime() + 35 * 24 * 60 * 60 * 1000);
+    benefitEligibilityDate.setHours(0, 0, 0, 0);
+
+    const selectedDateObj = req.body.selectedWithdrawalDate
+      ? new Date(req.body.selectedWithdrawalDate)
+      : new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000);
 
     // Find user using req.user, email (case-insensitive), or mobile
     let user = null;
@@ -89,6 +97,13 @@ exports.createInvestment = async (req, res) => {
       maturityAmount,
       maturityDate,
       withdrawalStatus: 'locked',
+
+      // Date-based withdrawal & 5-week benefit eligibility
+      selectedWithdrawalDate: selectedDateObj,
+      benefitEligibilityDate: benefitEligibilityDate,
+      benefits: Number(req.body.benefits) || 0,
+      fifthWeekPaymentCompleted: req.body.fifthWeekPaymentCompleted !== false,
+      eligibilityStatus: 'early_principal_only',
     });
 
     await newInvestment.save();

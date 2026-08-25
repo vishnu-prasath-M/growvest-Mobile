@@ -212,6 +212,14 @@ const completeInvestment = async (user, data, orderId, paymentId, signature) => 
   const startDate = new Date();
   const maturityDate = new Date(startDate.getTime() + durationDays * 24 * 60 * 60 * 1000);
 
+  // 5th week / Benefit eligibility date = 35 days (5 weeks) from startDate
+  const benefitEligibilityDate = new Date(startDate.getTime() + 35 * 24 * 60 * 60 * 1000);
+  benefitEligibilityDate.setHours(0, 0, 0, 0);
+
+  const selectedDateObj = data.selectedWithdrawalDate
+    ? new Date(data.selectedWithdrawalDate)
+    : new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+
   // 1. Create & auto-approve investment
   const investment = new Investment({
     amount,
@@ -240,6 +248,13 @@ const completeInvestment = async (user, data, orderId, paymentId, signature) => 
     maturityAmount,
     maturityDate,
     withdrawalStatus: 'locked',
+
+    // Date-based withdrawal & 5-week benefit eligibility
+    selectedWithdrawalDate: selectedDateObj,
+    benefitEligibilityDate: benefitEligibilityDate,
+    benefits: Number(data.benefits) || 0,
+    fifthWeekPaymentCompleted: data.fifthWeekPaymentCompleted !== false,
+    eligibilityStatus: 'early_principal_only',
   });
 
   await investment.save();

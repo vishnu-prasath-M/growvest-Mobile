@@ -103,6 +103,8 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
       amount: parseFloat(amount),
       type: investmentType,
       userData,
+      selectedWithdrawalDate,
+      benefitEligibilityDate: fifthWeekDate.toISOString(),
     });
   };
 
@@ -205,6 +207,51 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
             />
           </View>
           <Text style={styles.minAmount}>Minimum: ₹100</Text>
+        </View>
+
+        {/* Intended Withdrawal Date Selection */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Choose Intended Withdrawal Date</Text>
+          <View style={styles.datePickerRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 12, color: themeColors.textSecondary }}>Selected Withdrawal Date</Text>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: themeColors.text, marginTop: 2 }}>
+                {new Date(selectedWithdrawalDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.changeDateBtn}
+              onPress={() => setDatePickerModalVisible(true)}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons name="calendar-edit" size={20} color={themeColors.primary} />
+              <Text style={{ color: themeColors.primary, fontWeight: '700', fontSize: 13, marginLeft: 4 }}>Change Date</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* 5-Week Benefit Rule Explanation Box */}
+        <View style={styles.ruleCard}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+            <MaterialCommunityIcons name="alert-decagram" size={20} color="#D97706" style={{ marginRight: 6 }} />
+            <Text style={{ fontSize: 14, fontWeight: '800', color: themeColors.text }}>Withdrawal & 5-Week Benefit Rule</Text>
+          </View>
+          
+          <Text style={{ fontSize: 12, color: themeColors.textSecondary, marginBottom: 4 }}>
+            • <Text style={{ fontWeight: '700', color: themeColors.text }}>Intended Withdrawal Date:</Text> {new Date(selectedWithdrawalDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+          </Text>
+          <Text style={{ fontSize: 12, color: themeColors.textSecondary, marginBottom: 8 }}>
+            • <Text style={{ fontWeight: '700', color: themeColors.primary }}>5th-Week Benefit Eligibility Date:</Text> {fifthWeekDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+          </Text>
+
+          <View style={styles.ruleWarningBox}>
+            <Text style={{ fontSize: 12, color: '#92400E', lineHeight: 17 }}>
+              ⚠️ <Text style={{ fontWeight: '700' }}>Important:</Text> If you withdraw BEFORE the 5th-week benefit eligibility date ({fifthWeekDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })), ONLY your original invested principal amount (₹{parseFloat(amount || 0).toLocaleString('en-IN')}) will be available for withdrawal. Interest/earnings and extra benefits will not be included.
+            </Text>
+            <Text style={{ fontSize: 12, color: '#065F46', lineHeight: 17, marginTop: 6 }}>
+              ✓ If you wait until the 5th-week eligibility date ({fifthWeekDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })) and complete the required 5th-week payment, your applicable interest, earnings, and benefits will become eligible for withdrawal.
+            </Text>
+          </View>
         </View>
 
         {/* Investment Summary */}
@@ -471,7 +518,42 @@ const getStyles = (colors) => StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
     marginTop: 8,
-    fontWeight: '500',
+    marginHorizontal: 4,
+  },
+  // Date Picker & Rule Card
+  datePickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  changeDateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: colors.background,
+  },
+  ruleCard: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: '#F59E0B',
+  },
+  ruleWarningBox: {
+    marginTop: 6,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FCD34D',
   },
   // Summary
   summaryContainer: {

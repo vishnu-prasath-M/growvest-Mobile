@@ -101,29 +101,42 @@ async function getUserPortfolioSummary(userIdInput) {
     }
     accruedInterest = Math.max(accruedInterest, Number(inv.interestEarned) || 0);
 
+    // 5-week benefit eligibility date calculation (35 days from startDate)
+    const startDateObj = inv.startDate ? new Date(inv.startDate) : new Date();
+    const benefitEligibilityDate = inv.benefitEligibilityDate
+      ? new Date(inv.benefitEligibilityDate)
+      : new Date(startDateObj.getTime() + 35 * 24 * 60 * 60 * 1000);
+    benefitEligibilityDate.setHours(0, 0, 0, 0);
+
+    const fifthWeekCompleted = inv.fifthWeekPaymentCompleted !== false;
+    const isEligibleForFullBenefits = !isPending && !isWithdrawn && nowDate >= benefitEligibilityDate && fifthWeekCompleted;
+
+    const extraBenefits = Number(inv.benefits) || 0;
+    const fullBenefitAmount = principal + accruedInterest + extraBenefits;
+    const earlyPrincipalOnlyAmount = principal;
+
     let availableToWithdraw = 0;
     let withdrawalStatus = 'locked';
 
     if (isWithdrawn) {
       withdrawalStatus = 'withdrawn';
       availableToWithdraw = 0;
-      // Withdrawn investment is no longer active — don't count in totalDurationInvested
-      // (its maturity amount is already in user.balance)
-    } else if (isMatured) {
-      withdrawalStatus = 'available';
-      availableToWithdraw = maturityAmount;
-      maturedWithdrawalAvailable += maturityAmount;
+    } else if (isEligibleForFullBenefits) {
+      withdrawalStatus = 'available_full';
+      availableToWithdraw = fullBenefitAmount;
+      maturedWithdrawalAvailable += fullBenefitAmount;
       totalDurationInvested += principal;
-      totalAccruedInterest += totalInterestForDuration;
+      totalAccruedInterest += accruedInterest;
     } else if (!isPending) {
-      withdrawalStatus = 'locked';
-      availableToWithdraw = 0;
+      // Early withdrawal before 5th week: Principal ONLY available
+      withdrawalStatus = 'available_early_principal';
+      availableToWithdraw = earlyPrincipalOnlyAmount;
+      maturedWithdrawalAvailable += earlyPrincipalOnlyAmount;
       totalDurationInvested += principal;
       totalDurationLocked += principal;
       totalDailyInterest += dailyInterest;
       totalAccruedInterest += accruedInterest;
     }
-    // pending — don't count in any total until approved
 
     return {
       ...inv.toObject(),
@@ -133,12 +146,18 @@ async function getUserPortfolioSummary(userIdInput) {
       totalInterest: totalInterestForDuration,
       maturityAmount,
       maturityDate,
+      benefitEligibilityDate,
+      selectedWithdrawalDate: inv.selectedWithdrawalDate || maturityDate,
+      isEligibleForFullBenefits,
+      earlyPrincipalOnlyAmount,
+      fullBenefitAmount,
+      lockedInterestAndBenefits: isEligibleForFullBenefits ? 0 : accruedInterest + extraBenefits,
       accruedInterest,
       availableToWithdraw,
       withdrawalStatus,
       isMatured,
       isLocked: !isMatured && !isWithdrawn && !isPending,
-      lockUnlockDate: maturityDate.toISOString(),
+      lockUnlockDate: benefitEligibilityDate.toISOString(),
     };
   });
 
