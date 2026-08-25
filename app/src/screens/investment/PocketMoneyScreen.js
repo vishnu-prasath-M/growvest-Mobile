@@ -216,8 +216,9 @@ const PocketMoneyScreen = ({ navigation }) => {
                 </View>
               </LinearGradient>
             </View>
-          ))
-        ) : (
+          );
+        })
+      ) : (
           /* Empty State */
           <View style={styles.emptyCard}>
             <MaterialCommunityIcons name="wallet-giftcard" size={64} color={themeColors.primary} />
