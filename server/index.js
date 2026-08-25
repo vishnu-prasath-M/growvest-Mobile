@@ -271,6 +271,11 @@ app.use(express.static(require('path').join(__dirname, 'public')));
 app.use(express.json({ limit: '150mb' }));
 app.use(express.urlencoded({ limit: '150mb', extended: true }));
 
+// Health Check & Render Keep-Alive Endpoint
+app.get(['/health', '/api/health'], (req, res) => {
+  res.status(200).json({ status: 'ok', uptime: process.uptime(), timestamp: new Date() });
+});
+
 // Web reset-password page route — serves the HTML file
 app.get('/reset-password', (req, res) => {
   res.sendFile(require('path').join(__dirname, 'public', 'reset-password.html'));
