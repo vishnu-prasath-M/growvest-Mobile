@@ -253,8 +253,8 @@ const PocketMoneyScreen = ({ navigation }) => {
               <Text style={styles.investMoreText}>More Investment</Text>
             </LinearGradient>
           </TouchableOpacity>
-        )}
-
+        {/* Active Plan Detail Specs */}
+        {activePlan && (
           <View style={styles.detailsCard}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <Text style={styles.detailsTitle}>Investment Details</Text>
