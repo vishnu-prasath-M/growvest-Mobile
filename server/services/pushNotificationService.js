@@ -16,6 +16,7 @@ const buildMessage = (token, { title, body, data = {} }) => ({
   channelId: 'default',
   badge: 1,
   _displayInForeground: true,
+  _contentAvailable: true,
 });
 
 /**
@@ -103,10 +104,10 @@ const sendWebFCMNotification = async (token, payload) => {
           body: payload.body,
         },
         data: payload.data || {},
+        priority: 'high',
       }),
     });
     const result = await response.json();
-    console.log('[PushService] Web FCM response:', result);
     return { success: true, result };
   } catch (err) {
     console.error('[PushService] Web FCM dispatch failed:', err);
@@ -128,23 +129,41 @@ const sendToUser = async (userId, payload) => {
       return { success: false, reason: 'no_tokens' };
     }
 
-    const expoTokens = (user.fcmTokens || [])
-      .filter(t => t.platform !== 'web')
-      .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
-      .map(t => t.token)
-      .filter(Boolean);
+    const allMobileTokens = (user.fcmTokens || []).filter(t => t.platform !== 'web');
+    const standaloneTokens = allMobileTokens.filter(t => t.deviceId === 'standalone_apk');
+    
+    let targetTokens = [];
+    if (standaloneTokens.length > 0) {
+      // STRICT ISOLATION: User has registered a Standalone APK device!
+      // Send ONLY to the newest Standalone APK token and IGNORE all Expo Go tokens.
+      targetTokens = standaloneTokens
+        .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
+        .map(t => t.token)
+        .filter(Boolean)
+        .slice(0, 1); // Deliver to primary active APK token
+      console.log(`[PushService] User "${userId}" has ${standaloneTokens.length} Standalone APK token(s). STRICTLY ISOLATING push dispatch to Standalone APK ONLY.`);
+    } else {
+      // Fallback only if user has no Standalone APK token registered yet
+      targetTokens = allMobileTokens
+        .filter(t => t.deviceId !== 'expo_go') // Filter out explicit expo_go
+        .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
+        .map(t => t.token)
+        .filter(Boolean)
+        .slice(0, 1);
+    }
+
     const webTokens = (user.fcmTokens || [])
       .filter(t => t.platform === 'web')
       .map(t => t.token)
       .filter(Boolean);
     
-    console.log(`[PushService] sendToUser: Retrieved ${expoTokens.length} Expo token(s) and ${webTokens.length} Web token(s) for user "${userId}".`);
+    console.log(`[PushService] sendToUser: Target push tokens for user "${userId}": Mobile=${targetTokens.length}, Web=${webTokens.length}`);
 
     let finalResult = { success: false };
 
-    // 1. Dispatch Expo (Mobile) push if present
-    if (expoTokens.length > 0) {
-      const result = await sendToTokens(expoTokens, payload);
+    // 1. Dispatch Mobile push if present
+    if (targetTokens.length > 0) {
+      const result = await sendToTokens(targetTokens, payload);
       finalResult = result;
 
       // Prune stale DeviceNotRegistered tokens to keep the list clean
@@ -156,7 +175,7 @@ const sendToUser = async (userId, payload) => {
             ticket.status === 'error' &&
             ticket.details?.error === 'DeviceNotRegistered'
           ) {
-            staleTokens.push(expoTokens[i]);
+            staleTokens.push(targetTokens[i]);
           }
         });
 
