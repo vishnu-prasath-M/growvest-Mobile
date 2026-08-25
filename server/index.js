@@ -287,21 +287,8 @@ app.get(['/ref', '/ref/', '/ref/:code'], (req, res) => {
 });
 
 // Android APK Download Route
-app.get('/downloads/growvest-latest.apk', (req, res) => {
-  const path = require('path');
-  const fs = require('fs');
-  const apkPath = path.join(__dirname, 'public', 'downloads', 'growvest-latest.apk');
-
-  if (fs.existsSync(apkPath)) {
-    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
-    res.setHeader('Content-Disposition', 'attachment; filename="growvest-latest.apk"');
-    return res.sendFile(apkPath);
-  } else if (process.env.APK_DOWNLOAD_URL) {
-    return res.redirect(process.env.APK_DOWNLOAD_URL);
-  } else {
-    return res.status(404).send('APK file currently updating');
-  }
-});
+const apkController = require('./controllers/apkController');
+app.get('/downloads/growvest-latest.apk', apkController.downloadActiveAPK);
 
 // Android App Links Digital Asset Links Route
 app.get('/.well-known/assetlinks.json', (req, res) => {
