@@ -54,11 +54,12 @@ exports.uploadAPK = async (req, res) => {
     // Mark all existing active APKs as inactive
     await APKRelease.updateMany({ status: 'active' }, { status: 'inactive' });
 
-    // Create new active APK metadata record in DB
+    // Create new active APK metadata record in DB (including binary buffer in MongoDB for zero-loss persistence)
     const newAPK = await APKRelease.create({
       fileName: name,
       fileSize,
       storagePath: '/downloads/growvest-latest.apk',
+      apkData: fileBuffer,
       version: version || '1.0.0',
       uploadedBy: adminId,
       status: 'active',
@@ -66,7 +67,7 @@ exports.uploadAPK = async (req, res) => {
     });
 
     res.status(201).json({
-      message: 'APK uploaded successfully and marked as Active',
+      message: 'APK uploaded successfully and saved persistently in database!',
       apk: {
         _id: newAPK._id,
         fileName: newAPK.fileName,
@@ -115,23 +116,58 @@ exports.getActiveAPK = async (req, res) => {
 // ─── PUBLIC: Download Active APK ─────────────────────────────────────────────
 exports.downloadActiveAPK = async (req, res) => {
   try {
-    const activeApk = await APKRelease.findOne({ status: 'active' }).sort({ createdAt: -1 });
+    const activeApk = await APKRelease.findOne({ status: 'active' })
+      .select('+apkData')
+      .sort({ createdAt: -1 });
 
     if (!activeApk) {
+      if (process.env.APK_DOWNLOAD_URL) {
+        return res.redirect(process.env.APK_DOWNLOAD_URL);
+      }
       return res.status(404).send('Android app download is currently unavailable');
     }
 
     // Increment download count atomically
     await APKRelease.findByIdAndUpdate(activeApk._id, { $inc: { downloadCount: 1 } });
 
-    // Check physical file
-    const physicalPath = path.join(__dirname, '../public/downloads/growvest-latest.apk');
+    const downloadsDir = path.join(__dirname, '../public/downloads');
+    const physicalPath = path.join(downloadsDir, 'growvest-latest.apk');
+
+    // 1. If physical file exists on local disk, serve directly
     if (fs.existsSync(physicalPath)) {
       res.setHeader('Content-Type', 'application/vnd.android.package-archive');
       res.setHeader('Content-Disposition', `attachment; filename="${activeApk.fileName || 'growvest.apk'}"`);
       return res.sendFile(physicalPath);
-    } else if (activeApk.externalUrl) {
+    }
+
+    // 2. If Render restarted & local disk file was wiped, restore directly from MongoDB persistent buffer!
+    if (activeApk.apkData && activeApk.apkData.length > 0) {
+      try {
+        if (!fs.existsSync(downloadsDir)) {
+          fs.mkdirSync(downloadsDir, { recursive: true });
+        }
+        // Write restored file back to disk for subsequent fast streaming
+        fs.writeFileSync(physicalPath, activeApk.apkData);
+        console.log(`[APKDownload] Restored APK file (${activeApk.fileSize} bytes) from MongoDB database to disk after Render restart!`);
+
+        res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+        res.setHeader('Content-Disposition', `attachment; filename="${activeApk.fileName || 'growvest.apk'}"`);
+        return res.send(activeApk.apkData);
+      } catch (restoreErr) {
+        console.error('[APKDownload] File restoration error, streaming directly from memory:', restoreErr);
+        res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+        res.setHeader('Content-Disposition', `attachment; filename="${activeApk.fileName || 'growvest.apk'}"`);
+        return res.send(activeApk.apkData);
+      }
+    }
+
+    // 3. Fallback to external URL if configured
+    if (activeApk.externalUrl) {
       return res.redirect(activeApk.externalUrl);
+    }
+
+    if (process.env.APK_DOWNLOAD_URL) {
+      return res.redirect(process.env.APK_DOWNLOAD_URL);
     }
 
     return res.status(404).send('APK file currently updating');
