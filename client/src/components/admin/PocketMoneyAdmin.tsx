@@ -322,7 +322,9 @@ export default function PocketMoneyAdmin({ token }: PocketMoneyAdminProps) {
               <thead>
                 <tr className="border-b border-border text-xs font-body font-semibold text-muted-foreground uppercase tracking-wider bg-muted/40">
                   <th className="py-3 px-4">User</th>
+                  <th className="py-3 px-4">Investment Plan</th>
                   <th className="py-3 px-4">Frequency</th>
+                  <th className="py-3 px-4">Payout #</th>
                   <th className="py-3 px-4">Request Amount</th>
                   <th className="py-3 px-4">Remaining</th>
                   <th className="py-3 px-4">Request Date</th>
@@ -336,7 +338,12 @@ export default function PocketMoneyAdmin({ token }: PocketMoneyAdminProps) {
                       <div className="font-semibold text-foreground">{payout.userId?.name || payout.userId?.username || 'User'}</div>
                       <div className="text-xs text-muted-foreground">{payout.userId?.email || 'No email'}</div>
                     </td>
+                    <td className="py-3 px-4">
+                      <div className="font-semibold text-foreground">₹{fmt(payout.pocketMoneyId?.investedAmount)} Plan</div>
+                      <div className="text-xs text-primary font-mono">ID: PM-{payout.pocketMoneyId?._id ? String(payout.pocketMoneyId._id).slice(-6).toUpperCase() : 'N/A'}</div>
+                    </td>
                     <td className="py-3 px-4 capitalize font-semibold">{payout.pocketMoneyId?.frequency || 'daily'}</td>
+                    <td className="py-3 px-4 font-semibold text-amber-600">#{payout.payoutNumber || 1} / 10</td>
                     <td className="py-3 px-4 text-emerald-600 font-bold">₹{fmt(payout.amount)}</td>
                     <td className="py-3 px-4">₹{fmt(payout.pocketMoneyId?.remainingAmount || 0)}</td>
                     <td className="py-3 px-4 text-amber-600 font-semibold">

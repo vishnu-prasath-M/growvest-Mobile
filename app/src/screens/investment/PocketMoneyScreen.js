@@ -7,19 +7,15 @@ import {
   TouchableOpacity,
   RefreshControl,
   Alert,
-  FlatList,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../context/ThemeContext';
 import { colors } from '../../theme/theme';
 import TopBar from '../../components/TopBar';
-import { authService } from '../../services/authService';
 import api from '../../services/apiService';
 import { kycService } from '../../services/kycService';
 import KycRequiredModal from '../../components/KycRequiredModal';
-
-const API_URL = 'http://localhost:5000'; // Fallback URL, authService uses base URL
 
 const PocketMoneyScreen = ({ navigation }) => {
   const { colors: themeColors, isDarkMode } = useTheme();
@@ -28,27 +24,17 @@ const PocketMoneyScreen = ({ navigation }) => {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [payoutStatus, setPayoutStatus] = useState('available'); // 'available', 'requested', 'released'
+  const [payoutStatuses, setPayoutStatuses] = useState({}); // Map of plan._id -> 'available' | 'requested' | 'released'
+  const [selectedPlanId, setSelectedPlanId] = useState(null);
   const [kycModalVisible, setKycModalVisible] = useState(false);
 
-  const fetchPayoutStatus = async (planId) => {
+  const handleRequestPayout = async (planId, payoutAmt) => {
     try {
-      const res = await api.get(`/pocket-money/payout-status/${planId}`);
+      if (!planId) return;
+      const res = await api.post(`/pocket-money/request-payout/${planId}`);
       if (res && res.data) {
-        setPayoutStatus(res.data.status);
-      }
-    } catch (err) {
-      console.error('Error fetching payout status:', err);
-    }
-  };
-
-  const handleRequestPayout = async () => {
-    try {
-      if (!activePlan) return;
-      const res = await api.post(`/pocket-money/request-payout/${activePlan._id}`);
-      if (res && res.data) {
-        Alert.alert('Request Sent', 'Your payout request has been sent to Admin. You will be notified once released!');
-        setPayoutStatus('requested');
+        Alert.alert('Request Sent', `Your payout request of ₹${payoutAmt} has been sent to Admin. You will be notified once released!`);
+        setPayoutStatuses((prev) => ({ ...prev, [planId]: 'requested' }));
         loadData();
       }
     } catch (error) {
@@ -60,13 +46,22 @@ const PocketMoneyScreen = ({ navigation }) => {
   const loadData = async () => {
     try {
       setLoading(true);
-      // Fetch pocket money plans
+      // Fetch pocket money plans (enriched per plan with todayPayoutStatus)
       const plansRes = await api.get('/pocket-money/my');
-      if (plansRes && plansRes.data) {
+      if (plansRes && plansRes.data && Array.isArray(plansRes.data)) {
         setPocketPlans(plansRes.data);
-        const active = plansRes.data.find(p => p.status === 'active');
-        if (active) {
-          await fetchPayoutStatus(active._id);
+
+        const statusMap = {};
+        plansRes.data.forEach((p) => {
+          if (p && p._id) {
+            statusMap[p._id] = p.todayPayoutStatus || 'available';
+          }
+        });
+        setPayoutStatuses(statusMap);
+
+        const active = plansRes.data.filter((p) => p && p.status === 'active');
+        if (active.length > 0) {
+          setSelectedPlanId((prev) => (prev && active.some(p => p._id === prev) ? prev : active[0]._id));
         }
       }
 
@@ -74,7 +69,7 @@ const PocketMoneyScreen = ({ navigation }) => {
       const txRes = await api.get('/transactions/my');
       if (txRes && txRes.data && Array.isArray(txRes.data)) {
         const pocketTxs = txRes.data.filter(
-          (tx) => tx.type === 'pocket_money_payout' || tx.type === 'pocket_money_invest'
+          (tx) => tx && (tx.type === 'pocket_money_payout' || tx.type === 'pocket_money_invest')
         );
         setTransactions(pocketTxs);
       }
@@ -98,12 +93,8 @@ const PocketMoneyScreen = ({ navigation }) => {
     loadData();
   }, []);
 
-  const getActivePlan = () => {
-    return pocketPlans.find((p) => p.status === 'active');
-  };
-
   const getCompletedPlans = () => {
-    return pocketPlans.filter((p) => p.status === 'completed');
+    return pocketPlans.filter((p) => p && p.status === 'completed');
   };
 
   const formatCurrency = (val) => {
@@ -120,8 +111,8 @@ const PocketMoneyScreen = ({ navigation }) => {
     });
   };
 
-  const activePlans = pocketPlans.filter((p) => p.status === 'active');
-  const activePlan = activePlans.length > 0 ? activePlans[0] : null;
+  const activePlans = pocketPlans.filter((p) => p && p.status === 'active');
+  const activePlan = activePlans.find(p => p._id === selectedPlanId) || (activePlans.length > 0 ? activePlans[0] : null);
   const completedPlans = getCompletedPlans();
 
   const handleInvestMore = async () => {
@@ -146,82 +137,89 @@ const PocketMoneyScreen = ({ navigation }) => {
       >
         {/* Active Plans Card List */}
         {activePlans.length > 0 ? (
-          activePlans.map((plan, planIdx) => (
-            <View key={plan._id || String(planIdx)} style={styles.activeCardOuter}>
-              <LinearGradient
-                colors={isDarkMode ? ['#121F17', '#1A3324'] : ['#0E3D23', '#1C6B3F']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.activeCardGradient}
-              >
-                <View style={styles.cardHeader}>
-                  <View style={styles.cardBadge}>
-                    <Text style={styles.cardBadgeText}>ACTIVE PLAN {activePlans.length > 1 ? `#${planIdx + 1}` : ''}</Text>
-                  </View>
-                  <Text style={styles.frequencyText}>{plan.frequency?.toUpperCase()}</Text>
-                </View>
+          activePlans.map((plan, planIdx) => {
+            const currentStatus = payoutStatuses[plan._id] || plan.todayPayoutStatus || 'available';
+            const paidOut = plan.totalPaidOut || 0;
+            const invested = plan.investedAmount || 1;
+            const progressPercent = Math.min(100, Math.max(0, (paidOut / invested) * 100));
 
-                <Text style={styles.activeAmountLabel}>Invested Amount</Text>
-                <Text style={styles.activeAmount}>{formatCurrency(plan.investedAmount)}</Text>
-
-                <View style={styles.progressContainer}>
-                  <View style={styles.progressBarBg}>
-                    <View
-                      style={[
-                        styles.progressBarFill,
-                        {
-                          width: `${(plan.totalPaidOut / plan.investedAmount) * 100}%`,
-                        },
-                      ]}
-                    />
-                  </View>
-                  <View style={styles.progressLabels}>
-                    <Text style={styles.progressLabelText}>Released: {formatCurrency(plan.totalPaidOut)}</Text>
-                    <Text style={styles.progressLabelText}>Remaining: {formatCurrency(plan.remainingAmount)}</Text>
-                  </View>
-                </View>
-
-                {/* Payout Request Section */}
-                <View style={styles.requestSection}>
-                  {payoutStatus === 'available' ? (
-                    <TouchableOpacity
-                      style={styles.requestBtn}
-                      activeOpacity={0.8}
-                      onPress={handleRequestPayout}
-                    >
-                      <MaterialCommunityIcons name="hand-coin" size={20} color={colors.primary} />
-                      <Text style={styles.requestBtnText}>Request Today's Payout (₹{plan.payoutAmount})</Text>
-                    </TouchableOpacity>
-                  ) : payoutStatus === 'requested' ? (
-                    <View style={styles.statusPillPending}>
-                      <MaterialCommunityIcons name="clock-outline" size={16} color="#B45309" style={{ marginRight: 6 }} />
-                      <Text style={styles.statusTextPending}>Payout Requested (Pending Approval)</Text>
+            return (
+              <View key={plan._id || String(planIdx)} style={styles.activeCardOuter}>
+                <LinearGradient
+                  colors={isDarkMode ? ['#121F17', '#1A3324'] : ['#0E3D23', '#1C6B3F']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.activeCardGradient}
+                >
+                  <View style={styles.cardHeader}>
+                    <View style={styles.cardBadge}>
+                      <Text style={styles.cardBadgeText}>ACTIVE PLAN {activePlans.length > 1 ? `#${planIdx + 1}` : ''}</Text>
                     </View>
-                  ) : (
-                    <View style={styles.statusPillSuccess}>
-                      <MaterialCommunityIcons name="check-circle-outline" size={16} color="#065F46" style={{ marginRight: 6 }} />
-                      <Text style={styles.statusTextSuccess}>Today's Payout Released (Paid Out)</Text>
-                    </View>
-                  )}
-                </View>
+                    <Text style={styles.frequencyText}>{plan.frequency?.toUpperCase()}</Text>
+                  </View>
 
-                <View style={styles.cardFooter}>
-                  <View style={styles.footerCol}>
-                    <Text style={styles.footerLabel}>Next Release</Text>
-                    <Text style={styles.footerVal}>{formatCurrency(plan.payoutAmount)}</Text>
+                  <Text style={styles.activeAmountLabel}>Invested Amount</Text>
+                  <Text style={styles.activeAmount}>{formatCurrency(plan.investedAmount)}</Text>
+
+                  <View style={styles.progressContainer}>
+                    <View style={styles.progressBarBg}>
+                      <View
+                        style={[
+                          styles.progressBarFill,
+                          {
+                            width: `${progressPercent}%`,
+                          },
+                        ]}
+                      />
+                    </View>
+                    <View style={styles.progressLabels}>
+                      <Text style={styles.progressLabelText}>Released: {formatCurrency(plan.totalPaidOut)}</Text>
+                      <Text style={styles.progressLabelText}>Remaining: {formatCurrency(plan.remainingAmount)}</Text>
+                    </View>
                   </View>
-                  <View style={styles.footerCol}>
-                    <Text style={styles.footerLabel}>Release Date</Text>
-                    <Text style={styles.footerVal}>{formatDate(plan.nextPayoutDate)}</Text>
+
+                  {/* Payout Request Section (Per-Investment Status) */}
+                  <View style={styles.requestSection}>
+                    {currentStatus === 'available' ? (
+                      <TouchableOpacity
+                        style={styles.requestBtn}
+                        activeOpacity={0.8}
+                        onPress={() => handleRequestPayout(plan._id, plan.payoutAmount)}
+                      >
+                        <MaterialCommunityIcons name="hand-coin" size={20} color={colors.primary} />
+                        <Text style={styles.requestBtnText}>Request Today's Payout (₹{plan.payoutAmount})</Text>
+                      </TouchableOpacity>
+                    ) : currentStatus === 'requested' ? (
+                      <View style={styles.statusPillPending}>
+                        <MaterialCommunityIcons name="clock-outline" size={16} color="#B45309" style={{ marginRight: 6 }} />
+                        <Text style={styles.statusTextPending}>Payout Requested (Pending Approval)</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.statusPillSuccess}>
+                        <MaterialCommunityIcons name="check-circle-outline" size={16} color="#065F46" style={{ marginRight: 6 }} />
+                        <Text style={styles.statusTextSuccess}>Today's Payout Released (Paid Out)</Text>
+                      </View>
+                    )}
                   </View>
-                  <View style={styles.footerCol}>
-                    <Text style={styles.footerLabel}>Progress</Text>
-                    <Text style={styles.footerVal}>{plan.payoutCount}/10</Text>
+
+                  <View style={styles.cardFooter}>
+                    <View style={styles.footerCol}>
+                      <Text style={styles.footerLabel}>Next Release</Text>
+                      <Text style={styles.footerVal}>{formatCurrency(plan.payoutAmount)}</Text>
+                    </View>
+                    <View style={styles.footerCol}>
+                      <Text style={styles.footerLabel}>Release Date</Text>
+                      <Text style={styles.footerVal}>{formatDate(plan.nextPayoutDate)}</Text>
+                    </View>
+                    <View style={styles.footerCol}>
+                      <Text style={styles.footerLabel}>Progress</Text>
+                      <Text style={styles.footerVal}>{plan.payoutCount || 0}/10</Text>
+                    </View>
                   </View>
-                </View>
-              </LinearGradient>
-            </View>
-          ))
+                </LinearGradient>
+              </View>
+            );
+          })
         ) : (
           /* Empty State */
           <View style={styles.emptyCard}>
@@ -262,7 +260,41 @@ const PocketMoneyScreen = ({ navigation }) => {
         {/* Active Plan Detail Specs */}
         {activePlan && (
           <View style={styles.detailsCard}>
-            <Text style={styles.detailsTitle}>Investment Details</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <Text style={styles.detailsTitle}>Investment Details</Text>
+              {activePlans.length > 1 && (
+                <Text style={{ fontSize: 11, fontWeight: '700', color: themeColors.primary }}>
+                  Viewing Plan #{activePlans.findIndex(p => p._id === activePlan._id) + 1}
+                </Text>
+              )}
+            </View>
+
+            {activePlans.length > 1 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+                {activePlans.map((p, idx) => {
+                  const isSelected = p._id === activePlan._id;
+                  return (
+                    <TouchableOpacity
+                      key={p._id}
+                      onPress={() => setSelectedPlanId(p._id)}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                        borderRadius: 10,
+                        backgroundColor: isSelected ? themeColors.primary : themeColors.surface,
+                        borderWidth: 1,
+                        borderColor: isSelected ? themeColors.primary : themeColors.border,
+                        marginRight: 8,
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: isSelected ? '#FFFFFF' : themeColors.text }}>
+                        Plan #{idx + 1} ({formatCurrency(p.investedAmount)})
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
             
             {[
               { label: 'Original Investment', value: formatCurrency(activePlan.investedAmount) },
@@ -275,9 +307,9 @@ const PocketMoneyScreen = ({ navigation }) => {
                 badgeColor: activePlan.bonusReleased ? '#065F46' : '#B45309',
                 badgeBg: activePlan.bonusReleased ? '#D1FAE5' : '#FEF3C7',
               },
-              { label: 'Total Final Value', value: formatCurrency(activePlan.totalFinalValue || (activePlan.investedAmount * 1.06)) },
-              { label: 'Payouts Completed', value: `${activePlan.payoutCount} Completed` },
-              { label: 'Remaining Payouts', value: `${Math.max(0, 10 - activePlan.payoutCount)} Remaining` },
+              { label: 'Total Final Value', value: formatCurrency(activePlan.totalFinalValue || ((activePlan.investedAmount || 0) * 1.06)) },
+              { label: 'Payouts Completed', value: `${activePlan.payoutCount || 0} Completed` },
+              { label: 'Remaining Payouts', value: `${Math.max(0, 10 - (activePlan.payoutCount || 0))} Remaining` },
               { label: 'Next Payout Date', value: formatDate(activePlan.nextPayoutDate) },
               { label: 'Final Payout Date', value: formatDate(activePlan.finalPayoutDate || activePlan.completedAt) },
               { 
@@ -363,7 +395,7 @@ const PocketMoneyScreen = ({ navigation }) => {
               {completedPlans.map((plan) => (
                 <View key={plan._id} style={styles.completedItem}>
                   <View style={styles.completedHeader}>
-                    <Text style={styles.completedName}>₹{plan.investedAmount.toLocaleString('en-IN')} Plan</Text>
+                    <Text style={styles.completedName}>₹{(plan.investedAmount || 0).toLocaleString('en-IN')} Plan</Text>
                     <Text style={styles.completedStatus}>COMPLETED</Text>
                   </View>
                   <Text style={styles.completedMeta}>

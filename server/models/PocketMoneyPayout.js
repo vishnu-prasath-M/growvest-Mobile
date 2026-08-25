@@ -44,4 +44,8 @@ const pocketMoneyPayoutSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Compound indexes for fast per-investment status lookup & idempotency enforcement
+pocketMoneyPayoutSchema.index({ pocketMoneyId: 1, payoutNumber: 1 });
+pocketMoneyPayoutSchema.index({ pocketMoneyId: 1, idempotencyKey: 1 });
+
 module.exports = mongoose.model('PocketMoneyPayout', pocketMoneyPayoutSchema);

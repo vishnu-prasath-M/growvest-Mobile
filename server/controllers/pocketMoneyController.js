@@ -127,11 +127,68 @@ const runPocketMoneyPayouts = async () => {
   return processedCount;
 };
 
+// Helper: Get 12:00 AM Midnight start date of current day in local timezone
+const getStartOfToday = () => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
 // GET /api/pocket-money/my
 exports.getMyPocketMoney = async (req, res) => {
   try {
     const pocketMonies = await PocketMoney.find({ userId: req.user._id }).sort({ createdAt: -1 });
-    res.json(pocketMonies);
+
+    const startOfToday = getStartOfToday();
+
+    const enriched = await Promise.all(
+      pocketMonies.map(async (pocket) => {
+        const pocketObj = pocket.toObject();
+
+        if (pocket.status === 'completed' || pocket.remainingAmount <= 0) {
+          pocketObj.todayPayoutStatus = 'completed';
+          return pocketObj;
+        }
+
+        // Search for any payout record created today OR matching the latest payoutCount for THIS plan
+        const payoutToday = await PocketMoneyPayout.findOne({
+          pocketMoneyId: pocket._id,
+          $or: [
+            { createdAt: { $gte: startOfToday } },
+            { payoutDate: { $gte: startOfToday } },
+            { payoutNumber: pocket.payoutCount && pocket.payoutCount > 0 ? pocket.payoutCount : -1 }
+          ]
+        }).sort({ createdAt: -1 });
+
+        let isTodayPayout = false;
+        if (payoutToday) {
+          const payoutCreated = new Date(payoutToday.createdAt || payoutToday.payoutDate);
+          if (payoutCreated >= startOfToday || (pocket.payoutCount > 0 && payoutToday.payoutNumber === pocket.payoutCount)) {
+            isTodayPayout = true;
+          }
+        }
+
+        if (isTodayPayout && payoutToday) {
+          if (payoutToday.status === 'released') {
+            pocketObj.todayPayoutStatus = 'released';
+          } else if (payoutToday.status === 'requested') {
+            pocketObj.todayPayoutStatus = 'requested';
+          } else {
+            pocketObj.todayPayoutStatus = 'available';
+          }
+        } else {
+          pocketObj.todayPayoutStatus = 'available';
+        }
+
+        const payoutNum = pocket.payoutCount + 1;
+        pocketObj.currentPayoutNumber = payoutNum;
+        pocketObj.currentPayoutAmount = Math.min(pocket.payoutAmount, pocket.remainingAmount) + (payoutNum === 10 ? (pocket.bonusAmount || 0) : 0);
+
+        return pocketObj;
+      })
+    );
+
+    res.json(enriched);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching pocket money investments', error: error.message });
   }
@@ -216,13 +273,22 @@ exports.releaseSinglePayout = async (req, res) => {
       return res.status(400).json({ message: 'Pocket Money is already fully paid out' });
     }
     
+    const startOfToday = getStartOfToday();
     const now = new Date();
     const payoutNum = pocket.payoutCount + 1;
     const todayStr = now.toISOString().slice(0, 10);
     const idempotencyKey = `PM_${pocket._id}_${todayStr}_release_${payoutNum}`;
     
-    // Check if already released today to prevent double clicks
-    const existingPayout = await PocketMoneyPayout.findOne({ idempotencyKey });
+    // Check if already released today to prevent double releases
+    const existingPayout = await PocketMoneyPayout.findOne({
+      pocketMoneyId: pocket._id,
+      status: 'released',
+      $or: [
+        { createdAt: { $gte: startOfToday } },
+        { payoutDate: { $gte: startOfToday } },
+        { payoutNumber: payoutNum }
+      ]
+    });
     if (existingPayout) {
       return res.status(400).json({ message: 'Payout already released for this plan today.' });
     }
@@ -327,21 +393,39 @@ exports.requestPayout = async (req, res) => {
       return res.status(400).json({ message: 'Pocket Money is already fully paid out' });
     }
     
+    const startOfToday = getStartOfToday();
     const now = new Date();
     const todayStr = now.toISOString().slice(0, 10);
-    // Unique key: PM_req_{pocketId}_{todayStr}
+    const payoutNum = pocket.payoutCount + 1;
     const idempotencyKey = `PM_req_${pocket._id}_${todayStr}`;
     
-    // Check if user already requested/received payout today
-    const existingPayout = await PocketMoneyPayout.findOne({ idempotencyKey });
+    // Check if user already requested or received payout for THIS SPECIFIC investment today
+    const existingPayout = await PocketMoneyPayout.findOne({
+      pocketMoneyId: pocket._id,
+      $or: [
+        { createdAt: { $gte: startOfToday } },
+        { payoutDate: { $gte: startOfToday } },
+        { payoutNumber: pocket.payoutCount && pocket.payoutCount > 0 ? pocket.payoutCount : -1 }
+      ]
+    }).sort({ createdAt: -1 });
+    
     if (existingPayout) {
-      return res.status(400).json({
-        message: 'Payout already requested today. Please wait for Admin approval or try again tomorrow.',
-        status: existingPayout.status
-      });
+      const payoutCreated = new Date(existingPayout.createdAt || existingPayout.payoutDate);
+      if (payoutCreated >= startOfToday || (pocket.payoutCount > 0 && existingPayout.payoutNumber === pocket.payoutCount)) {
+        if (existingPayout.status === 'requested') {
+          return res.status(400).json({
+            message: 'Payout already requested today for this plan. Please wait for Admin approval.',
+            status: 'requested'
+          });
+        } else if (existingPayout.status === 'released') {
+          return res.status(400).json({
+            message: 'Today\'s payout has already been released for this plan. Next payout available tomorrow after 12:00 AM midnight.',
+            status: 'released'
+          });
+        }
+      }
     }
     
-    const payoutNum = pocket.payoutCount + 1;
     const amountToPay = Math.min(pocket.payoutAmount, pocket.remainingAmount) + (payoutNum === 10 ? (pocket.bonusAmount || 0) : 0);
     
     const payout = new PocketMoneyPayout({
@@ -355,12 +439,12 @@ exports.requestPayout = async (req, res) => {
     });
     await payout.save();
     
-    // Notify admins
+    // Notify admins with exact investment ID reference
     try {
       const { notifyAdmins } = require('../services/notificationHelper');
       await notifyAdmins({
         title: '💼 New Pocket Money Payout Request',
-        description: `${pocket.userName} requested a Pocket Money payout of ₹${amountToPay}.`,
+        description: `${pocket.userName} requested payout of ₹${amountToPay} for Plan PM-${pocket._id.toString().slice(-6)}.`,
         type: 'general',
         metadata: { payoutId: payout._id, pocketMoneyId: pocket._id }
       });
@@ -384,19 +468,37 @@ exports.getPayoutStatus = async (req, res) => {
       return res.status(404).json({ message: 'Pocket Money plan not found' });
     }
     
-    const now = new Date();
-    const todayStr = now.toISOString().slice(0, 10);
-    const idempotencyKey = `PM_req_${pocket._id}_${todayStr}`;
-    
-    const payout = await PocketMoneyPayout.findOne({ idempotencyKey });
-    
-    if (!payout) {
-      const payoutNum = pocket.payoutCount + 1;
-      const payoutAmt = Math.min(pocket.payoutAmount, pocket.remainingAmount) + (payoutNum === 10 ? (pocket.bonusAmount || 0) : 0);
-      return res.json({ status: 'available', payoutAmount: payoutAmt });
+    if (pocket.status === 'completed' || pocket.remainingAmount <= 0) {
+      return res.json({ status: 'completed', payoutAmount: 0 });
     }
     
-    res.json({ status: payout.status, payout });
+    const startOfToday = getStartOfToday();
+    const payoutNum = pocket.payoutCount + 1;
+    
+    const payout = await PocketMoneyPayout.findOne({
+      pocketMoneyId: pocket._id,
+      $or: [
+        { createdAt: { $gte: startOfToday } },
+        { payoutDate: { $gte: startOfToday } },
+        { payoutNumber: pocket.payoutCount && pocket.payoutCount > 0 ? pocket.payoutCount : -1 }
+      ]
+    }).sort({ createdAt: -1 });
+    
+    const payoutAmt = Math.min(pocket.payoutAmount, pocket.remainingAmount) + (payoutNum === 10 ? (pocket.bonusAmount || 0) : 0);
+    
+    let isTodayPayout = false;
+    if (payout) {
+      const payoutCreated = new Date(payout.createdAt || payout.payoutDate);
+      if (payoutCreated >= startOfToday || (pocket.payoutCount > 0 && payout.payoutNumber === pocket.payoutCount)) {
+        isTodayPayout = true;
+      }
+    }
+
+    if (!isTodayPayout || !payout) {
+      return res.json({ status: 'available', payoutAmount: payoutAmt, payoutNumber: payoutNum });
+    }
+    
+    res.json({ status: payout.status, payoutAmount: payoutAmt, payoutNumber: payout.payoutNumber, payout });
   } catch (error) {
     res.status(500).json({ message: 'Error checking payout status', error: error.message });
   }
