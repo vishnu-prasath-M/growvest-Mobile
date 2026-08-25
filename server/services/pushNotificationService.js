@@ -134,22 +134,18 @@ const sendToUser = async (userId, payload) => {
     
     let targetTokens = [];
     if (standaloneTokens.length > 0) {
-      // STRICT ISOLATION: User has registered a Standalone APK device!
-      // Send ONLY to the newest Standalone APK token and IGNORE all Expo Go tokens.
+      // User has registered a Standalone APK device: Deliver to ALL Standalone APK tokens
       targetTokens = standaloneTokens
         .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
         .map(t => t.token)
-        .filter(Boolean)
-        .slice(0, 1); // Deliver to primary active APK token
-      console.log(`[PushService] User "${userId}" has ${standaloneTokens.length} Standalone APK token(s). STRICTLY ISOLATING push dispatch to Standalone APK ONLY.`);
+        .filter(Boolean);
+      console.log(`[PushService] User "${userId}" has ${standaloneTokens.length} Standalone APK token(s). Dispatching to Standalone APK tokens.`);
     } else {
-      // Fallback only if user has no Standalone APK token registered yet
+      // Fallback: Deliver to all mobile tokens for user
       targetTokens = allMobileTokens
-        .filter(t => t.deviceId !== 'expo_go') // Filter out explicit expo_go
         .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
         .map(t => t.token)
-        .filter(Boolean)
-        .slice(0, 1);
+        .filter(Boolean);
     }
 
     const webTokens = (user.fcmTokens || [])

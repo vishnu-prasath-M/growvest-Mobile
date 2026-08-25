@@ -5,6 +5,7 @@ import Constants from 'expo-constants';
 import api from './apiService';
 import { Platform } from 'react-native';
 
+// Global handler ensuring notifications ALWAYS show pop-up alert & play sound when app is OPEN (foreground)
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -21,6 +22,18 @@ let pollingInterval = null;
 let currentUserId = null;
 let lastPolledTime = Date.now();
 
+// Immediately create high-importance Android Notification Channel on module load
+if (Platform.OS === 'android') {
+  Notifications.setNotificationChannelAsync('default', {
+    name: 'Default',
+    importance: Notifications.AndroidImportance.MAX,
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: '#085428',
+    sound: 'default',
+    showBadge: true,
+  }).catch((err) => console.warn('[NotificationService] Channel setup warning:', err));
+}
+
 async function showLocalNotification(title, body, data = {}) {
   try {
     await Notifications.scheduleNotificationAsync({
@@ -33,7 +46,7 @@ async function showLocalNotification(title, body, data = {}) {
       },
       trigger: null,
     });
-    console.log('[NotificationService] Single local notification displayed:', title);
+    console.log('[NotificationService] Local notification displayed:', title);
   } catch (error) {
     console.error('[NotificationService] Error showing local notification:', error);
   }
@@ -80,7 +93,6 @@ async function pollForNotifications() {
 export const notificationService = {
   async requestPermission() {
     try {
-      // Instantly cancel any existing stuck or repeating local scheduled notifications on device
       await Notifications.cancelAllScheduledNotificationsAsync();
     } catch (e) {
       // ignore
@@ -218,7 +230,13 @@ export const notificationService = {
   },
 
   setupNotificationListeners(navigateFn) {
-    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+    // 1. Listen for incoming notifications when app is OPEN (foreground)
+    const receivedSubscription = Notifications.addNotificationReceivedListener((notification) => {
+      console.log('[NotificationService] Foreground notification received:', notification?.request?.content?.title);
+    });
+
+    // 2. Listen for tapping on notification banners (background/closed)
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
       try {
         const data = response?.notification?.request?.content?.data;
         if (data?.screen && typeof navigateFn === 'function') {
@@ -229,6 +247,9 @@ export const notificationService = {
       }
     });
 
-    return () => subscription.remove();
+    return () => {
+      receivedSubscription.remove();
+      responseSubscription.remove();
+    };
   },
 };
