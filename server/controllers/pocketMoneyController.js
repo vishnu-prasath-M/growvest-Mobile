@@ -131,7 +131,53 @@ const runPocketMoneyPayouts = async () => {
 exports.getMyPocketMoney = async (req, res) => {
   try {
     const pocketMonies = await PocketMoney.find({ userId: req.user._id }).sort({ createdAt: -1 });
-    res.json(pocketMonies);
+
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+
+    const enriched = await Promise.all(
+      pocketMonies.map(async (pocket) => {
+        const pocketObj = pocket.toObject();
+
+        if (pocket.status === 'completed' || pocket.remainingAmount <= 0) {
+          pocketObj.todayPayoutStatus = 'completed';
+          return pocketObj;
+        }
+
+        const payoutNum = pocket.payoutCount + 1;
+        const idempotencyKey = `PM_req_${pocket._id}_${todayStr}`;
+        const releaseIdempotencyKey = `PM_${pocket._id}_${todayStr}_release_${payoutNum}`;
+        const cronIdempotencyKey = `PM_${pocket._id}_${todayStr}`;
+
+        // Find today's payout record or payout matching current payoutNumber for THIS pocketId
+        const payout = await PocketMoneyPayout.findOne({
+          pocketMoneyId: pocket._id,
+          $or: [
+            { idempotencyKey },
+            { idempotencyKey: releaseIdempotencyKey },
+            { idempotencyKey: cronIdempotencyKey },
+            { payoutNumber: payoutNum }
+          ]
+        }).sort({ createdAt: -1 });
+
+        if (!payout) {
+          pocketObj.todayPayoutStatus = 'available';
+        } else if (payout.status === 'requested') {
+          pocketObj.todayPayoutStatus = 'requested';
+        } else if (payout.status === 'released') {
+          pocketObj.todayPayoutStatus = 'released';
+        } else {
+          pocketObj.todayPayoutStatus = 'available';
+        }
+
+        pocketObj.currentPayoutNumber = payoutNum;
+        pocketObj.currentPayoutAmount = Math.min(pocket.payoutAmount, pocket.remainingAmount) + (payoutNum === 10 ? (pocket.bonusAmount || 0) : 0);
+
+        return pocketObj;
+      })
+    );
+
+    res.json(enriched);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching pocket money investments', error: error.message });
   }
@@ -222,7 +268,7 @@ exports.releaseSinglePayout = async (req, res) => {
     const idempotencyKey = `PM_${pocket._id}_${todayStr}_release_${payoutNum}`;
     
     // Check if already released today to prevent double clicks
-    const existingPayout = await PocketMoneyPayout.findOne({ idempotencyKey });
+    const existingPayout = await PocketMoneyPayout.findOne({ pocketMoneyId: pocket._id, idempotencyKey });
     if (existingPayout) {
       return res.status(400).json({ message: 'Payout already released for this plan today.' });
     }
@@ -329,19 +375,36 @@ exports.requestPayout = async (req, res) => {
     
     const now = new Date();
     const todayStr = now.toISOString().slice(0, 10);
-    // Unique key: PM_req_{pocketId}_{todayStr}
+    const payoutNum = pocket.payoutCount + 1;
     const idempotencyKey = `PM_req_${pocket._id}_${todayStr}`;
+    const releaseIdempotencyKey = `PM_${pocket._id}_${todayStr}_release_${payoutNum}`;
+    const cronIdempotencyKey = `PM_${pocket._id}_${todayStr}`;
     
-    // Check if user already requested/received payout today
-    const existingPayout = await PocketMoneyPayout.findOne({ idempotencyKey });
+    // Check if user already requested or received payout for THIS SPECIFIC investment today
+    const existingPayout = await PocketMoneyPayout.findOne({
+      pocketMoneyId: pocket._id,
+      $or: [
+        { idempotencyKey },
+        { idempotencyKey: releaseIdempotencyKey },
+        { idempotencyKey: cronIdempotencyKey },
+        { payoutNumber: payoutNum }
+      ]
+    }).sort({ createdAt: -1 });
+    
     if (existingPayout) {
-      return res.status(400).json({
-        message: 'Payout already requested today. Please wait for Admin approval or try again tomorrow.',
-        status: existingPayout.status
-      });
+      if (existingPayout.status === 'requested') {
+        return res.status(400).json({
+          message: 'Payout already requested today for this plan. Please wait for Admin approval.',
+          status: 'requested'
+        });
+      } else if (existingPayout.status === 'released') {
+        return res.status(400).json({
+          message: 'Today\'s payout has already been released for this plan.',
+          status: 'released'
+        });
+      }
     }
     
-    const payoutNum = pocket.payoutCount + 1;
     const amountToPay = Math.min(pocket.payoutAmount, pocket.remainingAmount) + (payoutNum === 10 ? (pocket.bonusAmount || 0) : 0);
     
     const payout = new PocketMoneyPayout({
@@ -355,12 +418,12 @@ exports.requestPayout = async (req, res) => {
     });
     await payout.save();
     
-    // Notify admins
+    // Notify admins with exact investment ID reference
     try {
       const { notifyAdmins } = require('../services/notificationHelper');
       await notifyAdmins({
         title: '💼 New Pocket Money Payout Request',
-        description: `${pocket.userName} requested a Pocket Money payout of ₹${amountToPay}.`,
+        description: `${pocket.userName} requested payout of ₹${amountToPay} for Plan PM-${pocket._id.toString().slice(-6)}.`,
         type: 'general',
         metadata: { payoutId: payout._id, pocketMoneyId: pocket._id }
       });
@@ -384,19 +447,34 @@ exports.getPayoutStatus = async (req, res) => {
       return res.status(404).json({ message: 'Pocket Money plan not found' });
     }
     
-    const now = new Date();
-    const todayStr = now.toISOString().slice(0, 10);
-    const idempotencyKey = `PM_req_${pocket._id}_${todayStr}`;
-    
-    const payout = await PocketMoneyPayout.findOne({ idempotencyKey });
-    
-    if (!payout) {
-      const payoutNum = pocket.payoutCount + 1;
-      const payoutAmt = Math.min(pocket.payoutAmount, pocket.remainingAmount) + (payoutNum === 10 ? (pocket.bonusAmount || 0) : 0);
-      return res.json({ status: 'available', payoutAmount: payoutAmt });
+    if (pocket.status === 'completed' || pocket.remainingAmount <= 0) {
+      return res.json({ status: 'completed', payoutAmount: 0 });
     }
     
-    res.json({ status: payout.status, payout });
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+    const payoutNum = pocket.payoutCount + 1;
+    const idempotencyKey = `PM_req_${pocket._id}_${todayStr}`;
+    const releaseIdempotencyKey = `PM_${pocket._id}_${todayStr}_release_${payoutNum}`;
+    const cronIdempotencyKey = `PM_${pocket._id}_${todayStr}`;
+    
+    const payout = await PocketMoneyPayout.findOne({
+      pocketMoneyId: pocket._id,
+      $or: [
+        { idempotencyKey },
+        { idempotencyKey: releaseIdempotencyKey },
+        { idempotencyKey: cronIdempotencyKey },
+        { payoutNumber: payoutNum }
+      ]
+    }).sort({ createdAt: -1 });
+    
+    const payoutAmt = Math.min(pocket.payoutAmount, pocket.remainingAmount) + (payoutNum === 10 ? (pocket.bonusAmount || 0) : 0);
+    
+    if (!payout) {
+      return res.json({ status: 'available', payoutAmount: payoutAmt, payoutNumber: payoutNum });
+    }
+    
+    res.json({ status: payout.status, payoutAmount: payoutAmt, payoutNumber: payout.payoutNumber, payout });
   } catch (error) {
     res.status(500).json({ message: 'Error checking payout status', error: error.message });
   }
