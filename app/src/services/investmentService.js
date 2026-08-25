@@ -44,7 +44,7 @@ export const investmentService = {
   // Withdraw investment
   withdrawInvestment: async (id, upiId) => {
     try {
-      const response = await api.post(`/api/investments/${id}/withdraw`, { upiId });
+      const response = await api.post(`/investments/${id}/withdraw`, { upiId });
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
