@@ -425,12 +425,12 @@ exports.saveFcmToken = async (req, res) => {
       }
     }
 
-    user.fcmTokens = dedupedTokens.slice(-10);
-    await user.save();
+    const finalTokens = dedupedTokens.slice(-10);
+    await User.findByIdAndUpdate(user._id, { fcmTokens: finalTokens });
 
     res.status(200).json({
       message: 'FCM token saved',
-      tokenCount: user.fcmTokens.length,
+      tokenCount: finalTokens.length,
     });
   } catch (error) {
     console.error('Save FCM token error:', error);
@@ -534,8 +534,7 @@ exports.registerDevice = async (req, res) => {
         }
       }
 
-      user.fcmTokens = dedupedTokens.slice(-10);
-      await user.save();
+      await User.findByIdAndUpdate(userId, { fcmTokens: dedupedTokens.slice(-10) });
       console.log(`[PushNotification] Active device token saved for user ${userId} (Standalone: ${!!isStandalone})`);
     }
 

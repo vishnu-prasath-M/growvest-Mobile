@@ -253,14 +253,11 @@ exports.updateInvestmentStatus = async (req, res) => {
 exports.withdrawInvestment = async (req, res) => {
   try {
     const { id } = req.params;
+    const { upiId } = req.body;
     const investment = await Investment.findById(id);
 
     if (!investment) {
       return res.status(404).json({ message: 'Investment not found' });
-    }
-
-    if (investment.status === 'withdrawn' || investment.withdrawalStatus === 'withdrawn') {
-      return res.status(400).json({ message: 'This investment has already been withdrawn' });
     }
 
     if (investment.status !== 'approved') {
@@ -268,53 +265,65 @@ exports.withdrawInvestment = async (req, res) => {
     }
 
     const now = new Date();
-    if (investment.maturityDate && now < new Date(investment.maturityDate)) {
-      const matDateStr = new Date(investment.maturityDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-      return res.status(400).json({ 
-        message: `Withdrawal available after maturity date: ${matDateStr}` 
-      });
-    }
+    const startDateObj = investment.startDate ? new Date(investment.startDate) : new Date();
+    const benefitEligibilityDate = investment.benefitEligibilityDate
+      ? new Date(investment.benefitEligibilityDate)
+      : new Date(startDateObj.getTime() + 35 * 24 * 60 * 60 * 1000);
+    benefitEligibilityDate.setHours(0, 0, 0, 0);
 
-    const maturityAmt = investment.maturityAmount || (investment.amount + (investment.totalInterest || 0));
+    const fifthWeekCompleted = investment.fifthWeekPaymentCompleted !== false;
+    const isFullEligible = now >= benefitEligibilityDate && fifthWeekCompleted;
+
+    const principal = Number(investment.amount) || 0;
+    const accruedInterest = Number(investment.interestEarned) || Number(investment.totalInterest) || 0;
+    const benefits = Number(investment.benefits) || 0;
+
+    const payoutAmount = isFullEligible ? (principal + accruedInterest + benefits) : principal;
 
     investment.status = 'withdrawn';
     investment.withdrawalStatus = 'withdrawn';
+    investment.eligibilityStatus = 'withdrawn';
     await investment.save();
 
-    // Update user balance & record transaction
-    const user = await User.findById(investment.userId || req.user?._id);
-    if (user) {
-      user.balance = (user.balance || 0) + maturityAmt;
-      await user.save();
+    // Create withdrawal request record
+    const Withdrawal = require('../models/Withdrawal');
+    const withdrawal = new Withdrawal({
+      userId: req.user?._id || investment.userId,
+      amount: payoutAmount,
+      upiId: upiId || 'Registered UPI',
+      userName: investment.userName,
+      userEmail: investment.userEmail,
+      date: new Date().toLocaleDateString('en-IN'),
+      status: 'pending',
+      withdrawType: investment.type || 'saving'
+    });
+    await withdrawal.save();
 
-      const transaction = new Transaction({
-        userId: user._id,
-        userEmail: user.email || 'user@growvest.com',
-        type: 'withdrawal',
-        amount: maturityAmt,
-        status: 'approved',
-        referenceId: investment._id,
-        referenceType: 'Investment',
-        description: `Investment Matured & Withdrawn (${investment.planType || investment.type}) - ₹${maturityAmt}`,
-      });
-      await transaction.save();
+    // Create transaction record
+    const transaction = new Transaction({
+      userId: req.user?._id || investment.userId,
+      userEmail: investment.userEmail,
+      type: 'withdrawal',
+      amount: payoutAmount,
+      status: 'pending',
+      referenceId: investment._id,
+      referenceType: 'Investment',
+      description: isFullEligible
+        ? `Full benefit withdrawal for ${investment.ref || investment.type} - ₹${payoutAmount}`
+        : `Early principal withdrawal for ${investment.ref || investment.type} - ₹${payoutAmount}`
+    });
+    await transaction.save();
 
-      try {
-        await sendNotification({
-          userId: user._id,
-          title: '🎉 Investment Withdrawn',
-          description: `₹${maturityAmt} has been credited to your account from your matured ${investment.planType || investment.type} plan.`,
-          type: 'withdrawal_approved',
-          pushData: { screen: 'Withdraw' },
-        });
-      } catch (notifErr) {
-        console.warn('[Investment Withdrawal] Notification failed:', notifErr.message);
-      }
-    }
-
-    res.status(200).json({ success: true, message: 'Withdrawal successful', investment, maturityAmount: maturityAmt });
+    res.status(200).json({
+      success: true,
+      message: isFullEligible
+        ? `Full benefit payout of ₹${payoutAmount.toLocaleString('en-IN')} requested successfully.`
+        : `Early principal payout of ₹${payoutAmount.toLocaleString('en-IN')} requested successfully. Interest & benefits remained locked.`,
+      investment,
+      payoutAmount
+    });
   } catch (error) {
-    console.error('Error processing investment withdrawal:', error);
-    res.status(500).json({ message: 'Error processing withdrawal', error: error.message });
+    console.error('Error withdrawing investment:', error);
+    res.status(500).json({ message: 'Error withdrawing investment', error: error.message });
   }
 };

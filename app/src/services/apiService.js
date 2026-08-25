@@ -73,15 +73,9 @@ api.interceptors.response.use(
     console.error('[apiService] Response error:', error?.message || error, 'Status:', status, 'URL:', url);
     console.error('[apiService] Error response data:', error.response?.data);
 
-    // Trigger error alerts via listeners
-    if (databaseErrorListener) {
-      if (!error.response) {
-        // Network connection error
-        databaseErrorListener('network_error', 'No Internet Connection', 'Cannot connect to the server. Please check your internet connection.');
-      } else if (status >= 500) {
-        // Server / Database error
-        databaseErrorListener('db_slow_error', 'Database Timeout', 'The database returned a server error. Please try again in a moment.');
-      }
+    // Log response error
+    if (!error.response) {
+      console.warn('[apiService] Network connection lost or server unreachable');
     }
     
     // Only clear auth tokens when the /auth/me endpoint returns 401
