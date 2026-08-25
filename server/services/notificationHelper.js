@@ -7,13 +7,6 @@
  * It replicates the exact same flow used by sendWelcomeNotification():
  * 1. Creates in-app DB notification (MongoDB)
  * 2. Sends push notification via Expo Push API
- * 
- * The only things that change per notification type are:
- * - title
- * - body/description
- * - type
- * - icon
- * - metadata (optional reference ID)
  */
 
 const Notification = require('../models/Notification');
@@ -45,7 +38,7 @@ async function sendNotification({ userId, title, description, type, icon, metada
     data: { type, ...(pushData || {}) },
   };
 
-  // STEP 1: Send Push Notification IMMEDIATELY (Do NOT wait for MongoDB)
+  // STEP 1: Send Push Notification IMMEDIATELY
   try {
     console.log(`[NotificationHelper] Executing immediate push delivery to user: ${userId}`);
     const pushResult = await sendToUser(userId, payload);
@@ -140,6 +133,11 @@ async function notifyAdmins({ title, description, type = 'general', metadata }) 
         metadata
       });
     }
+  } catch (err) {
+    console.error('[NotificationHelper] Error in notifyAdmins:', err);
+  }
+}
+
 /**
  * Send a notification to all active users.
  * 
