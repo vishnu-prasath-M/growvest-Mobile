@@ -31,6 +31,14 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [kycModalVisible, setKycModalVisible] = useState(false);
 
+  // Date-based withdrawal & 5-week benefit eligibility dates
+  const today = new Date();
+  const defaultWithdrawalDate = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const fifthWeekDate = new Date(today.getTime() + 35 * 24 * 60 * 60 * 1000);
+
+  const [selectedWithdrawalDate, setSelectedWithdrawalDate] = useState(defaultWithdrawalDate.toISOString().split('T')[0]);
+  const [datePickerModalVisible, setDatePickerModalVisible] = useState(false);
+
   useEffect(() => {
     loadUserData();
     loadPlans();
@@ -364,6 +372,70 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Intended Withdrawal Date Selection Modal */}
+      <Modal visible={datePickerModalVisible} transparent animationType="slide" onRequestClose={() => setDatePickerModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Choose Intended Withdrawal Date</Text>
+              <TouchableOpacity onPress={() => setDatePickerModalVisible(false)} style={styles.modalCloseBtn}>
+                <MaterialCommunityIcons name="close" size={18} color={themeColors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 13, color: themeColors.textSecondary, marginVertical: 8 }}>
+              Select your intended target withdrawal date:
+            </Text>
+
+            <ScrollView style={{ maxHeight: 260 }} showsVerticalScrollIndicator={false}>
+              {[15, 30, 35, 45, 60, 90, 180, 365].map((days) => {
+                const d = new Date(today.getTime() + days * 24 * 60 * 60 * 1000);
+                const isoDate = d.toISOString().split('T')[0];
+                const isSel = selectedWithdrawalDate === isoDate;
+                const is5thWeekOrLater = days >= 35;
+                return (
+                  <TouchableOpacity
+                    key={days}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: 12,
+                      borderRadius: 10,
+                      backgroundColor: isSel ? themeColors.primaryLight : themeColors.surface,
+                      marginBottom: 8,
+                      borderWidth: 1,
+                      borderColor: isSel ? themeColors.primary : themeColors.border,
+                    }}
+                    onPress={() => {
+                      setSelectedWithdrawalDate(isoDate);
+                      setDatePickerModalVisible(false);
+                    }}
+                  >
+                    <View>
+                      <Text style={{ fontWeight: '700', color: themeColors.text, fontSize: 14 }}>
+                        {d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} ({days} Days)
+                      </Text>
+                      <Text style={{ fontSize: 11, color: is5thWeekOrLater ? '#065F46' : '#B45309', marginTop: 2, fontWeight: '600' }}>
+                        {is5thWeekOrLater ? '✓ Full Principal + Interest + Benefits Eligible' : '⚠️ Early Withdrawal: Principal Only'}
+                      </Text>
+                    </View>
+                    {isSel && <MaterialCommunityIcons name="check-circle" size={20} color={themeColors.primary} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.continueBtn, { marginTop: 12 }]}
+              onPress={() => setDatePickerModalVisible(false)}
+            >
+              <Text style={styles.continueBtnText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Email Required Modal */}
       <Modal visible={showEmailModal} transparent animationType="fade" onRequestClose={() => setShowEmailModal(false)}>
