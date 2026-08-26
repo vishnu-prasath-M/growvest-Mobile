@@ -38,6 +38,9 @@ async function getUserPortfolioSummary(userIdInput) {
   const nowMidnight = new Date(nowDate);
   nowMidnight.setHours(0, 0, 0, 0);
 
+  // userId is used by chit fund and pocket money queries below
+  const userId = user._id;
+
   const userOrConditions = [{ userId: user._id }];
   if (user._id) userOrConditions.push({ userId: user._id.toString() });
   if (user.email && typeof user.email === 'string' && user.email.trim() !== '' && !user.email.includes('no-email@') && user.email !== 'undefined') {
