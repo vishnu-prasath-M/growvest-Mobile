@@ -30,8 +30,16 @@ const withdrawalSchema = new mongoose.Schema({
   },
   withdrawType: {
     type: String,
-    enum: ['saving', 'fixed'],
     default: 'saving',
+  },
+  investmentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Investment',
+    required: false,
+  },
+  isEarlyWithdrawal: {
+    type: Boolean,
+    default: false,
   },
   paidAt: {
     type: Date,

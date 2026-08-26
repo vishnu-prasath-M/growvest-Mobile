@@ -161,7 +161,7 @@ export const notificationService = {
         return null;
       }
 
-      const isStandalone = true;
+      const isStandalone = Constants.appOwnership === 'standalone' || Constants.executionEnvironment === 'standalone' || !__DEV__;
 
       await api.post('/users/register-device', {
         userId,
@@ -172,7 +172,7 @@ export const notificationService = {
       });
 
       await AsyncStorage.setItem(DEVICE_TOKEN_KEY, deviceToken);
-      console.log('[NotificationService] Device registered successfully');
+      console.log(`[NotificationService] Device registered successfully (Standalone: ${isStandalone})`);
       
       // Start polling for server-side notifications
       this.startPolling(userId);
@@ -181,6 +181,20 @@ export const notificationService = {
     } catch (error) {
       console.error('[NotificationService] Error registering device:', error);
       return null;
+    }
+  },
+
+  async unregisterDevice() {
+    try {
+      this.stopPolling();
+      const deviceToken = await this.getStoredToken();
+      if (deviceToken) {
+        await api.post('/users/unregister-device', { deviceToken }).catch(() => {});
+        await this.clearStoredToken();
+      }
+      console.log('[NotificationService] Device unregistered successfully on logout');
+    } catch (error) {
+      console.warn('[NotificationService] Error unregistering device:', error);
     }
   },
 

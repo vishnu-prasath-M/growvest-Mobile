@@ -23,6 +23,7 @@ router.delete('/fcm-token', protect, userController.removeFcmToken);
 
 // POST /api/users/register-device - Register device for push notifications
 router.post('/register-device', protect, userController.registerDevice);
+router.post('/unregister-device', protect, userController.unregisterDevice);
 
 // GET /api/users/email/:email - Get user by email (used by user dashboard)
 router.get('/email/:email', userController.getUserByEmail);

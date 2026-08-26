@@ -7,6 +7,7 @@ const { protect, admin } = require('../middleware/authMiddleware');
 router.get('/my', protect, pocketMoneyController.getMyPocketMoney);
 router.post('/request-payout/:pocketId', protect, pocketMoneyController.requestPayout);
 router.get('/payout-status/:pocketId', protect, pocketMoneyController.getPayoutStatus);
+router.get('/history/:pocketId', protect, pocketMoneyController.getPayoutHistory);
 
 // Admin routes
 router.get('/admin/all', protect, admin, pocketMoneyController.getAdminPocketMoneyList);

@@ -106,7 +106,18 @@ const investmentSchema = new mongoose.Schema({
     type: String,
     enum: ['early_principal_only', 'full_eligible', 'withdrawn'],
     default: 'early_principal_only',
-  }
+  },
+  // Withdrawal request tracking — investment stays 'approved' until admin marks withdrawal as paid
+  withdrawalStatus: {
+    type: String,
+    enum: ['none', 'pending', 'withdrawn'],
+    default: 'none',
+  },
+  withdrawalRequestId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Withdrawal',
+    required: false,
+  },
 }, { timestamps: true });
 
 // Index for fast user-based queries
