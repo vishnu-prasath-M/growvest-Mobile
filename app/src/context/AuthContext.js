@@ -94,15 +94,15 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
+    try {
+      const { notificationService } = await import('../services/notificationService');
+      await notificationService.unregisterDevice();
+    } catch (error) {
+      console.warn('[AuthContext] Failed to unregister device on logout:', error?.message || error);
+    }
     setToken(null);
     setUser(null);
     await AsyncStorage.multiRemove(['userToken', 'userData']);
-    try {
-      const { notificationService } = await import('../services/notificationService');
-      notificationService.stopPolling();
-    } catch (error) {
-      console.warn('[AuthContext] Failed to stop notification polling:', error?.message || error);
-    }
   };
 
   const updateUser = async (newUserData) => {

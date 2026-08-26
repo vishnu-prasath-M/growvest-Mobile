@@ -471,59 +471,65 @@ exports.removeFcmToken = async (req, res) => {
 // @access  Private
 exports.registerDevice = async (req, res) => {
   try {
-    const { userId, username, deviceToken, platform } = req.body;
+    const { userId, username, deviceToken, platform, isStandalone } = req.body;
 
-    if (!userId || !username || !deviceToken) {
-      return res.status(400).json({ message: 'userId, username, and deviceToken are required' });
+    if (!userId || !deviceToken) {
+      return res.status(400).json({ message: 'userId and deviceToken are required' });
     }
 
+    const cleanToken = deviceToken.trim();
     const normalizedPlatform = ['android', 'ios', 'web'].includes(platform) ? platform : 'android';
+    const deviceType = isStandalone ? 'standalone_apk' : 'expo_go';
 
-    // Save to DeviceToken collection (legacy)
-    const existingToken = await DeviceToken.findOne({ deviceToken });
+    // REQUIREMENT H: Disassociate this token from ALL OTHER users so User A's token
+    // is never attached to User B when switching accounts on the same physical device.
+    await User.updateMany(
+      { _id: { $ne: userId } },
+      { $pull: { fcmTokens: { token: cleanToken } } }
+    );
 
-    if (existingToken) {
-      await DeviceToken.findByIdAndUpdate(
-        existingToken._id,
-        { userId, username, platform: normalizedPlatform, updatedAt: Date.now() }
-      );
-    } else {
-      await DeviceToken.create({
-        userId,
-        username,
-        deviceToken,
-        platform: normalizedPlatform
-      });
+    // Save to legacy DeviceToken collection if needed
+    try {
+      const existingToken = await DeviceToken.findOne({ deviceToken: cleanToken });
+      if (existingToken) {
+        await DeviceToken.findByIdAndUpdate(
+          existingToken._id,
+          { userId, username: username || 'user', platform: normalizedPlatform, updatedAt: Date.now() }
+        );
+      } else {
+        await DeviceToken.create({
+          userId,
+          username: username || 'user',
+          deviceToken: cleanToken,
+          platform: normalizedPlatform
+        });
+      }
+    } catch (legacyErr) {
+      console.warn('[RegisterDevice] Legacy collection update warning:', legacyErr.message);
     }
 
-    const { isStandalone } = req.body;
-
-    // CRITICAL FIX: Save to User.fcmTokens and ensure Standalone APK tokens overwrite stale tokens
+    // Save/update token in User.fcmTokens
     const user = await User.findById(userId);
     if (user) {
       const now = new Date();
       let tokens = Array.isArray(user.fcmTokens) ? [...user.fcmTokens] : [];
-      
+
       const tokenEntry = {
-        token: deviceToken.trim(),
+        token: cleanToken,
         platform: normalizedPlatform,
-        deviceId: isStandalone ? 'standalone_apk' : 'expo_go',
+        deviceId: deviceType,
         updatedAt: now,
       };
 
-      if (isStandalone) {
-        // If registering from Standalone APK, remove stale Expo Go tokens for clean delivery
-        tokens = tokens.filter(t => t.deviceId !== 'expo_go' && !t.token.includes('ExpoGo'));
-      }
-
-      const existingIndex = tokens.findIndex((entry) => entry.token === deviceToken.trim());
+      // Check if token already registered for this user
+      const existingIndex = tokens.findIndex((entry) => entry.token === cleanToken);
       if (existingIndex >= 0) {
         tokens[existingIndex] = tokenEntry;
       } else {
         tokens.push(tokenEntry);
       }
 
-      // Deduplicate keeping newest first
+      // Deduplicate keeping newest entries (max 10 tokens per user)
       const dedupedTokens = [];
       const seen = new Set();
       for (let i = tokens.length - 1; i >= 0; i -= 1) {
@@ -535,13 +541,36 @@ exports.registerDevice = async (req, res) => {
       }
 
       await User.findByIdAndUpdate(userId, { fcmTokens: dedupedTokens.slice(-10) });
-      console.log(`[PushNotification] Active device token saved for user ${userId} (Standalone: ${!!isStandalone})`);
+      console.log(`[PushNotification] Device token registered for user ${userId} (${deviceType})`);
     }
 
     res.status(200).json({ message: 'Device registered successfully' });
   } catch (error) {
     console.error('Register device error:', error);
     res.status(500).json({ message: 'Error registering device', error: error.message });
+  }
+};
+
+// @route   POST /api/users/unregister-device
+// @access  Private
+exports.unregisterDevice = async (req, res) => {
+  try {
+    const { deviceToken } = req.body;
+    const userId = req.user._id;
+
+    if (deviceToken) {
+      const cleanToken = deviceToken.trim();
+      await User.findByIdAndUpdate(userId, {
+        $pull: { fcmTokens: { token: cleanToken } }
+      });
+      await DeviceToken.deleteMany({ deviceToken: cleanToken, userId });
+      console.log(`[PushNotification] Token unregistered for logging-out user ${userId}`);
+    }
+
+    res.status(200).json({ message: 'Device unregistered successfully' });
+  } catch (error) {
+    console.error('Unregister device error:', error);
+    res.status(500).json({ message: 'Error unregistering device', error: error.message });
   }
 };
 

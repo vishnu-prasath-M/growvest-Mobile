@@ -194,6 +194,11 @@ const PocketMoneyScreen = ({ navigation }) => {
                         <MaterialCommunityIcons name="clock-outline" size={16} color="#B45309" style={{ marginRight: 6 }} />
                         <Text style={styles.statusTextPending}>Payout Requested (Pending Approval)</Text>
                       </View>
+                    ) : currentStatus === 'upcoming' ? (
+                      <View style={[styles.statusPillPending, { backgroundColor: '#F3F4F6', borderColor: '#E5E7EB' }]}>
+                        <MaterialCommunityIcons name="calendar-clock" size={16} color="#4B5563" style={{ marginRight: 6 }} />
+                        <Text style={[styles.statusTextPending, { color: '#374151' }]}>Next Payout Scheduled ({formatDate(plan.nextPayoutDate)})</Text>
+                      </View>
                     ) : (
                       <View style={styles.statusPillSuccess}>
                         <MaterialCommunityIcons name="check-circle-outline" size={16} color="#065F46" style={{ marginRight: 6 }} />

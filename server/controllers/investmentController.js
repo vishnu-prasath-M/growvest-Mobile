@@ -274,13 +274,23 @@ exports.withdrawInvestment = async (req, res) => {
 
     const now = new Date();
     const startDateObj = investment.startDate ? new Date(investment.startDate) : new Date();
-    const benefitEligibilityDate = investment.benefitEligibilityDate
-      ? new Date(investment.benefitEligibilityDate)
-      : new Date(startDateObj.getTime() + 35 * 24 * 60 * 60 * 1000);
-    benefitEligibilityDate.setHours(0, 0, 0, 0);
 
-    const fifthWeekCompleted = investment.fifthWeekPaymentCompleted !== false;
-    const isFullEligible = now >= benefitEligibilityDate && fifthWeekCompleted;
+    const durationDaysMap = {
+      '15_days': 15,
+      '1_month': 30,
+      '3_months': 90,
+      '6_months': 180,
+      '1_year': 365,
+      '2_years': 730,
+    };
+    const planDurationDays = investment.durationDays || durationDaysMap[investment.type] || 365;
+
+    const maturityDate = investment.maturityDate
+      ? new Date(investment.maturityDate)
+      : new Date(startDateObj.getTime() + planDurationDays * 24 * 60 * 60 * 1000);
+    maturityDate.setHours(0, 0, 0, 0);
+
+    const isFullEligible = now >= maturityDate;
 
     const principal = Number(investment.amount) || 0;
     const accruedInterest = Number(investment.interestEarned) || Number(investment.totalInterest) || 0;

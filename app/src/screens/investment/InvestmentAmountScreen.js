@@ -222,7 +222,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
           <Text style={styles.sectionTitle}>Choose Intended Withdrawal Date</Text>
           <View style={styles.datePickerRow}>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 12, color: themeColors.textSecondary }}>Selected Withdrawal Date</Text>
+              <Text style={{ fontSize: 12, color: themeColors.textSecondary }}>Selected Intended Date</Text>
               <Text style={{ fontSize: 15, fontWeight: '700', color: themeColors.text, marginTop: 2 }}>
                 {new Date(selectedWithdrawalDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
               </Text>
@@ -238,35 +238,51 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
           </View>
         </View>
 
-        {/* 5-Week Benefit Rule Explanation Box */}
+        {/* Dynamic Plan Withdrawal Rule Box */}
         {(() => {
-          const formattedEligibilityDate = fifthWeekDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+          const selectedPlan = getSelectedPlan();
+          const maxDays = selectedPlan?.durationDays || 365;
+          const maturityDate = new Date(today.getTime() + maxDays * 24 * 60 * 60 * 1000);
+          const formattedMaturityDate = maturityDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
           const formattedWithdrawalDate = new Date(selectedWithdrawalDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+          const isEarlyWithdrawal = new Date(selectedWithdrawalDate) < new Date(maturityDate.toDateString());
           const hasAmount = amount && parseFloat(amount) > 0;
           const formattedAmountText = hasAmount ? ` (₹${parseFloat(amount).toLocaleString('en-IN')})` : '';
 
           return (
             <View style={styles.ruleCard}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                <MaterialCommunityIcons name="alert-decagram" size={20} color="#D97706" style={{ marginRight: 6 }} />
-                <Text style={{ fontSize: 14, fontWeight: '800', color: themeColors.text }}>Withdrawal & 5-Week Benefit Rule</Text>
+                <MaterialCommunityIcons 
+                  name={isEarlyWithdrawal ? "alert-circle" : "check-decagram"} 
+                  size={20} 
+                  color={isEarlyWithdrawal ? "#D97706" : "#059669"} 
+                  style={{ marginRight: 6 }} 
+                />
+                <Text style={{ fontSize: 14, fontWeight: '800', color: themeColors.text }}>
+                  {isEarlyWithdrawal ? 'Early Withdrawal Rule' : 'Maturity Payout Rule'}
+                </Text>
               </View>
               
               <Text style={{ fontSize: 12, color: themeColors.textSecondary, marginBottom: 4 }}>
-                • <Text style={{ fontWeight: '700', color: themeColors.text }}>Intended Withdrawal Date:</Text> {formattedWithdrawalDate}
+                • <Text style={{ fontWeight: '700', color: themeColors.text }}>Selected Withdrawal Date:</Text> {formattedWithdrawalDate}
               </Text>
               <Text style={{ fontSize: 12, color: themeColors.textSecondary, marginBottom: 8 }}>
-                • <Text style={{ fontWeight: '700', color: themeColors.primary }}>5th-Week Benefit Eligibility Date:</Text> {formattedEligibilityDate}
+                • <Text style={{ fontWeight: '700', color: themeColors.primary }}>Plan Maturity Date ({maxDays} Days):</Text> {formattedMaturityDate}
               </Text>
 
-              <View style={styles.ruleWarningBox}>
-                <Text style={{ fontSize: 12, color: '#92400E', lineHeight: 17 }}>
-                  ⚠️ <Text style={{ fontWeight: '700' }}>Important:</Text> If you withdraw BEFORE the 5th-week benefit eligibility date ({formattedEligibilityDate}), ONLY your original invested principal amount{formattedAmountText} will be available for withdrawal. Interest/earnings and extra benefits will not be included.
-                </Text>
-                <Text style={{ fontSize: 12, color: '#065F46', lineHeight: 17, marginTop: 6 }}>
-                  ✓ If you wait until the 5th-week eligibility date ({formattedEligibilityDate}) and complete the required 5th-week payment, your applicable interest, earnings, and benefits will become eligible for withdrawal.
-                </Text>
-              </View>
+              {isEarlyWithdrawal ? (
+                <View style={styles.ruleWarningBox}>
+                  <Text style={{ fontSize: 12, color: '#92400E', lineHeight: 17 }}>
+                    ⚠️ <Text style={{ fontWeight: '700' }}>Early Withdrawal Notice:</Text> If you withdraw on {formattedWithdrawalDate} (before plan maturity date {formattedMaturityDate}), <Text style={{ fontWeight: '700' }}>ONLY your original invested principal amount{formattedAmountText}</Text> will be eligible for withdrawal. Interest returns will be ₹0.
+                  </Text>
+                </View>
+              ) : (
+                <View style={[styles.ruleWarningBox, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}>
+                  <Text style={{ fontSize: 12, color: '#065F46', lineHeight: 17 }}>
+                    ✓ <Text style={{ fontWeight: '700' }}>Full Return Eligible:</Text> You are withdrawing on/after maturity date ({formattedMaturityDate}). <Text style={{ fontWeight: '700' }}>Your full principal{formattedAmountText} + {getSelectedPlan()?.interestRate}% plan interest return</Text> will be eligible for withdrawal.
+                  </Text>
+                </View>
+              )}
             </View>
           );
         })()}
@@ -389,43 +405,55 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
               Select your intended target withdrawal date:
             </Text>
 
-            <ScrollView style={{ maxHeight: 260 }} showsVerticalScrollIndicator={false}>
-              {[15, 30, 35, 45, 60, 90, 180, 365].map((days) => {
-                const d = new Date(today.getTime() + days * 24 * 60 * 60 * 1000);
-                const isoDate = d.toISOString().split('T')[0];
-                const isSel = selectedWithdrawalDate === isoDate;
-                const is5thWeekOrLater = days >= 35;
-                return (
-                  <TouchableOpacity
-                    key={days}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: 12,
-                      borderRadius: 10,
-                      backgroundColor: isSel ? themeColors.primaryLight : themeColors.surface,
-                      marginBottom: 8,
-                      borderWidth: 1,
-                      borderColor: isSel ? themeColors.primary : themeColors.border,
-                    }}
-                    onPress={() => {
-                      setSelectedWithdrawalDate(isoDate);
-                      setDatePickerModalVisible(false);
-                    }}
-                  >
-                    <View>
-                      <Text style={{ fontWeight: '700', color: themeColors.text, fontSize: 14 }}>
-                        {d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} ({days} Days)
-                      </Text>
-                      <Text style={{ fontSize: 11, color: is5thWeekOrLater ? '#065F46' : '#B45309', marginTop: 2, fontWeight: '600' }}>
-                        {is5thWeekOrLater ? '✓ Full Principal + Interest + Benefits Eligible' : '⚠️ Early Withdrawal: Principal Only'}
-                      </Text>
-                    </View>
-                    {isSel && <MaterialCommunityIcons name="check-circle" size={20} color={themeColors.primary} />}
-                  </TouchableOpacity>
-                );
-              })}
+            <ScrollView style={{ maxHeight: 280 }} showsVerticalScrollIndicator={false}>
+              {(() => {
+                const selectedPlan = getSelectedPlan();
+                const maxDays = selectedPlan?.durationDays || 365;
+                // Generate interval options up to maxDays
+                let intervals = [];
+                if (maxDays <= 15) intervals = [5, 10, 15];
+                else if (maxDays <= 30) intervals = [7, 15, 21, 30];
+                else if (maxDays <= 90) intervals = [15, 30, 60, 90];
+                else if (maxDays <= 180) intervals = [30, 60, 120, 180];
+                else intervals = [30, 90, 180, 270, 365];
+
+                return intervals.map((days) => {
+                  const d = new Date(today.getTime() + days * 24 * 60 * 60 * 1000);
+                  const isoDate = d.toISOString().split('T')[0];
+                  const isSel = selectedWithdrawalDate === isoDate;
+                  const isMaturity = days >= maxDays;
+                  return (
+                    <TouchableOpacity
+                      key={days}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: 12,
+                        borderRadius: 10,
+                        backgroundColor: isSel ? themeColors.primaryLight : themeColors.surface,
+                        marginBottom: 8,
+                        borderWidth: 1,
+                        borderColor: isSel ? themeColors.primary : themeColors.border,
+                      }}
+                      onPress={() => {
+                        setSelectedWithdrawalDate(isoDate);
+                        setDatePickerModalVisible(false);
+                      }}
+                    >
+                      <View>
+                        <Text style={{ fontWeight: '700', color: themeColors.text, fontSize: 14 }}>
+                          {d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} ({days} Days)
+                        </Text>
+                        <Text style={{ fontSize: 11, color: isMaturity ? '#065F46' : '#B45309', marginTop: 2, fontWeight: '600' }}>
+                          {isMaturity ? '✓ Maturity Payout: Principal + Interest' : '⚠️ Early Withdrawal: Principal Only'}
+                        </Text>
+                      </View>
+                      {isSel && <MaterialCommunityIcons name="check-circle" size={20} color={themeColors.primary} />}
+                    </TouchableOpacity>
+                  );
+                });
+              })()}
             </ScrollView>
 
             <TouchableOpacity
