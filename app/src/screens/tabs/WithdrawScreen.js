@@ -482,8 +482,9 @@ const WithdrawScreen = ({ navigation }) => {
               const fullAmt = inv.fullBenefitAmount || inv.availableToWithdraw || principalAmt;
               const withdrawableAmt = inv.availableToWithdraw || (isFullEligible ? fullAmt : principalAmt);
               
-              const benefitDateStr = inv.benefitEligibilityDate
-                ? new Date(inv.benefitEligibilityDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+              const maturityDateVal = inv.maturityDate || inv.selectedWithdrawalDate || inv.benefitEligibilityDate;
+              const maturityDateStr = maturityDateVal
+                ? new Date(maturityDateVal).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
                 : 'N/A';
 
               return (
@@ -515,7 +516,7 @@ const WithdrawScreen = ({ navigation }) => {
                         styles.statusBadgeText, 
                         { color: isWithdrawn ? themeColors.textTertiary : isPendingWithdrawal ? '#92400E' : isFullEligible ? '#065F46' : '#B45309' }
                       ]}>
-                        {isWithdrawn ? 'WITHDRAWN' : isPendingWithdrawal ? 'REQUESTED – PENDING APPROVAL' : isFullEligible ? 'FULL BENEFITS ELIGIBLE' : 'EARLY (PRINCIPAL ONLY)'}
+                        {isWithdrawn ? 'WITHDRAWN' : isPendingWithdrawal ? 'REQUESTED – PENDING APPROVAL' : isFullEligible ? 'MATURED (FULL RETURNS ELIGIBLE)' : 'EARLY (PRINCIPAL ONLY)'}
                       </Text>
                     </View>
                   </View>
@@ -524,8 +525,8 @@ const WithdrawScreen = ({ navigation }) => {
 
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 4 }}>
                     <View>
-                      <Text style={{ fontSize: 11, color: themeColors.textSecondary }}>5th-Week Benefit Date</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: themeColors.text }}>{benefitDateStr}</Text>
+                      <Text style={{ fontSize: 11, color: themeColors.textSecondary }}>Plan Maturity Date</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: themeColors.text }}>{maturityDateStr}</Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
                       <Text style={{ fontSize: 11, color: themeColors.textSecondary }}>Available to Withdraw</Text>
@@ -579,7 +580,7 @@ const WithdrawScreen = ({ navigation }) => {
 
                     {!isFullEligible && !isWithdrawn && !isPendingWithdrawal && (
                       <Text style={{ fontSize: 11, color: '#B45309', marginTop: 6, textAlign: 'center', fontStyle: 'italic' }}>
-                        🔒 Interest & extra benefits are locked until 5th-week eligibility date ({benefitDateStr}).
+                        🔒 Plan interest returns are locked until plan maturity date ({maturityDateStr}).
                       </Text>
                     )}
                   </View>
