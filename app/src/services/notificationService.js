@@ -5,7 +5,7 @@ import Constants from 'expo-constants';
 import api from './apiService';
 import { Platform } from 'react-native';
 
-// Global handler ensuring notifications ALWAYS show pop-up alert & play sound when app is OPEN (foreground)
+// Ensures notifications show as banners even when app is OPEN (foreground)
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -112,9 +112,10 @@ export const notificationService = {
       });
     }
 
+    // Do NOT block on !Device.isDevice — real phones with Expo Go return Device.isDevice=true.
+    // The old guard was wrongly returning false on valid physical devices.
     if (!Device.isDevice) {
-      console.log('[NotificationService] Must use physical device for push notifications');
-      return false;
+      console.warn('[NotificationService] Not a physical device - push tokens may not work on simulator');
     }
 
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
@@ -126,63 +127,86 @@ export const notificationService = {
     }
 
     if (finalStatus !== 'granted') {
-      console.log('[NotificationService] Failed to get push token for push notification!');
+      console.warn('[NotificationService] Push permission not granted - status:', finalStatus);
       return false;
     }
 
+    console.log('[NotificationService] Push permission GRANTED');
     return true;
   },
 
   async getDeviceToken() {
-    try {
-      const projectId =
-        Constants.expoConfig?.extra?.eas?.projectId ||
-        Constants.easConfig?.projectId ||
-        Constants.manifest?.extra?.eas?.projectId ||
-        'f4211c90-3448-400b-9e0c-82933dd6dbed';
+    const projectId =
+      Constants.expoConfig?.extra?.eas?.projectId ||
+      Constants.easConfig?.projectId ||
+      Constants.manifest?.extra?.eas?.projectId ||
+      'f4211c90-3448-400b-9e0c-82933dd6dbed';
 
-      const token = await Notifications.getExpoPushTokenAsync({
-        projectId,
-      });
-      
-      return token.data;
-    } catch (error) {
-      console.error('[NotificationService] Error getting device token:', error);
-      return null;
+    console.log('[NotificationService] Getting push token, projectId:', projectId);
+
+    // Strategy 1: Expo Push Token (works in Expo Go AND EAS/standalone via Expo FCM gateway)
+    try {
+      const expoTokenObj = await Notifications.getExpoPushTokenAsync({ projectId });
+      const token = expoTokenObj?.data;
+      if (token) {
+        console.log('[NotificationService] Got Expo Push Token:', token);
+        return { token, type: 'expo' };
+      }
+    } catch (err) {
+      console.warn('[NotificationService] getExpoPushTokenAsync failed:', err?.message);
     }
+
+    // Strategy 2: Native FCM device token (standalone APK fallback)
+    try {
+      const deviceTokenObj = await Notifications.getDevicePushTokenAsync();
+      const token = deviceTokenObj?.data;
+      if (token) {
+        console.log('[NotificationService] Got Native FCM Token:', token);
+        return { token, type: 'fcm' };
+      }
+    } catch (err) {
+      console.warn('[NotificationService] getDevicePushTokenAsync failed:', err?.message);
+    }
+
+    console.error('[NotificationService] FAILED to get any push token');
+    return null;
   },
 
   async registerDevice(userId, username) {
     try {
+      console.log('[NotificationService] Starting device registration for userId:', userId);
+
       const hasPermission = await this.requestPermission();
       if (!hasPermission) {
+        console.warn('[NotificationService] Skipping registration - no permission');
         return null;
       }
 
-      const deviceToken = await this.getDeviceToken();
-      if (!deviceToken) {
+      const tokenResult = await this.getDeviceToken();
+      if (!tokenResult) {
+        console.error('[NotificationService] Skipping registration - no push token obtained');
         return null;
       }
 
-      const isStandalone = Constants.appOwnership === 'standalone' || Constants.executionEnvironment === 'standalone' || !__DEV__;
+      const { token: deviceToken, type: tokenType } = tokenResult;
+      const isStandalone = Constants.appOwnership === 'standalone' ||
+        Constants.executionEnvironment === 'standalone' ||
+        !__DEV__;
 
-      await api.post('/users/register-device', {
-        userId,
-        username,
-        deviceToken,
-        platform: Platform.OS,
-        isStandalone,
+      console.log('[NotificationService] Sending token to server:', {
+        userId, tokenType, isStandalone, tokenPrefix: deviceToken.substring(0, 30),
       });
 
+      const response = await api.post('/users/register-device', {
+        userId, username, deviceToken, platform: Platform.OS, isStandalone, tokenType,
+      });
+
+      console.log('[NotificationService] Token saved to DB:', response.data?.message);
       await AsyncStorage.setItem(DEVICE_TOKEN_KEY, deviceToken);
-      console.log(`[NotificationService] Device registered successfully (Standalone: ${isStandalone})`);
-      
-      // Start polling for server-side notifications
       this.startPolling(userId);
-      
       return deviceToken;
     } catch (error) {
-      console.error('[NotificationService] Error registering device:', error);
+      console.error('[NotificationService] registerDevice error:', error?.response?.data || error?.message);
       return null;
     }
   },

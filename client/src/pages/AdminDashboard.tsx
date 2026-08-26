@@ -31,7 +31,7 @@ import ChitFundAdmin from "@/components/admin/ChitFundAdmin";
 import PocketMoneyAdmin from "@/components/admin/PocketMoneyAdmin";
 import KYCAdmin from "@/components/admin/KYCAdmin";
 import ReferralAdmin from "@/components/admin/ReferralAdmin";
-import { Gift } from "lucide-react";
+import { Gift, Bell } from "lucide-react";
 
 import { toast } from "sonner";
 
@@ -100,7 +100,7 @@ const getPlanDisplayName = (type: string) => {
   return type + ' Plan';
 };
 
-type AdminTab = "overview" | "pending" | "users" | "withdrawals" | "kyc" | "chits" | "settings" | "pocket" | "referral";
+type AdminTab = "overview" | "pending" | "users" | "withdrawals" | "kyc" | "chits" | "settings" | "pocket" | "referral" | "push_test";
 
 const AdminDashboard = () => {
   const { user: authUser, token, logout } = useAuth();
@@ -115,6 +115,50 @@ const AdminDashboard = () => {
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [userDetails, setUserDetails] = useState<Record<string, any>>({});
 
+  // Push Notification Test state
+  const [testPushTargetUserId, setTestPushTargetUserId] = useState<string>("");
+  const [testPushTitle, setTestPushTitle] = useState<string>("🔔 Test from Admin");
+  const [testPushBody, setTestPushBody] = useState<string>("Push notification is working on your device!");
+  const [testPushSending, setTestPushSending] = useState<boolean>(false);
+  const [testPushResult, setTestPushResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const handleSendTestPush = async () => {
+    if (!token) return;
+    setTestPushSending(true);
+    setTestPushResult(null);
+    try {
+      const res = await fetch(`${API_URL}/api/notifications/test-push`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          targetUserId: testPushTargetUserId || undefined,
+          title: testPushTitle,
+          body: testPushBody,
+        }),
+      });
+      const rawText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(rawText);
+      } catch (jsonErr) {
+        throw new Error(res.ok ? "Invalid server response format" : `Server returned status ${res.status}: ${res.statusText}`);
+      }
+
+      if (res.ok && data.success) {
+        setTestPushResult({ success: true, message: "Push dispatched! Check the target device." });
+        toast.success("Push notification sent!");
+      } else {
+        setTestPushResult({ success: false, message: data.message || "Failed to dispatch push notification" });
+        toast.error(data.message || "Push notification failed");
+      }
+    } catch (err: any) {
+      setTestPushResult({ success: false, message: err.message || "Network error" });
+      toast.error(err.message || "Error sending push notification");
+    } finally {
+      setTestPushSending(false);
+    }
+  };
+
   // Navigation items with state for badges (all dynamic from MongoDB)
   const [navItems, setNavItems] = useState<{ label: string; tab: AdminTab; icon: React.ElementType; badge?: number }[]>([
     { label: "Overview", tab: "overview", icon: LayoutDashboard },
@@ -125,6 +169,7 @@ const AdminDashboard = () => {
     { label: "Chit Funds", tab: "chits", icon: TrendingUp, badge: 0 },
     { label: "Pocket Money", tab: "pocket", icon: Wallet },
     { label: "Referral & APK", tab: "referral", icon: Gift },
+    { label: "Push Notifications", tab: "push_test", icon: Bell },
     { label: "Settings", tab: "settings", icon: Settings },
   ]);
 
@@ -1401,6 +1446,85 @@ const AdminDashboard = () => {
               className="w-full"
             >
               <PocketMoneyAdmin token={token} />
+            </motion.div>
+          )}
+
+          {/* PUSH NOTIFICATION TEST */}
+          {activeTab === "push_test" && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="w-full max-w-xl mx-auto"
+            >
+              <div className="card-premium p-6 sm:p-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="h-11 w-11 rounded-2xl bg-primary/10 flex items-center justify-center">
+                    <Bell className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h2 className="font-heading text-xl font-bold text-foreground">Push Notification Test</h2>
+                    <p className="text-xs font-body text-muted-foreground">Send a live push to any user's device</p>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-body font-semibold text-foreground block mb-1.5">Target User <span className="text-muted-foreground font-normal">(optional)</span></label>
+                    <select
+                      className="w-full h-12 text-base font-body rounded-xl border border-border bg-background px-4 focus:outline-none focus:border-primary transition-all"
+                      value={testPushTargetUserId}
+                      onChange={(e) => setTestPushTargetUserId(e.target.value)}
+                    >
+                      <option value="">— Me (Admin) —</option>
+                      {allUsers.map((u: any) => (
+                        <option key={u._id} value={u._id}>{u.username} ({u.email || u.mobileNumber})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-body font-semibold text-foreground block mb-1.5">Notification Title</label>
+                    <input
+                      type="text"
+                      className="w-full h-12 text-base font-body rounded-xl border border-border bg-background px-4 focus:outline-none focus:border-primary transition-all"
+                      value={testPushTitle}
+                      onChange={(e) => setTestPushTitle(e.target.value)}
+                      placeholder="Test Notification"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-body font-semibold text-foreground block mb-1.5">Message Body</label>
+                    <textarea
+                      className="w-full text-base font-body rounded-xl border border-border bg-background px-4 py-3 focus:outline-none focus:border-primary transition-all resize-none"
+                      rows={3}
+                      value={testPushBody}
+                      onChange={(e) => setTestPushBody(e.target.value)}
+                      placeholder="Push notification is working!"
+                    />
+                  </div>
+                  {testPushResult && (
+                    <div className={`rounded-xl px-4 py-3 text-sm font-body font-medium ${testPushResult.success ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                      {testPushResult.success ? '✅ ' : '❌ '}{testPushResult.message}
+                    </div>
+                  )}
+                  <Button
+                    className="w-full h-12 rounded-xl font-body font-semibold text-base flex items-center justify-center gap-2"
+                    onClick={handleSendTestPush}
+                    disabled={testPushSending}
+                  >
+                    <Bell className="h-4 w-4" />
+                    {testPushSending ? "Sending..." : "Send Push Notification"}
+                  </Button>
+                </div>
+                <div className="mt-6 rounded-xl bg-muted/50 border border-border p-4">
+                  <p className="text-xs font-body font-semibold text-foreground mb-1">How it works</p>
+                  <ul className="text-xs font-body text-muted-foreground space-y-1 list-disc list-inside">
+                    <li>Works in Expo Go and standalone APK</li>
+                    <li>Delivered via Expo Push Gateway (FCM-backed)</li>
+                    <li>Appears on device even when app is killed/closed</li>
+                    <li>Device token must be registered (open the app after login)</li>
+                  </ul>
+                </div>
+              </div>
             </motion.div>
           )}
 
