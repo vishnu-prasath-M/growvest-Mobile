@@ -228,6 +228,24 @@ exports.updateInvestmentStatus = async (req, res) => {
           pushData: { screen: 'Investments' },
         });
       }
+    } else if (status === 'rejected' && investment.status !== 'rejected') {
+      const user = await User.findOne({
+        $or: [
+          ...(investment.userEmail ? [{ email: investment.userEmail }] : []),
+          ...(investment.userId ? [{ _id: investment.userId }] : []),
+          ...(investment.mobileNumber ? [{ mobileNumber: investment.mobileNumber }] : [])
+        ]
+      });
+      if (user) {
+        await sendNotification({
+          userId: user._id,
+          title: '❌ Investment Rejected',
+          description: `Your ₹${investment.amount} ${investment.type} plan request was rejected. Please contact support if you need assistance.`,
+          type: 'investment_rejected',
+          metadata: { investmentId: investment._id, amount: investment.amount },
+          pushData: { screen: 'Investments' },
+        });
+      }
     }
 
     res.status(200).json(updatedInvestment);
