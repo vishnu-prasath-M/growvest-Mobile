@@ -264,6 +264,14 @@ exports.withdrawInvestment = async (req, res) => {
       return res.status(400).json({ message: 'Only approved investments can be withdrawn' });
     }
 
+    if (investment.withdrawalStatus === 'pending') {
+      return res.status(400).json({ message: 'A withdrawal request for this investment is already pending admin approval.' });
+    }
+
+    if (investment.withdrawalStatus === 'withdrawn' || investment.status === 'withdrawn') {
+      return res.status(400).json({ message: 'This investment has already been withdrawn.' });
+    }
+
     const now = new Date();
     const startDateObj = investment.startDate ? new Date(investment.startDate) : new Date();
     const benefitEligibilityDate = investment.benefitEligibilityDate
@@ -280,50 +288,75 @@ exports.withdrawInvestment = async (req, res) => {
 
     const payoutAmount = isFullEligible ? (principal + accruedInterest + benefits) : principal;
 
-    investment.status = 'withdrawn';
-    investment.withdrawalStatus = 'withdrawn';
-    investment.eligibilityStatus = 'withdrawn';
-    await investment.save();
+    // Map investment type to allowed Withdrawal.withdrawType enum values
+    const supportedTypes = ['saving', 'fixed', '15_days', '1_month', '3_months', '6_months', '1_year', '2_years'];
+    const rawType = (investment.type || '').toLowerCase().replace(/\s/g, '_');
+    const resolvedWithdrawType = supportedTypes.includes(rawType) ? rawType : 'investment';
 
-    // Create withdrawal request record
+    // STEP 1: Create withdrawal request record FIRST (so admin can see it)
     const Withdrawal = require('../models/Withdrawal');
     const withdrawal = new Withdrawal({
       userId: req.user?._id || investment.userId,
       amount: payoutAmount,
-      upiId: upiId || 'Registered UPI',
-      userName: investment.userName,
-      userEmail: investment.userEmail,
+      upiId: upiId || investment.upiId || 'Registered UPI',
+      userName: investment.userName || 'User',
+      userEmail: investment.userEmail || req.user?.email || '',
       date: new Date().toLocaleDateString('en-IN'),
       status: 'pending',
-      withdrawType: investment.type || 'saving'
+      withdrawType: resolvedWithdrawType,
+      investmentId: investment._id,
+      isEarlyWithdrawal: !isFullEligible,
     });
     await withdrawal.save();
 
-    // Create transaction record
+    // STEP 2: Create pending transaction record
     const transaction = new Transaction({
       userId: req.user?._id || investment.userId,
       userEmail: investment.userEmail,
       type: 'withdrawal',
       amount: payoutAmount,
-      status: 'pending',
-      referenceId: investment._id,
-      referenceType: 'Investment',
+      status: 'requested',
+      referenceId: withdrawal._id,
+      referenceType: 'Withdrawal',
       description: isFullEligible
-        ? `Full benefit withdrawal for ${investment.ref || investment.type} - ₹${payoutAmount}`
-        : `Early principal withdrawal for ${investment.ref || investment.type} - ₹${payoutAmount}`
+        ? `Full benefit withdrawal requested for ${investment.type} plan - ₹${payoutAmount}`
+        : `Early principal withdrawal requested for ${investment.type} plan - ₹${payoutAmount}`,
     });
     await transaction.save();
+
+    // STEP 3: Only after records are saved, mark investment as withdrawal pending
+    // Investment stays 'approved' — only withdrawalStatus changes to 'pending'
+    // It becomes 'withdrawn' only when admin marks the Withdrawal as paid
+    await Investment.findByIdAndUpdate(id, {
+      withdrawalStatus: 'pending',
+      withdrawalRequestId: withdrawal._id,
+    });
+
+    // STEP 4: Notify admins about the withdrawal request
+    try {
+      const { notifyAdmins } = require('../services/notificationHelper');
+      await notifyAdmins({
+        title: '💸 New Investment Withdrawal Request',
+        description: `${investment.userName || 'User'} requested a ${isFullEligible ? 'full benefit' : 'early principal'} withdrawal of ₹${payoutAmount.toLocaleString('en-IN')} from ${investment.type} plan.`,
+        type: 'general',
+        metadata: { withdrawalId: withdrawal._id, investmentId: investment._id },
+      });
+    } catch (notifErr) {
+      console.warn('[withdrawInvestment] Admin notification failed (non-fatal):', notifErr.message);
+    }
 
     res.status(200).json({
       success: true,
       message: isFullEligible
-        ? `Full benefit payout of ₹${payoutAmount.toLocaleString('en-IN')} requested successfully.`
-        : `Early principal payout of ₹${payoutAmount.toLocaleString('en-IN')} requested successfully. Interest & benefits remained locked.`,
-      investment,
-      payoutAmount
+        ? `Full benefit payout of ₹${payoutAmount.toLocaleString('en-IN')} requested. Pending admin approval.`
+        : `Early principal payout of ₹${payoutAmount.toLocaleString('en-IN')} requested. Pending admin approval. Interest & benefits remain locked.`,
+      withdrawal,
+      payoutAmount,
+      isEarlyWithdrawal: !isFullEligible,
     });
   } catch (error) {
     console.error('Error withdrawing investment:', error);
     res.status(500).json({ message: 'Error withdrawing investment', error: error.message });
   }
 };
+

@@ -181,7 +181,11 @@ const WithdrawScreen = ({ navigation }) => {
     try {
       if (withdrawType && withdrawType !== 'saving' && withdrawType !== 'fixed') {
         await investmentService.withdrawInvestment(withdrawType, upiId);
-        Alert.alert('Withdrawal Successful 🎉', 'Your matured investment payout has been processed.');
+        Alert.alert(
+          'Withdrawal Requested ⏳',
+          'Your withdrawal request has been submitted and is pending admin approval. You will be notified once it is processed.',
+          [{ text: 'OK' }]
+        );
       } else {
         await withdrawalService.createWithdrawal({
           amount: parseFloat(amount),
@@ -472,6 +476,7 @@ const WithdrawScreen = ({ navigation }) => {
 
               // ── SAVINGS / FIXED CARD ──────────────────────────────────────
               const isWithdrawn = inv.status === 'withdrawn' || inv.withdrawalStatus === 'withdrawn';
+              const isPendingWithdrawal = !isWithdrawn && inv.withdrawalStatus === 'pending';
               const isFullEligible = inv.isEligibleForFullBenefits === true;
               const principalAmt = inv.earlyPrincipalOnlyAmount || inv.amount || 0;
               const fullAmt = inv.fullBenefitAmount || inv.availableToWithdraw || principalAmt;
@@ -498,18 +503,19 @@ const WithdrawScreen = ({ navigation }) => {
                     <View style={[
                       styles.statusBadge,
                       isWithdrawn ? { backgroundColor: themeColors.surface2 } :
+                      isPendingWithdrawal ? { backgroundColor: '#FEF3C7' } :
                       isFullEligible ? styles.statusBadgeMatured : styles.statusBadgeLocked
                     ]}>
                       <MaterialCommunityIcons 
-                        name={isWithdrawn ? 'check-all' : isFullEligible ? 'check-circle' : 'alert-circle'} 
+                        name={isWithdrawn ? 'check-all' : isPendingWithdrawal ? 'clock-outline' : isFullEligible ? 'check-circle' : 'alert-circle'} 
                         size={14} 
-                        color={isWithdrawn ? themeColors.textTertiary : isFullEligible ? '#065F46' : '#B45309'} 
+                        color={isWithdrawn ? themeColors.textTertiary : isPendingWithdrawal ? '#92400E' : isFullEligible ? '#065F46' : '#B45309'} 
                       />
                       <Text style={[
                         styles.statusBadgeText, 
-                        { color: isWithdrawn ? themeColors.textTertiary : isFullEligible ? '#065F46' : '#B45309' }
+                        { color: isWithdrawn ? themeColors.textTertiary : isPendingWithdrawal ? '#92400E' : isFullEligible ? '#065F46' : '#B45309' }
                       ]}>
-                        {isWithdrawn ? 'WITHDRAWN' : isFullEligible ? 'FULL BENEFITS ELIGIBLE' : 'EARLY (PRINCIPAL ONLY)'}
+                        {isWithdrawn ? 'WITHDRAWN' : isPendingWithdrawal ? 'REQUESTED – PENDING APPROVAL' : isFullEligible ? 'FULL BENEFITS ELIGIBLE' : 'EARLY (PRINCIPAL ONLY)'}
                       </Text>
                     </View>
                   </View>
@@ -533,7 +539,16 @@ const WithdrawScreen = ({ navigation }) => {
                     {isWithdrawn ? (
                       <View style={{ backgroundColor: themeColors.surface2, padding: 10, borderRadius: 10, alignItems: 'center' }}>
                         <Text style={{ fontSize: 12, fontWeight: '600', color: themeColors.textSecondary }}>
-                          ✓ Payout of {formatCurrency(withdrawableAmt)} has been processed.
+                          ✓ Payout of {formatCurrency(withdrawableAmt)} has been processed by admin.
+                        </Text>
+                      </View>
+                    ) : isPendingWithdrawal ? (
+                      <View style={{ backgroundColor: '#FEF3C7', padding: 12, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: '#FDE68A' }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#92400E', textAlign: 'center' }}>
+                          ⏳ Withdrawal Requested
+                        </Text>
+                        <Text style={{ fontSize: 11, color: '#92400E', marginTop: 4, textAlign: 'center' }}>
+                          Your request of {formatCurrency(withdrawableAmt)} is pending admin approval. You will be notified once processed.
                         </Text>
                       </View>
                     ) : (
@@ -562,7 +577,7 @@ const WithdrawScreen = ({ navigation }) => {
                       </TouchableOpacity>
                     )}
 
-                    {!isFullEligible && !isWithdrawn && (
+                    {!isFullEligible && !isWithdrawn && !isPendingWithdrawal && (
                       <Text style={{ fontSize: 11, color: '#B45309', marginTop: 6, textAlign: 'center', fontStyle: 'italic' }}>
                         🔒 Interest & extra benefits are locked until 5th-week eligibility date ({benefitDateStr}).
                       </Text>

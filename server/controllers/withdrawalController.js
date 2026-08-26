@@ -277,6 +277,21 @@ exports.updateWithdrawalStatus = async (req, res) => {
         { new: true }
       );
 
+      // If this withdrawal is linked to an investment, mark that investment as withdrawn
+      if (updatedWithdrawal.investmentId) {
+        try {
+          const Investment = require('../models/Investment');
+          await Investment.findByIdAndUpdate(updatedWithdrawal.investmentId, {
+            status: 'withdrawn',
+            withdrawalStatus: 'withdrawn',
+            eligibilityStatus: 'withdrawn',
+          });
+          console.log(`[withdrawalController] Investment ${updatedWithdrawal.investmentId} marked as withdrawn.`);
+        } catch (invErr) {
+          console.warn('[withdrawalController] Could not mark investment as withdrawn (non-fatal):', invErr.message);
+        }
+      }
+
       // Send unified notification (DB + Push) using the same implementation
       try {
         const userToNotify = await User.findOne({
