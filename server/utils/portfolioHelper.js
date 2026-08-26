@@ -34,10 +34,21 @@ async function getUserPortfolioSummary(userIdInput) {
   const user = await User.findById(userIdInput).select('-password');
   if (!user) return null;
 
-  const userId = user._id;
+  const nowDate = new Date();
+  const nowMidnight = new Date(nowDate);
+  nowMidnight.setHours(0, 0, 0, 0);
+
+  const userOrConditions = [{ userId: user._id }];
+  if (user._id) userOrConditions.push({ userId: user._id.toString() });
+  if (user.email && typeof user.email === 'string' && user.email.trim() !== '' && !user.email.includes('no-email@') && user.email !== 'undefined') {
+    userOrConditions.push({ userEmail: new RegExp(`^${user.email.trim()}$`, 'i') });
+  }
+  if (user.mobileNumber && typeof user.mobileNumber === 'string' && user.mobileNumber.trim() !== '' && user.mobileNumber.trim() !== '0000000000' && user.mobileNumber.trim() !== '1234567890' && user.mobileNumber !== 'undefined') {
+    userOrConditions.push({ mobileNumber: user.mobileNumber.trim() });
+  }
 
   // ─── 1. SAVINGS / FIXED DURATION INVESTMENTS ────────────────────────────────
-  const investments = await Investment.find({ userId });
+  const investments = await Investment.find({ $or: userOrConditions });
 
   let totalDurationInvested = 0;
   let totalDurationLocked = 0;

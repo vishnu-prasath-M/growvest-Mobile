@@ -140,16 +140,23 @@ exports.getUserDetailByEmail = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    const invQuery = { userId: user._id };
-    const investments = await Investment.find(invQuery);
+    const userOrConditions = [{ userId: user._id }];
+    if (user._id) userOrConditions.push({ userId: user._id.toString() });
+    if (user.email && typeof user.email === 'string' && user.email.trim() !== '' && !user.email.includes('no-email@') && user.email !== 'undefined') {
+      userOrConditions.push({ userEmail: new RegExp(`^${user.email.trim()}$`, 'i') });
+    }
+    if (user.mobileNumber && typeof user.mobileNumber === 'string' && user.mobileNumber.trim() !== '' && user.mobileNumber.trim() !== '0000000000' && user.mobileNumber.trim() !== '1234567890' && user.mobileNumber !== 'undefined') {
+      userOrConditions.push({ mobileNumber: user.mobileNumber.trim() });
+    }
+
+    const investments = await Investment.find({ $or: userOrConditions });
     
     // Sync each before detail view
     for (const inv of investments) {
       await syncInvestmentInterest(inv);
     }
 
-    const wdQuery = { userId: user._id, status: { $in: ['paid', 'approved'] } };
-    const withdrawals = await Withdrawal.find(wdQuery);
+    const withdrawals = await Withdrawal.find({ $or: userOrConditions, status: { $in: ['paid', 'approved'] } });
 
     const KYC = require('../models/KYC');
     const kyc = await KYC.findOne({ userId: user._id });
