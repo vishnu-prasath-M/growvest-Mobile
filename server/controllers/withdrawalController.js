@@ -106,7 +106,11 @@ exports.createWithdrawal = async (req, res) => {
 
 exports.getWithdrawals = async (req, res) => {
   try {
-    const withdrawals = await Withdrawal.find().sort({ createdAt: -1 });
+    let query = { userId: req.user?._id };
+    if (req.user && req.user.role === 'admin' && req.query.all === 'true') {
+      query = {};
+    }
+    const withdrawals = await Withdrawal.find(query).sort({ createdAt: -1 });
     res.status(200).json(withdrawals);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching withdrawals', error: error.message });

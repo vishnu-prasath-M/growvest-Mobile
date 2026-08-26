@@ -140,14 +140,7 @@ exports.getUserDetailByEmail = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-
-    const investOrConds = [];
-    if (user.email) investOrConds.push({ userEmail: user.email });
-    if (user.mobileNumber) investOrConds.push({ mobileNumber: user.mobileNumber });
-    const invQuery = investOrConds.length > 0
-      ? { $or: investOrConds, status: 'approved' }
-      : { status: 'approved', userEmail: '__no_match__' };
-
+    const invQuery = { userId: user._id };
     const investments = await Investment.find(invQuery);
     
     // Sync each before detail view
@@ -155,13 +148,7 @@ exports.getUserDetailByEmail = async (req, res) => {
       await syncInvestmentInterest(inv);
     }
 
-    const wdOrConditions = [];
-    if (user.email) wdOrConditions.push({ userEmail: user.email });
-    if (user.mobileNumber) wdOrConditions.push({ mobileNumber: user.mobileNumber });
-    const wdQuery = wdOrConditions.length > 0
-      ? { $or: wdOrConditions, status: { $in: ['paid', 'approved'] } }
-      : { status: { $in: ['paid', 'approved'] }, userEmail: '__no_match__' };
-
+    const wdQuery = { userId: user._id, status: { $in: ['paid', 'approved'] } };
     const withdrawals = await Withdrawal.find(wdQuery);
 
     const KYC = require('../models/KYC');
@@ -321,28 +308,14 @@ exports.getAllUsers = async (req, res) => {
     const enrichedUsers = await Promise.all(users.map(async (user) => {
       if (user.role === 'admin') return user.toObject();
 
-      const allUserInvOrConds = [];
-      if (user.email) allUserInvOrConds.push({ userEmail: user.email });
-      if (user.mobileNumber) allUserInvOrConds.push({ mobileNumber: user.mobileNumber });
-      const allUserInvQuery = allUserInvOrConds.length > 0
-        ? { $or: allUserInvOrConds, status: 'approved' }
-        : { status: 'approved', userEmail: '__no_match__' };
-
-      const investments = await Investment.find(allUserInvQuery);
+      const investments = await Investment.find({ userId: user._id });
       
       let totalInterest = 0;
       for (const inv of investments) {
         totalInterest += await syncInvestmentInterest(inv);
       }
       
-      const allUserWdOrConditions = [];
-      if (user.email) allUserWdOrConditions.push({ userEmail: user.email });
-      if (user.mobileNumber) allUserWdOrConditions.push({ mobileNumber: user.mobileNumber });
-      const allUserWdQuery = allUserWdOrConditions.length > 0
-        ? { $or: allUserWdOrConditions, status: { $in: ['paid', 'approved'] } }
-        : { status: { $in: ['paid', 'approved'] }, userEmail: '__no_match__' };
-
-      const withdrawals = await Withdrawal.find(allUserWdQuery);
+      const withdrawals = await Withdrawal.find({ userId: user._id, status: { $in: ['paid', 'approved'] } });
       
       const PocketMoneyPayout = require('../models/PocketMoneyPayout');
       const pocketPayouts = await PocketMoneyPayout.find({ userId: user._id });

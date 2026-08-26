@@ -26,13 +26,10 @@ exports.getDashboard = async (req, res) => {
     const pocketInvested = pocketMonies.reduce((sum, pm) => sum + (pm.investedAmount || 0), 0);
     const pocketRemaining = pocketMonies.reduce((sum, pm) => sum + (pm.remainingAmount || 0), 0);
 
-    const userOrConditions = [{ userId: req.user.id }];
-    if (req.user.email) userOrConditions.push({ userEmail: new RegExp(`^${String(req.user.email).trim()}$`, 'i') });
-
-    const transactions = await Transaction.find({ $or: userOrConditions })
+    const transactions = await Transaction.find({ userId: req.user.id })
       .sort({ createdAt: -1 })
       .limit(10);
-    const withdrawals = await Withdrawal.find({ $or: userOrConditions }).sort({ createdAt: -1 });
+    const withdrawals = await Withdrawal.find({ userId: req.user.id }).sort({ createdAt: -1 });
 
     const pendingInvestments = summary.investments.filter(inv => inv.status === 'pending').length;
     const pendingWithdrawals = withdrawals.filter(w => w.status === 'pending').length;

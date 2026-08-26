@@ -36,22 +36,8 @@ async function getUserPortfolioSummary(userIdInput) {
 
   const userId = user._id;
 
-  // Build OR conditions to match user across all investment records
-  const userOrConditions = [{ userId }];
-  if (user.email && String(user.email).trim() !== '' && user.email !== 'undefined') {
-    userOrConditions.push({ userEmail: new RegExp(`^${String(user.email).trim()}$`, 'i') });
-  }
-  if (user.mobileNumber && String(user.mobileNumber).trim() !== '' && user.mobileNumber !== 'undefined') {
-    userOrConditions.push({ mobileNumber: String(user.mobileNumber).trim() });
-  }
-
-  const nowDate = new Date();
-  // Normalise to midnight for consistent elapsed-day calculation
-  const nowMidnight = new Date(nowDate);
-  nowMidnight.setHours(0, 0, 0, 0);
-
   // ─── 1. SAVINGS / FIXED DURATION INVESTMENTS ────────────────────────────────
-  const investments = await Investment.find({ $or: userOrConditions });
+  const investments = await Investment.find({ userId });
 
   let totalDurationInvested = 0;
   let totalDurationLocked = 0;
