@@ -1,124 +1,229 @@
-const cron = require('node-cron');
+/**
+ * CronService — All daily push notification functions.
+ * Called exclusively by cronRoutes.js (GitHub Actions triggers) and
+ * index.js for server-side scheduling.
+ * 
+ * Scheduling is handled in index.js with { timezone: "Asia/Kolkata" } to ensure
+ * correct IST timing on the UTC Render server.
+ * GitHub Actions provides an additional reliable trigger for each notification type.
+ */
+
 const PocketMoney = require('../models/PocketMoney');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 const pushNotificationService = require('./pushNotificationService');
 
-// Engagement Notification Messages Pool
-const ENGAGEMENT_MESSAGES = [
+// ─── Morning Financial Tips (rotated daily) ───────────────────────────────────
+const MORNING_TIPS = [
   {
-    title: '📈 Don\'t Let Your Savings Sleep!',
-    body: 'Consistent daily & weekly savings build compounding wealth. Log in to check your active returns today!',
+    title: '🌱 Morning Wealth Booster',
+    body: 'Consistent daily savings grow into wealth. Check your active plans in Growvest today!',
   },
   {
-    title: '💰 Daily Pocket Money Reminder!',
-    body: 'Start a 10-day Pocket Money plan today and enjoy guaranteed daily payouts!',
+    title: '📈 The Magic of Compounding',
+    body: 'Investing even a small amount regularly creates high compound returns. Explore Growvest investment plans!',
   },
   {
-    title: '🏆 Exclusive Chit Fund Slots Opening!',
+    title: '💡 Financial Freedom Goal',
+    body: 'Build your emergency fund and wealth pot effortlessly with low-risk chit savings.',
+  },
+  {
+    title: '☀️ Start Your Day Financially Smart',
+    body: 'Good morning! Did you know Growvest chit savings can earn you up to 24% annual returns?',
+  },
+  {
+    title: '🎯 Your Financial Goals Matter',
+    body: 'Every rupee saved today is a step towards your dream. Check your portfolio growth in Growvest!',
+  },
+  {
+    title: '💎 Invest Small, Earn Big',
+    body: 'Start with as little as ₹500 per week in chit funds. Join thousands of smart investors on Growvest!',
+  },
+  {
+    title: '🚀 Your Savings Are Growing!',
+    body: 'Log in now to see how much your investments have grown. Growvest works even while you sleep!',
+  },
+];
+
+// ─── Evening Engagement Messages (rotated daily) ──────────────────────────────
+const EVENING_PROMOS = [
+  {
+    title: '🎁 Refer Friends & Earn Bonus Cash!',
+    body: 'Share your Growvest referral link with family & friends to earn instant coin rewards!',
+  },
+  {
+    title: '🏆 Auction Winnings & Chit Draws!',
+    body: 'Keep your monthly chit dues current so you can participate in upcoming chit auction draws!',
+  },
+  {
+    title: '✨ Smart Savings Reminder',
+    body: 'End your day on a prosperous note by reviewing your growing financial portfolio on Growvest.',
+  },
+  {
+    title: '💰 Don\'t Let Your Savings Sleep!',
+    body: 'Consistent weekly savings build compounding wealth. Log in to check your active returns today!',
+  },
+  {
+    title: '🔥 Exclusive Chit Fund Slots!',
     body: 'High-yield chit fund slots are filling fast. Secure your slot before it closes!',
   },
   {
-    title: '🎁 Claim Your Daily Growth & Coins!',
-    body: 'Log in today to check your balance, claim referral coin rewards, and explore new high-yield plans!',
+    title: '🎉 Claim Your Rewards Tonight!',
+    body: 'Log in now to check your balance, claim referral coin rewards, and explore new high-yield plans!',
   },
   {
-    title: '🔥 24% Annual Returns Available!',
+    title: '📊 24% Annual Returns Available!',
     body: 'Explore our 1 Year Fixed Savings plan with up to 24% annual yield. Start investing smarter today!',
   },
 ];
 
-// ─── 1. Send Daily Pocket Money Payout Notifications ─────────────────────────
+// ─── Helper: Rotate message by day of year ────────────────────────────────────
+const getDayOfYear = () => {
+  const now = new Date();
+  return Math.floor((now - new Date(now.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
+};
+
+// ─── Helper: Send push + DB notification to a user ───────────────────────────
+const sendUserNotification = async (userId, title, body, type, data = {}) => {
+  try {
+    await Notification.create({
+      userId,
+      title,
+      description: body,
+      type,
+      read: false,
+    });
+  } catch (dbErr) {
+    console.warn(`[CronService] DB notification save failed for user ${userId}:`, dbErr.message);
+  }
+
+  try {
+    await pushNotificationService.sendToUser(userId, {
+      title,
+      body,
+      data: { type, ...data },
+    });
+  } catch (pushErr) {
+    console.warn(`[CronService] Push notification failed for user ${userId}:`, pushErr.message);
+  }
+};
+
+// ─── 1. Pocket Money Payout Notification (8:30 AM IST) ───────────────────────
 const sendDailyPocketMoneyNotifications = async () => {
   console.log('[CronService] Running Daily Pocket Money Payout Notification check...');
   try {
-    const activePlans = await PocketMoney.find({ status: 'active' }).populate('userId');
+    const now = new Date();
+    const activePlans = await PocketMoney.find({
+      status: 'active',
+      nextPayoutDate: { $lte: now },
+    }).populate('userId');
 
+    let count = 0;
     for (const plan of activePlans) {
-      if (!plan.userId) continue;
+      if (!plan.userId?._id) continue;
 
-      const payoutAmount = (plan.investedAmount || 0) / 10;
-      const title = '💰 Daily Pocket Money Ready!';
-      const body = `Your daily payout of ₹${payoutAmount.toLocaleString('en-IN')} for ${plan.frequency?.toUpperCase()} plan is ready! Log in to claim.`;
+      const payoutAmount = plan.payoutAmount || Math.round((plan.investedAmount || 0) / 10);
+      const freqLabel = plan.frequency === 'daily' ? 'daily'
+        : plan.frequency === 'every_2_days' ? 'every 2 days' : 'weekly';
 
-      // 1. Create In-App Notification record
-      await Notification.create({
-        userId: plan.userId._id,
-        title,
-        description: body,
-        type: 'pocket_money_payout',
-        read: false,
-      });
+      const title = '☀️ Daily Pocket Money Ready to Claim!';
+      const body = `Good morning! Your ${freqLabel} pocket money payout of ₹${payoutAmount.toLocaleString('en-IN')} is ready. Log in to claim it in the Pocket Money section.`;
 
-      // 2. Send Native Push Notification
-      await pushNotificationService.sendToUser(plan.userId._id, {
+      await sendUserNotification(
+        plan.userId._id,
         title,
         body,
-        data: { screen: 'PocketMoney' },
-      });
+        'pocket_money_payout',
+        { screen: 'PocketMoney', pocketMoneyId: plan._id.toString() }
+      );
+      count++;
     }
 
-    console.log(`[CronService] Processed Pocket Money notifications for ${activePlans.length} active plans.`);
+    console.log(`[CronService] Pocket Money notifications sent to ${count} active plan holders.`);
+    return { sent: count };
   } catch (error) {
-    console.error('[CronService] Error sending daily pocket money notifications:', error);
+    console.error('[CronService] Error sending pocket money notifications:', error);
+    throw error;
   }
 };
 
-// ─── 2. Send Daily Engaging Notifications to All Users ─────────────────────────
-const sendDailyEngagingNotifications = async () => {
-  console.log('[CronService] Running Daily Engaging Notification broadcast...');
+// ─── 2. Morning Financial Growth Tip (9:15 AM IST) ────────────────────────────
+const sendMorningFinancialTip = async () => {
+  console.log('[CronService] Running Morning Financial Tip Broadcast...');
   try {
-    const users = await User.find({ fcmTokens: { $exists: true, $not: { $size: 0 } } });
+    const users = await User.find({ role: 'user' }).select('_id');
     if (!users.length) {
-      console.log('[CronService] No users with registered push tokens found.');
-      return;
+      console.log('[CronService] No users found for morning tip.');
+      return { sent: 0 };
     }
 
-    // Pick message based on day of year
-    const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
-    const selectedMsg = ENGAGEMENT_MESSAGES[dayOfYear % ENGAGEMENT_MESSAGES.length];
+    const dayIdx = getDayOfYear();
+    const tip = MORNING_TIPS[dayIdx % MORNING_TIPS.length];
 
-    console.log(`[CronService] Broadcasting message to ${users.length} users: "${selectedMsg.title}"`);
+    console.log(`[CronService] Broadcasting morning tip to ${users.length} users: "${tip.title}"`);
 
+    let count = 0;
     for (const user of users) {
-      // Create In-App Record
-      await Notification.create({
-        userId: user._id,
-        title: selectedMsg.title,
-        description: selectedMsg.body,
-        type: 'system',
-        read: false,
-      });
-
-      // Send Native Push Notification
-      await pushNotificationService.sendToUser(user._id, {
-        title: selectedMsg.title,
-        body: selectedMsg.body,
-        data: { screen: 'Home' },
-      });
+      await sendUserNotification(
+        user._id,
+        tip.title,
+        tip.body,
+        'general',
+        { screen: 'Home' }
+      );
+      count++;
     }
+
+    console.log(`[CronService] Morning tip dispatched to ${count} users.`);
+    return { sent: count };
   } catch (error) {
-    console.error('[CronService] Error broadcasting daily engaging notifications:', error);
+    console.error('[CronService] Error sending morning tip:', error);
+    throw error;
   }
 };
 
-// ─── Initialize Scheduled Cron Jobs ──────────────────────────────────────────
-const initCronJobs = () => {
-  console.log('[CronService] Initializing scheduled background cron jobs...');
+// ─── 3. Evening Engagement Notification (6:00 PM IST) ────────────────────────
+const sendEveningEngagementNotification = async () => {
+  console.log('[CronService] Running Evening Engagement Notification Broadcast...');
+  try {
+    const users = await User.find({ role: 'user' }).select('_id');
+    if (!users.length) {
+      console.log('[CronService] No users found for evening engagement.');
+      return { sent: 0 };
+    }
 
-  // Daily at 9:00 AM IST: Pocket Money Payout Notifications
-  cron.schedule('0 9 * * *', () => {
-    sendDailyPocketMoneyNotifications();
-  });
+    const dayIdx = getDayOfYear();
+    const promo = EVENING_PROMOS[dayIdx % EVENING_PROMOS.length];
 
-  // Daily at 6:00 PM IST: Engaging Investment Reminder
-  cron.schedule('0 18 * * *', () => {
-    sendDailyEngagingNotifications();
-  });
+    console.log(`[CronService] Broadcasting evening promo to ${users.length} users: "${promo.title}"`);
+
+    let count = 0;
+    for (const user of users) {
+      await sendUserNotification(
+        user._id,
+        promo.title,
+        promo.body,
+        'general',
+        { screen: 'Home' }
+      );
+      count++;
+    }
+
+    console.log(`[CronService] Evening engagement dispatched to ${count} users.`);
+    return { sent: count };
+  } catch (error) {
+    console.error('[CronService] Error sending evening engagement notification:', error);
+    throw error;
+  }
 };
+
+// ─── Legacy alias (for backward-compat with admin manual trigger endpoint) ────
+const sendDailyEngagingNotifications = sendEveningEngagementNotification;
 
 module.exports = {
-  initCronJobs,
   sendDailyPocketMoneyNotifications,
+  sendMorningFinancialTip,
+  sendEveningEngagementNotification,
+  // Legacy alias
   sendDailyEngagingNotifications,
 };
