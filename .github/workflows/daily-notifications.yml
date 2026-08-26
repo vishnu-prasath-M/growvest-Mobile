@@ -2,29 +2,76 @@ name: Daily Push Notifications & Cron Trigger
 
 on:
   schedule:
-    # 3:30 AM UTC = 9:00 AM IST (Daily Pocket Money Payout Notification)
-    - cron: '30 3 * * *'
-    # 12:30 PM UTC = 6:00 PM IST (Daily Engaging Login Reminder)
+    # === MORNING POCKET MONEY CHECK: 3:00 AM UTC = 8:30 AM IST ===
+    - cron: '0 3 * * *'
+    # === MORNING FINANCIAL TIP: 3:45 AM UTC = 9:15 AM IST ===
+    - cron: '45 3 * * *'
+    # === EVENING ENGAGEMENT: 12:30 PM UTC = 6:00 PM IST ===
     - cron: '30 12 * * *'
   workflow_dispatch:
+    inputs:
+      type:
+        description: 'Notification type to trigger (pocket_money | morning_tip | evening | all)'
+        required: false
+        default: 'all'
 
 jobs:
-  trigger-daily-notifications:
+  trigger-pocket-money:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 3 * * *'
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Growvest Backend Daily Notification Endpoint
+      - name: Trigger Pocket Money Notification (8:30 AM IST)
         run: |
-          echo "Sending Daily Notification Trigger to Growvest Production Backend..."
-          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "https://growvest-mobile.onrender.com/api/cron/daily-notifications" \
+          echo "==> [8:30 AM IST] Sending Pocket Money Payout Notifications..."
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST \
+            "https://growvest-mobile.onrender.com/api/cron/daily-notifications?type=pocket_money" \
             -H "Content-Type: application/json" \
             -H "x-cron-secret: growvest-daily-secret-2026")
-          
-          echo "Server Response:"
-          echo "$RESPONSE"
-          
+          echo "Server Response: $RESPONSE"
           HTTP_STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS" | cut -d':' -f2)
           if [ "$HTTP_STATUS" -eq 200 ]; then
-            echo "✅ Daily Push Notifications successfully dispatched!"
+            echo "✅ Pocket Money notifications dispatched!"
           else
-            echo "⚠️ Unexpected response status: $HTTP_STATUS"
+            echo "⚠️ Unexpected response: $HTTP_STATUS"
+            exit 1
+          fi
+
+  trigger-morning-tip:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '45 3 * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Morning Financial Tip (9:15 AM IST)
+        run: |
+          echo "==> [9:15 AM IST] Sending Morning Financial Growth Tip..."
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST \
+            "https://growvest-mobile.onrender.com/api/cron/daily-notifications?type=morning_tip" \
+            -H "Content-Type: application/json" \
+            -H "x-cron-secret: growvest-daily-secret-2026")
+          echo "Server Response: $RESPONSE"
+          HTTP_STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS" | cut -d':' -f2)
+          if [ "$HTTP_STATUS" -eq 200 ]; then
+            echo "✅ Morning tip dispatched!"
+          else
+            echo "⚠️ Unexpected response: $HTTP_STATUS"
+            exit 1
+          fi
+
+  trigger-evening-engagement:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 12 * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Evening Engagement Notification (6:00 PM IST)
+        run: |
+          echo "==> [6:00 PM IST] Sending Evening Engagement Notification..."
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST \
+            "https://growvest-mobile.onrender.com/api/cron/daily-notifications?type=evening" \
+            -H "Content-Type: application/json" \
+            -H "x-cron-secret: growvest-daily-secret-2026")
+          echo "Server Response: $RESPONSE"
+          HTTP_STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS" | cut -d':' -f2)
+          if [ "$HTTP_STATUS" -eq 200 ]; then
+            echo "✅ Evening engagement notification dispatched!"
+          else
+            echo "⚠️ Unexpected response: $HTTP_STATUS"
+            exit 1
           fi

@@ -29,52 +29,10 @@ cron.schedule("0 0 * * *", async () => {
   }
 }, { timezone: "Asia/Kolkata" });
 
-// Daily Pocket Money Payout Cron (admin-controlled) — kept commented out on purpose.
-// Payouts are released ONLY when admin approves via /api/pocket-money/admin/release/:id
-const { runPocketMoneyPayouts } = require('./controllers/pocketMoneyController');
-
-// 🔔 DAILY POCKET MONEY REMINDER — runs every morning at 8:30 AM IST
-// Sends push notification to all users with a pocket money payout due today.
-cron.schedule("30 8 * * *", async () => {
-  console.log("[PocketMoneyReminder] Running daily pocket money notification cron (8:30 AM IST)...");
-  try {
-    const PocketMoney = require('./models/PocketMoney');
-    const { sendNotification } = require('./services/notificationHelper');
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-
-    // Find active plans whose nextPayoutDate is today or overdue
-    const eligiblePlans = await PocketMoney.find({
-      status: 'active',
-      nextPayoutDate: { $lte: new Date() },
-    });
-
-    let notifCount = 0;
-    for (const plan of eligiblePlans) {
-      try {
-        const freqLabel = plan.frequency === 'daily' ? 'daily'
-          : plan.frequency === 'every_2_days' ? 'every 2 days' : 'weekly';
-        const remaining = plan.remainingAmount || 0;
-        const payoutAmt = plan.payoutAmount || 0;
-
-        await sendNotification({
-          userId: plan.userId,
-          title: '☀️ Daily Pocket Money Ready to Claim!',
-          description: `Good morning! Your ${freqLabel} pocket money payout of ₹${payoutAmt} is ready. Request your payout now in the Pocket Money section.`,
-          type: 'pocket_money_payout',
-          metadata: { pocketMoneyId: plan._id, amount: payoutAmt },
-          pushData: { screen: 'PocketMoney' },
-        });
-        notifCount++;
-      } catch (err) {
-        console.error(`[PocketMoneyReminder] Failed to notify userId ${plan.userId}:`, err.message);
-      }
-    }
-    console.log(`[PocketMoneyReminder] Sent ${notifCount} pocket money reminder notifications.`);
-  } catch (error) {
-    console.error("[PocketMoneyReminder] Cron error:", error);
-  }
-}, { timezone: "Asia/Kolkata" });
+// 📢 Daily notifications (pocket money payout, morning tip, evening engagement)
+// are handled exclusively by GitHub Actions (.github/workflows/daily-notifications.yml)
+// which calls POST /api/cron/daily-notifications?type=<pocket_money|morning_tip|evening>
+// This avoids duplicate notifications from server-side crons on the UTC Render server.
 
 
 // Due Reminder & Penalty Cron Job (runs daily at 8:45 AM IST)
@@ -237,79 +195,8 @@ cron.schedule("45 8 * * *", async () => {
   }
 }, { timezone: "Asia/Kolkata" });
 
-// 🌅 Morning Financial Tip & Growth Push (Runs daily at 9:15 AM IST)
-const MORNING_TIPS = [
-  {
-    title: '🌱 Morning Wealth Booster',
-    body: 'Consistent daily savings grow into wealth. Check your active plans in Growvest today!',
-    type: 'general'
-  },
-  {
-    title: '📈 The Magic of Compounding',
-    body: 'Investing even a small amount regularly creates high compound returns. Explore Growvest investment plans!',
-    type: 'general'
-  },
-  {
-    title: '💡 Financial Freedom Goal',
-    body: 'Build your emergency fund and wealth pot effortlessly with low-risk chit savings.',
-    type: 'general'
-  }
-];
-
-cron.schedule("15 9 * * *", async () => {
-  console.log("[Cron] Running Morning Financial Tip Push Broadcast (9:15 AM IST)...");
-  try {
-    const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
-    const msg = MORNING_TIPS[dayOfYear % MORNING_TIPS.length];
-
-    const { notifyAllUsers } = require('./services/notificationHelper');
-    await notifyAllUsers({
-      title: msg.title,
-      description: msg.body,
-      type: msg.type,
-      pushData: { screen: 'Home' }
-    });
-  } catch (err) {
-    console.error("[Cron] Morning push error:", err);
-  }
-}, { timezone: "Asia/Kolkata" });
-
-// 🌇 Evening Referral & Rewards Engagement Push (Runs daily at 6:00 PM IST)
-const EVENING_PROMOS = [
-  {
-    title: '🎁 Refer Friends & Earn Bonus Cash!',
-    body: 'Share your Growvest referral link with family & friends to earn instant cash rewards!',
-    type: 'general'
-  },
-  {
-    title: '🏆 Auction Winnings & Chit Draws',
-    body: 'Keep your monthly chit dues current so you can participate in upcoming chit auction draws!',
-    type: 'due_reminder'
-  },
-  {
-    title: '✨ Smart Savings Reminder',
-    body: 'End your day on a prosperous note by reviewing your growing financial portfolio on Growvest.',
-    type: 'general'
-  }
-];
-
-cron.schedule("0 18 * * *", async () => {
-  console.log("[Cron] Running Evening Referral & Rewards Push Broadcast (6:00 PM IST)...");
-  try {
-    const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
-    const msg = EVENING_PROMOS[dayOfYear % EVENING_PROMOS.length];
-
-    const { notifyAllUsers } = require('./services/notificationHelper');
-    await notifyAllUsers({
-      title: msg.title,
-      description: msg.body,
-      type: msg.type,
-      pushData: { screen: 'Home' }
-    });
-  } catch (err) {
-    console.error("[Cron] Evening push error:", err);
-  }
-}, { timezone: "Asia/Kolkata" });
+// Morning tip (9:15 AM IST) and Evening engagement (6:00 PM IST) are
+// triggered by GitHub Actions workflows — see .github/workflows/daily-notifications.yml
 const investmentRoutes = require('./routes/investmentRoutes');
 const chitAdminRoutes = require('./routes/chitAdminRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
@@ -426,16 +313,16 @@ app.use('/api/referral', referralRoutes);
 app.use('/api/wallet', referralRoutes);
 app.use('/api/cron', cronRoutes);
 
-// Admin Manual Trigger for Daily Notifications
+// Admin manual trigger — calls the same cron functions as GitHub Actions
 const { protect, admin } = require('./middleware/authMiddleware');
 const cronService = require('./services/cronService');
-cronService.initCronJobs();
 
 app.post('/api/admin/trigger-daily-notifications', protect, admin, async (req, res) => {
   try {
     await cronService.sendDailyPocketMoneyNotifications();
-    await cronService.sendDailyEngagingNotifications();
-    res.json({ message: 'Daily notifications triggered and dispatched successfully' });
+    await cronService.sendMorningFinancialTip();
+    await cronService.sendEveningEngagementNotification();
+    res.json({ message: 'All daily notifications triggered and dispatched successfully' });
   } catch (err) {
     res.status(500).json({ message: 'Error triggering notifications', error: err.message });
   }
