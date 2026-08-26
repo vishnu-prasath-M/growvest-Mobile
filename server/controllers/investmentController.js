@@ -148,23 +148,9 @@ exports.createInvestment = async (req, res) => {
 
 exports.getInvestments = async (req, res) => {
   try {
-    let query = {};
-    if (req.user && req.user.role !== 'admin') {
-      const userOrConditions = [{ userId: req.user._id }];
-      if (req.user.email && String(req.user.email).trim() !== '' && req.user.email !== 'undefined') {
-        userOrConditions.push({ userEmail: new RegExp(`^${String(req.user.email).trim()}$`, 'i') });
-      }
-      if (req.user.mobileNumber && String(req.user.mobileNumber).trim() !== '' && req.user.mobileNumber !== 'undefined') {
-        userOrConditions.push({ mobileNumber: String(req.user.mobileNumber).trim() });
-      }
-      query = { $or: userOrConditions };
-    } else if (req.query.all !== 'true' && req.user?._id) {
-      // Even if admin, default to admin's own investments unless ?all=true is explicitly requested
-      const userOrConditions = [{ userId: req.user._id }];
-      if (req.user.email && String(req.user.email).trim() !== '') {
-        userOrConditions.push({ userEmail: new RegExp(`^${String(req.user.email).trim()}$`, 'i') });
-      }
-      query = { $or: userOrConditions };
+    let query = { userId: req.user._id };
+    if (req.user && req.user.role === 'admin' && req.query.all === 'true') {
+      query = {};
     }
 
     const investments = await Investment.find(query).sort({ createdAt: -1 });

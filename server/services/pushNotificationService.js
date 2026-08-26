@@ -29,13 +29,13 @@ const sendToTokens = async (tokens, payload) => {
     return { success: false, reason: 'no_tokens' };
   }
 
-  // Only send to valid ExponentPushToken[...] format tokens
+  // Send to valid Expo push token formats (ExponentPushToken[...] or ExpoPushToken[...])
   const validTokens = tokens.filter(
-    (token) => token && typeof token === 'string' && token.startsWith('ExponentPushToken')
+    (token) => token && typeof token === 'string' && (token.startsWith('ExponentPushToken') || token.startsWith('ExpoPushToken'))
   );
 
   if (validTokens.length === 0) {
-    console.warn('[PushService] No valid ExponentPushToken entries found. Provided raw tokens:', JSON.stringify(tokens));
+    console.warn('[PushService] No valid Expo push tokens found in list:', JSON.stringify(tokens));
     return { success: false, reason: 'no_valid_expo_tokens' };
   }
 
@@ -129,9 +129,9 @@ const sendToUser = async (userId, payload) => {
       return { success: false, reason: 'no_tokens' };
     }
 
-    // Collect ALL valid ExponentPushToken[...] entries stored for this user (deduplicated)
+    // Collect ALL valid push tokens stored for this user (deduplicated)
     const mobileTokenEntries = (user.fcmTokens || [])
-      .filter(t => t.token && typeof t.token === 'string' && t.token.startsWith('ExponentPushToken'))
+      .filter(t => t.token && typeof t.token === 'string' && (t.token.startsWith('ExponentPushToken') || t.token.startsWith('ExpoPushToken')))
       .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
 
     const seenTokens = new Set();
