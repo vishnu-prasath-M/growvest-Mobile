@@ -30,7 +30,6 @@ const withdrawalSchema = new mongoose.Schema({
   },
   withdrawType: {
     type: String,
-    enum: ['saving', 'fixed', '15_days', '1_month', '3_months', '6_months', '1_year', '2_years', 'investment'],
     default: 'saving',
   },
   investmentId: {
