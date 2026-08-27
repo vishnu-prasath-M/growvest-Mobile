@@ -45,6 +45,8 @@ async function showLocalNotification(title, body, data = {}) {
         body: body || 'You have a new update.',
         sound: 'default',
         badge: 1,
+        channelId: 'default',
+        priority: Notifications.AndroidNotificationPriority.HIGH,
         data,
       },
       trigger: null,
@@ -140,7 +142,7 @@ export const notificationService = {
       Constants.expoConfig?.extra?.eas?.projectId ||
       Constants.easConfig?.projectId ||
       Constants.manifest?.extra?.eas?.projectId ||
-      'f4211c90-3448-400b-9e0c-82933dd6dbed';
+      '9a48acf2-d6c0-4c4a-ab7e-19a23ab026bd';
 
     console.log('[NotificationService] Getting push token, projectId:', projectId);
 
@@ -250,9 +252,11 @@ export const notificationService = {
       await Notifications.scheduleNotificationAsync({
         content: {
           title: 'Welcome 🎉',
-          body: 'Welcome to Growvest. We\'re happy to have you with us.',
+          body: "Welcome to Growvest. We're happy to have you with us.",
           sound: 'default',
           badge: 1,
+          channelId: 'default',
+          priority: Notifications.AndroidNotificationPriority.HIGH,
         },
         trigger: null,
       });

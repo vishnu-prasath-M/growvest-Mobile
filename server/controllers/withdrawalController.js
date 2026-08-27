@@ -107,8 +107,8 @@ exports.createWithdrawal = async (req, res) => {
 exports.getWithdrawals = async (req, res) => {
   try {
     let query = { userId: req.user?._id };
-    if (req.user && req.user.role === 'admin' && req.query.all === 'true') {
-      query = {};
+    if (req.user && req.user.role === 'admin') {
+      query = {}; // Admin sees all user withdrawal requests
     }
     const withdrawals = await Withdrawal.find(query).sort({ createdAt: -1 });
     res.status(200).json(withdrawals);
