@@ -96,15 +96,19 @@ const MonthlyDueScreen = ({ navigation }) => {
         timeLabel = `on your Due Date (${reminderChit?.nextDueDateFormatted} at 9:00 AM)`;
         
         if (targetDate.getTime() <= now.getTime()) {
-          targetDate = new Date(now.getTime() + 10 * 1000);
+          trigger = {
+            type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+            seconds: 10,
+            repeats: false,
+          };
           timeLabel = "in 10 seconds (as your due date is in the past)";
+        } else {
+          trigger = {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: targetDate,
+            repeats: false,
+          };
         }
-
-        trigger = {
-          type: Notifications.SchedulableTriggerInputTypes.DATE,
-          date: targetDate,
-          repeats: false,
-        };
       }
 
       if (Platform.OS === 'android') {
