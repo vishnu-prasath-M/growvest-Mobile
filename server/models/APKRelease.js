@@ -5,6 +5,7 @@ const apkReleaseSchema = new mongoose.Schema({
   fileSize: { type: Number, required: true }, // size in bytes
   storagePath: { type: String, default: '/downloads/growvest-latest.apk' },
   externalUrl: { type: String, default: '' },
+  gridFsFileId: { type: mongoose.Schema.Types.ObjectId, default: null }, // GridFS reference for unlimited APK file size in MongoDB
   apkData: { type: Buffer, select: false }, // Persistent binary storage in MongoDB
   version: { type: String, default: '1.0.0' },
   uploadedAt: { type: Date, default: Date.now },
