@@ -45,15 +45,24 @@ exports.registerUser = async (req, res) => {
       if (count === 0) isUnique = true;
     }
 
-    // Check optional referral code passed during registration
-    const inputRefCode = (req.body.referralCode || req.body.ref || '').toString().trim().toUpperCase();
+    // Check optional referral code passed during registration (supports referralCode, username, or phone)
+    const rawRefInput = (req.body.referralCode || req.body.ref || '').toString().trim();
     let referrer = null;
-    if (inputRefCode) {
-      referrer = await User.findOne({ referralCode: inputRefCode });
+    if (rawRefInput) {
+      referrer = await User.findOne({
+        $or: [
+          { referralCode: new RegExp(`^${rawRefInput}$`, 'i') },
+          { username: new RegExp(`^${rawRefInput}$`, 'i') },
+          { mobileNumber: rawRefInput }
+        ]
+      });
     }
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Give 20 welcome coins to new user if referred, otherwise 10 welcome coins
+    const initialCoins = referrer ? 20 : 10;
 
     const user = await User.create({
       username,
@@ -63,18 +72,63 @@ exports.registerUser = async (req, res) => {
       password: hashedPassword,
       referralCode: userReferralCode,
       referredBy: referrer ? referrer._id : null,
+      coinBalance: initialCoins,
     });
 
     if (user) {
-      // Create pending Referral record if valid referrer found
+      // Create Referral record and reward referrer immediately upon registration
       if (referrer && referrer._id.toString() !== user._id.toString()) {
-        const Referral = require('../models/Referral');
-        await Referral.create({
-          referrerUserId: referrer._id,
-          referredUserId: user._id,
-          referralCode: inputRefCode,
-          status: 'REGISTERED',
-        }).catch(err => console.error('[Referral Attribution Error]', err.message));
+        try {
+          const Referral = require('../models/Referral');
+          const CoinTransaction = require('../models/CoinTransaction');
+          const { sendNotification } = require('../services/notificationHelper');
+
+          const signupRewardCoins = 50;
+
+          const refDoc = await Referral.create({
+            referrerUserId: referrer._id,
+            referredUserId: user._id,
+            referralCode: referrer.referralCode || rawRefInput.toUpperCase(),
+            rewardCoins: signupRewardCoins,
+            status: 'REGISTERED',
+          });
+
+          // Credit referrer's coin balance
+          await User.findByIdAndUpdate(referrer._id, {
+            $inc: { coinBalance: signupRewardCoins }
+          });
+
+          // Record Coin Transaction for referrer
+          await CoinTransaction.create({
+            userId: referrer._id,
+            type: 'REFERRAL_REWARD',
+            amount: signupRewardCoins,
+            description: `Referral signup bonus: ${user.name || user.username} joined with your link`,
+            referenceId: refDoc._id,
+          });
+
+          // Record Welcome Coin Transaction for new user
+          await CoinTransaction.create({
+            userId: user._id,
+            type: 'REFERRAL_REWARD',
+            amount: initialCoins,
+            description: `Welcome bonus for joining Growvest with referral code ${referrer.referralCode || rawRefInput}`,
+            referenceId: refDoc._id,
+          });
+
+          // Notify referrer via Push Notification
+          await sendNotification({
+            userId: referrer._id,
+            title: '🪙 Friend Joined Growvest!',
+            description: `🎉 +${signupRewardCoins} Growvest Coins! ${user.name || user.username} just joined using your referral link. You will earn even more coins when they make their first investment!`,
+            type: 'referral_reward',
+            metadata: { referralId: refDoc._id },
+          }).catch(err => console.warn('[Referral Notif Error]', err.message));
+
+          console.log(`[Referral Attribution] Credited ${signupRewardCoins} coins to referrer ${referrer.username} for new user ${user.username}`);
+        } catch (refErr) {
+          console.error('[Referral Attribution Error]', refErr.message);
+        }
       }
 
       res.status(201).json({
@@ -84,6 +138,7 @@ exports.registerUser = async (req, res) => {
         email: user.email,
         mobileNumber: user.mobileNumber,
         referralCode: user.referralCode,
+        coinBalance: user.coinBalance,
         createdAt: user.createdAt,
         token: generateToken(user._id),
       });
