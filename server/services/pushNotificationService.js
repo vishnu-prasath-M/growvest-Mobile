@@ -129,17 +129,23 @@ const sendToUser = async (userId, payload) => {
       return { success: false, reason: 'no_tokens' };
     }
 
-    // Collect ALL valid push tokens stored for this user (deduplicated)
-    const mobileTokenEntries = (user.fcmTokens || [])
-      .filter(t => t.token && typeof t.token === 'string' && (t.token.startsWith('ExponentPushToken') || t.token.startsWith('ExpoPushToken')))
+    // Split mobile tokens into Expo Push tokens and Native FCM tokens
+    const expoTokens = [];
+    const nativeFcmTokens = [];
+
+    const allMobileEntries = (user.fcmTokens || [])
+      .filter(t => t.token && typeof t.token === 'string' && t.platform !== 'web')
       .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
 
     const seenTokens = new Set();
-    const targetTokens = [];
-    for (const entry of mobileTokenEntries) {
+    for (const entry of allMobileEntries) {
       if (!seenTokens.has(entry.token)) {
         seenTokens.add(entry.token);
-        targetTokens.push(entry.token);
+        if (entry.token.startsWith('ExponentPushToken') || entry.token.startsWith('ExpoPushToken')) {
+          expoTokens.push(entry.token);
+        } else {
+          nativeFcmTokens.push(entry.token);
+        }
       }
     }
 
@@ -148,14 +154,16 @@ const sendToUser = async (userId, payload) => {
       .map(t => t.token)
       .filter(Boolean);
     
-    console.log(`[PushService] sendToUser: Target push tokens for user "${userId}": Mobile=${targetTokens.length}, Web=${webTokens.length}`);
+    console.log(`[PushService] sendToUser: Target push tokens for user "${userId}": Expo=${expoTokens.length}, NativeFCM=${nativeFcmTokens.length}, Web=${webTokens.length}`);
 
     let finalResult = { success: false };
 
-    // 1. Dispatch Mobile push if present
-    if (targetTokens.length > 0) {
-      const result = await sendToTokens(targetTokens, payload);
-      finalResult = result;
+    // 1. Dispatch Expo push tokens
+    if (expoTokens.length > 0) {
+      const result = await sendToTokens(expoTokens, payload);
+      if (result.success) {
+        finalResult = result;
+      }
 
       // Prune stale DeviceNotRegistered tokens to keep the list clean
       if (result.success) {
@@ -166,7 +174,12 @@ const sendToUser = async (userId, payload) => {
             ticket.status === 'error' &&
             ticket.details?.error === 'DeviceNotRegistered'
           ) {
-            staleTokens.push(targetTokens[i]);
+            staleTokens.push(expoTokens[i]);
+          } else if (
+            ticket.status === 'error' &&
+            ticket.details?.error === 'InvalidCredentials'
+          ) {
+            console.warn(`[PushService] ⚠️ Standalone APK delivery requires FCM Server Key uploaded to Expo EAS credentials.`);
           }
         });
 
@@ -179,7 +192,17 @@ const sendToUser = async (userId, payload) => {
       }
     }
 
-    // 2. Dispatch Web FCM push if present
+    // 2. Dispatch Native FCM tokens (direct FCM fallback)
+    if (nativeFcmTokens.length > 0) {
+      for (const fcmToken of nativeFcmTokens) {
+        const fcmResult = await sendWebFCMNotification(fcmToken, payload);
+        if (fcmResult.success) {
+          finalResult = { success: true, nativeFcm: true };
+        }
+      }
+    }
+
+    // 3. Dispatch Web FCM push if present
     if (webTokens.length > 0) {
       let webSuccess = false;
       for (const webToken of webTokens) {

@@ -107,11 +107,25 @@ const MonthlyDueScreen = ({ navigation }) => {
         };
       }
 
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'Growvest Notifications',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#085428',
+          sound: 'default',
+          showBadge: true,
+          enableVibrate: true,
+        });
+      }
+
       await Notifications.scheduleNotificationAsync({
         content: {
           title: '📅 Growvest Due Reminder',
           body: `Reminder: Your ${isWeekly ? 'weekly' : 'monthly'} due of ${formatCurrency(reminderChit?.nextDueAmount)} for "${reminderChit?.chitName}" is due soon.`,
           sound: 'default',
+          channelId: 'default',
+          priority: Notifications.AndroidNotificationPriority.HIGH,
           data: { screen: 'MonthlyDue' },
         },
         trigger,
