@@ -61,8 +61,8 @@ const MonthlyDueScreen = ({ navigation }) => {
       if (type === '10_seconds') {
         timeLabel = "in 10 seconds";
         trigger = {
-          type: Notifications.SchedulableTriggerInputTypes.DATE,
-          date: new Date(now.getTime() + 10 * 1000),
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: 10,
           repeats: false,
         };
       } else if (type === 'tomorrow_morning') {

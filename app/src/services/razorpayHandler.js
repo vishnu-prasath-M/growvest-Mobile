@@ -69,12 +69,15 @@ export const executeRazorpayPayment = async ({
         if (onSuccess) onSuccess(verification);
       } catch (error) {
         if (setLoading) setLoading(false);
-        console.error('[Razorpay] Payment cancelled or failed:', error);
-        Alert.alert(
-          'Payment Failed',
-          error.description || error.message || 'Payment was cancelled or could not be processed.'
-        );
-        if (onFailure) onFailure(error);
+        console.log('[Razorpay] Payment cancelled or dismissed:', error?.description || error?.message);
+        if (onFailure) {
+          onFailure(error);
+        } else {
+          Alert.alert(
+            'Payment Failed',
+            error.description || error.message || 'Payment was cancelled or could not be processed.'
+          );
+        }
       }
     } else {
       // Test Mode Simulation fallback when running in Expo Go without native build
