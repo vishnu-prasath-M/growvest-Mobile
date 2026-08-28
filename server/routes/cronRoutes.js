@@ -2,9 +2,9 @@ const express = require('express');
 const router = express.Router();
 const cronService = require('../services/cronService');
 
-// POST /api/cron/daily-notifications?type=pocket_money|morning_tip|evening|all
-// Triggered by GitHub Actions daily cron or external scheduler
-router.post('/daily-notifications', async (req, res) => {
+// POST / GET /api/cron/daily-notifications?type=pocket_money|morning_tip|evening|all&secret=growvest-daily-secret-2026
+// Triggered by GitHub Actions daily cron or external scheduler (cron-job.org)
+const handleDailyNotifications = async (req, res) => {
   try {
     const cronSecret = process.env.CRON_SECRET || 'growvest-daily-secret-2026';
     const authHeader = req.headers['x-cron-secret'] || req.query.secret;
@@ -47,6 +47,9 @@ router.post('/daily-notifications', async (req, res) => {
     console.error('[CronRoute] Error executing daily notifications:', error);
     return res.status(500).json({ success: false, error: error.message });
   }
-});
+};
+
+router.get('/daily-notifications', handleDailyNotifications);
+router.post('/daily-notifications', handleDailyNotifications);
 
 module.exports = router;
