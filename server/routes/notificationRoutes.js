@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const router = express.Router();
 const {
   getNotifications,
@@ -54,6 +54,42 @@ router.post('/test-push', protect, admin, async (req, res) => {
   } catch (error) {
     console.error('[TestPush] Error:', error);
     return res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+});
+
+// User: Schedule a Due Reminder via reliable FCM Server Push
+// POST /api/notifications/schedule-due-reminder
+// Body: { seconds, chitName, amount, isWeekly }
+router.post('/schedule-due-reminder', protect, async (req, res) => {
+  try {
+    const userId = req.user._id || req.user.id;
+    const { seconds = 10, chitName = 'Chit Fund Plan', amount = 0, isWeekly = false } = req.body;
+
+    const delayMs = Math.max(1000, Number(seconds) * 1000);
+
+    console.log(`[DueReminder] Scheduling FCM Push reminder for user ${userId} in ${seconds}s for "${chitName}"`);
+
+    setTimeout(async () => {
+      try {
+        const payload = {
+          title: '📅 Growvest Due Reminder',
+          body: `Reminder: Your ${isWeekly ? 'weekly' : 'monthly'} due of ₹${amount} for "${chitName}" is due soon.`,
+          data: { screen: 'MonthlyDue', type: 'due_reminder' },
+        };
+        const result = await pushNotificationService.sendToUser(userId, payload);
+        console.log(`[DueReminder] FCM Push dispatched to user ${userId}:`, result?.success ? 'SUCCESS' : 'FAILED');
+      } catch (err) {
+        console.error('[DueReminder] Error dispatching scheduled push:', err.message);
+      }
+    }, delayMs);
+
+    return res.json({
+      success: true,
+      message: `Reminder scheduled. Push notification will arrive in ${seconds} seconds.`,
+    });
+  } catch (error) {
+    console.error('[DueReminder] Error scheduling reminder:', error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 });
 
