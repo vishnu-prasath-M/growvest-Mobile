@@ -16,6 +16,7 @@ import { colors } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { chitFundService } from '../../services/chitFundService';
 import { authService } from '../../services/authService';
+import api from '../../services/apiService';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -123,17 +124,40 @@ const MonthlyDueScreen = ({ navigation }) => {
         });
       }
 
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: '📅 Growvest Due Reminder',
-          body: `Reminder: Your ${isWeekly ? 'weekly' : 'monthly'} due of ${formatCurrency(reminderChit?.nextDueAmount)} for "${reminderChit?.chitName}" is due soon.`,
-          sound: 'default',
-          channelId: 'default',
-          priority: Notifications.AndroidNotificationPriority.HIGH,
-          data: { screen: 'MonthlyDue' },
-        },
-        trigger,
-      });
+      // Dispatch server-side FCM push notification for 100% reliability across all app states (killed, background, open)
+      let reminderSeconds = 10;
+      if (type === 'tomorrow_morning') {
+        reminderSeconds = Math.max(10, Math.round((targetDate.getTime() - now.getTime()) / 1000));
+      } else if (type === 'two_days') {
+        reminderSeconds = Math.max(10, Math.round((targetDate.getTime() - now.getTime()) / 1000));
+      } else if (type === 'due_date') {
+        reminderSeconds = Math.max(10, Math.round((targetDate.getTime() - now.getTime()) / 1000));
+      }
+
+      // Schedule real server FCM Push
+      api.post('/notifications/schedule-due-reminder', {
+        seconds: reminderSeconds,
+        chitName: reminderChit?.chitName || 'Chit Plan',
+        amount: reminderChit?.nextDueAmount || 0,
+        isWeekly,
+      }).catch(err => console.warn('[DueReminder] Server push schedule fallback:', err?.message));
+
+      // Also schedule local notification
+      try {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: '📅 Growvest Due Reminder',
+            body: `Reminder: Your ${isWeekly ? 'weekly' : 'monthly'} due of ${formatCurrency(reminderChit?.nextDueAmount)} for "${reminderChit?.chitName}" is due soon.`,
+            sound: 'default',
+            channelId: 'default',
+            priority: Notifications.AndroidNotificationPriority.HIGH,
+            data: { screen: 'MonthlyDue' },
+          },
+          trigger,
+        });
+      } catch (localErr) {
+        console.warn('[DueReminder] Local notification non-fatal:', localErr?.message);
+      }
 
       Alert.alert(
         'Reminder Set',

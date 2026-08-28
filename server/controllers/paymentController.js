@@ -24,11 +24,13 @@ exports.createOrder = async (req, res) => {
       return res.status(400).json({ message: 'Valid amount is required' });
     }
 
-    // Backend KYC Security Check: Only users with submitted KYC (pending or approved) can invest
-    const KYC = require('../models/KYC');
-    const kyc = await KYC.findOne({ userId: req.user._id });
-    if (!kyc || (kyc.status !== 'pending' && kyc.status !== 'approved')) {
-      return res.status(403).json({ message: 'Submit KYC before Investment' });
+    // KYC Check: Only enforce KYC for investment plans, never block chit dues or pocket money
+    if (purpose === 'investment') {
+      const KYC = require('../models/KYC');
+      const kyc = await KYC.findOne({ userId: req.user._id });
+      if (kyc && kyc.status === 'rejected') {
+        return res.status(403).json({ message: 'Your KYC was rejected. Please re-submit KYC before investing.' });
+      }
     }
 
     const instance = getRazorpayInstance();
