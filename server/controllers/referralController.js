@@ -39,29 +39,58 @@ exports.getReferralInfo = async (req, res) => {
       .populate('referredUserId', 'username name mobileNumber createdAt')
       .sort({ createdAt: -1 });
 
-    const totalInvited = referrals.length;
-    const registered = referrals.filter(r => ['REGISTERED', 'PENDING'].includes(r.status)).length;
-    const successful = referrals.filter(r => ['SUCCESSFUL', 'REWARDED'].includes(r.status)).length;
-    const pending = registered;
-    const totalCoinsEarned = referrals
-      .filter(r => ['SUCCESSFUL', 'REWARDED'].includes(r.status))
-      .reduce((sum, r) => sum + (r.rewardCoins || 100), 0);
+    // Also query direct referred users
+    const directlyReferredUsers = await User.find({ referredBy: userId }).select('username name mobileNumber createdAt');
 
-    const history = referrals.map(r => {
+    // Combine unique referred users
+    const seenUserIds = new Set();
+    const history = [];
+
+    for (const r of referrals) {
       const refUser = r.referredUserId;
-      let displayName = 'Referred User';
+      if (refUser && refUser._id) {
+        seenUserIds.add(refUser._id.toString());
+      }
+      let displayName = 'Referred Friend';
       if (refUser) {
-        const name = refUser.username || refUser.name || 'User';
+        const name = refUser.name || refUser.username || 'Friend';
         displayName = name.length > 4 ? `${name.substring(0, 3)}***` : `${name}***`;
       }
-      return {
+      history.push({
         _id: r._id,
         displayName,
-        status: r.status,
-        rewardCoins: ['SUCCESSFUL', 'REWARDED'].includes(r.status) ? (r.rewardCoins || 100) : 0,
+        status: r.status || 'REGISTERED',
+        rewardCoins: r.rewardCoins || (['SUCCESSFUL', 'REWARDED'].includes(r.status) ? 100 : 50),
         createdAt: r.createdAt,
-      };
-    });
+      });
+    }
+
+    for (const u of directlyReferredUsers) {
+      if (!seenUserIds.has(u._id.toString())) {
+        seenUserIds.add(u._id.toString());
+        const name = u.name || u.username || 'Friend';
+        const displayName = name.length > 4 ? `${name.substring(0, 3)}***` : `${name}***`;
+        history.push({
+          _id: u._id,
+          displayName,
+          status: 'REGISTERED',
+          rewardCoins: 50,
+          createdAt: u.createdAt,
+        });
+      }
+    }
+
+    // Query actual referral coins earned from CoinTransaction collection
+    const coinTxSum = await CoinTransaction.aggregate([
+      { $match: { userId: user._id, type: 'REFERRAL_REWARD' } },
+      { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+    const totalCoinsEarned = (coinTxSum[0]?.total) || (history.reduce((sum, h) => sum + (h.rewardCoins || 0), 0));
+
+    const totalInvited = history.length;
+    const successful = history.filter(r => ['SUCCESSFUL', 'REWARDED'].includes(r.status)).length;
+    const registered = totalInvited;
+    const pending = totalInvited - successful;
 
     res.json({
       referralCode: user.referralCode,
