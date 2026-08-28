@@ -71,7 +71,7 @@ const investmentSchema = new mongoose.Schema({
   },
   withdrawalStatus: {
     type: String,
-    enum: ['locked', 'available', 'withdrawn'],
+    enum: ['locked', 'available', 'none', 'pending', 'withdrawn'],
     default: 'locked',
   },
   lastInterestCalculatedAt: {
@@ -108,11 +108,6 @@ const investmentSchema = new mongoose.Schema({
     default: 'early_principal_only',
   },
   // Withdrawal request tracking — investment stays 'approved' until admin marks withdrawal as paid
-  withdrawalStatus: {
-    type: String,
-    enum: ['none', 'pending', 'withdrawn'],
-    default: 'none',
-  },
   withdrawalRequestId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Withdrawal',
