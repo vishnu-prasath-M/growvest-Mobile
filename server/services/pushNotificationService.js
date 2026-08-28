@@ -172,14 +172,9 @@ const sendToUser = async (userId, payload) => {
         tickets.forEach((ticket, i) => {
           if (
             ticket.status === 'error' &&
-            ticket.details?.error === 'DeviceNotRegistered'
+            (ticket.details?.error === 'DeviceNotRegistered' || ticket.details?.error === 'InvalidCredentials')
           ) {
             staleTokens.push(expoTokens[i]);
-          } else if (
-            ticket.status === 'error' &&
-            ticket.details?.error === 'InvalidCredentials'
-          ) {
-            console.warn(`[PushService] ⚠️ Standalone APK delivery requires FCM Server Key uploaded to Expo EAS credentials.`);
           }
         });
 
