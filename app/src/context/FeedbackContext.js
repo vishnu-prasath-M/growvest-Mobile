@@ -28,12 +28,13 @@ export const FeedbackProvider = ({ children }) => {
   const offlinePulse = useRef(new Animated.Value(1)).current;
   const backOnlineAnim = useRef(new Animated.Value(-100)).current; // starts offscreen (top)
   const popupAnim = useRef(new Animated.Value(0)).current;
+  const failureCountRef = useRef(0);
 
-  // Connection check helper using high-availability, instant response google check
+  // Connection check helper with consecutive failure threshold (prevents false offline triggers on minor mobile jitter)
   const checkConnection = async () => {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
       
       const response = await fetch('https://clients3.google.com/generate_204', {
         method: 'GET',
@@ -41,28 +42,38 @@ export const FeedbackProvider = ({ children }) => {
       });
       clearTimeout(timeoutId);
       
-      if (offline) {
-        setOffline(false);
-        // Show "We are back" banner
-        setShowBackOnline(true);
-        Animated.sequence([
-          Animated.spring(backOnlineAnim, {
-            toValue: 24, // slide down slightly below status bar
-            useNativeDriver: true,
-            bounciness: 12,
-          }),
-          Animated.delay(3000),
-          Animated.timing(backOnlineAnim, {
-            toValue: -120,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-        ]).start(() => {
-          setShowBackOnline(false);
-        });
+      if (response && (response.status === 204 || response.status === 200 || response.ok)) {
+        failureCountRef.current = 0;
+        if (offline) {
+          setOffline(false);
+          // Show "We are back" banner
+          setShowBackOnline(true);
+          Animated.sequence([
+            Animated.spring(backOnlineAnim, {
+              toValue: 24, // slide down slightly below status bar
+              useNativeDriver: true,
+              bounciness: 12,
+            }),
+            Animated.delay(3000),
+            Animated.timing(backOnlineAnim, {
+              toValue: -120,
+              duration: 300,
+              useNativeDriver: true,
+            }),
+          ]).start(() => {
+            setShowBackOnline(false);
+          });
+        }
+      } else {
+        failureCountRef.current += 1;
+        if (failureCountRef.current >= 3 && !offline) {
+          setOffline(true);
+        }
       }
     } catch (err) {
-      if (!offline) {
+      failureCountRef.current += 1;
+      // Only trigger offline modal if 3 consecutive pings fail (genuine network loss)
+      if (failureCountRef.current >= 3 && !offline) {
         setOffline(true);
       }
     }
@@ -71,8 +82,8 @@ export const FeedbackProvider = ({ children }) => {
   useEffect(() => {
     // Check initial connection
     checkConnection();
-    // Poll connection status every 10 seconds
-    const interval = setInterval(checkConnection, 10000);
+    // Poll connection status every 25 seconds
+    const interval = setInterval(checkConnection, 25000);
     return () => clearInterval(interval);
   }, [offline]);
 
