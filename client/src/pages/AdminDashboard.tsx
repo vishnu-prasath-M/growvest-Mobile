@@ -250,6 +250,40 @@ const AdminDashboard = () => {
     }
   }, [token, permissionState]);
 
+  const triggerBrowserPush = async (title: string, body: string) => {
+    if (typeof window === "undefined") return;
+
+    // 1. Try Service Worker showNotification (mandatory on Mobile Chrome / Android / Safari)
+    if ("serviceWorker" in navigator) {
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        if (reg && typeof reg.showNotification === "function") {
+          const origin = window.location.origin;
+          await reg.showNotification(title, {
+            body: body,
+            icon: `${origin}/favicon.ico`,
+            badge: `${origin}/favicon.ico`,
+            vibrate: [200, 100, 200],
+            tag: `growvest_${Date.now()}`,
+            renotify: true,
+          } as any);
+          return;
+        }
+      } catch (swErr) {
+        console.warn("[WebPush] ServiceWorker showNotification failed:", swErr);
+      }
+    }
+
+    // 2. Fallback to standard window.Notification (Desktop browsers)
+    if ("Notification" in window && Notification.permission === "granted") {
+      try {
+        new Notification(title, { body });
+      } catch (notifErr) {
+        console.warn("[WebPush] Window Notification failed:", notifErr);
+      }
+    }
+  };
+
   const handleRequestPermission = async () => {
     if (typeof window !== "undefined" && "Notification" in window) {
       try {
@@ -258,6 +292,8 @@ const AdminDashboard = () => {
         if (permission === 'granted') {
           registerWebPush();
           toast.success("Push notifications enabled successfully!");
+          // Trigger instant test notification on this device
+          triggerBrowserPush("🎉 Notifications Enabled", "You will now receive instant push alerts on this device!");
         } else {
           toast.error("Permission denied. You can enable them in browser settings.");
         }
@@ -308,32 +344,10 @@ const AdminDashboard = () => {
                   const notifs = result?.notifications || [];
                   if (Array.isArray(notifs) && notifs.length > 0) {
                     const latest = notifs[0];
-                    // Trigger web push notification using ServiceWorker if available (works on Mobile Chrome)
-                    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-                      if ('serviceWorker' in navigator) {
-                        navigator.serviceWorker.ready.then((reg) => {
-                          reg.showNotification(latest.title, {
-                            body: latest.description,
-                            icon: '/favicon.ico',
-                            badge: '/favicon.ico',
-                            vibrate: [200, 100, 200]
-                          });
-                        }).catch(() => {
-                          try {
-                            new Notification(latest.title, { body: latest.description });
-                          } catch (e) {
-                            console.warn('[WebPush] Fallback notification failed:', e);
-                          }
-                        });
-                      } else {
-                        try {
-                          new Notification(latest.title, { body: latest.description });
-                        } catch (e) {
-                          console.warn('[WebPush] Direct notification failed:', e);
-                        }
-                      }
-                    }
-                    // Always show local sonner toast as well for immediate visibility on mobile tabs
+                    // Trigger web push notification (works across Mobile and Desktop browsers)
+                    triggerBrowserPush(latest.title, latest.description);
+
+                    // Always show local sonner toast as well for immediate visibility on active tabs
                     toast(latest.title, {
                       description: latest.description,
                       duration: 8000,
