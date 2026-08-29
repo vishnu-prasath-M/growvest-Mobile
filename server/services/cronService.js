@@ -224,45 +224,72 @@ const sendChitDueReminders = async () => {
     const ChitMember = require('../models/ChitMember');
 
     const now = new Date();
-    // 4 days in future
     const fourDaysLater = new Date();
     fourDaysLater.setDate(fourDaysLater.getDate() + 4);
     fourDaysLater.setHours(23, 59, 59, 999);
 
-    // Find active members who have an upcoming due date within 4 days or overdue
-    const dueMembers = await ChitMember.find({
+    const calcNextWeeklyDueDate = (joinedAt, weekIndex) => {
+      const base = new Date(joinedAt || Date.now());
+      const day = base.getDay();
+      const daysToSunday = day === 0 ? 0 : 7 - day;
+      const firstSunday = new Date(base.getTime() + daysToSunday * 24 * 60 * 60 * 1000);
+      firstSunday.setHours(12, 0, 0, 0);
+      return new Date(firstSunday.getTime() + (weekIndex || 0) * 7 * 24 * 60 * 60 * 1000);
+    };
+
+    const calcNextMonthlyDueDate = (joinedAt, monthIndex) => {
+      const base = new Date(joinedAt || Date.now());
+      base.setMonth(base.getMonth() + (monthIndex || 0));
+      base.setDate(1);
+      base.setHours(12, 0, 0, 0);
+      return base;
+    };
+
+    // Find all active chit members
+    const activeMembers = await ChitMember.find({
       status: 'active',
-      nextDueDate: { $exists: true, $ne: null, $lte: fourDaysLater },
     }).populate('userId').populate('chitId');
 
     let count = 0;
-    for (const member of dueMembers) {
+    for (const member of activeMembers) {
       if (!member.userId?._id) continue;
 
-      const dueAmount = member.weeklyAmount || member.chitId?.monthlyAmount || 0;
-      const chitTitle = member.chitId?.name || 'Chit Plan';
-      const dueDate = new Date(member.nextDueDate);
-      const diffDays = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
-
-      let title = '';
-      let body = '';
-
-      if (diffDays <= 0) {
-        title = '🚨 Chit Due Today!';
-        body = `Your contribution of ₹${dueAmount.toLocaleString('en-IN')} for "${chitTitle}" is due today. Pay now to stay eligible for upcoming chit draws!`;
-      } else {
-        title = `⏳ Chit Due in ${diffDays} Day${diffDays > 1 ? 's' : ''}!`;
-        body = `Your contribution of ₹${dueAmount.toLocaleString('en-IN')} for "${chitTitle}" is due in ${diffDays} days. Pay early to maintain your clean chit record.`;
+      const isWeekly = (member.chitId?.duration || 0) > 0 ? (member.totalWeeks > 0 || (member.weeklyAmount && member.weeklyAmount > 0)) : true;
+      const paidUnits = member.paidWeeks || member.currentWeek || member.currentMonth || 0;
+      
+      let dueDate = member.nextDueDate ? new Date(member.nextDueDate) : null;
+      if (!dueDate) {
+        dueDate = isWeekly 
+          ? calcNextWeeklyDueDate(member.joinedAt, paidUnits)
+          : calcNextMonthlyDueDate(member.joinedAt, paidUnits);
       }
 
-      await sendUserNotification(
-        member.userId._id,
-        title,
-        body,
-        'chit_due_reminder',
-        { screen: 'MonthlyDueScreen', chitId: member.chitId?._id?.toString() }
-      );
-      count++;
+      // Check if due date is within the 4-day window (or overdue)
+      if (dueDate && dueDate.getTime() <= fourDaysLater.getTime()) {
+        const dueAmount = member.weeklyAmount || member.chitId?.monthlyAmount || 200;
+        const chitTitle = member.chitId?.name || 'Chit Plan';
+        const diffDays = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+
+        let title = '';
+        let body = '';
+
+        if (diffDays <= 0) {
+          title = '🚨 Chit Due Today!';
+          body = `Your contribution of ₹${dueAmount.toLocaleString('en-IN')} for "${chitTitle}" is due today. Pay now to stay eligible for upcoming chit draws!`;
+        } else {
+          title = `⏳ Chit Due in ${diffDays} Day${diffDays > 1 ? 's' : ''}!`;
+          body = `Your contribution of ₹${dueAmount.toLocaleString('en-IN')} for "${chitTitle}" is due in ${diffDays} days. Pay early to maintain your clean chit record.`;
+        }
+
+        await sendUserNotification(
+          member.userId._id,
+          title,
+          body,
+          'chit_due_reminder',
+          { screen: 'MonthlyDueScreen', chitId: member.chitId?._id?.toString() }
+        );
+        count++;
+      }
     }
 
     console.log(`[CronService] Chit due reminders dispatched to ${count} members.`);
