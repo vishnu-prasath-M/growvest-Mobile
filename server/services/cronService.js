@@ -217,6 +217,62 @@ const sendEveningEngagementNotification = async () => {
   }
 };
 
+// ─── 4. Chit Due Reminders (Last 4 Days before Due Date) ─────────────────────
+const sendChitDueReminders = async () => {
+  console.log('[CronService] Running Chit Due Reminder check (within 4 days)...');
+  try {
+    const ChitMember = require('../models/ChitMember');
+
+    const now = new Date();
+    // 4 days in future
+    const fourDaysLater = new Date();
+    fourDaysLater.setDate(fourDaysLater.getDate() + 4);
+    fourDaysLater.setHours(23, 59, 59, 999);
+
+    // Find active members who have an upcoming due date within 4 days or overdue
+    const dueMembers = await ChitMember.find({
+      status: 'active',
+      nextDueDate: { $exists: true, $ne: null, $lte: fourDaysLater },
+    }).populate('userId').populate('chitId');
+
+    let count = 0;
+    for (const member of dueMembers) {
+      if (!member.userId?._id) continue;
+
+      const dueAmount = member.weeklyAmount || member.chitId?.monthlyAmount || 0;
+      const chitTitle = member.chitId?.name || 'Chit Plan';
+      const dueDate = new Date(member.nextDueDate);
+      const diffDays = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+
+      let title = '';
+      let body = '';
+
+      if (diffDays <= 0) {
+        title = '🚨 Chit Due Today!';
+        body = `Your contribution of ₹${dueAmount.toLocaleString('en-IN')} for "${chitTitle}" is due today. Pay now to stay eligible for upcoming chit draws!`;
+      } else {
+        title = `⏳ Chit Due in ${diffDays} Day${diffDays > 1 ? 's' : ''}!`;
+        body = `Your contribution of ₹${dueAmount.toLocaleString('en-IN')} for "${chitTitle}" is due in ${diffDays} days. Pay early to maintain your clean chit record.`;
+      }
+
+      await sendUserNotification(
+        member.userId._id,
+        title,
+        body,
+        'chit_due_reminder',
+        { screen: 'MonthlyDueScreen', chitId: member.chitId?._id?.toString() }
+      );
+      count++;
+    }
+
+    console.log(`[CronService] Chit due reminders dispatched to ${count} members.`);
+    return { sent: count };
+  } catch (error) {
+    console.error('[CronService] Error sending chit due reminders:', error);
+    throw error;
+  }
+};
+
 // ─── Legacy alias (for backward-compat with admin manual trigger endpoint) ────
 const sendDailyEngagingNotifications = sendEveningEngagementNotification;
 
@@ -224,6 +280,7 @@ module.exports = {
   sendDailyPocketMoneyNotifications,
   sendMorningFinancialTip,
   sendEveningEngagementNotification,
+  sendChitDueReminders,
   // Legacy alias
   sendDailyEngagingNotifications,
 };

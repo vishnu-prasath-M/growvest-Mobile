@@ -25,6 +25,12 @@ const handleDailyNotifications = async (req, res) => {
       results.pocket_money = 'dispatched';
     }
 
+    if (type === 'chit_due' || type === 'all') {
+      console.log('[CronRoute] → Running Chit Due Reminders (within 4 days)...');
+      await cronService.sendChitDueReminders();
+      results.chit_due = 'dispatched';
+    }
+
     if (type === 'morning_tip' || type === 'all') {
       console.log('[CronRoute] → Running Morning Financial Tip Broadcast...');
       await cronService.sendMorningFinancialTip();
