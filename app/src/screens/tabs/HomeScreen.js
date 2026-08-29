@@ -70,6 +70,7 @@ const HomeScreen = ({ navigation }) => {
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [coinsBalance, setCoinsBalance] = useState(0);
   const [kycModalVisible, setKycModalVisible] = useState(false);
+  const [kycStatusInfo, setKycStatusInfo] = useState({ status: 'not_submitted', rejectionReason: null });
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -201,8 +202,6 @@ const HomeScreen = ({ navigation }) => {
     ? formatCurrency(balances?.availableToWithdraw)
     : nextUnlockDate ? `Unlocks ${nextUnlockDate}` : '₹0.00';
   const availableIcon = isAvailable ? 'wallet-outline' : 'lock-outline';
-
-  const [kycStatusInfo, setKycStatusInfo] = useState({ status: 'not_submitted', rejectionReason: null });
 
   const quickActions = [
     {
