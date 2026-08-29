@@ -314,7 +314,7 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
           { key: "dashboard", label: "Dashboard" },
           { key: "chits", label: `All Chits (${chits.length || overview.totalChits || 0})` },
           { key: "create", label: editingChit ? "Edit Chit" : "Create Chit" },
-          { key: "joins", label: `Join Requests (${joins.filter((j: any) => j.status === 'pending').length || overview.pendingJoins || 0})` },
+          { key: "joins", label: `Enrolled Members (${joins.length || overview.totalMembers || 0})` },
           { key: "payments", label: `Pending Payments (${payments.filter((p: any) => p.status === 'pending').length || overview.pendingPayments || 0})` },
           { key: "analytics", label: "Analytics" },
         ].map(tab => (
@@ -343,12 +343,12 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div className="card-premium p-5">
               <div className="flex items-center gap-3 mb-3">
-                <div className="p-2 rounded-lg bg-amber-50">
-                  <Users className="w-5 h-5 text-amber-600" />
+                <div className="p-2 rounded-lg bg-green-50">
+                  <Users className="w-5 h-5 text-green-600" />
                 </div>
-                <p className="text-sm text-muted-foreground">Pending Join Requests</p>
+                <p className="text-sm text-muted-foreground">Enrolled Members</p>
               </div>
-              <p className="text-3xl font-bold text-amber-600">{overview.pendingJoins || 0}</p>
+              <p className="text-3xl font-bold text-green-600">{joins.length || overview.totalMembers || 0}</p>
             </div>
 
             <div className="card-premium p-5">

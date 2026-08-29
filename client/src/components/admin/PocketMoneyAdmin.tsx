@@ -242,17 +242,9 @@ export default function PocketMoneyAdmin({ token }: PocketMoneyAdminProps) {
         <div>
           <h1 className="text-2xl font-heading font-bold text-foreground">Pocket Money Control Center</h1>
           <p className="text-sm font-body text-muted-foreground mt-1">
-            Manage user pocket money release schedules and trigger cron payouts.
+            Manage user pocket money release schedules and manual payout approvals.
           </p>
         </div>
-        <Button
-          onClick={handleRunScheduler}
-          disabled={triggering}
-          className="rounded-xl font-body flex items-center gap-2 h-11"
-        >
-          <RefreshCw className={`h-4 w-4 ${triggering ? "animate-spin" : ""}`} />
-          Run Payouts Scheduler
-        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -473,14 +465,33 @@ export default function PocketMoneyAdmin({ token }: PocketMoneyAdminProps) {
                     </td>
                     <td className="py-3 px-4 text-center">
                       {item.status === "active" ? (
-                        <Button
-                          size="sm"
-                          onClick={() => setReleaseModalData(item)}
-                          className="rounded-xl font-body h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 flex items-center gap-1 mx-auto"
-                        >
-                          <Play className="h-3 w-3 fill-current" />
-                          Release
-                        </Button>
+                        (() => {
+                          const todayMidnight = new Date();
+                          todayMidnight.setHours(0, 0, 0, 0);
+                          const nextPayoutMidnight = item.nextPayoutDate ? new Date(item.nextPayoutDate) : null;
+                          if (nextPayoutMidnight) nextPayoutMidnight.setHours(0, 0, 0, 0);
+                          const isDue = !nextPayoutMidnight || nextPayoutMidnight.getTime() <= todayMidnight.getTime();
+
+                          if (isDue) {
+                            return (
+                              <Button
+                                size="sm"
+                                onClick={() => setReleaseModalData(item)}
+                                className="rounded-xl font-body h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 flex items-center gap-1 mx-auto"
+                              >
+                                <Play className="h-3 w-3 fill-current" />
+                                Release
+                              </Button>
+                            );
+                          } else {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                                <CheckCircle className="w-3 h-3 text-blue-600" />
+                                Payout Released
+                              </span>
+                            );
+                          }
+                        })()
                       ) : (
                         <span className="text-muted-foreground text-xs">-</span>
                       )}

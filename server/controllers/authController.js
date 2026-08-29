@@ -195,7 +195,7 @@ exports.loginUser = async (req, res) => {
         if (count === 0) isUnique = true;
       }
       user.referralCode = code;
-      await user.save();
+      await User.findByIdAndUpdate(user._id, { referralCode: code });
     }
 
     res.json({
@@ -229,7 +229,7 @@ exports.getMe = async (req, res) => {
           if (count === 0) isUnique = true;
         }
         user.referralCode = code;
-        await user.save();
+        await User.findByIdAndUpdate(user._id, { referralCode: code });
       }
 
       res.json({
