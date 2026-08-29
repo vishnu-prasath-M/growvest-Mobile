@@ -33,11 +33,24 @@ export const kycService = {
 
   /**
    * Helper to check if current user is allowed to invest.
-   * Returns true if KYC has been submitted (pending or approved).
-   * Returns false if not submitted or rejected.
+   * Returns true ONLY if KYC status is 'approved'.
+   * Returns false if 'pending', 'not_submitted', or 'rejected'.
    */
   isKYCSubmittedForInvestment: async () => {
     const result = await kycService.getKYCStatus();
-    return result.isSubmitted;
+    return result.status === 'approved';
+  },
+
+  /**
+   * Comprehensive KYC check for investment gates
+   * @returns {Promise<{ allowed: boolean, status: string, rejectionReason: string|null }>}
+   */
+  checkInvestmentKYC: async () => {
+    const result = await kycService.getKYCStatus();
+    return {
+      allowed: result.status === 'approved',
+      status: result.status,
+      rejectionReason: result.rejectionReason,
+    };
   },
 };

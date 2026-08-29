@@ -27,7 +27,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
  *   onClose (function)          - Called when modal is dismissed
  *   onNavigateToKYC (function)  - Called when user clicks "Verify KYC"
  */
-const KycRequiredModal = ({ visible, onClose, onNavigateToKYC }) => {
+const KycRequiredModal = ({ visible, status = 'not_submitted', rejectionReason, onClose, onNavigateToKYC }) => {
   const { colors: themeColors, isDarkMode } = useTheme();
   const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
 
@@ -86,6 +86,39 @@ const KycRequiredModal = ({ visible, onClose, onNavigateToKYC }) => {
     }
   };
 
+  const isPending = status === 'pending';
+  const isRejected = status === 'rejected';
+
+  const modalTitle = isPending
+    ? 'KYC Approval Pending'
+    : isRejected
+    ? 'KYC Verification Rejected'
+    : 'Submit KYC before Investment';
+
+  const modalSubtitle = isPending
+    ? 'Your KYC is approval pending. Please wait until the Growvest team approves your verification before starting a new investment.'
+    : isRejected
+    ? (rejectionReason ? `Your KYC was rejected: "${rejectionReason}". Please resubmit valid documents.` : 'Your KYC verification was rejected. Please resubmit valid documents to unlock investments.')
+    : 'As per regulatory standards, you must complete your KYC verification before making any investments or joining plans.';
+
+  const modalGradient = isPending
+    ? ['#78350F', '#B45309', '#D97706']
+    : isRejected
+    ? ['#7F1D1D', '#B91C1C', '#DC2626']
+    : ['#0E3D23', '#1A5C39', '#2E8B5A'];
+
+  const modalIcon = isPending
+    ? 'clock-outline'
+    : isRejected
+    ? 'shield-alert-outline'
+    : 'shield-lock-outline';
+
+  const primaryBtnLabel = isPending
+    ? 'View KYC Status'
+    : isRejected
+    ? 'Resubmit KYC'
+    : 'Verify KYC';
+
   return (
     <Modal
       transparent
@@ -110,47 +143,47 @@ const KycRequiredModal = ({ visible, onClose, onNavigateToKYC }) => {
               {/* Header Decorative Icon */}
               <View style={styles.iconContainer}>
                 <LinearGradient
-                  colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+                  colors={modalGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.iconCircle}
                 >
-                  <MaterialCommunityIcons name="shield-lock-outline" size={38} color="#D4A843" />
+                  <MaterialCommunityIcons name={modalIcon} size={38} color="#FFFFFF" />
                 </LinearGradient>
               </View>
 
               {/* Title & Body */}
-              <Text style={styles.title}>Submit KYC before Investment</Text>
-              <Text style={styles.subtitle}>
-                As per regulatory standards, you must complete your KYC verification before making any investments or joining plans.
-              </Text>
+              <Text style={styles.title}>{modalTitle}</Text>
+              <Text style={styles.subtitle}>{modalSubtitle}</Text>
 
               {/* Benefit Badges */}
               <View style={styles.benefitBox}>
                 <View style={styles.benefitItem}>
-                  <MaterialCommunityIcons name="check-decagram" size={18} color="#1A5C39" />
-                  <Text style={styles.benefitText}>Instant digital verification</Text>
+                  <MaterialCommunityIcons name="check-decagram" size={18} color={isPending ? '#D97706' : isRejected ? '#DC2626' : '#1A5C39'} />
+                  <Text style={styles.benefitText}>
+                    {isPending ? 'Under review by Growvest compliance' : isRejected ? 'Quick document correction' : 'Instant digital verification'}
+                  </Text>
                 </View>
                 <View style={styles.benefitItem}>
-                  <MaterialCommunityIcons name="lock-open-outline" size={18} color="#1A5C39" />
+                  <MaterialCommunityIcons name="lock-open-outline" size={18} color={isPending ? '#D97706' : isRejected ? '#DC2626' : '#1A5C39'} />
                   <Text style={styles.benefitText}>Unlocks Savings, Chit & Pocket Money</Text>
                 </View>
               </View>
 
-              {/* Primary Action: Verify KYC */}
+              {/* Primary Action */}
               <TouchableOpacity
                 activeOpacity={0.88}
                 onPress={handleVerifyPress}
                 style={styles.primaryBtnOuter}
               >
                 <LinearGradient
-                  colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+                  colors={modalGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.primaryBtn}
                 >
-                  <MaterialCommunityIcons name="shield-check-outline" size={20} color="#F8FAF9" />
-                  <Text style={styles.primaryBtnText}>Verify KYC</Text>
+                  <MaterialCommunityIcons name={isPending ? 'eye-outline' : 'shield-check-outline'} size={20} color="#F8FAF9" />
+                  <Text style={styles.primaryBtnText}>{primaryBtnLabel}</Text>
                 </LinearGradient>
               </TouchableOpacity>
 
@@ -160,7 +193,9 @@ const KycRequiredModal = ({ visible, onClose, onNavigateToKYC }) => {
                 onPress={onClose}
                 style={styles.secondaryBtn}
               >
-                <Text style={styles.secondaryBtnText}>Maybe Later</Text>
+                <Text style={styles.secondaryBtnText}>
+                  {isPending ? 'Close' : 'Maybe Later'}
+                </Text>
               </TouchableOpacity>
             </Animated.View>
           </TouchableWithoutFeedback>

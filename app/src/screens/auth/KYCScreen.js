@@ -483,41 +483,53 @@ const KYCScreen = ({ navigation }) => {
         ))}
       </View>
 
-      <ScrollView ref={scrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        {renderStep()}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+      >
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={[styles.content, { paddingBottom: 180 }]}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={true}
+          showsVerticalScrollIndicator={false}
+        >
+          {renderStep()}
 
-        {/* Navigation Buttons */}
-        <View style={styles.navButtons}>
-          {currentStep > 0 && (
-            <TouchableOpacity style={styles.prevBtn} onPress={handlePrev} activeOpacity={0.8}>
-              <MaterialCommunityIcons name="chevron-left" size={20} color={colors.textSecondary} />
-              <Text style={styles.prevBtnText}>Previous</Text>
-            </TouchableOpacity>
-          )}
+          {/* Navigation Buttons */}
+          <View style={styles.navButtons}>
+            {currentStep > 0 && (
+              <TouchableOpacity style={styles.prevBtn} onPress={handlePrev} activeOpacity={0.8}>
+                <MaterialCommunityIcons name="chevron-left" size={20} color={colors.textSecondary} />
+                <Text style={styles.prevBtnText}>Previous</Text>
+              </TouchableOpacity>
+            )}
 
-          {currentStep < 3 ? (
-            <TouchableOpacity style={styles.nextBtn} onPress={handleNext} activeOpacity={0.85}>
-              <LinearGradient colors={['#0E3D23', '#1C6B3F']} style={styles.nextBtnGradient}>
-                <Text style={styles.nextBtnText}>Next Step</Text>
-                <MaterialCommunityIcons name="chevron-right" size={20} color={colors.white} />
-              </LinearGradient>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={[styles.nextBtn, saving && styles.nextBtnDisabled]}
-              onPress={handleSubmit}
-              disabled={saving}
-              activeOpacity={0.85}
-            >
-              <LinearGradient colors={['#0E3D23', '#1C6B3F']} style={styles.nextBtnGradient}>
-                <Text style={styles.nextBtnText}>{saving ? 'Submitting...' : 'Submit KYC'}</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-        </View>
+            {currentStep < 3 ? (
+              <TouchableOpacity style={styles.nextBtn} onPress={handleNext} activeOpacity={0.85}>
+                <LinearGradient colors={['#0E3D23', '#1C6B3F']} style={styles.nextBtnGradient}>
+                  <Text style={styles.nextBtnText}>Next Step</Text>
+                  <MaterialCommunityIcons name="chevron-right" size={20} color={colors.white} />
+                </LinearGradient>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={[styles.nextBtn, saving && styles.nextBtnDisabled]}
+                onPress={handleSubmit}
+                disabled={saving}
+                activeOpacity={0.85}
+              >
+                <LinearGradient colors={['#0E3D23', '#1C6B3F']} style={styles.nextBtnGradient}>
+                  <Text style={styles.nextBtnText}>{saving ? 'Submitting...' : 'Submit KYC'}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+          </View>
 
-        <View style={{ height: 40 }} />
-      </ScrollView>
+          <View style={{ height: 60 }} />
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Date Picker Modal */}
       <Modal visible={dobModalVisible} transparent animationType="slide" onRequestClose={() => setDobModalVisible(false)}>

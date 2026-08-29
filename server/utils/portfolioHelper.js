@@ -210,15 +210,11 @@ async function getUserPortfolioSummary(userIdInput) {
   const walletBalance = Number(user.balance) || 0;
 
   // ─── 5. AGGREGATION ─────────────────────────────────────────────────────────
-  const totalInvested = totalDurationInvested + totalChitInvested + pocketMoneyInvested;
+  // Current active pocket money holding is pocketMoneyRemaining (active principal remaining to be released)
+  const totalInvested = totalDurationInvested + totalChitInvested + pocketMoneyRemaining;
   const totalLocked = totalDurationLocked + totalChitLocked + pocketMoneyRemaining;
 
-  // totalBalance = what the user has committed + accrued interest
-  // NOTE: Do NOT add walletBalance here — walletBalance from investment approval is
-  // already reflected in totalDurationInvested (double-counting guard).
-  // walletBalance from maturity withdrawals is separate liquid cash — add it ONLY
-  // if user.balance does NOT overlap with active investment principal.
-  // Safest: exclude walletBalance from totalBalance entirely (it's in availableToWithdraw).
+  // totalBalance = what the user currently has invested + accrued interest
   const totalBalance = totalInvested + totalAccruedInterest;
 
   // availableToWithdraw = truly liquid right now in app (matured deposits + wallet cash + chit auction winnings)
@@ -251,6 +247,9 @@ async function getUserPortfolioSummary(userIdInput) {
       totalInterestEarned: totalAccruedInterest,
       totalEarned: totalAccruedInterest,
       totalInterest: totalAccruedInterest,
+      pocketMoneyRemaining,
+      pocketMoneyInvested,
+      pocketMoneyReleased,
       availableToWithdraw,
       maturedAvailableOnly: maturedWithdrawalAvailable,
       walletBalance,

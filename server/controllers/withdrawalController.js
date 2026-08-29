@@ -60,6 +60,7 @@ exports.createWithdrawal = async (req, res) => {
 
     const newWithdrawal = new Withdrawal({
       userId: user._id,
+      investmentId: targetInv ? targetInv._id : (mongoose.Types.ObjectId.isValid(withdrawType) ? withdrawType : undefined),
       amount,
       upiId,
       userName,
@@ -282,15 +283,16 @@ exports.updateWithdrawalStatus = async (req, res) => {
       );
 
       // If this withdrawal is linked to an investment, mark that investment as withdrawn
-      if (updatedWithdrawal.investmentId) {
+      const targetInvId = updatedWithdrawal.investmentId || (mongoose.Types.ObjectId.isValid(withdrawal.withdrawType) ? withdrawal.withdrawType : null);
+      if (targetInvId) {
         try {
           const Investment = require('../models/Investment');
-          await Investment.findByIdAndUpdate(updatedWithdrawal.investmentId, {
+          await Investment.findByIdAndUpdate(targetInvId, {
             status: 'withdrawn',
             withdrawalStatus: 'withdrawn',
             eligibilityStatus: 'withdrawn',
           });
-          console.log(`[withdrawalController] Investment ${updatedWithdrawal.investmentId} marked as withdrawn.`);
+          console.log(`[withdrawalController] Investment ${targetInvId} marked as withdrawn.`);
         } catch (invErr) {
           console.warn('[withdrawalController] Could not mark investment as withdrawn (non-fatal):', invErr.message);
         }
