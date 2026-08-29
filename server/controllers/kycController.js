@@ -3,6 +3,39 @@ const User = require('../models/User');
 const fs = require('fs');
 const path = require('path');
 
+const parseDateOfBirth = (rawDob) => {
+  if (!rawDob) return null;
+  if (rawDob instanceof Date && !isNaN(rawDob.getTime())) return rawDob;
+  
+  if (typeof rawDob === 'string') {
+    const trimmed = rawDob.trim();
+    // Match DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
+    const dmyMatch = trimmed.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
+    if (dmyMatch) {
+      const day = parseInt(dmyMatch[1], 10);
+      const month = parseInt(dmyMatch[2], 10) - 1; // 0-indexed month
+      const year = parseInt(dmyMatch[3], 10);
+      const d = new Date(Date.UTC(year, month, day));
+      if (!isNaN(d.getTime())) return d;
+    }
+
+    // Match YYYY-MM-DD
+    const ymdMatch = trimmed.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
+    if (ymdMatch) {
+      const year = parseInt(ymdMatch[1], 10);
+      const month = parseInt(ymdMatch[2], 10) - 1;
+      const day = parseInt(ymdMatch[3], 10);
+      const d = new Date(Date.UTC(year, month, day));
+      if (!isNaN(d.getTime())) return d;
+    }
+
+    // Fallback standard parse
+    const fallback = new Date(trimmed);
+    if (!isNaN(fallback.getTime())) return fallback;
+  }
+  return null;
+};
+
 // @desc    Submit KYC
 // @route   POST /api/kyc/submit
 // @access  Private
@@ -29,7 +62,7 @@ exports.submitKYC = async (req, res) => {
       userId,
       fullName: req.body.fullName || '',
       fatherOrHusbandName: req.body.fatherOrHusbandName || '',
-      dob: req.body.dob ? new Date(req.body.dob) : null,
+      dob: parseDateOfBirth(req.body.dob),
       gender: req.body.gender || '',
       address: req.body.address || '',
       city: req.body.city || '',

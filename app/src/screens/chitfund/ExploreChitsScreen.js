@@ -198,14 +198,9 @@ const ExploreChitsScreen = ({ navigation }) => {
                 <TouchableOpacity
                   style={[styles.joinBtnOuter, (isFull || hasJoined || isClosed) && styles.joinBtnDisabled]}
                   activeOpacity={0.85}
-                  onPress={async () => {
+                  onPress={() => {
                     if (!isFull && !hasJoined && !isClosed) {
-                      const isSubmitted = await kycService.isKYCSubmittedForInvestment();
-                      if (!isSubmitted) {
-                        setKycModalVisible(true);
-                      } else {
-                        navigation.navigate('JoinChit', { chitId: chit._id });
-                      }
+                      navigation.navigate('JoinChit', { chitId: chit._id });
                     }
                   }}
                   disabled={isFull || hasJoined || isClosed}
