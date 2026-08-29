@@ -207,15 +207,7 @@ const HomeScreen = ({ navigation }) => {
     {
       label: 'New Investment',
       image: require('../../../assets/add.png'),
-      onPress: async () => {
-        const kycCheck = await kycService.checkInvestmentKYC();
-        if (!kycCheck.allowed) {
-          setKycStatusInfo({ status: kycCheck.status, rejectionReason: kycCheck.rejectionReason });
-          setKycModalVisible(true);
-          return;
-        }
-        navigation.navigate('InvestmentAmount');
-      },
+      onPress: () => navigation.navigate('InvestmentAmount'),
     },
     {
       label: 'My Investments',

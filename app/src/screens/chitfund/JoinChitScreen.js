@@ -31,6 +31,7 @@ const JoinChitScreen = ({ navigation, route }) => {
   const [processing, setProcessing] = useState(false);
   const [userData, setUserData] = useState(null);
   const [kycModalVisible, setKycModalVisible] = useState(false);
+  const [kycStatusInfo, setKycStatusInfo] = useState({ status: 'not_submitted', rejectionReason: null });
 
   React.useEffect(() => {
     fetchChitDetails();
@@ -61,10 +62,11 @@ const JoinChitScreen = ({ navigation, route }) => {
   const handleJoin = async () => {
     if (!agreed) return;
 
-    // KYC Check
-    const isSubmitted = await kycService.isKYCSubmittedForInvestment();
-    if (!isSubmitted) {
+    // KYC Check — must be approved before joining chit
+    const kycCheck = await kycService.checkInvestmentKYC();
+    if (!kycCheck.allowed) {
       setShowConfirm(false);
+      setKycStatusInfo({ status: kycCheck.status, rejectionReason: kycCheck.rejectionReason });
       setKycModalVisible(true);
       return;
     }
@@ -306,6 +308,8 @@ const JoinChitScreen = ({ navigation, route }) => {
       {/* KYC Required Modal */}
       <KycRequiredModal
         visible={kycModalVisible}
+        status={kycStatusInfo.status}
+        rejectionReason={kycStatusInfo.rejectionReason}
         onClose={() => setKycModalVisible(false)}
         onNavigateToKYC={() => navigation.navigate('KYC')}
       />

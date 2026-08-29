@@ -251,12 +251,6 @@ const ProfileScreen = ({ navigation }) => {
             <Text style={styles.profileName}>{(userData || authUser)?.name || (userData || authUser)?.username || 'User'}</Text>
             <MaterialCommunityIcons name="check-decagram" size={18} color={colors.primary} />
           </View>
-          <Text style={styles.profileMeta}>
-            {(userData || authUser)?.email || ''}{(userData || authUser)?.mobileNumber ? ' • ' + (userData || authUser).mobileNumber : ''}
-          </Text>
-          {(userData || authUser)?.createdAt && (
-            <Text style={styles.joinDate}>Member since {formatDate((userData || authUser).createdAt)}</Text>
-          )}
         </View>
 
         {/* Stats Row */}

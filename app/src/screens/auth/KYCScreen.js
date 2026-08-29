@@ -246,9 +246,17 @@ const KYCScreen = ({ navigation }) => {
     if (!validateStep(3)) return;
     setSaving(true);
     try {
+      let formattedDob = form.dob;
+      if (typeof form.dob === 'string' && form.dob.includes('/')) {
+        const [d, m, y] = form.dob.split('/');
+        if (d && m && y && y.length === 4) {
+          formattedDob = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+        }
+      }
+
       const payload = {
         ...form,
-        dob: form.dob,
+        dob: formattedDob,
         gender: form.gender,
         pincode: form.pincode,
         aadhaarNumber: form.aadhaarNumber,

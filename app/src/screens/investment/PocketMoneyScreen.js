@@ -115,13 +115,8 @@ const PocketMoneyScreen = ({ navigation }) => {
   const activePlan = activePlans.find(p => p._id === selectedPlanId) || (activePlans.length > 0 ? activePlans[0] : null);
   const completedPlans = getCompletedPlans();
 
-  const handleInvestMore = async () => {
-    const isSubmitted = await kycService.isKYCSubmittedForInvestment();
-    if (!isSubmitted) {
-      setKycModalVisible(true);
-    } else {
-      navigation.navigate('PocketMoneyAmount');
-    }
+  const handleInvestMore = () => {
+    navigation.navigate('PocketMoneyAmount');
   };
 
   return (
