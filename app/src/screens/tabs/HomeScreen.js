@@ -202,11 +202,21 @@ const HomeScreen = ({ navigation }) => {
     : nextUnlockDate ? `Unlocks ${nextUnlockDate}` : '₹0.00';
   const availableIcon = isAvailable ? 'wallet-outline' : 'lock-outline';
 
+  const [kycStatusInfo, setKycStatusInfo] = useState({ status: 'not_submitted', rejectionReason: null });
+
   const quickActions = [
     {
       label: 'New Investment',
       image: require('../../../assets/add.png'),
-      onPress: () => navigation.navigate('InvestmentAmount'),
+      onPress: async () => {
+        const kycCheck = await kycService.checkInvestmentKYC();
+        if (!kycCheck.allowed) {
+          setKycStatusInfo({ status: kycCheck.status, rejectionReason: kycCheck.rejectionReason });
+          setKycModalVisible(true);
+          return;
+        }
+        navigation.navigate('InvestmentAmount');
+      },
     },
     {
       label: 'My Investments',
@@ -425,6 +435,8 @@ const HomeScreen = ({ navigation }) => {
       {/* ── KYC Required Modal ── */}
       <KycRequiredModal
         visible={kycModalVisible}
+        status={kycStatusInfo.status}
+        rejectionReason={kycStatusInfo.rejectionReason}
         onClose={() => setKycModalVisible(false)}
         onNavigateToKYC={() => navigation.navigate('KYC')}
       />

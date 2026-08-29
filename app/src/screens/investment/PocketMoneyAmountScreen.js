@@ -26,6 +26,7 @@ const PocketMoneyAmountScreen = ({ navigation }) => {
   const [userData, setUserData] = useState(null);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [kycModalVisible, setKycModalVisible] = useState(false);
+  const [kycStatusInfo, setKycStatusInfo] = useState({ status: 'not_submitted', rejectionReason: null });
 
   useEffect(() => {
     loadUserData();
@@ -56,9 +57,10 @@ const PocketMoneyAmountScreen = ({ navigation }) => {
       return;
     }
 
-    // KYC Check
-    const isSubmitted = await kycService.isKYCSubmittedForInvestment();
-    if (!isSubmitted) {
+    // KYC Check — must be approved before investing
+    const kycCheck = await kycService.checkInvestmentKYC();
+    if (!kycCheck.allowed) {
+      setKycStatusInfo({ status: kycCheck.status, rejectionReason: kycCheck.rejectionReason });
       setKycModalVisible(true);
       return;
     }
@@ -305,6 +307,8 @@ const PocketMoneyAmountScreen = ({ navigation }) => {
       {/* KYC Required Modal */}
       <KycRequiredModal
         visible={kycModalVisible}
+        status={kycStatusInfo.status}
+        rejectionReason={kycStatusInfo.rejectionReason}
         onClose={() => setKycModalVisible(false)}
         onNavigateToKYC={() => navigation.navigate('KYC')}
       />
