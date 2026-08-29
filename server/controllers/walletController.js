@@ -15,8 +15,12 @@ exports.getCoinWallet = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(50);
 
+    const balance = Number(user.coinBalance) || Number(user.coins) || 0;
+
     res.json({
-      coinBalance: user.coinBalance || 0,
+      coinBalance: balance,
+      totalCoins: balance,
+      coins: balance,
       transactions,
     });
   } catch (error) {
