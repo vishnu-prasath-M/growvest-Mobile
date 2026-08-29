@@ -104,10 +104,11 @@ const HomeScreen = ({ navigation }) => {
 
       // Fetch user's actual earned coins balance from backend DB
       try {
-        const coinsRes = await api.get('/referral/coins');
-        setCoinsBalance(coinsRes.data?.totalCoins ?? coinsRes.data?.coins ?? 0);
+        const coinsRes = await api.get('/wallet/coins');
+        const coins = coinsRes.data?.coinBalance ?? coinsRes.data?.totalCoins ?? coinsRes.data?.coins ?? data?.user?.coinBalance ?? data?.user?.coins ?? 0;
+        setCoinsBalance(coins);
       } catch (coinErr) {
-        setCoinsBalance(data?.user?.coins || authUser?.coins || 0);
+        setCoinsBalance(data?.user?.coinBalance ?? data?.user?.coins ?? authUser?.coins ?? 0);
       }
 
       // Register device token for Standalone APK push notifications

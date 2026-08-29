@@ -202,12 +202,13 @@ async function getUserPortfolioSummary(userIdInput) {
     }
   });
 
-  // ─── 4. WALLET BALANCE ───────────────────────────────────────────────────────
-  // user.balance is ONLY liquid cash (from maturity withdrawals, not from investment approval)
-  // If the old code incorrectly credited user.balance on approval, those records will
-  // show inflated wallet. The correct fix is to NOT add walletBalance to totalBalance.
-  // walletBalance is used ONLY for availableToWithdraw.
-  const walletBalance = Number(user.balance) || 0;
+  // ─── 4. PENDING WITHDRAWALS ────────────────────────────────────────────────
+  const Withdrawal = require('../models/Withdrawal');
+  const pendingWithdrawals = await Withdrawal.find({
+    $or: userOrConditions,
+    status: 'pending',
+  });
+  const pendingWithdrawalAmount = pendingWithdrawals.reduce((sum, w) => sum + (Number(w.amount) || 0), 0);
 
   // ─── 5. AGGREGATION ─────────────────────────────────────────────────────────
   // Current active pocket money holding is pocketMoneyRemaining (active principal remaining to be released)
@@ -217,9 +218,8 @@ async function getUserPortfolioSummary(userIdInput) {
   // totalBalance = what the user currently has invested + accrued interest
   const totalBalance = totalInvested + totalAccruedInterest;
 
-  // availableToWithdraw = truly liquid right now in app (matured deposits + wallet cash + chit auction winnings)
-  // NOTE: pocketMoneyReleased is NOT included because Pocket Money payouts are paid directly to the user by Admin.
-  const availableToWithdraw = maturedWithdrawalAvailable + walletBalance + chitWithdrawalAvailable;
+  // availableToWithdraw = truly liquid right now in app (matured/eligible active deposits + chit winnings - pending withdrawal requests)
+  const availableToWithdraw = Math.max(0, maturedWithdrawalAvailable + chitWithdrawalAvailable - pendingWithdrawalAmount);
 
   // Next unlock date — earliest maturity date among locked investments
   const lockedInvestments = enrichedInvestments.filter(i => i.isLocked && i.maturityDate);
@@ -229,6 +229,8 @@ async function getUserPortfolioSummary(userIdInput) {
     nextUnlockDate = sorted[0].maturityDate;
   }
 
+  const userCoinBalance = Number(user.coinBalance) || Number(user.coins) || 0;
+
   return {
     user: {
       _id: user._id,
@@ -237,7 +239,9 @@ async function getUserPortfolioSummary(userIdInput) {
       email: user.email,
       mobileNumber: user.mobileNumber,
       role: user.role,
-      balance: walletBalance,
+      balance: totalBalance,
+      coinBalance: userCoinBalance,
+      coins: userCoinBalance,
     },
     balances: {
       totalBalance,
@@ -252,26 +256,25 @@ async function getUserPortfolioSummary(userIdInput) {
       pocketMoneyReleased,
       availableToWithdraw,
       maturedAvailableOnly: maturedWithdrawalAvailable,
-      walletBalance,
-      nextUnlockDate,   // ISO string of next investment maturity date
-      // Chit breakdowns
+      walletBalance: 0,
+      coinBalance: userCoinBalance,
+      coins: userCoinBalance,
       totalChitInvested,
       totalChitWinningAmount,
       chitWithdrawalAvailable,
-      // Pocket Money breakdowns
-      pocketMoneyInvested,
-      pocketMoneyReleased,
-      pocketMoneyRemaining,
+      activeChitsCount,
+      nextUnlockDate,
     },
+    investments: enrichedInvestments,
+    chitMemberships,
+    pocketMonies,
     stats: {
       totalInvestments: enrichedInvestments.filter(i => i.status === 'approved').length + activeChitsCount + pocketMonies.filter(pm => pm.status === 'active').length,
       activeInvestmentsCount: enrichedInvestments.filter(i => !['rejected', 'withdrawn'].includes(i.status)).length + activeChitsCount + pocketMonies.filter(pm => pm.status === 'active').length,
       activeChitsCount,
       activePocketMoneyCount: pocketMonies.filter(pm => pm.status === 'active').length,
+      pendingRequests: 0,
     },
-    investments: enrichedInvestments,
-    chitMemberships,
-    pocketMonies,
   };
 }
 
