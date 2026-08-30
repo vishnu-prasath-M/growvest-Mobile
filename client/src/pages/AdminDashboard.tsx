@@ -790,34 +790,52 @@ const AdminDashboard = () => {
       iconColor: "text-blue-600",
     },
     {
-      label: "Total Investments",
-      value: dashboardStats.totalInvestments || 0,
-      sub: `${dashboardStats.pendingInvestments || 0} pending`,
+      label: "Saving Plan Investments",
+      value: `₹${(dashboardStats.savingInvestments?.total || dashboardStats.revenue || 0).toLocaleString("en-IN")}`,
+      sub: `${dashboardStats.savingInvestments?.count || dashboardStats.approvedInvestments || 0} approved investments`,
       icon: DollarSign,
-      color: "bg-green-50",
-      iconColor: "text-green-600",
+      color: "bg-emerald-50",
+      iconColor: "text-emerald-600",
     },
     {
-      label: "Total Revenue",
-      value: `₹${(dashboardStats.revenue || 0).toLocaleString("en-IN")}`,
-      sub: "From approved investments",
+      label: "Total Chit Investments",
+      value: `₹${(dashboardStats.chitInvestments?.total || 0).toLocaleString("en-IN")}`,
+      sub: `${dashboardStats.chitInvestments?.count || dashboardStats.activeChitMembers || 0} enrolled members`,
       icon: TrendingUp,
       color: "bg-purple-50",
       iconColor: "text-purple-600",
+    },
+    {
+      label: "Total Pocket Money Investments",
+      value: `₹${(dashboardStats.pocketMoneyInvestments?.total || dashboardStats.pocketMoney?.invested || 0).toLocaleString("en-IN")}`,
+      sub: `${dashboardStats.pocketMoneyInvestments?.count || dashboardStats.pocketMoney?.active || 0} active plans`,
+      icon: Wallet,
+      color: "bg-amber-50",
+      iconColor: "text-amber-600",
+    },
+    {
+      label: "Total Platform Revenue",
+      value: `₹${(dashboardStats.totalOverallRevenue || ((dashboardStats.revenue || 0) + (dashboardStats.pocketMoney?.invested || 0) + (dashboardStats.chitInvestments?.total || 0))).toLocaleString("en-IN")}`,
+      sub: "Across all investment streams",
+      icon: Shield,
+      color: "bg-indigo-50",
+      iconColor: "text-indigo-600",
     },
     {
       label: "Pending Actions",
       value: (dashboardStats.pendingInvestments || 0) + (dashboardStats.pendingWithdrawals || 0) + (dashboardStats.pendingKYC || 0),
       sub: `${dashboardStats.pendingKYC || 0} KYC, ${dashboardStats.pendingWithdrawals || 0} withdrawals`,
       icon: Clock,
-      color: "bg-amber-50",
-      iconColor: "text-amber-600",
+      color: "bg-rose-50",
+      iconColor: "text-rose-600",
     },
   ] : [
     { label: "Total Users", value: 0, sub: "Loading...", icon: Users, color: "bg-blue-50", iconColor: "text-blue-600" },
-    { label: "Total Investments", value: 0, sub: "Loading...", icon: DollarSign, color: "bg-green-50", iconColor: "text-green-600" },
-    { label: "Total Revenue", value: "₹0", sub: "Loading...", icon: TrendingUp, color: "bg-purple-50", iconColor: "text-purple-600" },
-    { label: "Pending Actions", value: 0, sub: "Loading...", icon: Clock, color: "bg-amber-50", iconColor: "text-amber-600" },
+    { label: "Saving Plan Investments", value: "₹0", sub: "Loading...", icon: DollarSign, color: "bg-emerald-50", iconColor: "text-emerald-600" },
+    { label: "Total Chit Investments", value: "₹0", sub: "Loading...", icon: TrendingUp, color: "bg-purple-50", iconColor: "text-purple-600" },
+    { label: "Total Pocket Money Investments", value: "₹0", sub: "Loading...", icon: Wallet, color: "bg-amber-50", iconColor: "text-amber-600" },
+    { label: "Total Platform Revenue", value: "₹0", sub: "Loading...", icon: Shield, color: "bg-indigo-50", iconColor: "text-indigo-600" },
+    { label: "Pending Actions", value: 0, sub: "Loading...", icon: Clock, color: "bg-rose-50", iconColor: "text-rose-600" },
   ];
 
   return (
@@ -964,7 +982,7 @@ const AdminDashboard = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4 }}
             >
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
                 {overviewCards.map((c, i) => {
                   const Icon = c.icon;
                   return (

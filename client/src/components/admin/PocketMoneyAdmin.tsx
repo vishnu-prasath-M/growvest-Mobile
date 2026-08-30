@@ -483,12 +483,23 @@ export default function PocketMoneyAdmin({ token }: PocketMoneyAdminProps) {
                                 Release
                               </Button>
                             );
+                          } else if ((item.totalPaidOut || 0) > 0) {
+                            return (
+                              <div className="flex flex-col items-center gap-1">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                                  <CheckCircle className="w-3 h-3 text-blue-600" />
+                                  Payout Released
+                                </span>
+                              </div>
+                            );
                           } else {
                             return (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                                <CheckCircle className="w-3 h-3 text-blue-600" />
-                                Payout Released
-                              </span>
+                              <div className="flex flex-col items-center gap-1">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                  <Clock className="w-3 h-3 text-amber-600" />
+                                  Upcoming
+                                </span>
+                              </div>
                             );
                           }
                         })()

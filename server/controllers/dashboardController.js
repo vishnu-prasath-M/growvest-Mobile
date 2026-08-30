@@ -79,6 +79,7 @@ exports.getAdminStats = async (req, res) => {
       totalNotifications,
       revenueResult,
       pocketMoneyStatsResult,
+      chitStatsResult,
     ] = await Promise.all([
       // Total Users
       User.countDocuments({ role: { $ne: 'admin' } }),
@@ -110,10 +111,10 @@ exports.getAdminStats = async (req, res) => {
       ChitMember.countDocuments({ status: 'active' }),
       // Total Notifications
       Notification.countDocuments(),
-      // Total Revenue (sum of all approved investment amounts)
+      // Total Revenue (sum of all approved saving investment amounts)
       Investment.aggregate([
         { $match: { status: 'approved' } },
-        { $group: { _id: null, total: { $sum: '$amount' } } },
+        { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } },
       ]),
       // Pocket Money Stats
       (async () => {
@@ -124,7 +125,8 @@ exports.getAdminStats = async (req, res) => {
               _id: null,
               invested: { $sum: '$investedAmount' },
               released: { $sum: '$totalPaidOut' },
-              remaining: { $sum: '$remainingAmount' }
+              remaining: { $sum: '$remainingAmount' },
+              count: { $sum: 1 }
             }
           }
         ]);
@@ -134,13 +136,39 @@ exports.getAdminStats = async (req, res) => {
           invested: r[0]?.invested || 0,
           released: r[0]?.released || 0,
           remaining: r[0]?.remaining || 0,
+          count: r[0]?.count || 0,
           active,
           completed
         };
+      })(),
+      // Chit Fund Stats (Total Paid Contributions across Members)
+      (async () => {
+        const ChitMember = require('../models/ChitMember');
+        const ChitPayment = require('../models/ChitPayment');
+        const [memAgg, payAgg] = await Promise.all([
+          ChitMember.aggregate([
+            { $match: { status: { $in: ['active', 'approved', 'completed'] } } },
+            { $group: { _id: null, total: { $sum: '$totalPaid' }, count: { $sum: 1 } } }
+          ]),
+          ChitPayment.aggregate([
+            { $match: { status: { $in: ['approved', 'completed', 'paid'] } } },
+            { $group: { _id: null, total: { $sum: '$amount' } } }
+          ])
+        ]);
+        const total = Math.max(memAgg[0]?.total || 0, payAgg[0]?.total || 0);
+        const count = memAgg[0]?.count || 0;
+        return { total, count };
       })()
     ]);
 
-    const revenue = revenueResult.length > 0 ? revenueResult[0].total : 0;
+    const savingRevenue = revenueResult.length > 0 ? revenueResult[0].total : 0;
+    const savingCount = revenueResult.length > 0 ? revenueResult[0].count : 0;
+    const pocketRevenue = pocketMoneyStatsResult.invested || 0;
+    const pocketCount = pocketMoneyStatsResult.count || 0;
+    const chitRevenue = chitStatsResult?.total || 0;
+    const chitCount = chitStatsResult?.count || 0;
+
+    const totalOverallRevenue = savingRevenue + pocketRevenue + chitRevenue;
 
     res.json({
       totalUsers,
@@ -158,7 +186,20 @@ exports.getAdminStats = async (req, res) => {
       pendingChitRequests,
       activeChitMembers,
       totalNotifications,
-      revenue,
+      revenue: savingRevenue,
+      totalOverallRevenue,
+      savingInvestments: {
+        total: savingRevenue,
+        count: savingCount,
+      },
+      pocketMoneyInvestments: {
+        total: pocketRevenue,
+        count: pocketCount,
+      },
+      chitInvestments: {
+        total: chitRevenue,
+        count: chitCount,
+      },
       pocketMoney: pocketMoneyStatsResult
     });
   } catch (error) {
