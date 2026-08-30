@@ -273,17 +273,13 @@ exports.releaseSinglePayout = async (req, res) => {
     const todayStr = now.toISOString().slice(0, 10);
     const idempotencyKey = `PM_${pocket._id}_${todayStr}_release_${payoutNum}`;
     
-    // Check if already released today to prevent double releases
-    const existingPayout = await PocketMoneyPayout.findOne({
+    // Check if a payout was already completed today
+    const alreadyReleasedToday = await PocketMoneyPayout.findOne({
       pocketMoneyId: pocket._id,
       status: 'released',
-      $or: [
-        { createdAt: { $gte: startOfToday } },
-        { payoutDate: { $gte: startOfToday } },
-        { payoutNumber: payoutNum }
-      ]
+      createdAt: { $gte: startOfToday }
     });
-    if (existingPayout) {
+    if (alreadyReleasedToday) {
       return res.status(400).json({ message: 'Payout already released for this plan today.' });
     }
     
@@ -297,20 +293,34 @@ exports.releaseSinglePayout = async (req, res) => {
       status: 'approved',
       referenceId: pocket._id,
       referenceType: 'PocketMoney',
-      description: `Pocket Money Payout Release #${payoutNum} (Manual Admin Release)`
+      description: `Pocket Money Payout Release #${payoutNum} (Admin Direct Release)`
     });
     await transaction.save();
     
-    const payout = new PocketMoneyPayout({
+    // Check if user had submitted a pending 'requested' payout record
+    let payout = await PocketMoneyPayout.findOne({
       pocketMoneyId: pocket._id,
-      userId: pocket.userId,
-      amount: amountToPay,
-      payoutDate: now,
-      payoutNumber: payoutNum,
-      idempotencyKey,
-      status: 'released',
-      transactionId: transaction._id
+      status: 'requested',
     });
+
+    if (payout) {
+      payout.status = 'released';
+      payout.amount = amountToPay;
+      payout.payoutDate = now;
+      payout.payoutNumber = payoutNum;
+      payout.transactionId = transaction._id;
+    } else {
+      payout = new PocketMoneyPayout({
+        pocketMoneyId: pocket._id,
+        userId: pocket.userId,
+        amount: amountToPay,
+        payoutDate: now,
+        payoutNumber: payoutNum,
+        idempotencyKey,
+        status: 'released',
+        transactionId: transaction._id
+      });
+    }
     await payout.save();
     
     const regularPayoutPart = amountToPay - (payoutNum === 10 ? (pocket.bonusAmount || 0) : 0);
