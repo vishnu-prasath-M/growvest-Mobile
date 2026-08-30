@@ -127,6 +127,13 @@ const runPocketMoneyPayouts = async () => {
   return processedCount;
 };
 
+// Helper: Get IST start of today
+const getStartOfToday = () => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
 // Helper: Get IST date string (YYYY-MM-DD)
 const getISTDateString = (dateInput) => {
   if (!dateInput) return '';
