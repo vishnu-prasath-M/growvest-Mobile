@@ -472,7 +472,16 @@ export default function PocketMoneyAdmin({ token }: PocketMoneyAdminProps) {
                           if (nextPayoutMidnight) nextPayoutMidnight.setHours(0, 0, 0, 0);
                           const isDue = !nextPayoutMidnight || nextPayoutMidnight.getTime() <= todayMidnight.getTime();
 
-                          if (isDue) {
+                          if (item.todayPayoutReleased || item.todayPayoutStatus === "released") {
+                            return (
+                              <div className="flex flex-col items-center gap-1">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                                  <CheckCircle className="w-3 h-3 text-blue-600" />
+                                  Payout Released
+                                </span>
+                              </div>
+                            );
+                          } else if (isDue) {
                             return (
                               <Button
                                 size="sm"

@@ -199,7 +199,35 @@ exports.getMyPocketMoney = async (req, res) => {
 exports.getAdminPocketMoneyList = async (req, res) => {
   try {
     const list = await PocketMoney.find().sort({ createdAt: -1 });
-    res.json(list);
+    const todayIST = getTodayISTString();
+
+    const enriched = await Promise.all(
+      list.map(async (pocket) => {
+        const pocketObj = pocket.toObject();
+
+        const payouts = await PocketMoneyPayout.find({ pocketMoneyId: pocket._id }).sort({ createdAt: -1 });
+        const todayPayout = payouts.find(p => getISTDateString(p.createdAt || p.payoutDate) === todayIST);
+
+        if (todayPayout) {
+          pocketObj.todayPayoutReleased = todayPayout.status === 'released';
+          pocketObj.todayPayoutRequested = todayPayout.status === 'requested';
+          pocketObj.todayPayoutStatus = todayPayout.status;
+        } else {
+          pocketObj.todayPayoutReleased = false;
+          pocketObj.todayPayoutRequested = false;
+          const nextDateIST = getISTDateString(pocket.nextPayoutDate);
+          if (nextDateIST > todayIST) {
+            pocketObj.todayPayoutStatus = 'upcoming';
+          } else {
+            pocketObj.todayPayoutStatus = 'due';
+          }
+        }
+
+        return pocketObj;
+      })
+    );
+
+    res.json(enriched);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching pocket money list for admin', error: error.message });
   }
@@ -343,16 +371,18 @@ exports.releaseSinglePayout = async (req, res) => {
       pocket.status = 'completed';
       pocket.completedAt = now;
     } else {
-      // Increment next payout date based on frequency
-      const nextDate = new Date(pocket.nextPayoutDate);
+      // Increment next payout date based on frequency from today/now
+      const baseDate = (pocket.nextPayoutDate && new Date(pocket.nextPayoutDate) > now)
+        ? new Date(pocket.nextPayoutDate)
+        : new Date(now);
       if (pocket.frequency === 'daily') {
-        nextDate.setDate(nextDate.getDate() + 1);
+        baseDate.setDate(baseDate.getDate() + 1);
       } else if (pocket.frequency === 'every_2_days') {
-        nextDate.setDate(nextDate.getDate() + 2);
+        baseDate.setDate(baseDate.getDate() + 2);
       } else if (pocket.frequency === 'weekly') {
-        nextDate.setDate(nextDate.getDate() + 7);
+        baseDate.setDate(baseDate.getDate() + 7);
       }
-      pocket.nextPayoutDate = nextDate;
+      pocket.nextPayoutDate = baseDate;
     }
     
     await pocket.save();
@@ -582,16 +612,18 @@ exports.confirmReleasePayout = async (req, res) => {
       pocket.status = 'completed';
       pocket.completedAt = now;
     } else {
-      // Calculate next payout date based on frequency
-      const nextDate = new Date(pocket.nextPayoutDate);
+      // Calculate next payout date based on frequency from today/now
+      const baseDate = (pocket.nextPayoutDate && new Date(pocket.nextPayoutDate) > now)
+        ? new Date(pocket.nextPayoutDate)
+        : new Date(now);
       if (pocket.frequency === 'daily') {
-        nextDate.setDate(nextDate.getDate() + 1);
+        baseDate.setDate(baseDate.getDate() + 1);
       } else if (pocket.frequency === 'every_2_days') {
-        nextDate.setDate(nextDate.getDate() + 2);
+        baseDate.setDate(baseDate.getDate() + 2);
       } else if (pocket.frequency === 'weekly') {
-        nextDate.setDate(nextDate.getDate() + 7);
+        baseDate.setDate(baseDate.getDate() + 7);
       }
-      pocket.nextPayoutDate = nextDate;
+      pocket.nextPayoutDate = baseDate;
     }
     
     await pocket.save();
