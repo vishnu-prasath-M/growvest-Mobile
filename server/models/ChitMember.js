@@ -137,6 +137,5 @@ const chitMemberSchema = new mongoose.Schema({
 // Indexes for fast lookup (users can join the same chit multiple times)
 chitMemberSchema.index({ userId: 1 });
 chitMemberSchema.index({ chitId: 1 });
-chitMemberSchema.index({ membershipId: 1 });
 
 module.exports = mongoose.model('ChitMember', chitMemberSchema);

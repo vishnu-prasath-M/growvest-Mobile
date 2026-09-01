@@ -36,14 +36,21 @@ const InvestmentsScreen = ({ navigation }) => {
   const [activeFilter, setActiveFilter] = useState('All');
   const [selectedDeposit, setSelectedDeposit] = useState(null);
 
+  const [portfolioSummary, setPortfolioSummary] = useState(null);
+
   const fetchAllInvestments = async () => {
     try {
-      // Fetch ALL investment types in parallel — all come from backend/DB
-      const [savingsRes, myChitsRes, pocketMoneyRes] = await Promise.allSettled([
+      // Fetch ALL investment types and portfolio summary in parallel
+      const [savingsRes, myChitsRes, pocketMoneyRes, profileRes] = await Promise.allSettled([
         investmentService.getInvestments(),
         chitFundService.getMyChits(),
         api.get('/pocket-money/my'),
+        userService.getUserProfile(),
       ]);
+
+      if (profileRes.status === 'fulfilled' && profileRes.value) {
+        setPortfolioSummary(profileRes.value);
+      }
 
       const savingsItems = (savingsRes.status === 'fulfilled' ? (savingsRes.value || []) : [])
         .map(inv => ({
@@ -138,21 +145,36 @@ const InvestmentsScreen = ({ navigation }) => {
 
   const filteredItems = allItems.filter((item) => {
     if (activeFilter === 'All') return true;
-    if (activeFilter === 'Active') return item.status === 'approved' || item.status === 'active';
+    if (activeFilter === 'Active') return (item.status === 'approved' || item.status === 'active') && item.status !== 'withdrawn';
     if (activeFilter === 'Pending') return item.status === 'pending';
     return true;
   });
 
-  // Summary totals
-  const totalInvested = allItems.reduce((s, i) => {
-    if (i._itemType === 'savings') return s + (i.status !== 'rejected' ? (i.amount || 0) : 0);
-    if (i._itemType === 'chit') return s + (i.amount || 0);
-    if (i._itemType === 'pocket_money') return s + (i.investedAmount || 0);
+  // Summary totals — strictly excludes withdrawn investments
+  const computedActiveInvested = allItems.reduce((s, i) => {
+    if (i._itemType === 'savings') {
+      const isWithdrawn = i.status === 'withdrawn' || i.withdrawalStatus === 'withdrawn';
+      return s + (i.status === 'approved' && !isWithdrawn ? (i.amount || 0) : 0);
+    }
+    if (i._itemType === 'chit') {
+      const isWithdrawn = i.hasWon && i.withdrawalStatus === 'completed';
+      return s + ((i.status === 'approved' || i.status === 'active') && !isWithdrawn ? (i.amount || 0) : 0);
+    }
+    if (i._itemType === 'pocket_money') {
+      return s + (i.status === 'active' ? (i.investedAmount || 0) : 0);
+    }
     return s;
   }, 0);
 
-  const totalEarned = allItems.reduce((s, i) => s + (i.interestEarned || 0), 0);
-  const activePlans = allItems.filter((i) => i.status === 'approved' || i.status === 'active').length;
+  const totalInvested = portfolioSummary?.totalInvested != null
+    ? portfolioSummary.totalInvested
+    : computedActiveInvested;
+
+  const totalEarned = portfolioSummary?.totalInterestEarned != null
+    ? portfolioSummary.totalInterestEarned
+    : allItems.reduce((s, i) => s + (i.interestEarned || 0), 0);
+
+  const activePlans = allItems.filter((i) => (i.status === 'approved' || i.status === 'active') && i.status !== 'withdrawn').length;
 
   if (loading) {
     return (
