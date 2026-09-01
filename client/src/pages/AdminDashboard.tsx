@@ -1011,128 +1011,107 @@ const AdminDashboard = () => {
                 })}
               </div>
 
-              {/* ── LIVE INCOMING REQUESTS & ACTIONS HUB ── */}
-              <div className="mb-6 sm:mb-8">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-heading font-bold text-foreground text-base sm:text-lg flex items-center gap-2">
-                    <Clock className="h-5 w-5 text-amber-600" />
-                    New Incoming Requests & Action Center
-                  </h3>
-                  {totalPendingActions > 0 && (
-                    <span className="text-xs font-body font-bold bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full border border-amber-200">
-                      {totalPendingActions} Pending Action{totalPendingActions > 1 ? "s" : ""}
-                    </span>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-                  {/* 1. Pending Withdrawals */}
+              {/* ── CONDITIONAL PENDING REQUEST ALERTS (ONLY SHOWS WHEN REQUESTS ARRIVE) ── */}
+              <div className="space-y-3 mb-6 sm:mb-8">
+                {/* 1. Pending Investments Alert */}
+                {pendingCount > 0 && (
                   <div
-                    onClick={() => setActiveTab("withdrawals")}
-                    className={`card-premium p-4 cursor-pointer transition-all hover:scale-[1.02] border ${
-                      wdPendingCount > 0 ? "border-amber-300 bg-amber-50/50" : "hover:border-primary/40"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="h-8 w-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
-                        <ArrowDownToLine className="h-4 w-4" />
-                      </div>
-                      <span className={`text-xs font-body font-bold px-2 py-0.5 rounded-full ${
-                        wdPendingCount > 0 ? "bg-rose-100 text-rose-700" : "bg-muted text-muted-foreground"
-                      }`}>
-                        {wdPendingCount} Pending
-                      </span>
-                    </div>
-                    <p className="font-heading font-bold text-sm text-foreground">Withdrawals</p>
-                    <p className="text-xs font-body text-muted-foreground mt-0.5">
-                      {wdPendingCount > 0 ? `${wdPendingCount} requests to pay` : "All paid & processed"}
-                    </p>
-                  </div>
-
-                  {/* 2. Pending KYC */}
-                  <div
-                    onClick={() => setActiveTab("kyc")}
-                    className={`card-premium p-4 cursor-pointer transition-all hover:scale-[1.02] border ${
-                      kycPendingCount > 0 ? "border-amber-300 bg-amber-50/50" : "hover:border-primary/40"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="h-8 w-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                        <Shield className="h-4 w-4" />
-                      </div>
-                      <span className={`text-xs font-body font-bold px-2 py-0.5 rounded-full ${
-                        kycPendingCount > 0 ? "bg-blue-100 text-blue-700" : "bg-muted text-muted-foreground"
-                      }`}>
-                        {kycPendingCount} Pending
-                      </span>
-                    </div>
-                    <p className="font-heading font-bold text-sm text-foreground">KYC Submissions</p>
-                    <p className="text-xs font-body text-muted-foreground mt-0.5">
-                      {kycPendingCount > 0 ? `${kycPendingCount} to verify` : "All KYC up-to-date"}
-                    </p>
-                  </div>
-
-                  {/* 3. Pending Investments */}
-                  <div
+                    className="rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-amber-100/80 transition-colors shadow-sm"
                     onClick={() => setActiveTab("pending")}
-                    className={`card-premium p-4 cursor-pointer transition-all hover:scale-[1.02] border ${
-                      pendingCount > 0 ? "border-amber-300 bg-amber-50/50" : "hover:border-primary/40"
-                    }`}
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="h-8 w-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                        <DollarSign className="h-4 w-4" />
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                        <DollarSign className="h-5 w-5" />
                       </div>
-                      <span className={`text-xs font-body font-bold px-2 py-0.5 rounded-full ${
-                        pendingCount > 0 ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground"
-                      }`}>
-                        {pendingCount} Pending
-                      </span>
+                      <div>
+                        <p className="text-sm font-body font-bold text-amber-900">
+                          {pendingCount} new investment{pendingCount > 1 ? "s" : ""} awaiting approval
+                        </p>
+                        <p className="text-xs font-body text-amber-700 mt-0.5">
+                          Click to review and approve or reject deposit requests
+                        </p>
+                      </div>
                     </div>
-                    <p className="font-heading font-bold text-sm text-foreground">Savings / Fixed</p>
-                    <p className="text-xs font-body text-muted-foreground mt-0.5">
-                      {pendingCount > 0 ? `${pendingCount} awaiting approval` : "No pending deposits"}
-                    </p>
+                    <Button size="sm" className="rounded-xl font-body bg-amber-600 hover:bg-amber-700 text-white w-full sm:w-auto shrink-0">
+                      Review Investments ({pendingCount})
+                    </Button>
                   </div>
+                )}
 
-                  {/* 4. Chit Funds Joins */}
+                {/* 2. Pending Withdrawals Alert */}
+                {wdPendingCount > 0 && (
                   <div
+                    className="rounded-2xl border border-rose-200 bg-rose-50 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-rose-100/80 transition-colors shadow-sm"
+                    onClick={() => setActiveTab("withdrawals")}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                        <ArrowDownToLine className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-body font-bold text-rose-900">
+                          {wdPendingCount} new withdrawal request{wdPendingCount > 1 ? "s" : ""} pending payment
+                        </p>
+                        <p className="text-xs font-body text-rose-700 mt-0.5">
+                          Click to verify UPI details and approve/mark as paid
+                        </p>
+                      </div>
+                    </div>
+                    <Button size="sm" className="rounded-xl font-body bg-rose-600 hover:bg-rose-700 text-white w-full sm:w-auto shrink-0">
+                      Review Withdrawals ({wdPendingCount})
+                    </Button>
+                  </div>
+                )}
+
+                {/* 3. Pending KYC Alert */}
+                {kycPendingCount > 0 && (
+                  <div
+                    className="rounded-2xl border border-blue-200 bg-blue-50 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-blue-100/80 transition-colors shadow-sm"
+                    onClick={() => setActiveTab("kyc")}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                        <Shield className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-body font-bold text-blue-900">
+                          {kycPendingCount} new KYC verification{kycPendingCount > 1 ? "s" : ""} submitted
+                        </p>
+                        <p className="text-xs font-body text-blue-700 mt-0.5">
+                          Click to review PAN and Aadhaar identity documents
+                        </p>
+                      </div>
+                    </div>
+                    <Button size="sm" className="rounded-xl font-body bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto shrink-0">
+                      Verify KYC ({kycPendingCount})
+                    </Button>
+                  </div>
+                )}
+
+                {/* 4. Pending Chit Fund Requests Alert */}
+                {(dashboardStats?.pendingChitRequests || 0) > 0 && (
+                  <div
+                    className="rounded-2xl border border-purple-200 bg-purple-50 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-purple-100/80 transition-colors shadow-sm"
                     onClick={() => setActiveTab("chits")}
-                    className="card-premium p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-primary/40"
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="h-8 w-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-                        <TrendingUp className="h-4 w-4" />
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                        <TrendingUp className="h-5 w-5" />
                       </div>
-                      <span className="text-xs font-body font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
-                        {chitActiveCount} Members
-                      </span>
-                    </div>
-                    <p className="font-heading font-bold text-sm text-foreground">Chit Funds</p>
-                    <p className="text-xs font-body text-muted-foreground mt-0.5">
-                      {dashboardStats?.activeChits || 0} active chit schemes
-                    </p>
-                  </div>
-
-                  {/* 5. Pocket Money Plans */}
-                  <div
-                    onClick={() => setActiveTab("pocket")}
-                    className="card-premium p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-primary/40"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="h-8 w-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                        <Wallet className="h-4 w-4" />
+                      <div>
+                        <p className="text-sm font-body font-bold text-purple-900">
+                          {dashboardStats.pendingChitRequests} new chit fund join/payment request{dashboardStats.pendingChitRequests > 1 ? "s" : ""}
+                        </p>
+                        <p className="text-xs font-body text-purple-700 mt-0.5">
+                          Click to approve chit scheme memberships and payments
+                        </p>
                       </div>
-                      <span className="text-xs font-body font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                        {pocketActiveCount} Active
-                      </span>
                     </div>
-                    <p className="font-heading font-bold text-sm text-foreground">Pocket Money</p>
-                    <p className="text-xs font-body text-muted-foreground mt-0.5">
-                      {dashboardStats?.pocketMoney?.completed || 0} completed cycles
-                    </p>
+                    <Button size="sm" className="rounded-xl font-body bg-purple-600 hover:bg-purple-700 text-white w-full sm:w-auto shrink-0">
+                      Review Chits ({dashboardStats.pendingChitRequests})
+                    </Button>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* ── UNIFIED REAL-TIME ACTIVITY STREAM ── */}
