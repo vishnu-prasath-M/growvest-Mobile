@@ -187,38 +187,28 @@ const JoinChitScreen = ({ navigation, route }) => {
 
       {/* Proceed Button */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
-        {alreadyJoined ? (
-          <View style={[styles.proceedBtnOuter, styles.proceedBtnDisabled]}>
-            <View style={[styles.proceedBtnGradient, { backgroundColor: colors.muted, borderRadius: 16, justifyContent: 'center', alignItems: 'center' }]}>
-              <Text style={[styles.proceedBtnText, { color: colors.textTertiary }]}>
-                ✓ Already Joined
-              </Text>
-            </View>
-          </View>
-        ) : (
-          <TouchableOpacity
-            style={[styles.proceedBtnOuter, !agreed && styles.proceedBtnDisabled]}
-            activeOpacity={0.85}
-            disabled={!agreed}
-            onPress={() => {
-              if (!userData?.email) {
-                setShowEmailModal(true);
-              } else {
-                setShowConfirm(true);
-              }
-            }}
+        <TouchableOpacity
+          style={[styles.proceedBtnOuter, !agreed && styles.proceedBtnDisabled]}
+          activeOpacity={0.85}
+          disabled={!agreed}
+          onPress={() => {
+            if (!userData?.email) {
+              setShowEmailModal(true);
+            } else {
+              setShowConfirm(true);
+            }
+          }}
+        >
+          <LinearGradient
+            colors={agreed ? ['#0E3D23', '#1A5C39', '#2E8B5A'] : [colors.muted, colors.muted]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={styles.proceedBtnGradient}
           >
-            <LinearGradient
-              colors={agreed ? ['#0E3D23', '#1A5C39', '#2E8B5A'] : [colors.muted, colors.muted]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={styles.proceedBtnGradient}
-            >
-              <Text style={[styles.proceedBtnText, !agreed && styles.proceedBtnTextDisabled]}>
-                Proceed to Pay {formatCurrency(totalPayable)}
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        )}
+            <Text style={[styles.proceedBtnText, !agreed && styles.proceedBtnTextDisabled]}>
+              Proceed to Pay {formatCurrency(totalPayable)}
+            </Text>
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
 
       {/* Confirmation Modal */}
