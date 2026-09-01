@@ -302,8 +302,9 @@ const completeInvestment = async (user, data, orderId, paymentId, signature) => 
       metadata: { investmentId: investment._id }
     });
 
-    // Trigger Referral Reward for referrer
-    await triggerReferralRewardOnInvestment(user._id, investment._id).catch(err =>
+    // Trigger First-Time Investment Reward (50c) & Referral Investment Reward (50c + 100c)
+    const { triggerFirstTimeAndReferralInvestmentReward } = require('../utils/referralHelper');
+    await triggerFirstTimeAndReferralInvestmentReward(user._id, investment._id).catch(err =>
       console.warn('[ReferralTrigger Error]', err.message)
     );
   } catch (notifErr) {
@@ -408,7 +409,7 @@ const completeChitJoin = async (user, data, orderId, paymentId, signature) => {
   // 4. Send Notification
   try {
     const { sendNotification, notifyAdmins } = require('../services/notificationHelper');
-    const { triggerReferralRewardOnInvestment } = require('../utils/referralHelper');
+    const { triggerFirstChitJoinReward } = require('../utils/referralHelper');
 
     await sendNotification({
       userId: user._id,
@@ -425,9 +426,9 @@ const completeChitJoin = async (user, data, orderId, paymentId, signature) => {
       metadata: { chitId: chit._id, memberId: member._id }
     });
 
-    // Trigger Referral Reward for referrer
-    await triggerReferralRewardOnInvestment(user._id, member._id).catch(err =>
-      console.warn('[ReferralTrigger Error]', err.message)
+    // Trigger First-Time Chit Join Reward (50c to user)
+    await triggerFirstChitJoinReward(user._id, member._id).catch(err =>
+      console.warn('[FirstChitReward Error]', err.message)
     );
   } catch (notifErr) {
     console.error('[PaymentController] Notification error:', notifErr);
@@ -620,12 +621,19 @@ const completePocketMoney = async (user, data, orderId, paymentId, signature) =>
   // Notify admins
   try {
     const { notifyAdmins } = require('../services/notificationHelper');
+    const { triggerFirstPocketMoneyReward } = require('../utils/referralHelper');
+
     await notifyAdmins({
       title: '🔔 New Pocket Money Investment',
       description: `${user.name || user.username} invested ₹${amount} in Pocket Money (${frequency}).`,
       type: 'general',
       metadata: { pocketMoneyId: pocketMoney._id },
     });
+
+    // Trigger First-Time Pocket Money Reward (50c to user)
+    await triggerFirstPocketMoneyReward(user._id, pocketMoney._id).catch(err =>
+      console.warn('[FirstPocketReward Error]', err.message)
+    );
   } catch (adminNotifErr) {
     console.error('[PaymentController] Admin notification error:', adminNotifErr);
   }

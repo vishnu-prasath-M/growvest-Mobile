@@ -241,23 +241,42 @@ exports.downloadActiveAPK = async (req, res) => {
 // ─── ADMIN: Get Referral Overview & Referral Users Table ───────────────────────
 exports.getReferralAdminOverview = async (req, res) => {
   try {
+    const KYC = require('../models/KYC');
+    const CoinTransaction = require('../models/CoinTransaction');
+    const Settings = require('../models/Settings');
+
     const referrals = await Referral.find({})
       .populate('referrerUserId', 'name username email mobileNumber referralCode')
       .populate('referredUserId', 'name username email mobileNumber createdAt')
       .sort({ createdAt: -1 });
 
+    const totalUsersCount = await User.countDocuments({});
     const totalReferrals = referrals.length;
-    const registeredCount = referrals.filter(r => ['REGISTERED', 'PENDING'].includes(r.status)).length;
-    const qualifiedCount = referrals.filter(r => ['SUCCESSFUL', 'REWARDED'].includes(r.status)).length;
-    const pendingCount = registeredCount;
-    const totalCoinsRewarded = referrals
-      .filter(r => ['SUCCESSFUL', 'REWARDED'].includes(r.status))
-      .reduce((sum, r) => sum + (r.rewardCoins || 100), 0);
+    const registeredCount = referrals.length;
+    const qualifiedCount = referrals.filter(r => ['SUCCESSFUL', 'REWARDED'].includes(r.status) || r.milestoneRewarded).length;
+    const pendingCount = totalReferrals - qualifiedCount;
 
+    // Total coins rewarded from CoinTransaction
+    const coinAgg = await CoinTransaction.aggregate([
+      { $match: { coins: { $gt: 0 } } },
+      { $group: { _id: null, totalCoins: { $sum: '$coins' } } }
+    ]);
+    const totalCoinsRewarded = coinAgg[0]?.totalCoins || 0;
+    const totalRewardRupees = Number((totalCoinsRewarded * 0.05).toFixed(2));
+
+    // Pending reward withdrawals
+    const Withdrawal = require('../models/Withdrawal');
+    const pendingWithdrawalsCount = await Withdrawal.countDocuments({ withdrawType: 'reward', status: 'pending' });
+
+    // Active APK info
     const activeApk = await APKRelease.findOne({ status: 'active' });
     const totalApkDownloads = activeApk ? activeApk.downloadCount : 0;
 
-    // Build rich table data with real investment status & amounts from DB
+    // Minimum withdrawal threshold
+    const minSetting = await Settings.findOne({ key: 'min_reward_withdrawal_coins' });
+    const minWithdrawalCoins = minSetting ? parseInt(minSetting.value, 10) : 1000;
+
+    // Build rich table data with real milestone statuses
     const referralUsers = await Promise.all(
       referrals.map(async (r) => {
         const referred = r.referredUserId || {};
@@ -265,8 +284,13 @@ exports.getReferralAdminOverview = async (req, res) => {
 
         let investmentStatus = 'None';
         let investmentAmount = 0;
+        let kycStatus = 'not_submitted';
 
         if (referred._id) {
+          // Check KYC
+          const kyc = await KYC.findOne({ userId: referred._id });
+          if (kyc) kycStatus = kyc.status;
+
           // Check Investments
           const inv = await Investment.findOne({ userId: referred._id, status: 'approved' });
           if (inv) {
@@ -277,17 +301,24 @@ exports.getReferralAdminOverview = async (req, res) => {
           // Check Chits
           const chit = await ChitMember.findOne({ userId: referred._id });
           if (chit) {
-            investmentStatus = 'Chit Joined';
+            investmentStatus = investmentStatus === 'None' ? 'Chit Joined' : `${investmentStatus} + Chit`;
             investmentAmount += chit.totalPaid || 0;
           }
 
           // Check Pocket Money
           const pm = await PocketMoney.findOne({ userId: referred._id, status: 'active' });
           if (pm) {
-            investmentStatus = 'Pocket Money Active';
-            investmentAmount += pm.totalAmount || 0;
+            investmentStatus = investmentStatus === 'None' ? 'Pocket Money' : `${investmentStatus} + Pocket`;
+            investmentAmount += pm.investedAmount || 0;
           }
         }
+
+        const coinsAwarded = r.totalCoinsAwarded || r.rewardCoins || (
+          (r.signupRewarded ? 20 : 0) +
+          (r.kycRewarded ? 30 : 0) +
+          (r.firstInvestmentRewarded ? 50 : 0) +
+          (r.milestoneRewarded ? 100 : 0)
+        );
 
         return {
           _id: r._id,
@@ -298,8 +329,14 @@ exports.getReferralAdminOverview = async (req, res) => {
           joinedDate: referred.createdAt || r.createdAt,
           investmentStatus,
           investmentAmount,
+          kycStatus,
+          signupRewarded: r.signupRewarded ?? true,
+          kycRewarded: r.kycRewarded ?? (kycStatus === 'approved'),
+          firstInvestmentRewarded: r.firstInvestmentRewarded ?? (investmentAmount > 0),
+          milestoneRewarded: r.milestoneRewarded ?? ['SUCCESSFUL', 'REWARDED'].includes(r.status),
           referralStatus: r.status,
-          rewardCoins: ['SUCCESSFUL', 'REWARDED'].includes(r.status) ? (r.rewardCoins || 100) : 0,
+          rewardCoins: coinsAwarded,
+          rewardRupees: Number((coinsAwarded * 0.05).toFixed(2)),
           createdAt: r.createdAt,
         };
       })
@@ -307,12 +344,18 @@ exports.getReferralAdminOverview = async (req, res) => {
 
     res.json({
       overview: {
+        totalUsersCount,
         totalReferrals,
         registeredCount,
         qualifiedCount,
         pendingCount,
         totalCoinsRewarded,
+        totalRewardRupees,
+        pendingWithdrawalsCount,
         totalApkDownloads,
+        minWithdrawalCoins,
+        minWithdrawalRupees: Number((minWithdrawalCoins * 0.05).toFixed(2)),
+        conversionRate: '20 Coins = ₹1 (₹0.05/coin)',
       },
       referralUsers,
     });

@@ -30,7 +30,27 @@ const referralSchema = new mongoose.Schema({
   },
   rewardCoins: {
     type: Number,
-    default: 100,
+    default: 0,
+  },
+  signupRewarded: {
+    type: Boolean,
+    default: false,
+  },
+  kycRewarded: {
+    type: Boolean,
+    default: false,
+  },
+  firstInvestmentRewarded: {
+    type: Boolean,
+    default: false,
+  },
+  milestoneRewarded: {
+    type: Boolean,
+    default: false,
+  },
+  totalCoinsAwarded: {
+    type: Number,
+    default: 0,
   },
   rewardedAt: {
     type: Date,

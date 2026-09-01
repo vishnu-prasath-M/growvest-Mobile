@@ -18,6 +18,10 @@ const userSchema = new mongoose.Schema({
   referralCode: { type: String, unique: true, sparse: true },
   referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   coinBalance: { type: Number, default: 0 },
+  hasFirstInvestmentReward: { type: Boolean, default: false },
+  hasFirstChitReward: { type: Boolean, default: false },
+  hasFirstPocketMoneyReward: { type: Boolean, default: false },
+  lastDailyLoginDate: { type: String, default: null }, // YYYY-MM-DD format in Asia/Kolkata timezone
 
   // Password reset — token stored as SHA-256 hash, never plain text
   passwordResetToken: { type: String, default: null },
