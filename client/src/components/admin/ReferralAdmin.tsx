@@ -49,6 +49,11 @@ const ReferralAdmin = ({ token }: ReferralAdminProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
+  // Threshold state
+  const [minThresholdInput, setMinThresholdInput] = useState("1000");
+  const [savingThreshold, setSavingThreshold] = useState(false);
+  const [thresholdSavedMsg, setThresholdSavedMsg] = useState("");
+
   // APK Upload state
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -66,9 +71,41 @@ const ReferralAdmin = ({ token }: ReferralAdminProps) => {
       if (res.ok) {
         const data = await res.json();
         setOverviewData(data);
+        if (data.overview?.minWithdrawalCoins) {
+          setMinThresholdInput(data.overview.minWithdrawalCoins.toString());
+        }
       }
     } catch (err) {
       console.error("Error fetching referral admin overview:", err);
+    }
+  };
+
+  const handleSaveThreshold = async () => {
+    if (!token) return;
+    const parsed = parseInt(minThresholdInput, 10);
+    if (isNaN(parsed) || parsed < 20) {
+      alert("Threshold must be at least 20 Coins");
+      return;
+    }
+    setSavingThreshold(true);
+    try {
+      const res = await fetch(`${API_URL}/api/referral/admin/threshold`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ minCoins: parsed }),
+      });
+      if (res.ok) {
+        setThresholdSavedMsg("Threshold updated!");
+        setTimeout(() => setThresholdSavedMsg(""), 3000);
+        fetchReferralOverview();
+      }
+    } catch (err) {
+      console.error("Error updating threshold:", err);
+    } finally {
+      setSavingThreshold(false);
     }
   };
 
