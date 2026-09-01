@@ -63,11 +63,23 @@
     "web": {
       "favicon": "./assets/growvest-logo.png"
     },
+    "notification": {
+      "icon": "./assets/noti-icon.png",
+      "color": "#0E3D23",
+      "androidMode": "default"
+    },
     "plugins": [
       "expo-asset",
       "expo-font",
       "expo-splash-screen",
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/noti-icon.png",
+          "color": "#0E3D23",
+          "defaultChannel": "default"
+        }
+      ],
       [
         "expo-build-properties",
         {
