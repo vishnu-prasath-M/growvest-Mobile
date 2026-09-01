@@ -105,8 +105,14 @@ exports.getAdminStats = async (req, res) => {
       Withdrawal.countDocuments({ status: 'rejected' }),
       // Active Chits
       Chit.countDocuments({ status: 'active' }),
-      // Pending Chit Join Requests
-      Transaction.countDocuments({ referenceType: 'ChitMember', status: 'pending' }),
+      // Pending Chit Join Requests & Pending Payments
+      (async () => {
+        const [pMembers, pPayments] = await Promise.all([
+          ChitMember.countDocuments({ status: 'pending' }),
+          ChitPayment.countDocuments({ status: 'pending' }),
+        ]);
+        return pMembers + pPayments;
+      })(),
       // Active Chit Members
       ChitMember.countDocuments({ status: 'active' }),
       // Total Notifications
