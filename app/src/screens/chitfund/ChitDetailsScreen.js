@@ -186,7 +186,7 @@ const ChitDetailsScreen = ({ navigation, route }) => {
     const weeklyAmount = chit.weeklyAmount || chit.monthlyAmount || 200;
     const totalWeeks = chit.totalWeeks || chit.duration || 10;
     
-    const myMembership = myChits.find(m => m.chitId === chit._id) || chit.myMembership;
+    const myMembership = (memberId ? myChits.find(m => m._id === memberId) : null) || myChits.find(m => (m.chitId?._id || m.chitId) === chit._id) || chit.myMembership;
     const currentWeek = myMembership?.currentWeek || 0;
     
     const { schedule } = generateWeeklySchedule(weeklyAmount, totalWeeks);
@@ -277,7 +277,7 @@ const ChitDetailsScreen = ({ navigation, route }) => {
         </View>
 
         {(() => {
-          const myMembership = myChits.find(m => m.chitId === chit._id) || chit.myMembership;
+          const myMembership = (memberId ? myChits.find(m => m._id === memberId) : null) || myChits.find(m => (m.chitId?._id || m.chitId) === chit._id) || chit.myMembership;
           const totalMembers = chit.totalMembers || 0;
           const availableSlots = chit.availableSlots || 0;
           const filledMembers = Math.max(0, totalMembers - availableSlots);
@@ -549,9 +549,8 @@ const ChitDetailsScreen = ({ navigation, route }) => {
 
         {(() => {
           const isFull = chit.availableSlots <= 0;
-          const hasJoined = myChits.some(m => m.chitId === chit._id);
           const isClosed = chit.status === 'closed' || chit.status === 'completed' || chit.status === 'archived';
-          const isDisabled = isFull || hasJoined || isClosed;
+          const isDisabled = isFull || isClosed;
           return (
             <TouchableOpacity
               style={[styles.joinNowBtn, isDisabled && styles.joinNowBtnDisabled]}
@@ -559,14 +558,14 @@ const ChitDetailsScreen = ({ navigation, route }) => {
               onPress={() => {
                 if (isFull) {
                   Alert.alert('Slot Full', 'This Chit is already full.');
-                } else if (!hasJoined && !isClosed) {
+                } else if (!isClosed) {
                   navigation.navigate('JoinChit', { chitId: chit._id });
                 }
               }}
               disabled={isDisabled}
             >
               <Text style={[styles.joinNowBtnText, isDisabled && styles.joinNowBtnTextDisabled]}>
-                {isFull ? 'Slot Full' : isClosed ? 'Closed' : hasJoined ? 'Already Joined' : 'Join This Chit'}
+                {isFull ? 'Slot Full' : isClosed ? 'Closed' : 'Join This Chit'}
               </Text>
               {!isDisabled && <MaterialCommunityIcons name="arrow-right" size={20} color={colors.white} />}
             </TouchableOpacity>

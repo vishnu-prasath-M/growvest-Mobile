@@ -91,6 +91,9 @@ const investmentSchema = new mongoose.Schema({
   selectedWithdrawalDate: {
     type: Date,
   },
+  intendedWithdrawalDate: {
+    type: Date,
+  },
   benefitEligibilityDate: {
     type: Date,
   },

@@ -253,6 +253,7 @@ const completeInvestment = async (user, data, orderId, paymentId, signature) => 
 
     // Date-based withdrawal & 5-week benefit eligibility
     selectedWithdrawalDate: selectedDateObj,
+    intendedWithdrawalDate: selectedDateObj,
     benefitEligibilityDate: benefitEligibilityDate,
     benefits: Number(data.benefits) || 0,
     fifthWeekPaymentCompleted: data.fifthWeekPaymentCompleted !== false,
@@ -340,51 +341,38 @@ const completeChitJoin = async (user, data, orderId, paymentId, signature) => {
   const totalWeeks = chit.totalWeeks || chit.duration || 10;
   const totalContribution = chit.totalContribution || chit.totalPot || (weeklyAmount * totalWeeks);
 
-  // 1. Find or Create active member
-  let member = await ChitMember.findOne({ chitId: chit._id, userId: user._id, status: { $ne: 'cancelled' } });
+  // 1. Create a NEW individual ChitMember subscription
+  const memberCount = await ChitMember.countDocuments({ chitId: chit._id, status: { $ne: 'cancelled' } });
+  const memberNumber = memberCount + 1;
+  const membershipId = `CM-${10000 + memberNumber}`;
 
-  if (!member) {
-    const memberCount = await ChitMember.countDocuments({ chitId: chit._id, status: { $ne: 'cancelled' } });
-    const memberNumber = memberCount + 1;
+  const member = new ChitMember({
+    chitId: chit._id,
+    userId: user._id,
+    memberNumber,
+    membershipId,
+    status: 'active',
+    adminApprovalStatus: 'approved',
+    approvedAt: new Date(),
+    totalPaid: Number(amount),
+    remainingAmount: totalContribution - Number(amount),
+    currentMonth: 1,
+    currentWeek: 1,
+    paidWeeks: 1,
+    unpaidWeeks: 0,
+    weeklyAmount,
+    totalWeeks,
+    totalContribution,
+    withdrawalStatus: 'pending',
+    hasWon: false,
+    joinedAt: new Date(),
+  });
+  await member.save();
 
-    member = new ChitMember({
-      chitId: chit._id,
-      userId: user._id,
-      memberNumber,
-      status: 'active',
-      adminApprovalStatus: 'approved',
-      approvedAt: new Date(),
-      totalPaid: Number(amount),
-      remainingAmount: totalContribution - Number(amount),
-      currentMonth: 1,
-      currentWeek: 1,
-      paidWeeks: 1,
-      unpaidWeeks: 0,
-      weeklyAmount,
-      totalWeeks,
-      totalContribution,
-      withdrawalStatus: 'pending',
-      hasWon: false,
-      joinedAt: new Date(),
-    });
-    await member.save();
-
-    // Decrement available slots
-    if (chit.availableSlots > 0) {
-      chit.availableSlots -= 1;
-      await chit.save();
-    }
-  } else {
-    // If member existed in pending state, activate & set Week 1
-    member.status = 'active';
-    member.adminApprovalStatus = 'approved';
-    member.approvedAt = new Date();
-    member.totalPaid = Number(amount);
-    member.remainingAmount = totalContribution - Number(amount);
-    member.currentMonth = 1;
-    member.currentWeek = 1;
-    member.paidWeeks = 1;
-    await member.save();
+  // Decrement available slots
+  if (chit.availableSlots > 0) {
+    chit.availableSlots -= 1;
+    await chit.save();
   }
 
   // 2. Create ChitPayment record as paid for Week/Month 1

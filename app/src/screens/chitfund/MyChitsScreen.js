@@ -115,7 +115,7 @@ const MyChitsScreen = ({ navigation }) => {
                   <View style={styles.chitInfo}>
                     <Text style={styles.chitName}>{chit.chitName}</Text>
                     <Text style={styles.chitMember}>
-                      {isRejected ? 'Request Rejected' : isPending ? 'Joining Request Submitted' : `Member #${chit.memberNumber} of ${chit.totalMembers}`}
+                      {isRejected ? 'Request Rejected' : isPending ? 'Joining Request Submitted' : `Member #${chit.memberNumber} • ID: ${chit.membershipId || ('CM-' + (chit.memberNumber || ''))}`}
                     </Text>
                   </View>
                   <View style={[

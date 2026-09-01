@@ -64,6 +64,21 @@ exports.uploadAPK = async (req, res) => {
     let gridFsFileId = null;
     const gridFsBucket = getGridFSBucket();
     if (gridFsBucket) {
+      // 1. Purge old GridFS files to prevent storage accumulation in MongoDB
+      try {
+        const oldGridFiles = await mongoose.connection.db.collection('apk_files.files').find({}).toArray();
+        for (const oldF of oldGridFiles) {
+          try {
+            await gridFsBucket.delete(oldF._id);
+            console.log(`[APKUpload] Purged previous GridFS file ${oldF._id}`);
+          } catch (delErr) {
+            console.error(`[APKUpload] Error deleting old GridFS file:`, delErr.message);
+          }
+        }
+      } catch (purgeErr) {
+        console.error('[APKUpload] Error purging old GridFS files:', purgeErr.message);
+      }
+
       const readableStream = new Readable();
       readableStream.push(fileBuffer);
       readableStream.push(null);
@@ -83,8 +98,9 @@ exports.uploadAPK = async (req, res) => {
       console.log(`[APKUpload] APK permanently stored in MongoDB GridFS with ID: ${gridFsFileId} (${fileSize} bytes)`);
     }
 
-    // Mark all existing active APKs as inactive
-    await APKRelease.updateMany({ status: 'active' }, { status: 'inactive' });
+    // Clean up inactive records in DB to save metadata space
+    await APKRelease.deleteMany({ status: { $ne: 'active' } });
+    await APKRelease.updateMany({}, { status: 'inactive' });
 
     // Store raw buffer in MongoDB ONLY if file size is <= 14 MB to prevent MongoDB 16MB BSON document limit crash
     const safeBufferInDb = fileSize <= 14 * 1024 * 1024 ? fileBuffer : null;
@@ -169,56 +185,41 @@ exports.downloadActiveAPK = async (req, res) => {
     const downloadsDir = path.join(__dirname, '../public/downloads');
     const physicalPath = path.join(downloadsDir, 'growvest-latest.apk');
 
+    // Set standard download headers for Android browsers & download managers
+    const filename = activeApk.fileName || 'growvest.apk';
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Accept-Ranges', 'bytes');
+    if (activeApk.fileSize) {
+      res.setHeader('Content-Length', activeApk.fileSize);
+    }
+
     // 1. If physical file exists on local disk, serve directly
     if (fs.existsSync(physicalPath)) {
-      res.setHeader('Content-Type', 'application/vnd.android.package-archive');
-      res.setHeader('Content-Disposition', `attachment; filename="${activeApk.fileName || 'growvest.apk'}"`);
       return res.sendFile(physicalPath);
     }
 
-    // 2. Stream directly from MongoDB GridFS (permanent across all Render restarts & container recycling)
+    // 2. Stream directly from MongoDB GridFS (permanent across all Render cold restarts)
     const gridFsBucket = getGridFSBucket();
     if (activeApk.gridFsFileId && gridFsBucket) {
       try {
-        console.log(`[APKDownload] Streaming APK permanently from MongoDB GridFS (ID: ${activeApk.gridFsFileId})`);
-        res.setHeader('Content-Type', 'application/vnd.android.package-archive');
-        res.setHeader('Content-Disposition', `attachment; filename="${activeApk.fileName || 'growvest.apk'}"`);
-
+        console.log(`[APKDownload] Streaming APK from MongoDB GridFS (ID: ${activeApk.gridFsFileId})`);
         const downloadStream = gridFsBucket.openDownloadStream(activeApk.gridFsFileId);
-
-        // Restore file back to disk in background for subsequent fast serving
-        try {
-          if (!fs.existsSync(downloadsDir)) fs.mkdirSync(downloadsDir, { recursive: true });
-          const fileWriteStream = fs.createWriteStream(physicalPath);
-          downloadStream.pipe(fileWriteStream);
-        } catch (diskErr) {
-          // ignore disk caching error
-        }
+        
+        downloadStream.on('error', (err) => {
+          console.error('[APKDownload] GridFS stream error:', err);
+          if (!res.headersSent) res.status(500).send('Error streaming APK file');
+        });
 
         return downloadStream.pipe(res);
       } catch (gridErr) {
-        console.error('[APKDownload] GridFS streaming error:', gridErr);
+        console.error('[APKDownload] GridFS open stream error:', gridErr);
       }
     }
 
-    // 3. If Render restarted & local disk file was wiped, restore from MongoDB persistent buffer (for small APKs)
+    // 3. Fallback to MongoDB persistent buffer (for small APKs)
     if (activeApk.apkData && activeApk.apkData.length > 0) {
-      try {
-        if (!fs.existsSync(downloadsDir)) {
-          fs.mkdirSync(downloadsDir, { recursive: true });
-        }
-        fs.writeFileSync(physicalPath, activeApk.apkData);
-        console.log(`[APKDownload] Restored APK file (${activeApk.fileSize} bytes) from MongoDB database to disk!`);
-
-        res.setHeader('Content-Type', 'application/vnd.android.package-archive');
-        res.setHeader('Content-Disposition', `attachment; filename="${activeApk.fileName || 'growvest.apk'}"`);
-        return res.send(activeApk.apkData);
-      } catch (restoreErr) {
-        console.error('[APKDownload] File restoration error, streaming directly from memory:', restoreErr);
-        res.setHeader('Content-Type', 'application/vnd.android.package-archive');
-        res.setHeader('Content-Disposition', `attachment; filename="${activeApk.fileName || 'growvest.apk'}"`);
-        return res.send(activeApk.apkData);
-      }
+      return res.send(activeApk.apkData);
     }
 
     // 4. Fallback to external URL if configured

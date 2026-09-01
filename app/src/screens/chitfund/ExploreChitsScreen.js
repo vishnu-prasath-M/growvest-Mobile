@@ -137,14 +137,14 @@ const ExploreChitsScreen = ({ navigation }) => {
           filteredChits.map((chit) => {
             const isFull = chit.availableSlots === 0;
             const isClosed = chit.status === 'closed' || chit.status === 'completed' || chit.status === 'archived';
-            const hasJoined = myChits.some(m => m.chitId === chit._id);
+            const joinedCountForChit = myChits.filter(m => (m.chitId?._id || m.chitId) === chit._id && m.status !== 'cancelled').length;
             return (
               <TouchableOpacity
                 key={chit._id}
                 style={styles.chitCard}
                 activeOpacity={0.85}
                 onPress={() => {
-                  if (!isFull && !hasJoined && !isClosed) {
+                  if (!isFull && !isClosed) {
                     navigation.navigate('ChitDetails', { chitId: chit._id });
                   }
                 }}
@@ -159,7 +159,16 @@ const ExploreChitsScreen = ({ navigation }) => {
                       <Text style={styles.chitDesc} numberOfLines={1}>{chit.description}</Text>
                     </View>
                   </View>
-                  <StatusChip status={chit.status.charAt(0).toUpperCase() + chit.status.slice(1)} />
+                  <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                    <StatusChip status={chit.status.charAt(0).toUpperCase() + chit.status.slice(1)} />
+                    {joinedCountForChit > 0 && (
+                      <View style={{ backgroundColor: '#E8F5E9', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                        <Text style={{ fontSize: 10, color: '#1A5C39', fontWeight: '700' }}>
+                          {joinedCountForChit} Joined
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
 
                 <View style={styles.chitPotRow}>
@@ -196,25 +205,25 @@ const ExploreChitsScreen = ({ navigation }) => {
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.joinBtnOuter, (isFull || hasJoined || isClosed) && styles.joinBtnDisabled]}
+                  style={[styles.joinBtnOuter, (isFull || isClosed) && styles.joinBtnDisabled]}
                   activeOpacity={0.85}
                   onPress={() => {
-                    if (!isFull && !hasJoined && !isClosed) {
+                    if (!isFull && !isClosed) {
                       navigation.navigate('JoinChit', { chitId: chit._id });
                     }
                   }}
-                  disabled={isFull || hasJoined || isClosed}
+                  disabled={isFull || isClosed}
                 >
                   <LinearGradient
-                    colors={(isFull || hasJoined || isClosed) ? [colors.muted, colors.muted] : ['#0E3D23', '#1A5C39', '#2E8B5A']}
+                    colors={(isFull || isClosed) ? [colors.muted, colors.muted] : ['#0E3D23', '#1A5C39', '#2E8B5A']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.joinBtnGradient}
                   >
-                    <Text style={[styles.joinBtnText, (isFull || hasJoined || isClosed) && styles.joinBtnTextDisabled]}>
-                      {isFull ? 'Chit Full' : isClosed ? 'Closed' : hasJoined ? 'Already Joined' : 'Join Chit'}
+                    <Text style={[styles.joinBtnText, (isFull || isClosed) && styles.joinBtnTextDisabled]}>
+                      {isFull ? 'Chit Full' : isClosed ? 'Closed' : 'Join Chit'}
                     </Text>
-                    {!(isFull || hasJoined || isClosed) && <MaterialCommunityIcons name="arrow-right" size={20} color={colors.white} />}
+                    {!(isFull || isClosed) && <MaterialCommunityIcons name="arrow-right" size={20} color={colors.white} />}
                   </LinearGradient>
                 </TouchableOpacity>
               </TouchableOpacity>

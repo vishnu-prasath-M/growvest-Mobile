@@ -21,7 +21,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
  *
  * Detailed breakdown modal for Savings / Fixed / Duration deposits.
  */
-const DepositDetailModal = ({ visible, item, onClose, onWithdraw }) => {
+const DepositDetailModal = ({ visible, item, onClose, onWithdraw, onReinvest }) => {
   const { colors: themeColors, isDarkMode } = useTheme();
   const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
 
@@ -85,7 +85,7 @@ const DepositDetailModal = ({ visible, item, onClose, onWithdraw }) => {
                     {isWithdrawn
                       ? 'Already withdrawn to bank account'
                       : isMatured
-                      ? '✅ Plan matured — ready for withdrawal'
+                      ? '✅ Plan matured — ready for withdrawal or reinvestment'
                       : isPending
                       ? '⏳ Awaiting admin review'
                       : `🔒 Locked until ${formatDate(item.maturityDate)}`}
@@ -146,6 +146,26 @@ const DepositDetailModal = ({ visible, item, onClose, onWithdraw }) => {
                   <Text style={styles.dismissBtnText}>Close</Text>
                 </TouchableOpacity>
 
+                {isMatured && onReinvest ? (
+                  <TouchableOpacity
+                    onPress={() => {
+                      onClose();
+                      onReinvest(item);
+                    }}
+                    style={[styles.withdrawBtn, { marginRight: onWithdraw && !isWithdrawn ? 8 : 0 }]}
+                  >
+                    <LinearGradient
+                      colors={['#10B981', '#059669']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.withdrawGradient}
+                    >
+                      <MaterialCommunityIcons name="refresh" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
+                      <Text style={styles.withdrawText}>Reinvest</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                ) : null}
+
                 {isMatured && !isWithdrawn && onWithdraw ? (
                   <TouchableOpacity
                     onPress={() => {
@@ -160,7 +180,7 @@ const DepositDetailModal = ({ visible, item, onClose, onWithdraw }) => {
                       end={{ x: 1, y: 1 }}
                       style={styles.withdrawGradient}
                     >
-                      <Text style={styles.withdrawText}>Withdraw Now</Text>
+                      <Text style={styles.withdrawText}>Withdraw</Text>
                     </LinearGradient>
                   </TouchableOpacity>
                 ) : null}
