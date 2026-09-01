@@ -114,6 +114,7 @@ const AdminDashboard = () => {
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [userDetails, setUserDetails] = useState<Record<string, any>>({});
+  const [overviewFilter, setOverviewFilter] = useState<'all' | 'investment' | 'withdrawal' | 'kyc' | 'chit' | 'pocket'>('all');
 
   // Push Notification Test state
   const [testPushTargetUserId, setTestPushTargetUserId] = useState<string>("");
@@ -733,6 +734,10 @@ const AdminDashboard = () => {
 
   const pendingCount = pendingList.filter((i) => i.status === "pending").length;
   const wdPendingCount = withdrawList.filter((w) => w.status === "pending").length;
+  const kycPendingCount = kycList.filter((k) => k.status === "pending").length;
+  const pocketActiveCount = dashboardStats?.pocketMoney?.active || 0;
+  const chitActiveCount = dashboardStats?.activeChitMembers || 0;
+  const totalPendingActions = pendingCount + wdPendingCount + kycPendingCount + (dashboardStats?.pendingChitRequests || 0);
 
   // Total Payable Balance = SUM of all users' current balance field from DB
   // This works immediately using already-fetched allUsers data
@@ -1006,59 +1011,259 @@ const AdminDashboard = () => {
                 })}
               </div>
 
-              {/* Pending actions alert */}
-              {pendingCount > 0 && (
-                <div
-                  className="rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-5 mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-amber-100 transition-colors"
-                  onClick={() => setActiveTab("pending")}
-                >
-                  <div className="flex items-center gap-3">
-                    <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0" />
-                    <div>
-                      <p className="text-sm font-body font-semibold text-amber-800">
-                        {pendingCount} investment{pendingCount > 1 ? "s" : ""} awaiting your approval
-                      </p>
-                      <p className="text-xs font-body text-amber-600 mt-0.5">
-                        Click to review and approve or reject
-                      </p>
-                    </div>
-                  </div>
-                  <Button size="sm" className="rounded-xl font-body bg-amber-600 hover:bg-amber-700 w-full sm:w-auto">
-                    Review Now
-                  </Button>
+              {/* ── LIVE INCOMING REQUESTS & ACTIONS HUB ── */}
+              <div className="mb-6 sm:mb-8">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-heading font-bold text-foreground text-base sm:text-lg flex items-center gap-2">
+                    <Clock className="h-5 w-5 text-amber-600" />
+                    New Incoming Requests & Action Center
+                  </h3>
+                  {totalPendingActions > 0 && (
+                    <span className="text-xs font-body font-bold bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full border border-amber-200">
+                      {totalPendingActions} Pending Action{totalPendingActions > 1 ? "s" : ""}
+                    </span>
+                  )}
                 </div>
-              )}
 
-              {/* Recent activity */}
-              <div className="card-premium overflow-hidden">
-                <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border">
-                  <h2 className="font-heading font-semibold text-foreground text-base sm:text-lg">Recent Investments</h2>
-                </div>
-                <div className="divide-y divide-border">
-                  {pendingList.slice(0, 5).map((inv) => (
-                    <div key={inv._id} className="px-4 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`h-8 w-8 sm:h-9 sm:w-9 rounded-xl flex items-center justify-center ${inv.status === "approved" ? "bg-accent" : inv.status === "pending" ? "bg-amber-50" : "bg-red-50"
-                            }`}
-                        >
-                          {inv.status === "approved" && <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-secondary" />}
-                          {inv.status === "pending" && <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600" />}
-                          {inv.status === "rejected" && <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-500" />}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-body font-semibold text-foreground">{inv.user} <span className="opacity-50 font-normal">({getPlanDisplayName(inv.type)})</span></p>
-                          <p className="text-xs font-body text-muted-foreground">{inv.ref} · {new Date(inv.startDate).toLocaleDateString()}</p>
-                        </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+                  {/* 1. Pending Withdrawals */}
+                  <div
+                    onClick={() => setActiveTab("withdrawals")}
+                    className={`card-premium p-4 cursor-pointer transition-all hover:scale-[1.02] border ${
+                      wdPendingCount > 0 ? "border-amber-300 bg-amber-50/50" : "hover:border-primary/40"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="h-8 w-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                        <ArrowDownToLine className="h-4 w-4" />
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-body font-bold text-foreground">₹{inv.amount.toLocaleString("en-IN")}</p>
-                        <span className={`text-[10px] font-body font-semibold px-2 py-0.5 rounded-full border ${statusStyle[inv.status]}`}>
-                          {inv.status.charAt(0).toUpperCase() + inv.status.slice(1)}
-                        </span>
-                      </div>
+                      <span className={`text-xs font-body font-bold px-2 py-0.5 rounded-full ${
+                        wdPendingCount > 0 ? "bg-rose-100 text-rose-700" : "bg-muted text-muted-foreground"
+                      }`}>
+                        {wdPendingCount} Pending
+                      </span>
                     </div>
-                  ))}
+                    <p className="font-heading font-bold text-sm text-foreground">Withdrawals</p>
+                    <p className="text-xs font-body text-muted-foreground mt-0.5">
+                      {wdPendingCount > 0 ? `${wdPendingCount} requests to pay` : "All paid & processed"}
+                    </p>
+                  </div>
+
+                  {/* 2. Pending KYC */}
+                  <div
+                    onClick={() => setActiveTab("kyc")}
+                    className={`card-premium p-4 cursor-pointer transition-all hover:scale-[1.02] border ${
+                      kycPendingCount > 0 ? "border-amber-300 bg-amber-50/50" : "hover:border-primary/40"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="h-8 w-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                        <Shield className="h-4 w-4" />
+                      </div>
+                      <span className={`text-xs font-body font-bold px-2 py-0.5 rounded-full ${
+                        kycPendingCount > 0 ? "bg-blue-100 text-blue-700" : "bg-muted text-muted-foreground"
+                      }`}>
+                        {kycPendingCount} Pending
+                      </span>
+                    </div>
+                    <p className="font-heading font-bold text-sm text-foreground">KYC Submissions</p>
+                    <p className="text-xs font-body text-muted-foreground mt-0.5">
+                      {kycPendingCount > 0 ? `${kycPendingCount} to verify` : "All KYC up-to-date"}
+                    </p>
+                  </div>
+
+                  {/* 3. Pending Investments */}
+                  <div
+                    onClick={() => setActiveTab("pending")}
+                    className={`card-premium p-4 cursor-pointer transition-all hover:scale-[1.02] border ${
+                      pendingCount > 0 ? "border-amber-300 bg-amber-50/50" : "hover:border-primary/40"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="h-8 w-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                        <DollarSign className="h-4 w-4" />
+                      </div>
+                      <span className={`text-xs font-body font-bold px-2 py-0.5 rounded-full ${
+                        pendingCount > 0 ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground"
+                      }`}>
+                        {pendingCount} Pending
+                      </span>
+                    </div>
+                    <p className="font-heading font-bold text-sm text-foreground">Savings / Fixed</p>
+                    <p className="text-xs font-body text-muted-foreground mt-0.5">
+                      {pendingCount > 0 ? `${pendingCount} awaiting approval` : "No pending deposits"}
+                    </p>
+                  </div>
+
+                  {/* 4. Chit Funds Joins */}
+                  <div
+                    onClick={() => setActiveTab("chits")}
+                    className="card-premium p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-primary/40"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="h-8 w-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                        <TrendingUp className="h-4 w-4" />
+                      </div>
+                      <span className="text-xs font-body font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                        {chitActiveCount} Members
+                      </span>
+                    </div>
+                    <p className="font-heading font-bold text-sm text-foreground">Chit Funds</p>
+                    <p className="text-xs font-body text-muted-foreground mt-0.5">
+                      {dashboardStats?.activeChits || 0} active chit schemes
+                    </p>
+                  </div>
+
+                  {/* 5. Pocket Money Plans */}
+                  <div
+                    onClick={() => setActiveTab("pocket")}
+                    className="card-premium p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-primary/40"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="h-8 w-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                        <Wallet className="h-4 w-4" />
+                      </div>
+                      <span className="text-xs font-body font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                        {pocketActiveCount} Active
+                      </span>
+                    </div>
+                    <p className="font-heading font-bold text-sm text-foreground">Pocket Money</p>
+                    <p className="text-xs font-body text-muted-foreground mt-0.5">
+                      {dashboardStats?.pocketMoney?.completed || 0} completed cycles
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── UNIFIED REAL-TIME ACTIVITY STREAM ── */}
+              <div className="card-premium overflow-hidden">
+                <div className="px-4 sm:px-6 py-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h2 className="font-heading font-semibold text-foreground text-base sm:text-lg">
+                      Recent Activity & Requests Stream
+                    </h2>
+                    <p className="text-xs font-body text-muted-foreground mt-0.5">
+                      Live unified feed across Pocket Money, Chit Funds, KYC, Withdrawals, and Investments
+                    </p>
+                  </div>
+
+                  {/* Category Filter Pills */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+                    {(
+                      [
+                        { id: "all", label: "All" },
+                        { id: "investment", label: "Investments" },
+                        { id: "withdrawal", label: "Withdrawals" },
+                        { id: "kyc", label: "KYC" },
+                        { id: "chit", label: "Chits" },
+                        { id: "pocket", label: "Pocket Money" },
+                      ] as const
+                    ).map((f) => (
+                      <button
+                        key={f.id}
+                        onClick={() => setOverviewFilter(f.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-body font-semibold transition-all whitespace-nowrap ${
+                          overviewFilter === f.id
+                            ? "bg-primary text-primary-foreground shadow-sm"
+                            : "bg-muted text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="divide-y divide-border">
+                  {(() => {
+                    const activities: any[] = dashboardStats?.recentActivities || [];
+                    const filtered = activities.filter((act) => {
+                      if (overviewFilter === "all") return true;
+                      return act.category === overviewFilter;
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <div className="p-8 text-center text-xs font-body text-muted-foreground">
+                          No recent activities found for the selected category.
+                        </div>
+                      );
+                    }
+
+                    return filtered.map((act) => {
+                      let Icon = DollarSign;
+                      let iconBg = "bg-emerald-50 text-emerald-600";
+
+                      if (act.category === "withdrawal") {
+                        Icon = ArrowDownToLine;
+                        iconBg = "bg-rose-50 text-rose-600";
+                      } else if (act.category === "kyc") {
+                        Icon = Shield;
+                        iconBg = "bg-blue-50 text-blue-600";
+                      } else if (act.category === "chit") {
+                        Icon = TrendingUp;
+                        iconBg = "bg-purple-50 text-purple-600";
+                      } else if (act.category === "pocket") {
+                        Icon = Wallet;
+                        iconBg = "bg-amber-50 text-amber-600";
+                      }
+
+                      return (
+                        <div
+                          key={act._id}
+                          className="px-4 sm:px-6 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-muted/20 transition-colors"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}>
+                              <Icon className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-sm font-body font-semibold text-foreground truncate">
+                                  {act.userName}
+                                </p>
+                                <span className="text-[11px] font-body text-muted-foreground">
+                                  • {act.title}
+                                </span>
+                              </div>
+                              <p className="text-xs font-body text-muted-foreground truncate">
+                                {act.details} • {new Date(act.date).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                            {act.amount !== null && act.amount !== undefined && (
+                              <p className="text-sm font-body font-bold text-foreground">
+                                ₹{Number(act.amount).toLocaleString("en-IN")}
+                              </p>
+                            )}
+
+                            <span
+                              className={`text-[10px] font-body font-semibold px-2.5 py-0.5 rounded-full border ${
+                                ["approved", "active", "completed", "paid"].includes(act.status)
+                                  ? "bg-green-50 text-green-700 border-green-200"
+                                  : act.status === "pending"
+                                  ? "bg-amber-50 text-amber-700 border-amber-200"
+                                  : "bg-red-50 text-red-600 border-red-200"
+                              }`}
+                            >
+                              {(act.status || "active").toUpperCase()}
+                            </span>
+
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 rounded-xl text-xs font-body px-3"
+                              onClick={() => setActiveTab(act.targetTab || "overview")}
+                            >
+                              Manage
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               </div>
             </motion.div>

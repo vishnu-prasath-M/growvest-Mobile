@@ -161,6 +161,18 @@ exports.getAdminStats = async (req, res) => {
       })()
     ]);
 
+    // Fetch recent items from each category for unified overview activity feed
+    const [recentInvestments, recentWithdrawals, recentKycs, recentChitMembers, recentPockets] = await Promise.all([
+      Investment.find().sort({ createdAt: -1 }).limit(8),
+      Withdrawal.find().sort({ createdAt: -1 }).limit(8),
+      KYC.find().populate('userId', 'name username email mobileNumber').sort({ submittedAt: -1, createdAt: -1 }).limit(8),
+      ChitMember.find().populate('userId', 'name username email mobileNumber').populate('chitId', 'name monthlyAmount weeklyAmount').sort({ joinedAt: -1, createdAt: -1 }).limit(8),
+      (async () => {
+        const PocketMoney = require('../models/PocketMoney');
+        return await PocketMoney.find().sort({ createdAt: -1 }).limit(8);
+      })(),
+    ]);
+
     const savingRevenue = revenueResult.length > 0 ? revenueResult[0].total : 0;
     const savingCount = revenueResult.length > 0 ? revenueResult[0].count : 0;
     const pocketRevenue = pocketMoneyStatsResult.invested || 0;
@@ -169,6 +181,70 @@ exports.getAdminStats = async (req, res) => {
     const chitCount = chitStatsResult?.count || 0;
 
     const totalOverallRevenue = savingRevenue + pocketRevenue + chitRevenue;
+
+    // Combine & sort all recent activities
+    const combinedActivities = [
+      ...recentInvestments.map(inv => ({
+        _id: inv._id,
+        category: 'investment',
+        title: `${inv.type === 'fixed' ? 'Fixed Deposit' : 'Savings Deposit'}`,
+        userName: inv.userName || 'Investor',
+        userEmail: inv.userEmail || '',
+        amount: inv.amount || 0,
+        status: inv.status || 'pending',
+        date: inv.createdAt || inv.startDate,
+        details: `Ref: ${inv.referenceId || 'Direct'}`,
+        targetTab: 'pending',
+      })),
+      ...recentWithdrawals.map(w => ({
+        _id: w._id,
+        category: 'withdrawal',
+        title: `Withdrawal (${w.withdrawType || 'saving'})`,
+        userName: w.userName || 'User',
+        userEmail: w.userEmail || '',
+        amount: w.amount || 0,
+        status: w.status || 'pending',
+        date: w.createdAt || w.date,
+        details: `UPI: ${w.upiId || '—'}`,
+        targetTab: 'withdrawals',
+      })),
+      ...recentKycs.map(k => ({
+        _id: k._id,
+        category: 'kyc',
+        title: 'KYC Document Verification',
+        userName: k.fullName || k.userId?.name || 'User',
+        userEmail: k.userId?.email || k.userId?.mobileNumber || '',
+        amount: null,
+        status: k.status || 'pending',
+        date: k.submittedAt || k.createdAt,
+        details: `PAN: ${k.panNumber || '—'} • Aadhaar: ${k.aadhaarNumber ? `•••• ${k.aadhaarNumber.slice(-4)}` : '—'}`,
+        targetTab: 'kyc',
+      })),
+      ...recentChitMembers.map(cm => ({
+        _id: cm._id,
+        category: 'chit',
+        title: `Chit Fund: ${cm.chitId?.name || 'Chit Scheme'}`,
+        userName: cm.userId?.name || cm.userId?.username || 'Member',
+        userEmail: cm.userId?.email || cm.userId?.mobileNumber || '',
+        amount: cm.totalPaid || cm.weeklyAmount || 0,
+        status: cm.status || 'active',
+        date: cm.joinedAt || cm.createdAt,
+        details: `Membership: ${cm.membershipId || 'CM'} (Week ${cm.currentWeek || 1})`,
+        targetTab: 'chits',
+      })),
+      ...recentPockets.map(pm => ({
+        _id: pm._id,
+        category: 'pocket',
+        title: `Pocket Money (${pm.frequency || 'daily'})`,
+        userName: pm.userName || 'Investor',
+        userEmail: pm.userEmail || '',
+        amount: pm.investedAmount || 0,
+        status: pm.status || 'active',
+        date: pm.startDate || pm.createdAt,
+        details: `Payout: ₹${pm.payoutAmount || 0} (${pm.payoutCount || 0}/10 paid)`,
+        targetTab: 'pocket',
+      })),
+    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 20);
 
     res.json({
       totalUsers,
@@ -200,7 +276,8 @@ exports.getAdminStats = async (req, res) => {
         total: chitRevenue,
         count: chitCount,
       },
-      pocketMoney: pocketMoneyStatsResult
+      pocketMoney: pocketMoneyStatsResult,
+      recentActivities: combinedActivities,
     });
   } catch (error) {
     console.error('Admin dashboard stats error:', error);
