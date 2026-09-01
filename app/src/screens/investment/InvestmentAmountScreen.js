@@ -23,8 +23,12 @@ import { kycService } from '../../services/kycService';
 const InvestmentAmountScreen = ({ navigation, route }) => {
   const { colors: themeColors } = useTheme();
   const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
-  const [amount, setAmount] = useState('');
-  const [investmentType, setInvestmentType] = useState('1_year');
+  
+  const initialPlan = route.params?.initialPlan || route.params?.type || null;
+  const initialAmount = route.params?.initialAmount || (route.params?.amount ? String(route.params.amount) : '');
+
+  const [amount, setAmount] = useState(initialAmount);
+  const [investmentType, setInvestmentType] = useState(initialPlan || '1_year');
   const [plans, setPlans] = useState([]);
   const [loadingPlans, setLoadingPlans] = useState(true);
   const [userData, setUserData] = useState(null);
@@ -34,7 +38,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
 
   // Date-based withdrawal & 5-week benefit eligibility dates
   const today = new Date();
-  const defaultWithdrawalDate = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const defaultWithdrawalDate = new Date(today.getTime() + 365 * 24 * 60 * 60 * 1000);
   const fifthWeekDate = new Date(today.getTime() + 35 * 24 * 60 * 60 * 1000);
 
   const [selectedWithdrawalDate, setSelectedWithdrawalDate] = useState(defaultWithdrawalDate.toISOString().split('T')[0]);
@@ -44,6 +48,25 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
     loadUserData();
     loadPlans();
   }, []);
+
+  useEffect(() => {
+    if (route.params?.initialPlan) {
+      setInvestmentType(route.params.initialPlan);
+    }
+    if (route.params?.initialAmount) {
+      setAmount(String(route.params.initialAmount));
+    }
+  }, [route.params]);
+
+  // Synchronize withdrawal date whenever investment plan changes
+  useEffect(() => {
+    if (plans.length > 0) {
+      const plan = plans.find(p => p.id === investmentType);
+      const days = plan?.durationDays || 365;
+      const targetDate = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+      setSelectedWithdrawalDate(targetDate.toISOString().split('T')[0]);
+    }
+  }, [investmentType, plans]);
 
   const loadUserData = async () => {
     try {
@@ -59,9 +82,10 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
       const fetchedPlans = await investmentService.getPlans();
       setPlans(fetchedPlans);
       if (fetchedPlans && fetchedPlans.length > 0) {
-        // Default to the 1 Year plan (last in the array usually)
-        const yearPlan = fetchedPlans.find(p => p.id === '1_year') || fetchedPlans[fetchedPlans.length - 1];
-        setInvestmentType(yearPlan.id);
+        if (!initialPlan) {
+          const yearPlan = fetchedPlans.find(p => p.id === '1_year') || fetchedPlans[fetchedPlans.length - 1];
+          setInvestmentType(yearPlan.id);
+        }
       }
     } catch (error) {
       console.error('Error loading plans:', error);
@@ -74,7 +98,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
         { id: '1_year', name: '1 Year Plan', durationDays: 365, interestRate: 24, label: '1 Year', desc: 'Locked for 365 days, 24% returns', icon: 'lock' },
       ];
       setPlans(fallbackPlans);
-      setInvestmentType('1_year');
+      if (!initialPlan) setInvestmentType('1_year');
     } finally {
       setLoadingPlans(false);
     }
@@ -96,6 +120,15 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
       return;
     }
 
+    const chosenDate = new Date(selectedWithdrawalDate);
+    const todayMidnight = new Date();
+    todayMidnight.setHours(0, 0, 0, 0);
+
+    if (isNaN(chosenDate.getTime()) || chosenDate < todayMidnight) {
+      Alert.alert('Invalid Date', 'Please choose a valid intended withdrawal date.');
+      return;
+    }
+
     // KYC Check — must be approved before investing
     const kycCheck = await kycService.checkInvestmentKYC();
     if (!kycCheck.allowed) {
@@ -114,6 +147,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
       type: investmentType,
       userData,
       selectedWithdrawalDate,
+      intendedWithdrawalDate: selectedWithdrawalDate,
       benefitEligibilityDate: fifthWeekDate.toISOString(),
     });
   };
@@ -290,80 +324,109 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
         })()}
 
         {/* Investment Summary */}
-        {amount && parseFloat(amount) > 0 && (
-          <View style={styles.summaryContainer}>
-            <Text style={styles.summaryTitle}>Investment Summary</Text>
-            
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Plan</Text>
-              <Text style={[styles.summaryValue, { color: themeColors.primary, fontWeight: '700' }]}>
-                {getSelectedPlan()?.name || 'Selected Plan'}
-              </Text>
+        {amount && parseFloat(amount) > 0 && (() => {
+          const selectedPlan = getSelectedPlan();
+          const maxDays = selectedPlan?.durationDays || 365;
+          const maturityDate = new Date(today.getTime() + maxDays * 24 * 60 * 60 * 1000);
+          const isEarlyWithdrawal = new Date(selectedWithdrawalDate) < new Date(maturityDate.toDateString());
+
+          return (
+            <View style={styles.summaryContainer}>
+              <Text style={styles.summaryTitle}>Investment Summary</Text>
+              
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Selected Plan</Text>
+                <Text style={[styles.summaryValue, { color: themeColors.primary, fontWeight: '700' }]}>
+                  {selectedPlan?.name || 'Selected Plan'}
+                </Text>
+              </View>
+
+              <View style={styles.summaryDivider} />
+
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Investment Amount</Text>
+                <Text style={styles.summaryAmount}>
+                  ₹{parseFloat(amount).toLocaleString('en-IN')}
+                </Text>
+              </View>
+
+              <View style={styles.summaryDivider} />
+
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Start Date</Text>
+                <Text style={styles.summaryValue}>
+                  {today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </Text>
+              </View>
+
+              <View style={styles.summaryDivider} />
+
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Intended Withdrawal Date</Text>
+                <Text style={[styles.summaryValue, { color: isEarlyWithdrawal ? '#D97706' : '#059669', fontWeight: '700' }]}>
+                  {new Date(selectedWithdrawalDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </Text>
+              </View>
+
+              <View style={styles.summaryDivider} />
+
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Plan Duration</Text>
+                <Text style={styles.summaryValue}>{maxDays} Days</Text>
+              </View>
+
+              <View style={styles.summaryDivider} />
+
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Maturity Date</Text>
+                <Text style={[styles.summaryValue, { fontWeight: '700', color: themeColors.primary }]}>
+                  {maturityDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </Text>
+              </View>
+
+              <View style={styles.summaryDivider} />
+
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Interest Rate</Text>
+                <Text style={[styles.summaryValue, { color: themeColors.success, fontWeight: '700' }]}>{getInterestRate()}</Text>
+              </View>
+
+              <View style={styles.summaryDivider} />
+
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Expected Interest</Text>
+                <Text style={[styles.summaryValue, { color: themeColors.success, fontWeight: '700' }]}>
+                  ₹{calculateInterest().toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                </Text>
+              </View>
+
+              <View style={styles.summaryDivider} />
+
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Daily Interest</Text>
+                <Text style={[styles.summaryValue, { color: themeColors.primary, fontWeight: '700' }]}>
+                  ₹{calculateDailyInterest().toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / day
+                </Text>
+              </View>
+
+              <View style={styles.summaryDivider} />
+
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Withdrawal Eligibility</Text>
+                <Text style={[styles.summaryValue, { color: isEarlyWithdrawal ? '#D97706' : '#059669', fontWeight: '700' }]}>
+                  {isEarlyWithdrawal ? 'Early: Principal Only' : 'Full Return (Principal + Interest)'}
+                </Text>
+              </View>
+
+              <View style={styles.summaryHighlightRow}>
+                <Text style={styles.summaryHighlightLabel}>Maturity Amount</Text>
+                <Text style={[styles.summaryHighlightValue, { color: themeColors.success }]}>
+                  ₹{calculateMaturityAmount().toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                </Text>
+              </View>
             </View>
-
-            <View style={styles.summaryDivider} />
-
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Investment Amount</Text>
-              <Text style={styles.summaryAmount}>
-                ₹{parseFloat(amount).toLocaleString('en-IN')}
-              </Text>
-            </View>
-
-            <View style={styles.summaryDivider} />
-
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Interest Rate</Text>
-              <Text style={[styles.summaryValue, { color: themeColors.success, fontWeight: '700' }]}>{getInterestRate()}</Text>
-            </View>
-
-            <View style={styles.summaryDivider} />
-
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Investment Duration</Text>
-              <Text style={styles.summaryValue}>{getLockPeriod()}</Text>
-            </View>
-
-            <View style={styles.summaryDivider} />
-
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Total Interest</Text>
-              <Text style={[styles.summaryValue, { color: themeColors.success, fontWeight: '700' }]}>
-                ₹{calculateInterest().toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-              </Text>
-            </View>
-
-            <View style={styles.summaryDivider} />
-
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Daily Interest</Text>
-              <Text style={[styles.summaryValue, { color: themeColors.primary, fontWeight: '700' }]}>
-                ₹{calculateDailyInterest().toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / day
-              </Text>
-            </View>
-
-            <View style={styles.summaryDivider} />
-
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Lock Period</Text>
-              <Text style={styles.summaryValue}>{getLockPeriod()}</Text>
-            </View>
-
-            <View style={styles.summaryDivider} />
-
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Withdrawal Available</Text>
-              <Text style={[styles.summaryValue, { fontWeight: '700' }]}>After {getLockPeriod()}</Text>
-            </View>
-
-            <View style={styles.summaryHighlightRow}>
-              <Text style={styles.summaryHighlightLabel}>Maturity Amount</Text>
-              <Text style={[styles.summaryHighlightValue, { color: themeColors.success }]}>
-                ₹{calculateMaturityAmount().toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-              </Text>
-            </View>
-          </View>
-        )}
+          );
+        })()}
 
         {/* Info Points */}
         <View style={styles.infoContainer}>

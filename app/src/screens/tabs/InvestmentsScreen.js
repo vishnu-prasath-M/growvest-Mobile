@@ -388,6 +388,22 @@ const InvestmentsScreen = ({ navigation }) => {
                       <Text style={styles.investEarningsValue}>+{formatCurrency(item.interestEarned)}</Text>
                     </View>
                   )}
+
+                  {/* Reinvest quick button if matured */}
+                  {item.maturityDate && new Date() >= new Date(item.maturityDate) && item.status === 'approved' && (
+                    <View style={{ marginTop: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#ECFDF5', padding: 8, borderRadius: 12, borderWidth: 1, borderColor: '#A7F3D0' }}>
+                      <Text style={{ fontSize: 11, color: '#065F46', fontWeight: '700' }}>✅ Plan Matured</Text>
+                      <TouchableOpacity
+                        onPress={(e) => {
+                          e.stopPropagation?.();
+                          navigation.navigate('InvestmentAmount', { initialPlan: item.type, initialAmount: String(item.amount) });
+                        }}
+                        style={{ backgroundColor: '#10B981', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8 }}
+                      >
+                        <Text style={{ fontSize: 11, color: '#FFFFFF', fontWeight: '800' }}>Reinvest ↺</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </TouchableOpacity>
               );
             })
@@ -413,6 +429,7 @@ const InvestmentsScreen = ({ navigation }) => {
         item={selectedDeposit}
         onClose={() => setSelectedDeposit(null)}
         onWithdraw={() => navigation.navigate('Withdraw')}
+        onReinvest={(item) => navigation.navigate('InvestmentAmount', { initialPlan: item.type, initialAmount: String(item.amount) })}
       />
     </View>
   );

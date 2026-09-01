@@ -126,14 +126,17 @@ const chitMemberSchema = new mongoose.Schema({
   accumulatedDividend: {
     type: Number,
   },
-  finalWithdrawalAmount: {
-    type: Number,
+  membershipId: {
+    type: String,
+    unique: true,
+    sparse: true,
+    index: true,
   },
 }, { timestamps: true });
 
-// Each user can join a chit only once
-chitMemberSchema.index({ chitId: 1, userId: 1 }, { unique: true });
+// Indexes for fast lookup (users can join the same chit multiple times)
 chitMemberSchema.index({ userId: 1 });
 chitMemberSchema.index({ chitId: 1 });
+chitMemberSchema.index({ membershipId: 1 });
 
 module.exports = mongoose.model('ChitMember', chitMemberSchema);

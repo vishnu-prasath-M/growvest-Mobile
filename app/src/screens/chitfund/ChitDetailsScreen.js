@@ -186,7 +186,7 @@ const ChitDetailsScreen = ({ navigation, route }) => {
     const weeklyAmount = chit.weeklyAmount || chit.monthlyAmount || 200;
     const totalWeeks = chit.totalWeeks || chit.duration || 10;
     
-    const myMembership = myChits.find(m => m.chitId === chit._id) || chit.myMembership;
+    const myMembership = (memberId ? myChits.find(m => m._id === memberId) : null) || myChits.find(m => (m.chitId?._id || m.chitId) === chit._id) || chit.myMembership;
     const currentWeek = myMembership?.currentWeek || 0;
     
     const { schedule } = generateWeeklySchedule(weeklyAmount, totalWeeks);
@@ -277,7 +277,7 @@ const ChitDetailsScreen = ({ navigation, route }) => {
         </View>
 
         {(() => {
-          const myMembership = myChits.find(m => m.chitId === chit._id) || chit.myMembership;
+          const myMembership = (memberId ? myChits.find(m => m._id === memberId) : null) || myChits.find(m => (m.chitId?._id || m.chitId) === chit._id) || chit.myMembership;
           const totalMembers = chit.totalMembers || 0;
           const availableSlots = chit.availableSlots || 0;
           const filledMembers = Math.max(0, totalMembers - availableSlots);

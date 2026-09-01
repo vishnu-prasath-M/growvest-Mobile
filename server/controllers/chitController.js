@@ -338,6 +338,7 @@ const getMyChits = async (req, res) => {
         remainingSlots: availableSlots,
         totalPot: totalContribution,
         memberNumber: m.memberNumber,
+        membershipId: m.membershipId || `CM-${m.memberNumber || (10000 + parseInt(m._id.toString().slice(-4), 16) % 90000)}`,
         status: m.status,
         adminApprovalStatus: m.adminApprovalStatus || 'approved',
         rejectionReason: m.rejectionReason || '',
@@ -377,9 +378,10 @@ const getChitById = async (req, res) => {
     const chit = await Chit.findById(req.params.id);
     if (!chit) return res.status(404).json({ message: 'Chit not found' });
 
-    const membership = await ChitMember.findOne({
+    const memberships = await ChitMember.find({
       chitId: req.params.id,
       userId: req.user._id,
+      status: { $ne: 'cancelled' }
     });
 
     const joinedCount = await ChitMember.countDocuments({ chitId: req.params.id, status: { $ne: 'cancelled' } });
@@ -394,7 +396,8 @@ const getChitById = async (req, res) => {
       availableSlots: realAvailableSlots,
       isFull,
       status: isFull ? 'full' : chit.status,
-      myMembership: membership || null,
+      myMemberships: memberships,
+      myMembership: memberships[0] || null,
     });
   } catch (error) {
     console.error('Error fetching chit by id:', error);
@@ -470,11 +473,6 @@ const joinChit = async (req, res) => {
 
     if (!['active', 'upcoming'].includes(chit.status)) {
       return res.status(400).json({ message: 'This chit is not accepting new members' });
-    }
-
-    const existing = await ChitMember.findOne({ chitId, userId, status: { $ne: 'cancelled' } });
-    if (existing && (existing.status === 'active' || existing.status === 'approved')) {
-      return res.status(400).json({ message: 'You are already an active member of this chit' });
     }
 
     const baseAmount = chit.isWeekly ? (chit.weeklyAmount || chit.monthlyAmount || 200) : chit.monthlyAmount;
