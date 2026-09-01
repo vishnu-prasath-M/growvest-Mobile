@@ -114,6 +114,7 @@ const AdminDashboard = () => {
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [userDetails, setUserDetails] = useState<Record<string, any>>({});
+  const [overviewFilter, setOverviewFilter] = useState<'all' | 'investment' | 'withdrawal' | 'kyc' | 'chit' | 'pocket'>('all');
 
   // Push Notification Test state
   const [testPushTargetUserId, setTestPushTargetUserId] = useState<string>("");
@@ -733,6 +734,10 @@ const AdminDashboard = () => {
 
   const pendingCount = pendingList.filter((i) => i.status === "pending").length;
   const wdPendingCount = withdrawList.filter((w) => w.status === "pending").length;
+  const kycPendingCount = kycList.filter((k) => k.status === "pending").length;
+  const pocketActiveCount = dashboardStats?.pocketMoney?.active || 0;
+  const chitActiveCount = dashboardStats?.activeChitMembers || 0;
+  const totalPendingActions = pendingCount + wdPendingCount + kycPendingCount + (dashboardStats?.pendingChitRequests || 0);
 
   // Total Payable Balance = SUM of all users' current balance field from DB
   // This works immediately using already-fetched allUsers data
@@ -1006,59 +1011,238 @@ const AdminDashboard = () => {
                 })}
               </div>
 
-              {/* Pending actions alert */}
-              {pendingCount > 0 && (
-                <div
-                  className="rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-5 mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-amber-100 transition-colors"
-                  onClick={() => setActiveTab("pending")}
-                >
-                  <div className="flex items-center gap-3">
-                    <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0" />
-                    <div>
-                      <p className="text-sm font-body font-semibold text-amber-800">
-                        {pendingCount} investment{pendingCount > 1 ? "s" : ""} awaiting your approval
-                      </p>
-                      <p className="text-xs font-body text-amber-600 mt-0.5">
-                        Click to review and approve or reject
-                      </p>
+              {/* ── CONDITIONAL PENDING REQUEST ALERTS (ONLY SHOWS WHEN REQUESTS ARRIVE) ── */}
+              <div className="space-y-3 mb-6 sm:mb-8">
+                {/* 1. Pending Investments Alert */}
+                {pendingCount > 0 && (
+                  <div
+                    className="rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-amber-100/80 transition-colors shadow-sm"
+                    onClick={() => setActiveTab("pending")}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                        <DollarSign className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-body font-bold text-amber-900">
+                          {pendingCount} new investment{pendingCount > 1 ? "s" : ""} awaiting approval
+                        </p>
+                        <p className="text-xs font-body text-amber-700 mt-0.5">
+                          Click to review and approve or reject deposit requests
+                        </p>
+                      </div>
                     </div>
+                    <Button size="sm" className="rounded-xl font-body bg-amber-600 hover:bg-amber-700 text-white w-full sm:w-auto shrink-0">
+                      Review Investments ({pendingCount})
+                    </Button>
                   </div>
-                  <Button size="sm" className="rounded-xl font-body bg-amber-600 hover:bg-amber-700 w-full sm:w-auto">
-                    Review Now
-                  </Button>
-                </div>
-              )}
+                )}
 
-              {/* Recent activity */}
-              <div className="card-premium overflow-hidden">
-                <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border">
-                  <h2 className="font-heading font-semibold text-foreground text-base sm:text-lg">Recent Investments</h2>
-                </div>
-                <div className="divide-y divide-border">
-                  {pendingList.slice(0, 5).map((inv) => (
-                    <div key={inv._id} className="px-4 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`h-8 w-8 sm:h-9 sm:w-9 rounded-xl flex items-center justify-center ${inv.status === "approved" ? "bg-accent" : inv.status === "pending" ? "bg-amber-50" : "bg-red-50"
-                            }`}
-                        >
-                          {inv.status === "approved" && <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-secondary" />}
-                          {inv.status === "pending" && <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600" />}
-                          {inv.status === "rejected" && <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-500" />}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-body font-semibold text-foreground">{inv.user} <span className="opacity-50 font-normal">({getPlanDisplayName(inv.type)})</span></p>
-                          <p className="text-xs font-body text-muted-foreground">{inv.ref} · {new Date(inv.startDate).toLocaleDateString()}</p>
-                        </div>
+                {/* 2. Pending Withdrawals Alert */}
+                {wdPendingCount > 0 && (
+                  <div
+                    className="rounded-2xl border border-rose-200 bg-rose-50 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-rose-100/80 transition-colors shadow-sm"
+                    onClick={() => setActiveTab("withdrawals")}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                        <ArrowDownToLine className="h-5 w-5" />
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-body font-bold text-foreground">₹{inv.amount.toLocaleString("en-IN")}</p>
-                        <span className={`text-[10px] font-body font-semibold px-2 py-0.5 rounded-full border ${statusStyle[inv.status]}`}>
-                          {inv.status.charAt(0).toUpperCase() + inv.status.slice(1)}
-                        </span>
+                      <div>
+                        <p className="text-sm font-body font-bold text-rose-900">
+                          {wdPendingCount} new withdrawal request{wdPendingCount > 1 ? "s" : ""} pending payment
+                        </p>
+                        <p className="text-xs font-body text-rose-700 mt-0.5">
+                          Click to verify UPI details and approve/mark as paid
+                        </p>
                       </div>
                     </div>
-                  ))}
+                    <Button size="sm" className="rounded-xl font-body bg-rose-600 hover:bg-rose-700 text-white w-full sm:w-auto shrink-0">
+                      Review Withdrawals ({wdPendingCount})
+                    </Button>
+                  </div>
+                )}
+
+                {/* 3. Pending KYC Alert */}
+                {kycPendingCount > 0 && (
+                  <div
+                    className="rounded-2xl border border-blue-200 bg-blue-50 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-blue-100/80 transition-colors shadow-sm"
+                    onClick={() => setActiveTab("kyc")}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                        <Shield className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-body font-bold text-blue-900">
+                          {kycPendingCount} new KYC verification{kycPendingCount > 1 ? "s" : ""} submitted
+                        </p>
+                        <p className="text-xs font-body text-blue-700 mt-0.5">
+                          Click to review PAN and Aadhaar identity documents
+                        </p>
+                      </div>
+                    </div>
+                    <Button size="sm" className="rounded-xl font-body bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto shrink-0">
+                      Verify KYC ({kycPendingCount})
+                    </Button>
+                  </div>
+                )}
+
+                {/* 4. Pending Chit Fund Requests Alert */}
+                {(dashboardStats?.pendingChitRequests || 0) > 0 && (
+                  <div
+                    className="rounded-2xl border border-purple-200 bg-purple-50 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-purple-100/80 transition-colors shadow-sm"
+                    onClick={() => setActiveTab("chits")}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                        <TrendingUp className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-body font-bold text-purple-900">
+                          {dashboardStats.pendingChitRequests} new chit fund join/payment request{dashboardStats.pendingChitRequests > 1 ? "s" : ""}
+                        </p>
+                        <p className="text-xs font-body text-purple-700 mt-0.5">
+                          Click to approve chit scheme memberships and payments
+                        </p>
+                      </div>
+                    </div>
+                    <Button size="sm" className="rounded-xl font-body bg-purple-600 hover:bg-purple-700 text-white w-full sm:w-auto shrink-0">
+                      Review Chits ({dashboardStats.pendingChitRequests})
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* ── UNIFIED REAL-TIME ACTIVITY STREAM ── */}
+              <div className="card-premium overflow-hidden">
+                <div className="px-4 sm:px-6 py-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h2 className="font-heading font-semibold text-foreground text-base sm:text-lg">
+                      Recent Activity & Requests Stream
+                    </h2>
+                    <p className="text-xs font-body text-muted-foreground mt-0.5">
+                      Live unified feed across Pocket Money, Chit Funds, KYC, Withdrawals, and Investments
+                    </p>
+                  </div>
+
+                  {/* Category Filter Pills */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+                    {(
+                      [
+                        { id: "all", label: "All" },
+                        { id: "investment", label: "Investments" },
+                        { id: "withdrawal", label: "Withdrawals" },
+                        { id: "kyc", label: "KYC" },
+                        { id: "chit", label: "Chits" },
+                        { id: "pocket", label: "Pocket Money" },
+                      ] as const
+                    ).map((f) => (
+                      <button
+                        key={f.id}
+                        onClick={() => setOverviewFilter(f.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-body font-semibold transition-all whitespace-nowrap ${
+                          overviewFilter === f.id
+                            ? "bg-primary text-primary-foreground shadow-sm"
+                            : "bg-muted text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="divide-y divide-border">
+                  {(() => {
+                    const activities: any[] = dashboardStats?.recentActivities || [];
+                    const filtered = activities.filter((act) => {
+                      if (overviewFilter === "all") return true;
+                      return act.category === overviewFilter;
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <div className="p-8 text-center text-xs font-body text-muted-foreground">
+                          No recent activities found for the selected category.
+                        </div>
+                      );
+                    }
+
+                    return filtered.map((act) => {
+                      let Icon = DollarSign;
+                      let iconBg = "bg-emerald-50 text-emerald-600";
+
+                      if (act.category === "withdrawal") {
+                        Icon = ArrowDownToLine;
+                        iconBg = "bg-rose-50 text-rose-600";
+                      } else if (act.category === "kyc") {
+                        Icon = Shield;
+                        iconBg = "bg-blue-50 text-blue-600";
+                      } else if (act.category === "chit") {
+                        Icon = TrendingUp;
+                        iconBg = "bg-purple-50 text-purple-600";
+                      } else if (act.category === "pocket") {
+                        Icon = Wallet;
+                        iconBg = "bg-amber-50 text-amber-600";
+                      }
+
+                      return (
+                        <div
+                          key={act._id}
+                          className="px-4 sm:px-6 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-muted/20 transition-colors"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}>
+                              <Icon className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-sm font-body font-semibold text-foreground truncate">
+                                  {act.userName}
+                                </p>
+                                <span className="text-[11px] font-body text-muted-foreground">
+                                  • {act.title}
+                                </span>
+                              </div>
+                              <p className="text-xs font-body text-muted-foreground truncate">
+                                {act.details} • {new Date(act.date).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                            {act.amount !== null && act.amount !== undefined && (
+                              <p className="text-sm font-body font-bold text-foreground">
+                                ₹{Number(act.amount).toLocaleString("en-IN")}
+                              </p>
+                            )}
+
+                            <span
+                              className={`text-[10px] font-body font-semibold px-2.5 py-0.5 rounded-full border ${
+                                ["approved", "active", "completed", "paid"].includes(act.status)
+                                  ? "bg-green-50 text-green-700 border-green-200"
+                                  : act.status === "pending"
+                                  ? "bg-amber-50 text-amber-700 border-amber-200"
+                                  : "bg-red-50 text-red-600 border-red-200"
+                              }`}
+                            >
+                              {(act.status || "active").toUpperCase()}
+                            </span>
+
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 rounded-xl text-xs font-body px-3"
+                              onClick={() => setActiveTab(act.targetTab || "overview")}
+                            >
+                              Manage
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               </div>
             </motion.div>
