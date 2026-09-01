@@ -229,7 +229,21 @@ async function getUserPortfolioSummary(userIdInput) {
     nextUnlockDate = sorted[0].maturityDate;
   }
 
+  const Settings = require('../models/Settings');
+  let minCoinThreshold = 1000;
+  try {
+    const minCoinSetting = await Settings.findOne({ key: 'min_reward_withdrawal_coins' });
+    if (minCoinSetting && minCoinSetting.value) {
+      const parsed = parseInt(minCoinSetting.value, 10);
+      if (!isNaN(parsed) && parsed > 0) minCoinThreshold = parsed;
+    }
+  } catch (settingErr) {
+    console.warn('[PortfolioHelper] Error fetching min coin setting:', settingErr.message);
+  }
+
   const userCoinBalance = Number(user.coinBalance) || Number(user.coins) || 0;
+  const isRewardUnlocked = userCoinBalance >= minCoinThreshold;
+  const unlockedRewardCoinsRupees = isRewardUnlocked ? Number((userCoinBalance * 0.05).toFixed(2)) : 0;
 
   return {
     user: {
@@ -259,6 +273,9 @@ async function getUserPortfolioSummary(userIdInput) {
       walletBalance: 0,
       coinBalance: userCoinBalance,
       coins: userCoinBalance,
+      unlockedRewardCoinsRupees,
+      isRewardUnlocked,
+      minCoinThreshold,
       totalChitInvested,
       totalChitWinningAmount,
       chitWithdrawalAvailable,

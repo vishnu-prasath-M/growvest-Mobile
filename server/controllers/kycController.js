@@ -326,9 +326,14 @@ exports.reviewKYC = async (req, res) => {
     
     // Send notification using unified helper
     const { sendNotification } = require('../services/notificationHelper');
+    const { triggerReferralKycReward } = require('../utils/referralHelper');
+
     if (status === 'approved') {
+      const kycTargetUserId = kyc.userId._id || kyc.userId;
+      await triggerReferralKycReward(kycTargetUserId);
+
       await sendNotification({
-        userId: kyc.userId._id || kyc.userId,
+        userId: kycTargetUserId,
         title: 'KYC Approved',
         description: 'Your KYC has been approved successfully. You can now access all features.',
         type: 'kyc_approved',

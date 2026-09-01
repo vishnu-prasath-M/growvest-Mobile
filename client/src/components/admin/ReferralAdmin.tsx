@@ -227,9 +227,9 @@ const ReferralAdmin = ({ token }: ReferralAdminProps) => {
       {/* Title & Nav Tabs */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h2 className="font-heading text-2xl text-foreground">Referral & APK Management</h2>
-          <p className="text-sm font-body text-muted-foreground mt-0.5">
-            Track user referrals, qualified rewards, and manage active Android APK releases
+          <h2 className="font-heading text-2xl text-foreground">Referral & Rewards Management</h2>
+          <p className="font-body text-xs text-muted-foreground mt-1">
+            Track user referrals, reward milestones (20c Signup, 30c KYC, 50c 1st Inv, 100c Milestone), and manage APK releases
           </p>
         </div>
 
@@ -242,7 +242,7 @@ const ReferralAdmin = ({ token }: ReferralAdminProps) => {
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            Overview
+            Overview & Settings
           </button>
           <button
             onClick={() => setActiveSubTab("users")}
@@ -272,29 +272,71 @@ const ReferralAdmin = ({ token }: ReferralAdminProps) => {
         <div className="space-y-6">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <div className="card-premium p-4">
+              <p className="text-xs font-body text-muted-foreground">Total Users</p>
+              <p className="text-2xl font-heading font-bold text-foreground mt-1">{overview.totalUsersCount || 0}</p>
+            </div>
+            <div className="card-premium p-4">
               <p className="text-xs font-body text-muted-foreground">Total Referrals</p>
               <p className="text-2xl font-heading font-bold text-foreground mt-1">{overview.totalReferrals || 0}</p>
             </div>
             <div className="card-premium p-4">
-              <p className="text-xs font-body text-muted-foreground">Registered</p>
-              <p className="text-2xl font-heading font-bold text-blue-600 mt-1">{overview.registeredCount || 0}</p>
-            </div>
-            <div className="card-premium p-4">
-              <p className="text-xs font-body text-muted-foreground">Qualified</p>
+              <p className="text-xs font-body text-muted-foreground">Qualified Referrals</p>
               <p className="text-2xl font-heading font-bold text-green-600 mt-1">{overview.qualifiedCount || 0}</p>
-            </div>
-            <div className="card-premium p-4">
-              <p className="text-xs font-body text-muted-foreground">Pending</p>
-              <p className="text-2xl font-heading font-bold text-amber-600 mt-1">{overview.pendingCount || 0}</p>
             </div>
             <div className="card-premium p-4">
               <p className="text-xs font-body text-muted-foreground">Coins Rewarded</p>
               <p className="text-2xl font-heading font-bold text-yellow-600 mt-1">🪙 {overview.totalCoinsRewarded || 0}</p>
+              <p className="text-[10px] text-muted-foreground">≈ ₹{overview.totalRewardRupees || "0.00"}</p>
+            </div>
+            <div className="card-premium p-4">
+              <p className="text-xs font-body text-muted-foreground">Pending Withdrawals</p>
+              <p className="text-2xl font-heading font-bold text-amber-600 mt-1">{overview.pendingWithdrawalsCount || 0}</p>
             </div>
             <div className="card-premium p-4">
               <p className="text-xs font-body text-muted-foreground">APK Downloads</p>
               <p className="text-2xl font-heading font-bold text-primary mt-1">📱 {overview.totalApkDownloads || 0}</p>
             </div>
+          </div>
+
+          {/* Reward Settings & Threshold Configuration */}
+          <div className="card-premium p-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="font-heading font-bold text-base text-foreground flex items-center gap-2">
+                  <Award className="text-yellow-600 h-5 w-5" />
+                  Minimum Reward Withdrawal Threshold
+                </h3>
+                <p className="text-xs font-body text-muted-foreground mt-1">
+                  Current rate: <strong>20 Coins = ₹1 (₹0.05 per Coin)</strong>. Users must reach this threshold to unlock withdrawal.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 bg-muted px-3 py-2 rounded-xl border border-border">
+                  <span className="text-xs font-semibold text-muted-foreground">🪙</span>
+                  <input
+                    type="number"
+                    min="20"
+                    step="50"
+                    value={minThresholdInput}
+                    onChange={(e) => setMinThresholdInput(e.target.value)}
+                    className="w-20 bg-transparent text-sm font-bold text-foreground focus:outline-none"
+                  />
+                  <span className="text-xs text-muted-foreground">Coins (₹{((parseInt(minThresholdInput, 10) || 0) * 0.05).toFixed(2)})</span>
+                </div>
+
+                <Button
+                  onClick={handleSaveThreshold}
+                  disabled={savingThreshold}
+                  className="rounded-xl text-xs font-semibold"
+                >
+                  {savingThreshold ? "Saving..." : "Update Threshold"}
+                </Button>
+              </div>
+            </div>
+            {thresholdSavedMsg && (
+              <p className="text-xs text-green-600 font-semibold mt-2">✓ {thresholdSavedMsg}</p>
+            )}
           </div>
 
           {/* Quick Active APK Status Card */}
@@ -376,10 +418,11 @@ const ReferralAdmin = ({ token }: ReferralAdminProps) => {
                     <th className="px-4 py-3">Referred User</th>
                     <th className="px-4 py-3">Referral Code</th>
                     <th className="px-4 py-3">Referrer</th>
-                    <th className="px-4 py-3">Joined Date</th>
-                    <th className="px-4 py-3">Investment Status</th>
-                    <th className="px-4 py-3">Referral Status</th>
-                    <th className="px-4 py-3 text-right">Coins Rewarded</th>
+                    <th className="px-4 py-3">Signup (20c)</th>
+                    <th className="px-4 py-3">KYC (30c)</th>
+                    <th className="px-4 py-3">1st Inv (50c)</th>
+                    <th className="px-4 py-3">Milestone (100c)</th>
+                    <th className="px-4 py-3 text-right">Total Rewarded</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -392,35 +435,57 @@ const ReferralAdmin = ({ token }: ReferralAdminProps) => {
                         </td>
                         <td className="px-4 py-3.5 font-mono text-yellow-600 font-bold">{u.referralCode}</td>
                         <td className="px-4 py-3.5 text-foreground">{u.referrerName}</td>
-                        <td className="px-4 py-3.5 text-muted-foreground">{formatDate(u.joinedDate)}</td>
-                        <td className="px-4 py-3.5 font-medium">
-                          {u.investmentStatus !== "None" ? (
-                            <span className="text-green-700 bg-green-50 px-2 py-0.5 rounded-full border border-green-200">
-                              {u.investmentStatus} (₹{u.investmentAmount})
+                        <td className="px-4 py-3.5">
+                          {u.signupRewarded ? (
+                            <span className="text-green-700 bg-green-50 px-2 py-0.5 rounded-full border border-green-200 text-[10px] font-semibold">
+                              ✓ +20c
                             </span>
                           ) : (
-                            <span className="text-gray-500">Not Invested Yet</span>
+                            <span className="text-muted-foreground text-[10px]">—</span>
                           )}
                         </td>
                         <td className="px-4 py-3.5">
-                          {["SUCCESSFUL", "REWARDED"].includes(u.referralStatus) ? (
-                            <span className="bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full font-semibold text-[10px]">
-                              SUCCESSFUL
+                          {u.kycRewarded ? (
+                            <span className="text-green-700 bg-green-50 px-2 py-0.5 rounded-full border border-green-200 text-[10px] font-semibold">
+                              ✓ +30c
                             </span>
                           ) : (
-                            <span className="bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full font-semibold text-[10px]">
-                              PENDING
+                            <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 text-[10px]">
+                              {u.kycStatus === 'pending' ? 'Reviewing' : 'Pending'}
                             </span>
                           )}
                         </td>
+                        <td className="px-4 py-3.5">
+                          {u.firstInvestmentRewarded ? (
+                            <span className="text-green-700 bg-green-50 px-2 py-0.5 rounded-full border border-green-200 text-[10px] font-semibold">
+                              ✓ +50c
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground text-[10px]">Pending</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          {u.milestoneRewarded ? (
+                            <span className="text-green-700 bg-green-50 px-2 py-0.5 rounded-full border border-green-200 text-[10px] font-semibold">
+                              ✓ +100c
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground text-[10px]">Pending</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3.5 text-right font-bold text-green-700">
-                          {u.rewardCoins > 0 ? `+${u.rewardCoins} Coins` : "—"}
+                          {u.rewardCoins > 0 ? (
+                            <div>
+                              <span>+{u.rewardCoins} Coins</span>
+                              <span className="block text-[10px] text-muted-foreground font-normal">≈ ₹{u.rewardRupees}</span>
+                            </div>
+                          ) : "—"}
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
+                      <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
                         No referral records match filter criteria.
                       </td>
                     </tr>

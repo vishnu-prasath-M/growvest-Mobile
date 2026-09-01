@@ -76,56 +76,21 @@ exports.registerUser = async (req, res) => {
     });
 
     if (user) {
-      // Create Referral record and reward referrer immediately upon registration
+      // Create Referral record and reward referrer 20 Coins upon registration
       if (referrer && referrer._id.toString() !== user._id.toString()) {
         try {
           const Referral = require('../models/Referral');
-          const CoinTransaction = require('../models/CoinTransaction');
-          const { sendNotification } = require('../services/notificationHelper');
+          const { triggerReferralSignupReward } = require('../utils/referralHelper');
 
-          const signupRewardCoins = 50;
-
-          const refDoc = await Referral.create({
+          await Referral.create({
             referrerUserId: referrer._id,
             referredUserId: user._id,
             referralCode: referrer.referralCode || rawRefInput.toUpperCase(),
-            rewardCoins: signupRewardCoins,
+            rewardCoins: 0,
             status: 'REGISTERED',
           });
 
-          // Credit referrer's coin balance
-          await User.findByIdAndUpdate(referrer._id, {
-            $inc: { coinBalance: signupRewardCoins }
-          });
-
-          // Record Coin Transaction for referrer
-          await CoinTransaction.create({
-            userId: referrer._id,
-            type: 'REFERRAL_REWARD',
-            amount: signupRewardCoins,
-            description: `Referral signup bonus: ${user.name || user.username} joined with your link`,
-            referenceId: refDoc._id,
-          });
-
-          // Record Welcome Coin Transaction for new user
-          await CoinTransaction.create({
-            userId: user._id,
-            type: 'REFERRAL_REWARD',
-            amount: initialCoins,
-            description: `Welcome bonus for joining Growvest with referral code ${referrer.referralCode || rawRefInput}`,
-            referenceId: refDoc._id,
-          });
-
-          // Notify referrer via Push Notification
-          await sendNotification({
-            userId: referrer._id,
-            title: '🪙 Friend Joined Growvest!',
-            description: `🎉 +${signupRewardCoins} Growvest Coins! ${user.name || user.username} just joined using your referral link. You will earn even more coins when they make their first investment!`,
-            type: 'referral_reward',
-            metadata: { referralId: refDoc._id },
-          }).catch(err => console.warn('[Referral Notif Error]', err.message));
-
-          console.log(`[Referral Attribution] Credited ${signupRewardCoins} coins to referrer ${referrer.username} for new user ${user.username}`);
+          await triggerReferralSignupReward(user._id, referrer._id);
         } catch (refErr) {
           console.error('[Referral Attribution Error]', refErr.message);
         }
