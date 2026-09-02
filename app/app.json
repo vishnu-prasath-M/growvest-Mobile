@@ -88,7 +88,8 @@
             "targetSdkVersion": 35
           }
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "owner": "prasath_apr",
     "extra": {
