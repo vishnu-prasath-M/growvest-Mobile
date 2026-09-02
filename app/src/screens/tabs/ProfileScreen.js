@@ -18,11 +18,11 @@ import { authService } from '../../services/authService';
 import { useAuth } from '../../context/AuthContext';
 import { colors } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
-import { SkeletonLoader } from '../../components/SkeletonLoader';
-import { useTheme } from '../../context/ThemeContext';
+import { useAppLock } from '../../context/AppLockContext';
 
 const ProfileScreen = ({ navigation }) => {
   const { isDarkMode, toggleTheme, colors: themeColors } = useTheme();
+  const { isAppLockEnabled } = useAppLock();
   const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const insets = useScreenInsets(8);
   const [userData, setUserData] = useState(null);
@@ -192,6 +192,19 @@ const ProfileScreen = ({ navigation }) => {
     {
       title: 'Account',
       items: accountItems,
+    },
+    {
+      title: 'Security',
+      items: [
+        {
+          icon: 'shield-lock-outline',
+          label: 'App Lock',
+          badge: isAppLockEnabled ? 'Enabled 🔒' : 'Off 🔓',
+          tint: isAppLockEnabled ? '#DCFCE7' : '#F1F5F9',
+          iconColor: isAppLockEnabled ? '#16A34A' : '#64748B',
+          onPress: () => navigation.navigate('AppLockSettings'),
+        },
+      ],
     },
     {
       title: 'Appearance',

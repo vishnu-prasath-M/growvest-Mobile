@@ -85,6 +85,13 @@ export const AuthProvider = ({ children }) => {
     await AsyncStorage.setItem('userData', JSON.stringify(userProfile));
 
     try {
+      const { appLockService } = await import('../services/appLockService');
+      await appLockService.setActiveUserId(userProfile._id || userProfile.id);
+    } catch (e) {
+      console.warn('[AuthContext] Failed to sync App Lock user id:', e);
+    }
+
+    try {
       const { notificationService } = await import('../services/notificationService');
       await notificationService.registerDevice(userProfile._id || userProfile.id, userProfile.username);
       await notificationService.sendWelcomeNotification();
@@ -94,6 +101,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
+    try {
+      const { appLockService } = await import('../services/appLockService');
+      await appLockService.setActiveUserId(null);
+    } catch (e) {
+      console.warn('[AuthContext] Failed to reset App Lock on logout:', e);
+    }
+
     try {
       const { notificationService } = await import('../services/notificationService');
       await notificationService.unregisterDevice();

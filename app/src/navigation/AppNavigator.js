@@ -66,6 +66,7 @@ import ReceiptsScreen from '../screens/chitfund/ReceiptsScreen';
 import RulesScreen from '../screens/chitfund/RulesScreen';
 import FAQScreen from '../screens/chitfund/FAQScreen';
 import SupportScreen from '../screens/chitfund/SupportScreen';
+import AppLockSettingsScreen from '../screens/profile/AppLockSettingsScreen';
 import NotificationsScreen from '../screens/tabs/NotificationsScreen';
 import { notificationService } from '../services/notificationService';
 
@@ -520,6 +521,7 @@ const AppNavigator = () => {
           <Stack.Screen name="ChitSupport" component={SupportScreen} options={{ headerShown: false }} />
           <Stack.Screen name="KYC" component={KYCScreen} options={{ headerShown: false }} />
           <Stack.Screen name="BankDetails" component={BankDetailsScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="AppLockSettings" component={AppLockSettingsScreen} options={{ headerShown: false }} />
         </>
       ) : (
         <>
