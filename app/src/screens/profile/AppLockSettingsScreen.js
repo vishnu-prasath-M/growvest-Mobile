@@ -465,9 +465,15 @@ export default function AppLockSettingsScreen({ navigation }) {
       </ScrollView>
 
       {/* Setup / Change / Verify PIN Modal */}
-      <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        transparent={false}
+        statusBarTranslucent={false}
+        onRequestClose={() => setModalVisible(false)}
+      >
         <View style={styles.modalOverlay}>
-          <SafeAreaView style={styles.modalSafeArea} edges={['bottom']}>
+          <SafeAreaView style={styles.modalSafeArea} edges={['top', 'bottom']}>
             <View style={styles.modalHeader}>
               <TouchableOpacity
                 style={styles.modalCloseBtn}
@@ -815,6 +821,8 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: '#071F12',
+    width: '100%',
+    height: '100%',
   },
   modalSafeArea: {
     flex: 1,
@@ -822,6 +830,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 24,
     paddingVertical: 16,
+    width: '100%',
   },
   modalHeader: {
     width: '100%',
@@ -905,12 +914,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   keypad: {
-    width: '100%',
-    maxWidth: 320,
+    width: 290,
     gap: 16,
     marginVertical: 10,
+    alignSelf: 'center',
   },
   keyRow: {
+    width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',

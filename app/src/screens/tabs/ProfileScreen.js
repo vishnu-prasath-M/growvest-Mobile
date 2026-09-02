@@ -18,6 +18,8 @@ import { authService } from '../../services/authService';
 import { useAuth } from '../../context/AuthContext';
 import { colors } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
+import { SkeletonLoader } from '../../components/SkeletonLoader';
+import { useTheme } from '../../context/ThemeContext';
 import { useAppLock } from '../../context/AppLockContext';
 
 const ProfileScreen = ({ navigation }) => {
