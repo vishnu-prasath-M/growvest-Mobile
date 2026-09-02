@@ -26,6 +26,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import api from '../../services/apiService';
 import { API_ENDPOINTS } from '../../config/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
 import KycRequiredModal from '../../components/KycRequiredModal';
 import { kycService } from '../../services/kycService';
@@ -74,46 +75,75 @@ const HomeScreen = ({ navigation }) => {
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
+  // Immediate cached state hydration on mount (0ms skeleton delay)
+  useEffect(() => {
+    const hydrateCached = async () => {
+      try {
+        if (authUser?.name || authUser?.username) {
+          setUserName(authUser.name || authUser.username || '');
+        }
+        const cached = await AsyncStorage.getItem('cached_dashboard_data');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed) {
+            setDashboardData(parsed);
+            if (parsed?.user?.name || parsed?.user?.username) {
+              setUserName(parsed.user.name || parsed.user.username);
+            }
+            setLoading(false);
+          }
+        }
+        const cachedCoins = await AsyncStorage.getItem('cached_coins_balance');
+        if (cachedCoins != null) {
+          setCoinsBalance(Number(cachedCoins) || 0);
+        }
+      } catch (err) {
+        console.warn('[HomeScreen] Cache hydration error:', err);
+      }
+    };
+    hydrateCached();
+  }, [authUser]);
+
   const fetchUserAndDashboard = async () => {
     try {
       if (authUser?.name || authUser?.username) {
         setUserName(authUser.name || authUser.username || '');
-      } else {
-        const userData = await authService.getUserData();
-        if (userData?.username || userData?.name) {
-          setUserName(userData?.name || userData?.username || '');
-        }
       }
 
-      try {
-        const freshUser = await authService.refreshUserProfile();
+      // Fetch Profile, Dashboard, and Coins concurrently in parallel
+      const [freshUserRes, dataRes, coinsRes] = await Promise.allSettled([
+        authService.refreshUserProfile().catch(() => null),
+        dashboardService.getDashboard().catch(() => null),
+        api.get('/wallet/coins').catch(() => null),
+      ]);
+
+      if (freshUserRes.status === 'fulfilled' && freshUserRes.value) {
+        const freshUser = freshUserRes.value;
         if (freshUser?.name || freshUser?.username) {
           setUserName(freshUser.name || freshUser.username || '');
-          await updateUser(freshUser);
+          updateUser(freshUser);
         }
-      } catch (profileError) {
-        console.warn('Could not refresh profile for home greeting:', profileError?.message || profileError);
       }
 
-      const data = await dashboardService.getDashboard();
-      setDashboardData(data);
+      if (dataRes.status === 'fulfilled' && dataRes.value) {
+        const data = dataRes.value;
+        setDashboardData(data);
+        AsyncStorage.setItem('cached_dashboard_data', JSON.stringify(data)).catch(() => {});
 
-      if (data?.user?.name || data?.user?.username) {
-        setUserName(data?.user?.name || data?.user?.username);
+        if (data?.user?.name || data?.user?.username) {
+          setUserName(data.user.name || data.user.username);
+        }
+
+        if (data?.user?._id) {
+          notificationService.registerDevice(data.user._id, data.user.username || data.user.name);
+        }
       }
 
-      // Fetch user's actual earned coins balance from backend DB
-      try {
-        const coinsRes = await api.get('/wallet/coins');
-        const coins = coinsRes.data?.coinBalance ?? coinsRes.data?.totalCoins ?? coinsRes.data?.coins ?? data?.user?.coinBalance ?? data?.user?.coins ?? 0;
+      if (coinsRes.status === 'fulfilled' && coinsRes.value?.data) {
+        const cData = coinsRes.value.data;
+        const coins = cData?.coinBalance ?? cData?.totalCoins ?? cData?.coins ?? 0;
         setCoinsBalance(coins);
-      } catch (coinErr) {
-        setCoinsBalance(data?.user?.coinBalance ?? data?.user?.coins ?? authUser?.coins ?? 0);
-      }
-
-      // Register device token for Standalone APK push notifications
-      if (data?.user?._id) {
-        notificationService.registerDevice(data.user._id, data.user.username || data.user.name);
+        AsyncStorage.setItem('cached_coins_balance', String(coins)).catch(() => {});
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);

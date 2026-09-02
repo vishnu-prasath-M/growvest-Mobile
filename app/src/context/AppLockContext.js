@@ -65,6 +65,28 @@ export const AppLockProvider = ({ children }) => {
         if (enabled && initialColdBootRef.current) {
           setIsLocked(true);
         }
+
+        // Parallel background pre-fetching while user is on the App Lock screen
+        (async () => {
+          try {
+            const api = (await import('../services/apiService')).default;
+            const { userService } = await import('../services/userService');
+            const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+            const [profile, coinsRes] = await Promise.allSettled([
+              userService.getDashboardData(),
+              api.get('/wallet/coins'),
+            ]);
+            if (profile.status === 'fulfilled' && profile.value) {
+              await AsyncStorage.setItem('cached_dashboard_data', JSON.stringify(profile.value));
+            }
+            if (coinsRes.status === 'fulfilled' && coinsRes.value?.data) {
+              const coins = coinsRes.value.data?.coinBalance ?? coinsRes.value.data?.totalCoins ?? 0;
+              await AsyncStorage.setItem('cached_coins_balance', String(coins));
+            }
+          } catch (prefetchErr) {
+            // Non-blocking background prefetch
+          }
+        })();
       }
     } catch (err) {
       console.warn('[AppLockContext] Error during initial lock check:', err?.message || err);

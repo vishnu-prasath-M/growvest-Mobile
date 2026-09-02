@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Animated,
   StatusBar,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
@@ -389,13 +390,12 @@ export const AppLockOverlay = () => {
 
 const styles = StyleSheet.create({
   fullScreenOverlay: {
+    ...StyleSheet.absoluteFillObject,
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
     backgroundColor: '#071F12',
     zIndex: 999999,
     elevation: 999999,
@@ -410,7 +410,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 20,
+    paddingTop: 16,
+    paddingBottom: Platform.OS === 'android' ? 28 : 16,
   },
   header: {
     alignItems: 'center',
