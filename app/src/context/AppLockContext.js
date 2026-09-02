@@ -22,6 +22,7 @@ export const AppLockProvider = ({ children }) => {
 
   const backgroundTimeRef = useRef(null);
   const activeUserIdRef = useRef(null);
+  const initialColdBootRef = useRef(true);
 
   // Keep active user ID ref updated
   useEffect(() => {
@@ -60,14 +61,15 @@ export const AppLockProvider = ({ children }) => {
         setPinLength(len);
         setLockTimeout(timeout);
 
-        if (enabled) {
-          // Immediately engage lock screen on app start
+        // ONLY lock on initial cold boot when app is first launched
+        if (enabled && initialColdBootRef.current) {
           setIsLocked(true);
         }
       }
     } catch (err) {
       console.warn('[AppLockContext] Error during initial lock check:', err?.message || err);
     } finally {
+      initialColdBootRef.current = false;
       setIsReady(true);
     }
   }, [user]);

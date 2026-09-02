@@ -120,8 +120,8 @@ function AppContent() {
             >
               <StatusBar style={isDarkMode ? 'light' : 'dark'} />
               <AppNavigator />
-              <AppLockOverlay />
             </NavigationContainer>
+            <AppLockOverlay />
           </AppLockProvider>
         </AuthProvider>
       </PaperProvider>

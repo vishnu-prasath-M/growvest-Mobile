@@ -180,13 +180,13 @@ export const AppLockOverlay = () => {
   }
 
   return (
-    <Modal visible={isLocked} animationType="fade" transparent={false} statusBarTranslucent>
+    <View style={styles.fullScreenOverlay} pointerEvents="auto">
       <StatusBar barStyle="light-content" backgroundColor="#071F12" />
       <LinearGradient
-        colors={['#071F12', '#0E3D23', '#134E2C']}
+        colors={['#071F12', '#0E3D23', '#092918']}
         start={{ x: 0, y: 0 }}
         end={{ x: 0.5, y: 1 }}
-        style={styles.container}
+        style={styles.gradientContainer}
       >
         <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
           {/* Header & Logo */}
@@ -383,32 +383,46 @@ export const AppLockOverlay = () => {
           </View>
         </View>
       </Modal>
-    </Modal>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  fullScreenOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+    backgroundColor: '#071F12',
+    zIndex: 999999,
+    elevation: 999999,
+  },
+  gradientContainer: {
     flex: 1,
+    width: '100%',
+    height: '100%',
   },
   safeArea: {
     flex: 1,
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 16,
+    paddingVertical: 20,
   },
   header: {
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 16,
   },
   logoWrapper: {
-    marginBottom: 16,
+    marginBottom: 14,
   },
   logoRing: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     padding: 3,
     justifyContent: 'center',
     alignItems: 'center',
@@ -422,12 +436,12 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 34,
+    borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
   },
   appTitle: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: -0.5,
@@ -435,7 +449,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: 'rgba(255, 255, 255, 0.75)',
     marginTop: 6,
   },
   dotsRow: {
@@ -443,7 +457,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 16,
-    marginVertical: 18,
+    marginVertical: 14,
   },
   dot: {
     width: 16,
@@ -463,7 +477,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(239, 68, 68, 0.3)',
   },
   errorContainer: {
-    height: 24,
+    height: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -473,12 +487,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   keypad: {
-    width: '100%',
-    maxWidth: 320,
+    width: 290,
     gap: 16,
     marginVertical: 10,
+    alignSelf: 'center',
   },
   keyRow: {
+    width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -507,7 +522,7 @@ const styles = StyleSheet.create({
   },
   bottomActions: {
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   forgotBtn: {
     paddingVertical: 10,
