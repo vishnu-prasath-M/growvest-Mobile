@@ -144,6 +144,22 @@ exports.verifyPayment = async (req, res) => {
       await triggerReferralRewardOnInvestment(user._id, result?._id);
       console.log('[CHIT_PAYMENT] completed pocket money activation');
       return res.status(200).json({ success: true, message: 'Pocket Money payment verified & activated.', data: result });
+    } else if (paymentType === 'sip_initial' || paymentType === 'sip_installment') {
+      const sipController = require('./sipController');
+      return await sipController.verifyPayment(
+        {
+          body: {
+            razorpay_order_id,
+            razorpay_payment_id,
+            razorpay_signature,
+            sipId: payloadData?.sipId,
+            contributionId: payloadData?.contributionId,
+            installmentNumber: payloadData?.installmentNumber,
+          },
+          user: req.user,
+        },
+        res
+      );
     } else {
       console.warn('[CHIT_PAYMENT_ERROR] Unknown payment type:', paymentType);
       return res.status(400).json({ message: 'Unknown payment type' });

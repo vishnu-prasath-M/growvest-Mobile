@@ -308,8 +308,50 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const pocketMoneyRoutes = require('./routes/pocketMoneyRoutes');
 const referralRoutes = require('./routes/referralRoutes');
+const sipRoutes = require('./routes/sipRoutes');
+const SIP = require('./models/SIP');
+const SIPContribution = require('./models/SIPContribution');
 
 const cronRoutes = require('./routes/cronRoutes');
+
+// Daily SIP Reminder Cron (runs daily at 8:30 AM IST)
+cron.schedule("30 8 * * *", async () => {
+  console.log("Running Daily SIP Due Reminder Cron Job (8:30 AM IST)...");
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const activeSIPs = await SIP.find({ status: 'active' });
+    let reminderCount = 0;
+
+    for (const sip of activeSIPs) {
+      if (!sip.nextContributionDate) continue;
+      const nextDue = new Date(sip.nextContributionDate);
+      nextDue.setHours(0, 0, 0, 0);
+
+      const diffTime = nextDue.getTime() - today.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      // Send reminder 2 days before, 1 day before, and on due date
+      if ([0, 1, 2].includes(diffDays)) {
+        const daysText = diffDays === 0 ? 'today' : diffDays === 1 ? 'tomorrow' : 'in 2 days';
+        const formattedDate = nextDue.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+
+        await sendNotification({
+          userId: sip.userId,
+          title: `📅 SIP Due Reminder (${daysText})`,
+          description: `Your monthly SIP contribution of ₹${sip.amount.toLocaleString('en-IN')} for ${sip.sipId} is due ${daysText} (${formattedDate}).`,
+          type: 'general',
+          pushData: { screen: 'SIPDetails', sipId: sip._id.toString() },
+        });
+        reminderCount++;
+      }
+    }
+    console.log(`SIP Cron Finished: Sent ${reminderCount} SIP reminders.`);
+  } catch (error) {
+    console.error("SIP Reminder Cron Error:", error);
+  }
+}, { timezone: "Asia/Kolkata" });
 
 app.use('/api/investments', investmentRoutes);
 app.use('/api/auth', authRoutes);
@@ -326,6 +368,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/pocket-money', pocketMoneyRoutes);
 app.use('/api/referral', referralRoutes);
 app.use('/api/wallet', referralRoutes);
+app.use('/api/sip', sipRoutes);
 app.use('/api/cron', cronRoutes);
 
 // Admin manual trigger — calls the same cron functions as GitHub Actions
