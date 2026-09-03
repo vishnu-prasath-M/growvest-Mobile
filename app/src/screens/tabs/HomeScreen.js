@@ -241,9 +241,9 @@ const HomeScreen = ({ navigation }) => {
       onPress: () => navigation.navigate('InvestmentAmount'),
     },
     {
-      label: 'My Investments',
+      label: 'SIP',
       image: require('../../../assets/earning.png'),
-      onPress: () => navigation.navigate('Investments'),
+      onPress: () => navigation.navigate('SIPDashboard'),
     },
     {
       label: 'Chit Fund',

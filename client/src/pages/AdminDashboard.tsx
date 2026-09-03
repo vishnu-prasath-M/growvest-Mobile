@@ -29,9 +29,10 @@ import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "@/context/AuthContext";
 import ChitFundAdmin from "@/components/admin/ChitFundAdmin";
 import PocketMoneyAdmin from "@/components/admin/PocketMoneyAdmin";
+import SIPAdmin from "@/components/admin/SIPAdmin";
 import KYCAdmin from "@/components/admin/KYCAdmin";
 import ReferralAdmin from "@/components/admin/ReferralAdmin";
-import { Gift, Bell } from "lucide-react";
+import { Gift, Bell, RefreshCw } from "lucide-react";
 
 import { toast } from "sonner";
 
@@ -100,7 +101,7 @@ const getPlanDisplayName = (type: string) => {
   return type + ' Plan';
 };
 
-type AdminTab = "overview" | "pending" | "users" | "withdrawals" | "kyc" | "chits" | "settings" | "pocket" | "referral" | "push_test";
+type AdminTab = "overview" | "pending" | "users" | "withdrawals" | "kyc" | "chits" | "sip" | "settings" | "pocket" | "referral" | "push_test";
 
 const AdminDashboard = () => {
   const { user: authUser, token, logout } = useAuth();
@@ -169,6 +170,7 @@ const AdminDashboard = () => {
     { label: "KYC Verification", tab: "kyc", icon: Shield, badge: 0 },
     { label: "Chit Funds", tab: "chits", icon: TrendingUp, badge: 0 },
     { label: "Pocket Money", tab: "pocket", icon: Wallet },
+    { label: "SIP Investments", tab: "sip", icon: RefreshCw },
     { label: "Referral & APK", tab: "referral", icon: Gift },
     { label: "Push Notifications", tab: "push_test", icon: Bell },
     { label: "Settings", tab: "settings", icon: Settings },
@@ -1662,6 +1664,18 @@ const AdminDashboard = () => {
               className="w-full"
             >
               <PocketMoneyAdmin token={token} />
+            </motion.div>
+          )}
+
+          {/* ── SIP INVESTMENTS ── */}
+          {activeTab === "sip" && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="w-full"
+            >
+              <SIPAdmin token={token} />
             </motion.div>
           )}
 

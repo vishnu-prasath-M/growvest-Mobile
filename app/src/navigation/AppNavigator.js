@@ -37,6 +37,11 @@ import InvestmentStatusScreen from '../screens/investment/InvestmentStatusScreen
 import PocketMoneyScreen from '../screens/investment/PocketMoneyScreen';
 import PocketMoneyAmountScreen from '../screens/investment/PocketMoneyAmountScreen';
 
+// SIP Screens
+import SIPDashboardScreen from '../screens/sip/SIPDashboardScreen';
+import CreateSIPScreen from '../screens/sip/CreateSIPScreen';
+import SIPDetailsScreen from '../screens/sip/SIPDetailsScreen';
+
 // Investment List Screen
 import InvestmentsScreen from '../screens/tabs/InvestmentsScreen';
 import WalletScreen from '../screens/wallet/WalletScreen';
@@ -493,6 +498,9 @@ const AppNavigator = () => {
           <Stack.Screen name="InvestmentStatus" component={InvestmentStatusScreen} options={{ headerShown: false }} />
           <Stack.Screen name="PocketMoney" component={PocketMoneyScreen} options={{ headerShown: false }} />
           <Stack.Screen name="PocketMoneyAmount" component={PocketMoneyAmountScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="SIPDashboard" component={SIPDashboardScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="CreateSIP" component={CreateSIPScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="SIPDetails" component={SIPDetailsScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Investments" component={InvestmentsScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Wallet" component={WalletScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Referral" component={ReferralScreen} options={{ headerShown: false }} />
