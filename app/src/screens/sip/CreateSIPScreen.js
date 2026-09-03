@@ -9,6 +9,8 @@ import {
   Modal,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -145,7 +147,10 @@ const CreateSIPScreen = ({ navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top }]}>
         <TouchableOpacity
@@ -153,7 +158,7 @@ const CreateSIPScreen = ({ navigation }) => {
           activeOpacity={0.7}
           onPress={() => navigation.goBack()}
         >
-          <MaterialCommunityIcons name="arrow-left" size={24} color={themeColors.text} />
+          <MaterialCommunityIcons name="arrow-left" size={24} color={themeColors.text || '#0F172A'} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Start New SIP</Text>
         <View style={{ width: 40 }} />
@@ -163,13 +168,35 @@ const CreateSIPScreen = ({ navigation }) => {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
+        {/* Intro banner */}
+        <View style={styles.bannerContainer}>
+          <View style={styles.bannerIconWrap}>
+            <MaterialCommunityIcons name="calendar-sync" size={24} color="#085428" />
+          </View>
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={styles.bannerTitle}>Set Your Recurring Plan</Text>
+            <Text style={styles.bannerSubtitle}>
+              Select your preferred monthly amount, debit date, and duration.
+            </Text>
+          </View>
+        </View>
+
         {/* Section 1: Monthly Amount */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>1. Choose Monthly Contribution</Text>
-          <Text style={styles.cardSubtitle}>Amount you will invest every month</Text>
+          <View style={styles.cardHeader}>
+            <View style={styles.stepBadge}>
+              <Text style={styles.stepBadgeText}>1</Text>
+            </View>
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={styles.cardTitle}>Monthly Contribution</Text>
+              <Text style={styles.cardSubtitle}>Amount you will invest each month</Text>
+            </View>
+          </View>
 
-          <View style={styles.presetsRow}>
+          {/* Quick Presets Grid */}
+          <View style={styles.presetsGrid}>
             {AMOUNT_PRESETS.map((amt) => {
               const active = !isCustom && selectedAmount === amt;
               return (
@@ -182,17 +209,21 @@ const CreateSIPScreen = ({ navigation }) => {
                   <Text style={[styles.presetChipText, active && styles.presetChipTextActive]}>
                     ₹{amt.toLocaleString('en-IN')}
                   </Text>
+                  {active && (
+                    <MaterialCommunityIcons name="check-circle" size={14} color="#085428" style={styles.presetCheck} />
+                  )}
                 </TouchableOpacity>
               );
             })}
           </View>
 
           {/* Custom Input */}
-          <View style={styles.customInputContainer}>
-            <Text style={styles.rupeeSymbol}>₹</Text>
+          <Text style={styles.customLabel}>Or enter custom amount:</Text>
+          <View style={[styles.customInputContainer, isCustom && styles.customInputActive]}>
+            <Text style={[styles.rupeeSymbol, isCustom && { color: '#085428' }]}>₹</Text>
             <TextInput
               style={styles.customInput}
-              placeholder="Enter Custom Amount"
+              placeholder="e.g. 3500"
               placeholderTextColor="#94A3B8"
               keyboardType="number-pad"
               value={customAmount}
@@ -203,8 +234,15 @@ const CreateSIPScreen = ({ navigation }) => {
 
         {/* Section 2: SIP Date */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>2. Choose Monthly SIP Date</Text>
-          <Text style={styles.cardSubtitle}>Recurring date when payment is due each month</Text>
+          <View style={styles.cardHeader}>
+            <View style={styles.stepBadge}>
+              <Text style={styles.stepBadgeText}>2</Text>
+            </View>
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={styles.cardTitle}>Monthly SIP Date</Text>
+              <Text style={styles.cardSubtitle}>Day of month when installment is due</Text>
+            </View>
+          </View>
 
           <View style={styles.datesGrid}>
             {SIP_DATES.map((day) => {
@@ -219,6 +257,9 @@ const CreateSIPScreen = ({ navigation }) => {
                   <Text style={[styles.dateChipText, active && styles.dateChipTextActive]}>
                     {day}th
                   </Text>
+                  <Text style={[styles.dateChipSub, active && styles.dateChipSubActive]}>
+                    monthly
+                  </Text>
                 </TouchableOpacity>
               );
             })}
@@ -227,10 +268,17 @@ const CreateSIPScreen = ({ navigation }) => {
 
         {/* Section 3: Duration */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>3. Choose Duration</Text>
-          <Text style={styles.cardSubtitle}>Total period of your recurring investment</Text>
+          <View style={styles.cardHeader}>
+            <View style={styles.stepBadge}>
+              <Text style={styles.stepBadgeText}>3</Text>
+            </View>
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={styles.cardTitle}>Duration</Text>
+              <Text style={styles.cardSubtitle}>Total investment commitment tenure</Text>
+            </View>
+          </View>
 
-          <View style={styles.durationsRow}>
+          <View style={styles.durationsGrid}>
             {DURATIONS.map((dur) => {
               const active = selectedDuration === dur.months;
               return (
@@ -243,6 +291,9 @@ const CreateSIPScreen = ({ navigation }) => {
                   <Text style={[styles.durationChipText, active && styles.durationChipTextActive]}>
                     {dur.label}
                   </Text>
+                  <Text style={[styles.durationChipSub, active && styles.durationChipSubActive]}>
+                    {dur.months} Installments
+                  </Text>
                 </TouchableOpacity>
               );
             })}
@@ -251,19 +302,18 @@ const CreateSIPScreen = ({ navigation }) => {
 
         {/* Section 4: Live Summary Card */}
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryCardTitle}>SIP Investment Summary</Text>
+          <View style={styles.summaryHeader}>
+            <MaterialCommunityIcons name="calculator-variant" size={20} color="#085428" />
+            <Text style={styles.summaryCardTitle}>Plan Overview</Text>
+          </View>
           <View style={styles.summaryDivider} />
 
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Monthly Amount</Text>
+            <Text style={styles.summaryLabel}>Monthly Installment</Text>
             <Text style={styles.summaryValue}>₹{currentAmount.toLocaleString('en-IN')}</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Frequency</Text>
-            <Text style={styles.summaryValue}>Monthly</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>SIP Date</Text>
+            <Text style={styles.summaryLabel}>Recurring Date</Text>
             <Text style={styles.summaryValue}>{selectedDate}th of every month</Text>
           </View>
           <View style={styles.summaryRow}>
@@ -271,14 +321,19 @@ const CreateSIPScreen = ({ navigation }) => {
             <Text style={styles.summaryValue}>{selectedDuration} Months</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Total Planned</Text>
-            <Text style={[styles.summaryValue, { color: '#085428', fontWeight: '800' }]}>
+            <Text style={styles.summaryLabel}>Target Completion</Text>
+            <Text style={styles.summaryValue}>{calculateEndDate()}</Text>
+          </View>
+
+          <View style={styles.summaryDivider} />
+
+          <View style={styles.summaryRow}>
+            <Text style={[styles.summaryLabel, { fontWeight: '700', color: themeColors.text }]}>
+              Total Planned Savings
+            </Text>
+            <Text style={[styles.summaryValue, { color: '#085428', fontSize: 18, fontWeight: '800' }]}>
               ₹{totalPlanned.toLocaleString('en-IN')}
             </Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Completion Date</Text>
-            <Text style={styles.summaryValue}>{calculateEndDate()}</Text>
           </View>
         </View>
 
@@ -306,7 +361,7 @@ const CreateSIPScreen = ({ navigation }) => {
           </LinearGradient>
         </TouchableOpacity>
 
-        <View style={{ height: 60 }} />
+        <View style={{ height: 40 }} />
       </ScrollView>
 
       {/* Confirmation Modal */}
@@ -362,7 +417,7 @@ const CreateSIPScreen = ({ navigation }) => {
           </View>
         </View>
       </Modal>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -401,6 +456,33 @@ const getStyles = (themeColors, isDark) =>
     scrollContent: {
       padding: 16,
     },
+    bannerContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#DCFCE7',
+      borderRadius: 14,
+      padding: 14,
+      marginBottom: 16,
+    },
+    bannerIconWrap: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+      backgroundColor: '#FFFFFF',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    bannerTitle: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: '#085428',
+      marginBottom: 2,
+    },
+    bannerSubtitle: {
+      fontSize: 12,
+      color: '#15803D',
+      lineHeight: 16,
+    },
     card: {
       backgroundColor: themeColors.surface || '#FFFFFF',
       borderRadius: 16,
@@ -409,80 +491,113 @@ const getStyles = (themeColors, isDark) =>
       borderWidth: 1,
       borderColor: isDark ? '#334155' : '#E2E8F0',
     },
+    cardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 14,
+    },
+    stepBadge: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      backgroundColor: '#085428',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    stepBadgeText: {
+      fontSize: 12,
+      fontWeight: '800',
+      color: '#FFFFFF',
+    },
     cardTitle: {
       fontSize: 15,
       fontWeight: '700',
       color: themeColors.text || '#0F172A',
-      marginBottom: 2,
     },
     cardSubtitle: {
-      fontSize: 13,
+      fontSize: 12,
       color: themeColors.textMuted || '#64748B',
-      marginBottom: 14,
+      marginTop: 2,
     },
-    presetsRow: {
+    presetsGrid: {
       flexDirection: 'row',
-      flexWrap: 'wrap',
+      justifyContent: 'space-between',
       gap: 8,
       marginBottom: 12,
     },
     presetChip: {
       flex: 1,
-      minWidth: '22%',
-      paddingVertical: 10,
+      paddingVertical: 12,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: 10,
+      borderRadius: 12,
       backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
       borderWidth: 1.5,
       borderColor: 'transparent',
+      position: 'relative',
     },
     presetChipActive: {
       backgroundColor: '#DCFCE7',
       borderColor: '#085428',
     },
     presetChipText: {
-      fontSize: 14,
+      fontSize: 13,
       fontWeight: '700',
       color: themeColors.text || '#0F172A',
     },
     presetChipTextActive: {
       color: '#085428',
     },
+    presetCheck: {
+      position: 'absolute',
+      top: 4,
+      right: 4,
+    },
+    customLabel: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: themeColors.textMuted || '#64748B',
+      marginBottom: 6,
+    },
     customInputContainer: {
       flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
-      borderWidth: 1,
+      borderWidth: 1.5,
       borderColor: isDark ? '#334155' : '#E2E8F0',
-      borderRadius: 10,
-      paddingHorizontal: 12,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      height: 48,
+    },
+    customInputActive: {
+      borderColor: '#085428',
+      backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
     },
     rupeeSymbol: {
       fontSize: 16,
       fontWeight: '700',
-      color: themeColors.text || '#0F172A',
+      color: themeColors.textMuted || '#94A3B8',
       marginRight: 6,
     },
     customInput: {
       flex: 1,
-      height: 44,
-      fontSize: 14,
-      fontWeight: '600',
+      height: '100%',
+      fontSize: 15,
+      fontWeight: '700',
       color: themeColors.text || '#0F172A',
     },
     datesGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: 8,
+      justifyContent: 'space-between',
     },
     dateChip: {
-      flex: 1,
-      minWidth: '30%',
-      paddingVertical: 10,
+      width: '31%',
+      paddingVertical: 12,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: 10,
+      borderRadius: 12,
       backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
       borderWidth: 1.5,
       borderColor: 'transparent',
@@ -492,25 +607,34 @@ const getStyles = (themeColors, isDark) =>
       borderColor: '#085428',
     },
     dateChipText: {
-      fontSize: 14,
+      fontSize: 15,
       fontWeight: '700',
       color: themeColors.text || '#0F172A',
     },
     dateChipTextActive: {
       color: '#085428',
     },
-    durationsRow: {
+    dateChipSub: {
+      fontSize: 10,
+      color: themeColors.textMuted || '#94A3B8',
+      marginTop: 2,
+    },
+    dateChipSubActive: {
+      color: '#15803D',
+      fontWeight: '600',
+    },
+    durationsGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: 8,
+      justifyContent: 'space-between',
     },
     durationChip: {
-      flex: 1,
-      minWidth: '45%',
-      paddingVertical: 10,
+      width: '48%',
+      paddingVertical: 12,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: 10,
+      borderRadius: 12,
       backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
       borderWidth: 1.5,
       borderColor: 'transparent',
@@ -527,6 +651,15 @@ const getStyles = (themeColors, isDark) =>
     durationChipTextActive: {
       color: '#085428',
     },
+    durationChipSub: {
+      fontSize: 10,
+      color: themeColors.textMuted || '#94A3B8',
+      marginTop: 2,
+    },
+    durationChipSubActive: {
+      color: '#15803D',
+      fontWeight: '600',
+    },
     summaryCard: {
       backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
       borderRadius: 16,
@@ -534,6 +667,11 @@ const getStyles = (themeColors, isDark) =>
       marginBottom: 20,
       borderWidth: 1,
       borderColor: isDark ? '#334155' : '#E2E8F0',
+    },
+    summaryHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
     },
     summaryCardTitle: {
       fontSize: 15,
@@ -543,12 +681,13 @@ const getStyles = (themeColors, isDark) =>
     summaryDivider: {
       height: 1,
       backgroundColor: isDark ? '#334155' : '#E2E8F0',
-      marginVertical: 12,
+      marginVertical: 10,
     },
     summaryRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      marginBottom: 8,
+      alignItems: 'center',
+      paddingVertical: 3,
     },
     summaryLabel: {
       fontSize: 13,
@@ -562,6 +701,11 @@ const getStyles = (themeColors, isDark) =>
     submitBtn: {
       borderRadius: 14,
       overflow: 'hidden',
+      elevation: 3,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
     },
     submitGradient: {
       flexDirection: 'row',
