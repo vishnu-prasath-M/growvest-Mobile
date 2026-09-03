@@ -82,14 +82,14 @@ export const appLockService = {
       const supportedTypes = await LocalAuthentication.supportedAuthenticationTypesAsync();
 
       let biometryType = 'Biometric';
-      let label = 'Fingerprint / Biometric';
+      let label = 'Fingerprint Unlock';
 
-      if (supportedTypes.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+      if (supportedTypes.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
+        biometryType = 'Fingerprint';
+        label = 'Fingerprint Unlock';
+      } else if (supportedTypes.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
         biometryType = 'Face';
         label = 'Face Unlock';
-      } else if (supportedTypes.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
-        biometryType = 'Fingerprint';
-        label = 'Fingerprint';
       } else if (supportedTypes.includes(LocalAuthentication.AuthenticationType.IRIS)) {
         biometryType = 'Iris';
         label = 'Iris Scan';
