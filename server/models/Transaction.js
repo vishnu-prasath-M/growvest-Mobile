@@ -12,7 +12,7 @@ const transactionSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['investment', 'withdrawal', 'chit_join', 'chit_payment', 'chit_winning', 'pocket_money_invest', 'pocket_money_payout'],
+    enum: ['investment', 'withdrawal', 'chit_join', 'chit_payment', 'chit_winning', 'pocket_money_invest', 'pocket_money_payout', 'sip_deposit', 'sip_withdrawal'],
     required: true
   },
   amount: {
@@ -30,7 +30,7 @@ const transactionSchema = new mongoose.Schema({
   },
   referenceType: {
     type: String,
-    enum: ['Investment', 'Withdrawal', 'ChitMember', 'ChitPayment', 'PocketMoney']
+    enum: ['Investment', 'Withdrawal', 'ChitMember', 'ChitPayment', 'PocketMoney', 'SIP', 'SIPContribution']
   },
   description: {
     type: String,

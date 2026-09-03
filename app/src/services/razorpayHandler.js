@@ -130,3 +130,90 @@ export const executeRazorpayPayment = async ({
     if (onFailure) onFailure(error);
   }
 };
+
+/**
+ * Open Razorpay Checkout for already-created orders (used by SIP, Chits, etc.)
+ */
+export const openRazorpayCheckout = async ({
+  orderId,
+  amount,
+  keyId,
+  name = 'Growvest',
+  description = 'Payment',
+  user,
+  isSimulated = false,
+  onSuccess,
+  onError,
+}) => {
+  const options = {
+    description,
+    image: 'https://growvest-mobile.onrender.com/logo.png',
+    currency: 'INR',
+    key: keyId || 'rzp_test_xxxxxxxxx',
+    amount: typeof amount === 'number' ? Math.round(amount) : Math.round(Number(amount)),
+    name,
+    order_id: orderId,
+    prefill: {
+      email: user?.email || '',
+      contact: user?.mobileNumber || '',
+      name: user?.name || user?.username || 'User',
+    },
+    theme: { color: '#085428' },
+  };
+
+  let RazorpayCheckout = null;
+  try {
+    const safeRequire = eval('require');
+    const RZ = safeRequire('react-native-razorpay');
+    RazorpayCheckout = RZ.default || RZ;
+  } catch (err) {
+    RazorpayCheckout = null;
+  }
+
+  if (!isSimulated && RazorpayCheckout && typeof RazorpayCheckout.open === 'function') {
+    try {
+      const response = await RazorpayCheckout.open(options);
+      if (onSuccess) {
+        onSuccess({
+          razorpay_order_id: response.razorpay_order_id || orderId,
+          razorpay_payment_id: response.razorpay_payment_id,
+          razorpay_signature: response.razorpay_signature,
+        });
+      }
+    } catch (error) {
+      console.log('[Razorpay] Checkout cancelled:', error);
+      if (onError) onError(error);
+    }
+  } else {
+    // Simulator fallback
+    const displayAmount = Math.round(amount / 100);
+    Alert.alert(
+      'Razorpay Test Mode',
+      `Complete payment of ₹${displayAmount.toLocaleString('en-IN')} for ${description}?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+          onPress: () => {
+            if (onError) onError(new Error('User cancelled'));
+          },
+        },
+        {
+          text: 'Pay Now (Test)',
+          onPress: () => {
+            const mockPaymentId = `pay_${Date.now()}`;
+            const signature = `simulated_signature_${orderId}_${mockPaymentId}`;
+            if (onSuccess) {
+              onSuccess({
+                razorpay_order_id: orderId,
+                razorpay_payment_id: mockPaymentId,
+                razorpay_signature: signature,
+              });
+            }
+          },
+        },
+      ]
+    );
+  }
+};
+
