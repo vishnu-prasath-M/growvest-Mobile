@@ -12,19 +12,14 @@ const { sendNotification } = require('../services/notificationHelper');
 const calcNextDueDate = (joinedAt, currentMonth) => {
   const base = new Date(joinedAt);
   base.setMonth(base.getMonth() + currentMonth);
-  base.setDate(1);
-  base.setHours(0, 0, 0, 0);
+  base.setHours(23, 59, 59, 999);
   return base;
 };
 
 const calcNextWeeklyDueDate = (joinedAt, weekIndex) => {
   const base = new Date(joinedAt);
-  const day = base.getDay();
-  const daysToSunday = day === 0 ? 0 : 7 - day;
-  const firstSunday = new Date(base.getTime() + daysToSunday * 24 * 60 * 60 * 1000);
-  firstSunday.setHours(12, 0, 0, 0); // Sunday 12:00 PM due
-  
-  const targetDueDate = new Date(firstSunday.getTime() + (weekIndex) * 7 * 24 * 60 * 60 * 1000);
+  const targetDueDate = new Date(base.getTime() + (weekIndex) * 7 * 24 * 60 * 60 * 1000);
+  targetDueDate.setHours(23, 59, 59, 999);
   return targetDueDate;
 };
 

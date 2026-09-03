@@ -177,23 +177,23 @@ const MonthlyDueScreen = ({ navigation }) => {
       
       const paidMonthsMap = {};
       allPayments.forEach(p => {
-        const chitId = p.chitId;
-        if (!paidMonthsMap[chitId]) paidMonthsMap[chitId] = new Set();
+        const memKey = String(p.memberId || p.chitMemberId || p.chitId);
+        if (!paidMonthsMap[memKey]) paidMonthsMap[memKey] = new Set();
         if (p.status === 'paid' || p.status === 'approved') {
-          paidMonthsMap[chitId].add(p.month);
+          paidMonthsMap[memKey].add(Number(p.month));
         }
       });
 
-      const activeOnly = data.filter(c => c.status === 'active');
+      const activeOnly = data.filter(c => c.status === 'active' || c.status === 'approved');
       const enriched = activeOnly.map(c => {
         const isWeekly = c.isWeekly || (c.totalWeeks && c.totalWeeks > 0);
-        const paidMonths = paidMonthsMap[c.chitId] || new Set();
-        const currentMonthDue = c.currentMonth + 1;
-        const isCurrentPaid = paidMonths.has(currentMonthDue);
-        
-        const durationLimit = isWeekly ? (c.totalWeeks || c.duration) : c.duration;
+        const memKey = String(c._id || c.memberId || c.chitId);
+        const paidMonths = paidMonthsMap[memKey] || new Set();
+        const durationLimit = isWeekly ? (c.totalWeeks || c.duration || 10) : (c.duration || 10);
 
-        let nextUnpaidMonth = currentMonthDue;
+        // A member ALWAYS pays Week/Month 1 upon joining, so next due starts at least from Week 2
+        const basePaidCount = Math.max(1, c.paidWeeks || 0, c.currentWeek || 0, c.installmentsPaid || 0);
+        let nextUnpaidMonth = basePaidCount + 1;
         while (paidMonths.has(nextUnpaidMonth) && nextUnpaidMonth <= durationLimit) {
           nextUnpaidMonth++;
         }
@@ -201,30 +201,35 @@ const MonthlyDueScreen = ({ navigation }) => {
         const isFullyPaid = nextUnpaidMonth > durationLimit;
         const isClosed = c.status === 'closed' || c.status === 'completed' || c.status === 'archived';
         
-        const joinedDate = new Date(c.joinedAt || Date.now());
+        const joinedDate = new Date(c.joinedAt || c.createdAt || Date.now());
         const nextDue = new Date(joinedDate);
         if (isWeekly) {
+          // Exactly (nextUnpaidMonth - 1) * 7 days from joinedAt date
           nextDue.setDate(joinedDate.getDate() + (nextUnpaidMonth - 1) * 7);
         } else {
+          // Exactly (nextUnpaidMonth - 1) months from joinedAt date
           nextDue.setMonth(joinedDate.getMonth() + (nextUnpaidMonth - 1));
-          nextDue.setDate(1);
         }
+        nextDue.setHours(23, 59, 59, 999);
         
         const today = new Date();
+        today.setHours(0, 0, 0, 0);
         const diffTime = nextDue.getTime() - today.getTime();
-        const remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const remainingDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+        const isOverdue = diffTime < 0;
         
         return {
           ...c,
           isWeekly,
           duration: durationLimit,
-          isCurrentPaid,
           isFullyPaid,
           isClosed,
           nextUnpaidMonth,
+          displayWeek: nextUnpaidMonth <= durationLimit ? nextUnpaidMonth : durationLimit,
           nextDueDateFormatted: nextDue.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-          remainingDays: remainingDays > 0 ? remainingDays : 0,
-          isOverdue: remainingDays < 0,
+          remainingDays,
+          isOverdue,
+          daysUntilDue: remainingDays,
         };
       });
 
@@ -279,98 +284,45 @@ const MonthlyDueScreen = ({ navigation }) => {
   };
 
   const renderChitCard = (chit) => {
-    const isPaid = chit.isCurrentPaid || chit.isFullyPaid;
     const isClosed = chit.isClosed;
-    const isWeekly = chit.isWeekly || (chit.totalWeeks && chit.totalWeeks > 0);
+    const isWeekly = chit.isWeekly;
     const unitTitle = getUnitLabel(isWeekly, 1);
+    const isFullyPaid = chit.isFullyPaid;
     
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const joinedDate = new Date(chit.joinedAt || Date.now());
-    const nextDueDate = new Date(joinedDate);
-    if (isWeekly) {
-      nextDueDate.setDate(joinedDate.getDate() + (chit.nextUnpaidMonth - 1) * 7);
-    } else {
-      nextDueDate.setMonth(joinedDate.getMonth() + (chit.nextUnpaidMonth - 1));
-      nextDueDate.setDate(1);
-    }
-    nextDueDate.setHours(0, 0, 0, 0);
-    
-    const diffTime = nextDueDate.getTime() - today.getTime();
-    const daysUntilDue = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    const isWithin5DaysWindow = daysUntilDue <= 5;
-    const canPay = !isPaid && !isClosed && !chit.isFullyPaid && isWithin5DaysWindow;
-    const nextInstallmentPending = !isPaid && !isClosed && !chit.isFullyPaid && !isWithin5DaysWindow;
+    // Payment window: Allowed when within 5 days of due date or overdue
+    const isWithin5DaysWindow = chit.daysUntilDue <= 5;
+    const canPay = !isClosed && !isFullyPaid && isWithin5DaysWindow;
 
     return (
       <View key={chit._id} style={styles.dueCard}>
+        {/* Header */}
         <View style={styles.dueCardHeader}>
-          <View style={[styles.dueIconWrap, isPaid && { backgroundColor: colors.successLight }]}>
+          <View style={[styles.dueIconWrap, isFullyPaid && { backgroundColor: colors.successLight }]}>
             <MaterialCommunityIcons 
-              name={isPaid ? "check-circle" : isClosed ? "lock" : "calendar-clock"} 
-              size={24} 
-              color={isPaid ? colors.success : isClosed ? colors.textTertiary : colors.primary} 
+              name={isFullyPaid ? "trophy" : isClosed ? "lock" : "calendar-clock"} 
+              size={22} 
+              color={isFullyPaid ? colors.gold : isClosed ? colors.textTertiary : colors.primary} 
             />
           </View>
           <View style={styles.dueInfo}>
             <Text style={styles.dueChitName}>{chit.chitName}</Text>
             <Text style={styles.dueChitDetail}>
-              {isClosed ? 'Chit Closed' : `${unitTitle} ${chit.currentMonth || 1} of ${chit.duration}`}
+              {isClosed
+                ? 'Chit Closed'
+                : isFullyPaid
+                ? `Completed (${chit.duration} ${getUnitLabel(isWeekly, chit.duration)})`
+                : `${unitTitle} ${chit.displayWeek} of ${chit.duration}`}
             </Text>
           </View>
         </View>
 
         <View style={styles.dueDivider} />
 
-        {isPaid ? (
-          <>
-            <View style={styles.paidSection}>
-              <View style={styles.paidBadge}>
-                <MaterialCommunityIcons name="check-circle" size={20} color={colors.success} />
-                <Text style={styles.paidText}>✓ {unitTitle} {chit.currentMonth || 1} Paid</Text>
-              </View>
-
-              {chit.isFullyPaid ? (
-                <View style={styles.fullyPaidBanner}>
-                  <MaterialCommunityIcons name="trophy" size={20} color={colors.gold} />
-                  <Text style={styles.fullyPaidText}>All installments completed!</Text>
-                </View>
-              ) : chit.nextUnpaidMonth <= chit.duration ? (
-                <>
-                  <View style={styles.dueAmountRow}>
-                    <View>
-                      <Text style={styles.dueLabel}>Next Due Date</Text>
-                      <Text style={styles.dueDate}>{chit.nextDueDateFormatted}</Text>
-                    </View>
-                    <View style={styles.dueDateWrap}>
-                      <Text style={styles.dueLabel}>Remaining Days</Text>
-                      <Text style={[styles.remainingDays, chit.isOverdue && { color: colors.error }]}>
-                        {chit.isOverdue ? 'Overdue' : `${chit.remainingDays} days`}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.dueAmountRow}>
-                    <View>
-                      <Text style={styles.dueLabel}>Next Installment</Text>
-                      <Text style={styles.dueAmount}>{formatCurrency(chit.nextDueAmount)}</Text>
-                    </View>
-                  </View>
-                </>
-              ) : null}
-            </View>
-
-            {nextInstallmentPending && (
-              <View style={styles.dueActions}>
-                <View style={[styles.payNowBtnEnabled, { backgroundColor: colors.muted }]}>
-                  <Text style={[styles.payNowBtnText, { color: colors.textMuted }]}>
-                    Next due in {chit.remainingDays} days
-                  </Text>
-                </View>
-              </View>
-            )}
-          </>
+        {isFullyPaid ? (
+          <View style={styles.fullyPaidBanner}>
+            <MaterialCommunityIcons name="trophy" size={20} color={colors.gold} />
+            <Text style={styles.fullyPaidText}>All installments completed!</Text>
+          </View>
         ) : isClosed ? (
           <View style={styles.closedSection}>
             <View style={styles.closedBadge}>
@@ -383,33 +335,35 @@ const MonthlyDueScreen = ({ navigation }) => {
           </View>
         ) : (
           <>
+            {/* Amount & Due Date Row */}
             <View style={styles.dueAmountRow}>
               <View>
-                <Text style={styles.dueLabel}>
-                  {chit.pendingInstallments > 1 ? `Due (${chit.pendingInstallments} ${getUnitLabel(isWeekly, chit.pendingInstallments)})` : 'Current Due'}
-                </Text>
+                <Text style={styles.dueLabel}>CURRENT DUE</Text>
                 <Text style={styles.dueAmount}>{formatCurrency(chit.nextDueAmount)}</Text>
               </View>
               <View style={styles.dueDateWrap}>
-                <Text style={styles.dueLabel}>Due Date</Text>
+                <Text style={styles.dueLabel}>DUE DATE</Text>
                 <Text style={styles.dueDate}>{chit.nextDueDateFormatted}</Text>
               </View>
             </View>
 
+            {/* Remaining Days Row */}
             <View style={styles.dueAmountRow}>
               <View>
-                <Text style={styles.dueLabel}>Remaining Days</Text>
+                <Text style={styles.dueLabel}>REMAINING DAYS</Text>
                 <Text style={[styles.remainingDays, chit.isOverdue && { color: colors.error }]}>
                   {chit.isOverdue ? 'Overdue' : `${chit.remainingDays} days`}
                 </Text>
               </View>
             </View>
 
+            {/* Late Fee Notice Strip */}
             <View style={styles.lateFeeRow}>
               <MaterialCommunityIcons name="alert-circle-outline" size={16} color={colors.warning} />
               <Text style={styles.lateFeeText}>Late fee of ₹10/day applies after due date</Text>
             </View>
 
+            {/* Actions */}
             <View style={styles.dueActions}>
               {canPay ? (
                 <>
