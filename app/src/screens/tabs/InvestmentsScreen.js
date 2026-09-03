@@ -13,6 +13,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { investmentService } from '../../services/investmentService';
 import { chitFundService } from '../../services/chitFundService';
 import { authService } from '../../services/authService';
+import { userService } from '../../services/userService';
 import api from '../../services/apiService';
 import { colors } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
@@ -42,10 +43,10 @@ const InvestmentsScreen = ({ navigation }) => {
     try {
       // Fetch ALL investment types and portfolio summary in parallel
       const [savingsRes, myChitsRes, pocketMoneyRes, profileRes] = await Promise.allSettled([
-        investmentService.getInvestments(),
-        chitFundService.getMyChits(),
-        api.get('/pocket-money/my'),
-        userService.getUserProfile(),
+        investmentService.getInvestments().catch(() => []),
+        chitFundService.getMyChits().catch(() => []),
+        api.get('/pocket-money/my').catch(() => ({ data: [] })),
+        userService.getUserProfile().catch(() => null),
       ]);
 
       if (profileRes.status === 'fulfilled' && profileRes.value) {

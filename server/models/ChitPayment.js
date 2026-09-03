@@ -49,5 +49,6 @@ chitPaymentSchema.index({ userId: 1, createdAt: -1 });
 chitPaymentSchema.index({ chitId: 1, status: 1 });
 chitPaymentSchema.index({ memberId: 1 });
 chitPaymentSchema.index({ status: 1 });
+chitPaymentSchema.index({ memberId: 1, month: 1 });
 
 module.exports = mongoose.model('ChitPayment', chitPaymentSchema);

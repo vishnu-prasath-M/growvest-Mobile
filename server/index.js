@@ -250,6 +250,21 @@ mongoose.connect(MONGO_URI)
     // Initialize default settings (UPI ID, etc.)
     await initializeSettings();
 
+    // Ensure obsolete unique indexes are cleaned up
+    try {
+      const db = mongoose.connection.db;
+      const chitpaymentsCol = db.collection('chitpayments');
+      const pIndexes = await chitpaymentsCol.indexes();
+      for (const idx of pIndexes) {
+        if (idx.name === 'chitId_1_userId_1_month_1') {
+          await chitpaymentsCol.dropIndex(idx.name);
+          console.log('[DB] Dropped legacy unique index chitId_1_userId_1_month_1');
+        }
+      }
+    } catch (idxErr) {
+      // Non-fatal
+    }
+
     // Seed default Chits
     await seedChits();
 
