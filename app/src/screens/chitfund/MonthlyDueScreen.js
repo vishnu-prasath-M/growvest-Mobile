@@ -191,8 +191,9 @@ const MonthlyDueScreen = ({ navigation }) => {
         const paidMonths = paidMonthsMap[memKey] || new Set();
         const durationLimit = isWeekly ? (c.totalWeeks || c.duration || 10) : (c.duration || 10);
 
-        // Find next unpaid installment month/week
-        let nextUnpaidMonth = 1;
+        // A member ALWAYS pays Week/Month 1 upon joining, so next due starts at least from Week 2
+        const basePaidCount = Math.max(1, c.paidWeeks || 0, c.currentWeek || 0, c.installmentsPaid || 0);
+        let nextUnpaidMonth = basePaidCount + 1;
         while (paidMonths.has(nextUnpaidMonth) && nextUnpaidMonth <= durationLimit) {
           nextUnpaidMonth++;
         }
@@ -200,20 +201,22 @@ const MonthlyDueScreen = ({ navigation }) => {
         const isFullyPaid = nextUnpaidMonth > durationLimit;
         const isClosed = c.status === 'closed' || c.status === 'completed' || c.status === 'archived';
         
-        const joinedDate = new Date(c.joinedAt || Date.now());
+        const joinedDate = new Date(c.joinedAt || c.createdAt || Date.now());
         const nextDue = new Date(joinedDate);
         if (isWeekly) {
+          // Exactly (nextUnpaidMonth - 1) * 7 days from joinedAt date
           nextDue.setDate(joinedDate.getDate() + (nextUnpaidMonth - 1) * 7);
         } else {
+          // Exactly (nextUnpaidMonth - 1) months from joinedAt date
           nextDue.setMonth(joinedDate.getMonth() + (nextUnpaidMonth - 1));
-          nextDue.setDate(1);
         }
-        nextDue.setHours(0, 0, 0, 0);
+        nextDue.setHours(23, 59, 59, 999);
         
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const diffTime = nextDue.getTime() - today.getTime();
-        const remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const remainingDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+        const isOverdue = diffTime < 0;
         
         return {
           ...c,
@@ -224,8 +227,8 @@ const MonthlyDueScreen = ({ navigation }) => {
           nextUnpaidMonth,
           displayWeek: nextUnpaidMonth <= durationLimit ? nextUnpaidMonth : durationLimit,
           nextDueDateFormatted: nextDue.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-          remainingDays: remainingDays > 0 ? remainingDays : 0,
-          isOverdue: remainingDays < 0,
+          remainingDays,
+          isOverdue,
           daysUntilDue: remainingDays,
         };
       });
