@@ -19,7 +19,7 @@ import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { colors } from '../../theme/theme';
 import { sipService } from '../../services/sipService';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
-import { openRazorpayCheckout } from '../../utils/razorpayHandler';
+import { openRazorpayCheckout } from '../../services/razorpayHandler';
 
 const SIPDetailsScreen = ({ route, navigation }) => {
   const { sipId, sipRefId } = route.params || {};

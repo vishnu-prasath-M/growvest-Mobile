@@ -16,7 +16,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { colors } from '../../theme/theme';
 import { sipService } from '../../services/sipService';
-import { openRazorpayCheckout } from '../../utils/razorpayHandler';
+import { openRazorpayCheckout } from '../../services/razorpayHandler';
 
 const AMOUNT_PRESETS = [500, 1000, 2000, 5000];
 const SIP_DATES = [1, 5, 10, 15, 20, 25];
