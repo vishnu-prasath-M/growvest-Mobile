@@ -102,7 +102,7 @@ const TermsScreen = ({ navigation }) => {
           </Section>
 
           {/* ─── Section 4: Interest/Profit Calculation ─── */}
-          <Section number="4" title="Interest / Profit Calculation" themeColors={themeColors}>
+          {/* <Section number="4" title="Interest / Profit Calculation" themeColors={themeColors}>
             <Text style={styles.para}>The following formulas govern how interest is calculated:</Text>
             <View style={[styles.formulaBox, { backgroundColor: themeColors.primaryLight, borderColor: themeColors.primary }]}>
               <Text style={[styles.formulaText, { color: themeColors.primary }]}>Total Interest = Principal × Rate ÷ 100</Text>
@@ -131,40 +131,40 @@ const TermsScreen = ({ navigation }) => {
             <Text style={[styles.para, { color: themeColors.textTertiary, fontSize: 12 }]}>
               The same formula applies dynamically for each plan. The Daily Interest shown in the app is informational and represents the average daily accrual.
             </Text>
-          </Section>
+          </Section> */}
 
-          {/* ─── Section 5: Lock-in Period ─── */}
-          <Section number="5" title="Lock-in Period" themeColors={themeColors}>
+          {/* ─── Section 4: Lock-in Period ─── */}
+          <Section number="4" title="Lock-in Period" themeColors={themeColors}>
             <BulletPoint text="All investments are locked for the full duration of the selected plan." themeColors={themeColors} />
             <BulletPoint text="No partial withdrawals are allowed during the lock-in period." themeColors={themeColors} />
             <BulletPoint text="The lock-in period begins from the date the investment is approved and activated in the system." themeColors={themeColors} />
           </Section>
 
-          {/* ─── Section 6: Maturity ─── */}
-          <Section number="6" title="Maturity" themeColors={themeColors}>
+          {/* ─── Section 5: Maturity ─── */}
+          <Section number="5" title="Maturity" themeColors={themeColors}>
             <BulletPoint text="Your investment matures on the date calculated from your actual investment/approval date plus the plan duration." themeColors={themeColors} />
             <BulletPoint text="Upon maturity, the full maturity value (principal + total interest) becomes eligible for withdrawal." themeColors={themeColors} />
             <BulletPoint text="Maturity dates may vary between different investments made by the same user." themeColors={themeColors} />
           </Section>
 
-          {/* ─── Section 7: Withdrawal Rules ─── */}
-          <Section number="7" title="Withdrawal Rules" themeColors={themeColors}>
+          {/* ─── Section 6: Withdrawal Rules ─── */}
+          <Section number="6" title="Withdrawal Rules" themeColors={themeColors}>
             <BulletPoint text="Withdrawal is NOT allowed before the maturity date." themeColors={themeColors} />
             <BulletPoint text="Early withdrawal requests will not be processed." themeColors={themeColors} />
             <BulletPoint text="After maturity, withdrawal requests are processed upon admin verification." themeColors={themeColors} />
             <BulletPoint text="Growvest reserves the right to request additional verification before processing withdrawals." themeColors={themeColors} />
           </Section>
 
-          {/* ─── Section 8: Investment Status ─── */}
-          <Section number="8" title="Investment Status" themeColors={themeColors}>
+          {/* ─── Section 7: Investment Status ─── */}
+          <Section number="7" title="Investment Status" themeColors={themeColors}>
             <BulletPoint text="Pending: Investment submitted but awaiting admin approval." themeColors={themeColors} />
             <BulletPoint text="Active: Investment approved and running. Interest is accruing." themeColors={themeColors} />
             <BulletPoint text="Matured: Investment has reached its end date and is ready for withdrawal." themeColors={themeColors} />
             <BulletPoint text="Completed: Investment has been withdrawn and the cycle is closed." themeColors={themeColors} />
           </Section>
 
-          {/* ─── Section 9: Important Notes ─── */}
-          <Section number="9" title="Important Notes" themeColors={themeColors}>
+          {/* ─── Section 8: Important Notes ─── */}
+          <Section number="8" title="Important Notes" themeColors={themeColors}>
             <BulletPoint text="Past performance does not guarantee future returns." themeColors={themeColors} />
             <BulletPoint text="Interest rates shown are specific to each plan and may be updated for future plans." themeColors={themeColors} />
             <BulletPoint text="Investment amounts must meet any minimum or maximum thresholds defined in the app at the time of investment." themeColors={themeColors} />
@@ -172,8 +172,8 @@ const TermsScreen = ({ navigation }) => {
             <BulletPoint text="Growvest is not responsible for losses arising from unauthorized account access." themeColors={themeColors} />
           </Section>
 
-          {/* ─── Section 10: User Acknowledgement ─── */}
-          <Section number="10" title="User Acknowledgement" themeColors={themeColors}>
+          {/* ─── Section 9: User Acknowledgement ─── */}
+          <Section number="9" title="User Acknowledgement" themeColors={themeColors}>
             <View style={{ backgroundColor: themeColors.primaryLight, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: themeColors.primary }}>
               <Text style={{ fontSize: 13, color: themeColors.text, lineHeight: 22 }}>
                 By proceeding with any investment on Growvest, you confirm that:{'\n\n'}

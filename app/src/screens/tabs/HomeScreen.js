@@ -236,7 +236,7 @@ const HomeScreen = ({ navigation }) => {
 
   const quickActions = [
     {
-      label: 'New Investment',
+      label: 'Investment',
       image: require('../../../assets/add.png'),
       onPress: () => navigation.navigate('InvestmentAmount'),
     },
