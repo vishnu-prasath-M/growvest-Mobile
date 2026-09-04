@@ -737,9 +737,10 @@ const AdminDashboard = () => {
   const pendingCount = pendingList.filter((i) => i.status === "pending").length;
   const wdPendingCount = withdrawList.filter((w) => w.status === "pending").length;
   const kycPendingCount = kycList.filter((k) => k.status === "pending").length;
+  const pendingPocketCount = dashboardStats?.pendingPocketPayouts || 0;
   const pocketActiveCount = dashboardStats?.pocketMoney?.active || 0;
   const chitActiveCount = dashboardStats?.activeChitMembers || 0;
-  const totalPendingActions = pendingCount + wdPendingCount + kycPendingCount + (dashboardStats?.pendingChitRequests || 0);
+  const totalPendingActions = pendingCount + wdPendingCount + kycPendingCount + (dashboardStats?.pendingChitRequests || 0) + pendingPocketCount;
 
   // Total Payable Balance = SUM of all users' current balance field from DB
   // This works immediately using already-fetched allUsers data
@@ -830,8 +831,8 @@ const AdminDashboard = () => {
     },
     {
       label: "Pending Actions",
-      value: (dashboardStats.pendingInvestments || 0) + (dashboardStats.pendingWithdrawals || 0) + (dashboardStats.pendingKYC || 0),
-      sub: `${dashboardStats.pendingKYC || 0} KYC, ${dashboardStats.pendingWithdrawals || 0} withdrawals`,
+      value: (dashboardStats.pendingInvestments || 0) + (dashboardStats.pendingWithdrawals || 0) + (dashboardStats.pendingKYC || 0) + (dashboardStats.pendingChitRequests || 0) + pendingPocketCount,
+      sub: `${dashboardStats.pendingKYC || 0} KYC, ${dashboardStats.pendingWithdrawals || 0} withdrawals, ${pendingPocketCount} pocket payouts`,
       icon: Clock,
       color: "bg-rose-50",
       iconColor: "text-rose-600",
@@ -872,7 +873,18 @@ const AdminDashboard = () => {
 
         <nav className="flex-1 p-3 space-y-1 mt-2">
           {navItems.map((item) => {
-            const badge = item.tab === "pending" ? pendingCount : item.tab === "withdrawals" ? wdPendingCount : 0;
+            const badge =
+              item.tab === "pending"
+                ? pendingCount
+                : item.tab === "withdrawals"
+                ? wdPendingCount
+                : item.tab === "kyc"
+                ? kycPendingCount
+                : item.tab === "chits"
+                ? (dashboardStats?.pendingChitRequests || 0)
+                : item.tab === "pocket"
+                ? pendingPocketCount
+                : 0;
             return (
               <button
                 key={item.tab}
@@ -947,11 +959,11 @@ const AdminDashboard = () => {
             </div>
           </div>
 
-          {(pendingCount + wdPendingCount) > 0 && (
+          {totalPendingActions > 0 && (
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200">
               <AlertCircle className="h-4 w-4 text-amber-600" />
               <span className="text-xs font-body font-semibold text-amber-700">
-                {pendingCount + wdPendingCount} pending
+                {totalPendingActions} pending action{totalPendingActions > 1 ? "s" : ""}
               </span>
             </div>
           )}
@@ -1114,6 +1126,31 @@ const AdminDashboard = () => {
                     </Button>
                   </div>
                 )}
+
+                {/* 5. Pending Pocket Money Payout Requests Alert (ONLY SHOWS IF REQUESTS ARRIVE) */}
+                {pendingPocketCount > 0 && (
+                  <div
+                    className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-emerald-100/80 transition-colors shadow-sm"
+                    onClick={() => setActiveTab("pocket")}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                        <Wallet className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-body font-bold text-emerald-900">
+                          {pendingPocketCount} new Pocket Money payout request{pendingPocketCount > 1 ? "s" : ""} awaiting release
+                        </p>
+                        <p className="text-xs font-body text-emerald-700 mt-0.5">
+                          Click to review user details, UPI address, and release payout
+                        </p>
+                      </div>
+                    </div>
+                    <Button size="sm" className="rounded-xl font-body bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto shrink-0">
+                      Review Payout Requests ({pendingPocketCount})
+                    </Button>
+                  </div>
+                )}
               </div>
 
               {/* ── UNIFIED REAL-TIME ACTIVITY STREAM ── */}
@@ -1224,7 +1261,7 @@ const AdminDashboard = () => {
                               className={`text-[10px] font-body font-semibold px-2.5 py-0.5 rounded-full border ${
                                 ["approved", "active", "completed", "paid"].includes(act.status)
                                   ? "bg-green-50 text-green-700 border-green-200"
-                                  : act.status === "pending"
+                                  : ["pending", "requested"].includes(act.status)
                                   ? "bg-amber-50 text-amber-700 border-amber-200"
                                   : "bg-red-50 text-red-600 border-red-200"
                               }`}
@@ -1234,11 +1271,15 @@ const AdminDashboard = () => {
 
                             <Button
                               size="sm"
-                              variant="outline"
-                              className="h-8 rounded-xl text-xs font-body px-3"
+                              variant={act.status === "requested" ? "default" : "outline"}
+                              className={`h-8 rounded-xl text-xs font-body px-3 ${
+                                act.status === "requested"
+                                  ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                                  : ""
+                              }`}
                               onClick={() => setActiveTab(act.targetTab || "overview")}
                             >
-                              Manage
+                              {act.status === "requested" ? "Release Payout" : "Manage"}
                             </Button>
                           </div>
                         </div>

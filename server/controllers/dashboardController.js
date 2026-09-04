@@ -168,16 +168,30 @@ exports.getAdminStats = async (req, res) => {
     ]);
 
     // Fetch recent items from each category for unified overview activity feed
-    const [recentInvestments, recentWithdrawals, recentKycs, recentChitMembers, recentPockets] = await Promise.all([
+    const PocketMoney = require('../models/PocketMoney');
+    const PocketMoneyPayout = require('../models/PocketMoneyPayout');
+
+    const [
+      recentInvestments,
+      recentWithdrawals,
+      recentKycs,
+      recentChitMembers,
+      recentPockets,
+      recentPendingPocketPayouts,
+      pendingPocketPayoutsCount,
+      pendingPocketInvestmentsCount,
+    ] = await Promise.all([
       Investment.find().sort({ createdAt: -1 }).limit(8),
       Withdrawal.find().sort({ createdAt: -1 }).limit(8),
       KYC.find().populate('userId', 'name username email mobileNumber').sort({ submittedAt: -1, createdAt: -1 }).limit(8),
       ChitMember.find().populate('userId', 'name username email mobileNumber').populate('chitId', 'name monthlyAmount weeklyAmount').sort({ joinedAt: -1, createdAt: -1 }).limit(8),
-      (async () => {
-        const PocketMoney = require('../models/PocketMoney');
-        return await PocketMoney.find().sort({ createdAt: -1 }).limit(8);
-      })(),
+      PocketMoney.find().sort({ createdAt: -1 }).limit(8),
+      PocketMoneyPayout.find({ status: 'requested' }).populate('pocketMoneyId').populate('userId', 'name username email mobileNumber').sort({ createdAt: -1 }).limit(8),
+      PocketMoneyPayout.countDocuments({ status: 'requested' }),
+      PocketMoney.countDocuments({ status: 'pending' }),
     ]);
+
+    const totalPendingPocketRequests = pendingPocketPayoutsCount + pendingPocketInvestmentsCount;
 
     const savingRevenue = revenueResult.length > 0 ? revenueResult[0].total : 0;
     const savingCount = revenueResult.length > 0 ? revenueResult[0].count : 0;
@@ -190,6 +204,18 @@ exports.getAdminStats = async (req, res) => {
 
     // Combine & sort all recent activities
     const combinedActivities = [
+      ...recentPendingPocketPayouts.map(p => ({
+        _id: p._id,
+        category: 'pocket',
+        title: `Pocket Money Payout Request (Payout #${p.payoutNumber || 1})`,
+        userName: p.userId?.name || p.userId?.username || p.pocketMoneyId?.userName || 'Investor',
+        userEmail: p.userId?.email || p.userId?.mobileNumber || p.pocketMoneyId?.userEmail || '',
+        amount: p.amount || 0,
+        status: 'requested',
+        date: p.createdAt || p.payoutDate,
+        details: `Plan: PM-${p.pocketMoneyId?._id ? p.pocketMoneyId._id.toString().slice(-6) : 'Plan'} (${p.pocketMoneyId?.frequency || 'daily'}) • Payout #${p.payoutNumber || 1}`,
+        targetTab: 'pocket',
+      })),
       ...recentInvestments.map(inv => ({
         _id: inv._id,
         category: 'investment',
@@ -283,6 +309,8 @@ exports.getAdminStats = async (req, res) => {
         count: chitCount,
       },
       pocketMoney: pocketMoneyStatsResult,
+      pendingPocketPayouts: totalPendingPocketRequests,
+      pendingPocketRequests: totalPendingPocketRequests,
       recentActivities: combinedActivities,
     });
   } catch (error) {
