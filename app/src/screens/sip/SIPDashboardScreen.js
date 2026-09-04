@@ -81,6 +81,18 @@ const SIPDashboardScreen = ({ navigation }) => {
     }
   };
 
+  const getFrequencySubtitle = (sip) => {
+    const freq = sip?.frequency || 'monthly';
+    const amt = formatCurrency(sip?.amount || 0);
+    if (freq === 'daily') {
+      return `${amt} / Day • Every day`;
+    }
+    if (freq === 'weekly') {
+      return `${amt} / Week • Every ${sip?.sipDayName || 'week'}`;
+    }
+    return `${amt} / Month • ${sip?.sipDate || 10}th of every month`;
+  };
+
   return (
     <View style={styles.container}>
       {/* Top Header */}
@@ -113,7 +125,7 @@ const SIPDashboardScreen = ({ navigation }) => {
         <View style={styles.titleSection}>
           <Text style={styles.mainTitle}>Systematic Investment Plan</Text>
           <Text style={styles.mainSubtitle}>
-            Invest regularly and build your savings over time with scheduled monthly contributions.
+            Invest regularly and build your savings over time with scheduled daily, weekly, or monthly contributions.
           </Text>
         </View>
 
@@ -167,19 +179,15 @@ const SIPDashboardScreen = ({ navigation }) => {
             end={{ x: 1, y: 0 }}
             style={styles.startSipGradient}
           >
-            <MaterialCommunityIcons name="plus-circle" size={22} color="#FFFFFF" />
+            <MaterialCommunityIcons name="plus-circle-outline" size={20} color="#FFFFFF" />
             <Text style={styles.startSipBtnText}>Start New SIP</Text>
           </LinearGradient>
         </TouchableOpacity>
 
-        {/* SIP List Section */}
+        {/* Section Header */}
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Your SIPs</Text>
-          {sips.length > 0 && (
-            <Text style={styles.sectionCount}>
-              {sips.length} {sips.length === 1 ? 'Plan' : 'Plans'}
-            </Text>
-          )}
+          <Text style={styles.sectionTitle}>My SIP Portfolio</Text>
+          <Text style={styles.sectionCount}>{sips.length} Plans</Text>
         </View>
 
         {loading ? (
@@ -187,11 +195,11 @@ const SIPDashboardScreen = ({ navigation }) => {
         ) : sips.length === 0 ? (
           <View style={styles.emptyContainer}>
             <View style={styles.emptyIconCircle}>
-              <MaterialCommunityIcons name="cash-sync" size={48} color="#085428" />
+              <MaterialCommunityIcons name="calendar-sync-outline" size={48} color="#94A3B8" />
             </View>
-            <Text style={styles.emptyTitle}>No SIPs yet</Text>
+            <Text style={styles.emptyTitle}>No SIP Plans Active</Text>
             <Text style={styles.emptySubtitle}>
-              Start a recurring investment and build your savings consistently.
+              Start a daily, weekly, or monthly SIP to grow your wealth with discipline.
             </Text>
             <TouchableOpacity
               style={styles.emptyActionBtn}
@@ -218,13 +226,21 @@ const SIPDashboardScreen = ({ navigation }) => {
               >
                 <View style={styles.sipCardHeader}>
                   <View style={styles.sipIconWrap}>
-                    <MaterialCommunityIcons name="calendar-sync" size={22} color="#085428" />
+                    <MaterialCommunityIcons
+                      name={
+                        item.frequency === 'daily'
+                          ? 'calendar-today'
+                          : item.frequency === 'weekly'
+                          ? 'calendar-week'
+                          : 'calendar-sync'
+                      }
+                      size={22}
+                      color="#085428"
+                    />
                   </View>
                   <View style={{ flex: 1, marginLeft: 12 }}>
                     <Text style={styles.sipCardId}>{item.sipId}</Text>
-                    <Text style={styles.sipCardSubtitle}>
-                      {formatCurrency(item.amount)} / Month • {item.sipDate}th of every month
-                    </Text>
+                    <Text style={styles.sipCardSubtitle}>{getFrequencySubtitle(item)}</Text>
                   </View>
                   <View style={[styles.statusBadge, { backgroundColor: badge.bg }]}>
                     <MaterialCommunityIcons name={badge.icon} size={14} color={badge.text} />

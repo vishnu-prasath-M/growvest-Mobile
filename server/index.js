@@ -331,16 +331,44 @@ cron.schedule("30 8 * * *", async () => {
 
       const diffTime = nextDue.getTime() - today.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const freq = sip.frequency || 'monthly';
+      const formattedDate = nextDue.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 
-      // Send reminder 2 days before, 1 day before, and on due date
-      if ([0, 1, 2].includes(diffDays)) {
-        const daysText = diffDays === 0 ? 'today' : diffDays === 1 ? 'tomorrow' : 'in 2 days';
-        const formattedDate = nextDue.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+      let shouldSend = false;
+      let title = '';
+      let description = '';
 
+      if (freq === 'daily') {
+        if (diffDays === 0) {
+          shouldSend = true;
+          title = '📅 Daily SIP Due Today!';
+          description = `Your daily SIP contribution of ₹${sip.amount.toLocaleString('en-IN')} for ${sip.sipId} is due today.`;
+        }
+      } else if (freq === 'weekly') {
+        if (diffDays === 0) {
+          shouldSend = true;
+          title = '📅 Weekly SIP Due Today!';
+          description = `Your weekly SIP contribution of ₹${sip.amount.toLocaleString('en-IN')} for ${sip.sipId} is due today.`;
+        } else if (diffDays === 1) {
+          shouldSend = true;
+          title = '📅 Weekly SIP Due Tomorrow';
+          description = `Your weekly SIP contribution of ₹${sip.amount.toLocaleString('en-IN')} for ${sip.sipId} is due tomorrow (${formattedDate}).`;
+        }
+      } else {
+        // Monthly
+        if ([0, 1, 2].includes(diffDays)) {
+          const daysText = diffDays === 0 ? 'today' : diffDays === 1 ? 'tomorrow' : 'in 2 days';
+          shouldSend = true;
+          title = `📅 Monthly SIP Due (${daysText})`;
+          description = `Your monthly SIP contribution of ₹${sip.amount.toLocaleString('en-IN')} for ${sip.sipId} is due ${daysText} (${formattedDate}).`;
+        }
+      }
+
+      if (shouldSend) {
         await sendNotification({
           userId: sip.userId,
-          title: `📅 SIP Due Reminder (${daysText})`,
-          description: `Your monthly SIP contribution of ₹${sip.amount.toLocaleString('en-IN')} for ${sip.sipId} is due ${daysText} (${formattedDate}).`,
+          title,
+          description,
           type: 'general',
           pushData: { screen: 'SIPDetails', sipId: sip._id.toString() },
         });
