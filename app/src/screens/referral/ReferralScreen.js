@@ -370,18 +370,18 @@ const ReferralScreen = ({ navigation }) => {
               </View>
 
               <View style={styles.statBox}>
-                <Text style={styles.statVal}>{stats.registered || 0}</Text>
+                <Text style={[styles.statVal, { color: '#0284C7' }]}>{stats.downloaded || 0}</Text>
+                <Text style={styles.statLabel}>Downloaded</Text>
+              </View>
+
+              <View style={styles.statBox}>
+                <Text style={[styles.statVal, { color: '#16A34A' }]}>{stats.registered || 0}</Text>
                 <Text style={styles.statLabel}>Registered</Text>
               </View>
 
               <View style={styles.statBox}>
-                <Text style={[styles.statVal, { color: '#1A5C39' }]}>{stats.successful || 0}</Text>
+                <Text style={[styles.statVal, { color: '#B45309' }]}>{stats.successful || 0}</Text>
                 <Text style={styles.statLabel}>Qualified</Text>
-              </View>
-
-              <View style={styles.statBox}>
-                <Text style={[styles.statVal, { color: '#B45309' }]}>🪙 {availableCoins}</Text>
-                <Text style={styles.statLabel}>Balance</Text>
               </View>
             </View>
 
@@ -441,7 +441,10 @@ const ReferralScreen = ({ navigation }) => {
                   <View key={item._id} style={styles.historyCard}>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.historyName}>{item.displayName}</Text>
-                      <Text style={styles.historyDate}>{formatDate(item.createdAt)}</Text>
+                      <Text style={styles.historyDate}>
+                        {formatDate(item.createdAt)}
+                        {item.status === 'DOWNLOADED' ? ' • App Downloaded (Pending Signup)' : ''}
+                      </Text>
                     </View>
                     <View style={{ alignItems: 'flex-end', gap: 4 }}>
                       <StatusChip status={item.status} />

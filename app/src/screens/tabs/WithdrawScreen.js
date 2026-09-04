@@ -406,49 +406,72 @@ const WithdrawScreen = ({ navigation }) => {
                     onPress={() => navigation.navigate('ChitDetails', { chitId: inv.chitId || inv._id })}
                   >
                     <View style={styles.planStatusTop}>
-                      <View style={styles.planStatusInfo}>
-                        <Text style={styles.planStatusName}>{inv.chitName}</Text>
-                        <Text style={styles.planStatusSub}>
-                          Paid: {formatCurrency(inv.amount)} • Week {inv.currentWeek}/{inv.totalWeeks} (₹{inv.weeklyAmount}/wk)
-                        </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+                        <View style={[
+                          styles.planIconAvatar,
+                          { backgroundColor: isWinner ? '#DCFCE7' : '#FEF3C7' }
+                        ]}>
+                          <MaterialCommunityIcons
+                            name={isWinner ? 'trophy' : 'cash-multiple'}
+                            size={18}
+                            color={isWinner ? '#059669' : '#D97706'}
+                          />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.planStatusName} numberOfLines={1}>{inv.chitName}</Text>
+                          <Text style={styles.planStatusSub}>
+                            Paid: {formatCurrency(inv.amount)} • Wk {inv.currentWeek}/{inv.totalWeeks} (₹{inv.weeklyAmount}/wk)
+                          </Text>
+                        </View>
                       </View>
                       <View style={[
-                        styles.statusBadge,
-                        isWinner ? styles.statusBadgeMatured : styles.statusBadgeLocked
+                        styles.statusBadgeCompact,
+                        isWinner ? { backgroundColor: '#DCFCE7' } : { backgroundColor: '#FEF3C7' }
                       ]}>
                         <MaterialCommunityIcons 
                           name={isWinner ? 'trophy' : 'cash-check'} 
-                          size={14} 
-                          color={isWinner ? '#065F46' : '#047857'} 
+                          size={12} 
+                          color={isWinner ? '#065F46' : '#92400E'} 
                         />
                         <Text style={[
-                          styles.statusBadgeText, 
-                          { color: isWinner ? '#065F46' : '#047857' }
+                          styles.statusBadgeCompactText, 
+                          { color: isWinner ? '#065F46' : '#92400E' }
                         ]}>
                           {isWinner ? 'AUCTION WON' : 'ACTIVE CHIT'}
                         </Text>
                       </View>
                     </View>
 
-                    <View style={styles.planStatusDivider} />
-
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 4 }}>
-                      <View>
-                        <Text style={{ fontSize: 11, color: themeColors.textSecondary }}>Category</Text>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: themeColors.text }}>Chit Fund</Text>
+                    <View style={styles.planMetricsBox}>
+                      <View style={styles.metricColLeft}>
+                        <Text style={styles.metricLabel}>CATEGORY</Text>
+                        <Text style={styles.metricValuePrimary}>Chit Fund Scheme</Text>
+                        <Text style={styles.metricSubText}>Weekly Savings</Text>
                       </View>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={{ fontSize: 11, color: themeColors.textSecondary }}>Available to Withdraw</Text>
-                        <Text style={{ fontSize: 15, fontWeight: '800', color: isWinner ? themeColors.primary : themeColors.textSecondary }}>
+
+                      <View style={styles.metricDividerVertical} />
+
+                      <View style={styles.metricColRight}>
+                        <Text style={styles.metricLabel}>AVAILABLE TO CLAIM</Text>
+                        <Text style={[
+                          styles.metricValueAmount,
+                          { color: isWinner ? themeColors.primary : themeColors.textSecondary }
+                        ]}>
                           {isWinner ? formatCurrency(winningAmt) : '₹0.00'}
+                        </Text>
+                        <Text style={[
+                          styles.metricSubText,
+                          { color: isWinner ? '#065F46' : themeColors.textTertiary }
+                        ]}>
+                          {isWinner ? 'Ready to Claim' : 'Pot unlock upon winning'}
                         </Text>
                       </View>
                     </View>
 
-                    <View style={{ marginTop: 8 }}>
+                    <View style={{ marginTop: 10 }}>
                       {isWinner ? (
                         <TouchableOpacity
-                          style={styles.withdrawActionBtn}
+                          style={styles.withdrawActionBtnModern}
                           activeOpacity={0.85}
                           onPress={() => navigation.navigate('ChitFundHome')}
                         >
@@ -456,16 +479,18 @@ const WithdrawScreen = ({ navigation }) => {
                             colors={['#0E3D23', '#1A5C39']}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 1 }}
-                            style={styles.withdrawActionGradient}
+                            style={styles.withdrawActionGradientModern}
                           >
                             <MaterialCommunityIcons name="trophy" size={16} color="#fff" />
-                            <Text style={styles.withdrawActionText}>Claim Payout {formatCurrency(winningAmt)}</Text>
+                            <Text style={styles.withdrawActionTextModern}>Claim Payout {formatCurrency(winningAmt)}</Text>
+                            <MaterialCommunityIcons name="arrow-right" size={16} color="#fff" style={{ marginLeft: 4 }} />
                           </LinearGradient>
                         </TouchableOpacity>
                       ) : (
-                        <View style={{ backgroundColor: themeColors.surface2, padding: 10, borderRadius: 10, alignItems: 'center' }}>
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: themeColors.textSecondary }}>
-                            ✓ Active Chit Member • Pot payout available upon winning auction
+                        <View style={styles.payoutDoneBanner}>
+                          <MaterialCommunityIcons name="information" size={15} color={themeColors.textSecondary} style={{ marginRight: 6 }} />
+                          <Text style={[styles.payoutDoneText, { color: themeColors.textSecondary }]}>
+                            Active Chit Member • Pot payout available upon winning auction.
                           </Text>
                         </View>
                       )}
@@ -492,6 +517,7 @@ const WithdrawScreen = ({ navigation }) => {
               const intendedDateStr = intendedDateVal
                 ? new Date(intendedDateVal).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
                 : 'N/A';
+              const isEarlyExit = intendedDateVal && maturityDateVal && new Date(intendedDateVal).getTime() < new Date(maturityDateVal).getTime();
 
               return (
                 <TouchableOpacity
@@ -500,110 +526,145 @@ const WithdrawScreen = ({ navigation }) => {
                   activeOpacity={0.88}
                   onPress={() => setSelectedDeposit(inv)}
                 >
+                  {/* Top Header: Icon + Plan Name & Rate + Compact Status Badge */}
                   <View style={styles.planStatusTop}>
-                    <View style={styles.planStatusInfo}>
-                      <Text style={styles.planStatusName}>{getPlanDisplayName(inv.type)}</Text>
-                      <Text style={styles.planStatusSub}>
-                        Invested: {formatCurrency(inv.amount)} • Rate: {inv.interestRate}%
-                      </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+                      <View style={[
+                        styles.planIconAvatar,
+                        { backgroundColor: isWithdrawn ? (themeColors.surface2 || '#F1F5F9') : isFullEligible ? '#DCFCE7' : isLocked ? '#FEF3C7' : '#E0F2FE' }
+                      ]}>
+                        <MaterialCommunityIcons
+                          name={isWithdrawn ? 'check-all' : isFullEligible ? 'check-decagram' : isLocked ? 'lock-outline' : 'lightning-bolt'}
+                          size={18}
+                          color={isWithdrawn ? themeColors.textTertiary : isFullEligible ? '#059669' : isLocked ? '#D97706' : themeColors.primary}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.planStatusName} numberOfLines={1}>
+                          {getPlanDisplayName(inv.type)}
+                        </Text>
+                        <Text style={styles.planStatusSub}>
+                          Invested: {formatCurrency(inv.amount)} • {inv.interestRate}% p.a.
+                        </Text>
+                      </View>
                     </View>
+
                     <View style={[
-                      styles.statusBadge,
-                      isWithdrawn ? { backgroundColor: themeColors.surface2 } :
+                      styles.statusBadgeCompact,
+                      isWithdrawn ? { backgroundColor: themeColors.surface2 || '#F1F5F9' } :
                       isPendingWithdrawal ? { backgroundColor: '#FEF3C7' } :
-                      isFullEligible ? styles.statusBadgeMatured :
+                      isFullEligible ? { backgroundColor: '#DCFCE7' } :
                       isLocked ? { backgroundColor: '#FEF3C7' } :
-                      styles.statusBadgeLocked
+                      { backgroundColor: '#E0F2FE' }
                     ]}>
                       <MaterialCommunityIcons 
-                        name={isWithdrawn ? 'check-all' : isPendingWithdrawal ? 'clock-outline' : isFullEligible ? 'check-circle' : isLocked ? 'lock-outline' : 'alert-circle'} 
-                        size={14} 
-                        color={isWithdrawn ? themeColors.textTertiary : isPendingWithdrawal ? '#92400E' : isFullEligible ? '#065F46' : isLocked ? '#92400E' : '#B45309'} 
+                        name={isWithdrawn ? 'check' : isPendingWithdrawal ? 'clock-outline' : isFullEligible ? 'check-circle' : isLocked ? 'lock' : 'lightning-bolt'} 
+                        size={12} 
+                        color={isWithdrawn ? themeColors.textTertiary : isPendingWithdrawal ? '#92400E' : isFullEligible ? '#065F46' : isLocked ? '#92400E' : '#0369A1'} 
                       />
                       <Text style={[
-                        styles.statusBadgeText, 
-                        { color: isWithdrawn ? themeColors.textTertiary : isPendingWithdrawal ? '#92400E' : isFullEligible ? '#065F46' : isLocked ? '#92400E' : '#B45309' }
+                        styles.statusBadgeCompactText, 
+                        { color: isWithdrawn ? themeColors.textTertiary : isPendingWithdrawal ? '#92400E' : isFullEligible ? '#065F46' : isLocked ? '#92400E' : '#0369A1' }
                       ]}>
-                        {isWithdrawn ? 'WITHDRAWN' : isPendingWithdrawal ? 'REQUESTED – PENDING APPROVAL' : isFullEligible ? 'MATURED (FULL RETURNS ELIGIBLE)' : isLocked ? `LOCKED (UNLOCKS ${intendedDateStr.toUpperCase()})` : 'EARLY (PRINCIPAL ONLY)'}
+                        {isWithdrawn ? 'WITHDRAWN' : isPendingWithdrawal ? 'PENDING' : isFullEligible ? 'MATURED' : isLocked ? 'LOCKED' : 'EARLY UNLOCKED'}
                       </Text>
                     </View>
                   </View>
 
-                  <View style={styles.planStatusDivider} />
-
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 4 }}>
-                    <View>
-                      <Text style={{ fontSize: 11, color: themeColors.textSecondary }}>Intended / Maturity Date</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: themeColors.text }}>
-                        {intendedDateStr} {intendedDateVal !== maturityDateVal && `(Matures ${maturityDateStr})`}
+                  {/* 2-Column Structured Financial Metrics Box (Never Overlaps) */}
+                  <View style={styles.planMetricsBox}>
+                    <View style={styles.metricColLeft}>
+                      <Text style={styles.metricLabel}>
+                        {isEarlyExit ? 'INTENDED UNLOCK' : 'MATURITY DATE'}
                       </Text>
+                      <Text style={styles.metricValuePrimary} numberOfLines={1}>
+                        {intendedDateStr}
+                      </Text>
+                      {isEarlyExit && (
+                        <Text style={styles.metricSubText} numberOfLines={1}>
+                          Matures: {maturityDateStr}
+                        </Text>
+                      )}
                     </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={{ fontSize: 11, color: themeColors.textSecondary }}>Available to Withdraw</Text>
-                      <Text style={{ fontSize: 15, fontWeight: '800', color: isLocked ? themeColors.textSecondary : themeColors.primary }}>
+
+                    <View style={styles.metricDividerVertical} />
+
+                    <View style={styles.metricColRight}>
+                      <Text style={styles.metricLabel}>AVAILABLE TO WITHDRAW</Text>
+                      <Text style={[
+                        styles.metricValueAmount,
+                        { color: isWithdrawn || isLocked ? themeColors.textSecondary : themeColors.primary }
+                      ]} numberOfLines={1}>
                         {formatCurrency(withdrawableAmt)}
                       </Text>
+                      <Text style={[
+                        styles.metricSubText,
+                        { color: isLocked ? '#92400E' : isFullEligible ? '#065F46' : '#D97706' }
+                      ]} numberOfLines={1}>
+                        {isWithdrawn ? 'Transferred' : isLocked ? `Locked till ${intendedDateStr}` : isFullEligible ? 'Principal + Interest' : 'Principal Only'}
+                      </Text>
                     </View>
                   </View>
 
-                  <View style={{ marginTop: 8 }}>
+                  {/* Bottom Status / Actions */}
+                  <View style={{ marginTop: 10 }}>
                     {isWithdrawn ? (
-                      <View style={{ backgroundColor: themeColors.surface2, padding: 10, borderRadius: 10, alignItems: 'center' }}>
-                        <Text style={{ fontSize: 12, fontWeight: '600', color: themeColors.textSecondary }}>
-                          ✓ Payout of {formatCurrency(withdrawableAmt)} has been processed by admin.
+                      <View style={styles.payoutDoneBanner}>
+                        <MaterialCommunityIcons name="check-circle" size={15} color="#059669" style={{ marginRight: 6 }} />
+                        <Text style={styles.payoutDoneText}>
+                          Payout of {formatCurrency(withdrawableAmt)} processed successfully.
                         </Text>
                       </View>
                     ) : isPendingWithdrawal ? (
-                      <View style={{ backgroundColor: '#FEF3C7', padding: 12, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: '#FDE68A' }}>
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#92400E', textAlign: 'center' }}>
-                          ⏳ Withdrawal Requested
-                        </Text>
-                        <Text style={{ fontSize: 11, color: '#92400E', marginTop: 4, textAlign: 'center' }}>
-                          Your request of {formatCurrency(withdrawableAmt)} is pending admin approval. You will be notified once processed.
-                        </Text>
-                      </View>
-                    ) : isLocked ? (
-                      <View style={{ backgroundColor: themeColors.surface2 || '#F1F5F9', padding: 12, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: themeColors.border || '#E2E8F0' }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                          <MaterialCommunityIcons name="lock" size={16} color={themeColors.textSecondary} style={{ marginRight: 4 }} />
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: themeColors.textSecondary }}>
-                            Investment Locked
+                      <View style={styles.payoutPendingBanner}>
+                        <MaterialCommunityIcons name="clock-outline" size={16} color="#92400E" style={{ marginRight: 6 }} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.payoutPendingTitle}>Withdrawal Request Pending</Text>
+                          <Text style={styles.payoutPendingSub}>
+                            Request for {formatCurrency(withdrawableAmt)} is awaiting admin approval.
                           </Text>
                         </View>
-                        <Text style={{ fontSize: 11, color: themeColors.textTertiary, marginTop: 4, textAlign: 'center' }}>
-                          Unlocks for withdrawal on your chosen intended date: {intendedDateStr}.
+                      </View>
+                    ) : isLocked ? (
+                      <View style={styles.lockNoticeBanner}>
+                        <MaterialCommunityIcons name="lock-outline" size={16} color="#92400E" style={{ marginRight: 6 }} />
+                        <Text style={styles.lockNoticeText}>
+                          Locked until <Text style={{ fontWeight: '700' }}>{intendedDateStr}</Text>. Unlocks for early principal withdrawal on this date.
                         </Text>
                       </View>
                     ) : (
-                      <TouchableOpacity
-                        style={styles.withdrawActionBtn}
-                        activeOpacity={0.85}
-                        onPress={() => {
-                          setWithdrawType(inv._id);
-                          setAmount(String(withdrawableAmt));
-                          openWithdrawModal(inv._id);
-                        }}
-                      >
-                        <LinearGradient
-                          colors={['#0E3D23', '#1A5C39']}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 1 }}
-                          style={styles.withdrawActionGradient}
+                      <View>
+                        <TouchableOpacity
+                          style={styles.withdrawActionBtnModern}
+                          activeOpacity={0.85}
+                          onPress={() => {
+                            setWithdrawType(inv._id);
+                            setAmount(String(withdrawableAmt));
+                            openWithdrawModal(inv._id);
+                          }}
                         >
-                          <MaterialCommunityIcons name="cash-fast" size={16} color="#fff" />
-                          <Text style={styles.withdrawActionText}>
-                            {isFullEligible
-                              ? `Withdraw Full Amount (${formatCurrency(fullAmt)})`
-                              : `Early Withdraw Principal Only (${formatCurrency(principalAmt)})`}
-                          </Text>
-                        </LinearGradient>
-                      </TouchableOpacity>
-                    )}
+                          <LinearGradient
+                            colors={['#0E3D23', '#1A5C39']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.withdrawActionGradientModern}
+                          >
+                            <MaterialCommunityIcons name="cash-fast" size={16} color="#fff" />
+                            <Text style={styles.withdrawActionTextModern}>
+                              {isFullEligible
+                                ? `Withdraw Full Amount (${formatCurrency(fullAmt)})`
+                                : `Withdraw Principal Only (${formatCurrency(principalAmt)})`}
+                            </Text>
+                            <MaterialCommunityIcons name="arrow-right" size={16} color="#fff" style={{ marginLeft: 4 }} />
+                          </LinearGradient>
+                        </TouchableOpacity>
 
-                    {!isFullEligible && !isWithdrawn && !isPendingWithdrawal && !isLocked && (
-                      <Text style={{ fontSize: 11, color: '#B45309', marginTop: 6, textAlign: 'center', fontStyle: 'italic' }}>
-                        🔒 Early withdrawal: Principal only. Plan interest returns will be available upon full maturity ({maturityDateStr}).
-                      </Text>
+                        {!isFullEligible && (
+                          <Text style={styles.earlyNoticeFooter}>
+                            ⚡ Early exit: Principal only. Full returns unlock on maturity ({maturityDateStr}).
+                          </Text>
+                        )}
+                      </View>
                     )}
                   </View>
                 </TouchableOpacity>
@@ -992,9 +1053,9 @@ const getStyles = (colors) => StyleSheet.create({
   // Plan Status Cards
   planStatusCard: {
     backgroundColor: colors.surface,
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 16,
-    marginBottom: 10,
+    marginBottom: 14,
     borderWidth: 1,
     borderColor: colors.borderLight,
     ...colors.shadow.card,
@@ -1003,21 +1064,29 @@ const getStyles = (colors) => StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 12,
   },
-  planStatusInfo: {
-    flex: 1,
+  planIconAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
   },
   planStatusName: {
     fontSize: 15,
     fontWeight: '700',
     color: colors.text,
-    marginBottom: 4,
+    letterSpacing: -0.2,
   },
   planStatusSub: {
-    fontSize: 13,
+    fontSize: 12,
     color: colors.textSecondary,
+    fontWeight: '500',
+    marginTop: 2,
   },
-  statusBadge: {
+  statusBadgeCompact: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
@@ -1025,25 +1094,134 @@ const getStyles = (colors) => StyleSheet.create({
     borderRadius: 8,
     gap: 4,
   },
-  statusBadgeMatured: {
-    backgroundColor: '#D1FAE5',
+  statusBadgeCompactText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
-  statusBadgeLocked: {
-    backgroundColor: '#FEF3C7',
+  planMetricsBox: {
+    flexDirection: 'row',
+    backgroundColor: colors.background,
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    alignItems: 'center',
   },
-  statusBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
+  metricColLeft: {
+    flex: 1,
+    paddingRight: 8,
   },
-  planStatusDivider: {
-    height: 1,
+  metricColRight: {
+    flex: 1,
+    paddingLeft: 8,
+    alignItems: 'flex-end',
+  },
+  metricDividerVertical: {
+    width: 1,
+    height: '80%',
     backgroundColor: colors.borderLight,
-    marginVertical: 12,
   },
-  planStatusFooter: {
-    fontSize: 12,
+  metricLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.textTertiary,
+    letterSpacing: 0.4,
+    marginBottom: 3,
+  },
+  metricValuePrimary: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  metricValueAmount: {
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  metricSubText: {
+    fontSize: 10,
     fontWeight: '600',
     color: colors.textSecondary,
+    marginTop: 2,
+  },
+  payoutDoneBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+  },
+  payoutDoneText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#065F46',
+    flex: 1,
+  },
+  payoutPendingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  payoutPendingTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#92400E',
+  },
+  payoutPendingSub: {
+    fontSize: 11,
+    color: '#92400E',
+    marginTop: 2,
+  },
+  lockNoticeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  lockNoticeText: {
+    fontSize: 11.5,
+    color: colors.textSecondary,
+    flex: 1,
+    lineHeight: 16,
+  },
+  withdrawActionBtnModern: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    shadowColor: '#1A5C39',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  withdrawActionGradientModern: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 6,
+  },
+  withdrawActionTextModern: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#F8FAF9',
+  },
+  earlyNoticeFooter: {
+    fontSize: 11,
+    color: '#B45309',
+    marginTop: 6,
+    textAlign: 'center',
+    fontWeight: '500',
   },
 });
 

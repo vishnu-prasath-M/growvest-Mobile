@@ -25,6 +25,7 @@ const notificationSchema = new mongoose.Schema({
     'pocket_money_reminder',
     'pocket_money_completed',
     'referral_reward',
+    'referral_lead',
     'reward',
     'coin_reward',
     'general'

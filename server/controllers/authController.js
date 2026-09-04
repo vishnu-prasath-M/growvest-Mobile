@@ -80,6 +80,7 @@ exports.registerUser = async (req, res) => {
       if (referrer && referrer._id.toString() !== user._id.toString()) {
         try {
           const Referral = require('../models/Referral');
+          const ReferralLead = require('../models/ReferralLead');
           const { triggerReferralSignupReward } = require('../utils/referralHelper');
 
           await Referral.create({
@@ -89,6 +90,16 @@ exports.registerUser = async (req, res) => {
             rewardCoins: 0,
             status: 'REGISTERED',
           });
+
+          // Mark any active downloaded leads for this referral as registered
+          try {
+            await ReferralLead.updateMany(
+              { referrerUserId: referrer._id, status: 'DOWNLOADED' },
+              { status: 'REGISTERED', registeredUserId: user._id }
+            );
+          } catch (leadUpdateErr) {
+            console.warn('[ReferralLead Update Warning]', leadUpdateErr.message);
+          }
 
           await triggerReferralSignupReward(user._id, referrer._id);
         } catch (refErr) {

@@ -11,6 +11,7 @@ import {
   Dimensions,
   Image,
   StatusBar,
+  Clipboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TextInput } from 'react-native-paper';
@@ -42,8 +43,20 @@ const SignupScreen = ({ navigation }) => {
     const checkPendingRefCode = async () => {
       try {
         const savedCode = await AsyncStorage.getItem('pendingReferralCode');
-        if (savedCode) {
+        if (savedCode && savedCode.trim()) {
           setReferralCode(savedCode.trim().toUpperCase());
+          return;
+        }
+
+        // Auto-check clipboard for copied GV referral code
+        if (Clipboard && Clipboard.getString) {
+          const clipText = await Clipboard.getString();
+          if (clipText && typeof clipText === 'string') {
+            const match = clipText.match(/GV[A-Z0-9]{4}/i);
+            if (match && match[0]) {
+              setReferralCode(match[0].toUpperCase());
+            }
+          }
         }
       } catch (e) {
         console.warn('Error reading pending referral code:', e);
