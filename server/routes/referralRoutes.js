@@ -11,9 +11,10 @@ const upload = multer({
   limits: { fileSize: 150 * 1024 * 1024 }, // 150MB limit
 });
 
-// Public APK Routes
+// Public APK & Referral Tracking Routes
 router.get('/apk', apkController.getActiveAPK);
 router.get('/apk/download', apkController.downloadActiveAPK);
+router.post('/track-download', referralController.trackDownloadOrVisit);
 
 // User Authenticated Routes
 router.get('/info', protect, referralController.getReferralInfo);

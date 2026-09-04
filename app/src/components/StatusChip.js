@@ -19,12 +19,21 @@ const StatusChip = ({ status, style }) => {
 
 const getStatusConfig = (colors) => ({
   Success: { bg: colors.successLight, color: colors.success },
+  SUCCESSFUL: { bg: colors.successLight, color: colors.success },
+  REWARDED: { bg: colors.successLight, color: colors.success },
   Active: { bg: colors.successLight, color: colors.success },
+  ACTIVE: { bg: colors.successLight, color: colors.success },
   Paid: { bg: colors.successLight, color: colors.success },
+  REGISTERED: { bg: colors.successLight, color: colors.success },
+  Registered: { bg: colors.successLight, color: colors.success },
+  DOWNLOADED: { bg: '#E0F2FE', color: '#0284C7' },
+  Downloaded: { bg: '#E0F2FE', color: '#0284C7' },
   Maturing: { bg: colors.warningLight, color: colors.warning },
   Pending: { bg: colors.warningLight, color: colors.warning },
+  PENDING: { bg: colors.warningLight, color: colors.warning },
   Processing: { bg: colors.warningLight, color: colors.warning },
   Failed: { bg: colors.errorLight, color: colors.error },
+  FAILED: { bg: colors.errorLight, color: colors.error },
   Rejected: { bg: colors.errorLight, color: colors.error },
   default: { bg: colors.accent, color: colors.accentFg },
 });

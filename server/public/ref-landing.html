@@ -115,47 +115,100 @@
     <h1 class="title">Growvest</h1>
     <p class="subtitle">Grow your money. Invest smarter with high-yield savings & chit fund plans.</p>
 
-    <div class="invite-box">
+    <div class="invite-box" onclick="copyRefCode()" style="cursor: pointer;">
       <div class="invite-label">🎁 You've Been Invited!</div>
-      <div class="subtitle" style="margin-bottom:8px;">Your Referral Code</div>
+      <div class="subtitle" style="margin-bottom:8px;">Your Referral Code (Tap to Copy)</div>
       <div class="code-val" id="refCodeDisplay">ABC123</div>
+      <div id="copyBadge" style="font-size: 11px; color: #10B981; font-weight: 700; margin-top: 6px;">📋 Click to Copy Code</div>
     </div>
 
-    <a href="/api/referral/apk/download" class="btn-download" id="downloadBtn" download>
+    <a href="/api/referral/apk/download" class="btn-download" id="downloadBtn" download onclick="handleDownloadClick(event)">
       📱 Download Android App
     </a>
+
+    <div id="downloadToast" style="display: none; background: rgba(16, 185, 129, 0.2); border: 1px solid #10B981; color: #D1FAE5; padding: 10px 14px; border-radius: 12px; font-size: 13px; font-weight: 600; margin-bottom: 14px;">
+      ✓ Referral code copied to clipboard!
+    </div>
 
     <a href="#" class="btn-open" id="openAppBtn">
       Already have the app? Open Growvest
     </a>
 
     <div class="notice">
-      ℹ️ <strong>Android Users:</strong> You may need to allow "Installation from unknown sources" if downloading the APK directly.
+      ℹ️ <strong>Android Users:</strong> When installing the APK, allow "Installation from unknown sources". Your referral bonus of <strong>+20 Coins</strong> will be credited on signup!
     </div>
   </div>
 
   <script>
     const pathParts = window.location.pathname.split('/');
-    const code = pathParts[pathParts.length - 1] || 'GVREF';
+    const code = (pathParts[pathParts.length - 1] || 'GVREF').trim().toUpperCase();
     document.getElementById('refCodeDisplay').innerText = code;
+
+    function copyRefCode() {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).then(() => {
+          const badge = document.getElementById('copyBadge');
+          if (badge) badge.innerText = '✓ Referral Code Copied!';
+          setTimeout(() => {
+            if (badge) badge.innerText = '📋 Click to Copy Code';
+          }, 2500);
+        }).catch(() => {});
+      }
+    }
+
+    // Auto-track visit on page load
+    try {
+      fetch('/api/referral/track-download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ referralCode: code, type: 'LINK_VISIT' })
+      }).catch(err => console.log('Visit track note:', err));
+    } catch(e) {}
 
     // Fetch active APK release uploaded from Admin Dashboard
     fetch('/api/referral/apk')
       .then(res => res.json())
       .then(data => {
         const downloadBtn = document.getElementById('downloadBtn');
+        const targetUrl = (data.downloadUrl || '/api/referral/apk/download') + '?ref=' + encodeURIComponent(code);
         if (data.hasActiveApk) {
-          downloadBtn.href = data.downloadUrl || '/api/referral/apk/download';
+          downloadBtn.href = targetUrl;
           if (data.fileName) {
             downloadBtn.setAttribute('download', data.fileName);
             downloadBtn.innerHTML = '📱 Download Android App';
           }
         } else {
-          downloadBtn.innerHTML = '⏳ APK Update Pending';
-          downloadBtn.style.opacity = '0.6';
+          downloadBtn.href = '/api/referral/apk/download?ref=' + encodeURIComponent(code);
+          downloadBtn.innerHTML = '📱 Download Android App';
         }
       })
-      .catch(err => console.warn('Could not fetch active APK metadata:', err));
+      .catch(err => {
+        console.warn('Could not fetch active APK metadata:', err);
+        const downloadBtn = document.getElementById('downloadBtn');
+        if (downloadBtn) {
+          downloadBtn.href = '/api/referral/apk/download?ref=' + encodeURIComponent(code);
+        }
+      });
+
+    function handleDownloadClick(e) {
+      // 1. Copy code to clipboard so app signup can auto-paste
+      copyRefCode();
+
+      const toast = document.getElementById('downloadToast');
+      if (toast) {
+        toast.style.display = 'block';
+        setTimeout(() => { toast.style.display = 'none'; }, 4000);
+      }
+
+      // 2. Track download lead immediately
+      try {
+        fetch('/api/referral/track-download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ referralCode: code, type: 'APK_DOWNLOAD' })
+        }).catch(err => console.log('Lead track note:', err));
+      } catch(err) {}
+    }
 
     const openAppBtn = document.getElementById('openAppBtn');
     const schemeUrl = 'growvest://ref/' + code;
@@ -165,6 +218,7 @@
 
     openAppBtn.addEventListener('click', function (e) {
       e.preventDefault();
+      copyRefCode();
       // Try custom scheme first
       window.location.href = schemeUrl;
 

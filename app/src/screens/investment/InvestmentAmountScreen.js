@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Modal,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { TextInput, Button } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -257,26 +258,38 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
 
         {/* Intended Withdrawal Date Selection */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Choose Intended Withdrawal Date</Text>
-          <View style={styles.datePickerRow}>
+          <Text style={styles.sectionTitle}>Intended Withdrawal Timeline</Text>
+          <TouchableOpacity
+            style={styles.datePickerRowModern}
+            onPress={() => setDatePickerModalVisible(true)}
+            activeOpacity={0.88}
+          >
+            <View style={styles.datePickerIconBox}>
+              <MaterialCommunityIcons name="calendar-clock" size={22} color={themeColors.primary} />
+            </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 12, color: themeColors.textSecondary }}>Selected Intended Date</Text>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: themeColors.text, marginTop: 2 }}>
-                {new Date(selectedWithdrawalDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+              <Text style={styles.datePickerLabel}>Target Withdrawal Date</Text>
+              <Text style={styles.datePickerValue}>
+                {new Date(selectedWithdrawalDate).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+              </Text>
+              <Text style={styles.datePickerSub}>
+                {(() => {
+                  const selectedPlan = getSelectedPlan();
+                  const maxDays = selectedPlan?.durationDays || 365;
+                  const maturityDate = new Date(today.getTime() + maxDays * 24 * 60 * 60 * 1000);
+                  const isEarly = new Date(selectedWithdrawalDate) < new Date(maturityDate.toDateString());
+                  return isEarly ? '⚡ Early Exit • Principal Only' : '💎 Full Maturity • Principal + Interest';
+                })()}
               </Text>
             </View>
-            <TouchableOpacity
-              style={styles.changeDateBtn}
-              onPress={() => setDatePickerModalVisible(true)}
-              activeOpacity={0.8}
-            >
-              <MaterialCommunityIcons name="calendar-edit" size={20} color={themeColors.primary} />
-              <Text style={{ color: themeColors.primary, fontWeight: '700', fontSize: 13, marginLeft: 4 }}>Change Date</Text>
-            </TouchableOpacity>
-          </View>
+            <View style={styles.changeDateBtnModern}>
+              <MaterialCommunityIcons name="calendar-edit" size={16} color={themeColors.primary} />
+              <Text style={styles.changeDateBtnText}>Change</Text>
+            </View>
+          </TouchableOpacity>
         </View>
 
-        {/* Dynamic Plan Withdrawal Rule Box */}
+        {/* Dynamic Plan Withdrawal Rule Policy Card */}
         {(() => {
           const selectedPlan = getSelectedPlan();
           const maxDays = selectedPlan?.durationDays || 365;
@@ -288,39 +301,37 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
           const formattedAmountText = hasAmount ? ` (₹${parseFloat(amount).toLocaleString('en-IN')})` : '';
 
           return (
-            <View style={styles.ruleCard}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+            <View style={[
+              styles.policyCardContainer,
+              { backgroundColor: isEarlyWithdrawal ? '#FFFBEB' : '#ECFDF5', borderColor: isEarlyWithdrawal ? '#FDE68A' : '#A7F3D0' }
+            ]}>
+              <View style={styles.policyCardHeader}>
                 <MaterialCommunityIcons 
                   name={isEarlyWithdrawal ? "alert-circle" : "check-decagram"} 
                   size={20} 
                   color={isEarlyWithdrawal ? "#D97706" : "#059669"} 
-                  style={{ marginRight: 6 }} 
+                  style={{ marginRight: 8 }} 
                 />
-                <Text style={{ fontSize: 14, fontWeight: '800', color: themeColors.text }}>
-                  {isEarlyWithdrawal ? 'Early Withdrawal Rule' : 'Maturity Payout Rule'}
+                <Text style={[styles.policyCardTitle, { color: isEarlyWithdrawal ? '#92400E' : '#065F46' }]}>
+                  {isEarlyWithdrawal ? 'Early Exit Policy' : 'Maturity Payout Policy'}
                 </Text>
               </View>
-              
-              <Text style={{ fontSize: 12, color: themeColors.textSecondary, marginBottom: 4 }}>
-                • <Text style={{ fontWeight: '700', color: themeColors.text }}>Selected Withdrawal Date:</Text> {formattedWithdrawalDate}
-              </Text>
-              <Text style={{ fontSize: 12, color: themeColors.textSecondary, marginBottom: 8 }}>
-                • <Text style={{ fontWeight: '700', color: themeColors.primary }}>Plan Maturity Date ({maxDays} Days):</Text> {formattedMaturityDate}
-              </Text>
 
-              {isEarlyWithdrawal ? (
-                <View style={styles.ruleWarningBox}>
-                  <Text style={{ fontSize: 12, color: '#92400E', lineHeight: 17 }}>
-                    ⚠️ <Text style={{ fontWeight: '700' }}>Early Withdrawal Notice:</Text> If you withdraw on {formattedWithdrawalDate} (before plan maturity date {formattedMaturityDate}), <Text style={{ fontWeight: '700' }}>ONLY your original invested principal amount{formattedAmountText}</Text> will be eligible for withdrawal. Interest returns will be ₹0.
-                  </Text>
-                </View>
-              ) : (
-                <View style={[styles.ruleWarningBox, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}>
-                  <Text style={{ fontSize: 12, color: '#065F46', lineHeight: 17 }}>
-                    ✓ <Text style={{ fontWeight: '700' }}>Full Return Eligible:</Text> You are withdrawing on/after maturity date ({formattedMaturityDate}). <Text style={{ fontWeight: '700' }}>Your full principal{formattedAmountText} + {getSelectedPlan()?.interestRate}% plan interest return</Text> will be eligible for withdrawal.
-                  </Text>
-                </View>
-              )}
+              <View style={styles.policyRowItem}>
+                <MaterialCommunityIcons name="shield-lock-outline" size={16} color={isEarlyWithdrawal ? '#D97706' : '#059669'} style={{ marginRight: 8, marginTop: 2 }} />
+                <Text style={[styles.policyRowText, { color: isEarlyWithdrawal ? '#92400E' : '#065F46' }]}>
+                  <Text style={{ fontWeight: '700' }}>Lock Period:</Text> Locked until <Text style={{ fontWeight: '700' }}>{formattedWithdrawalDate}</Text>. Funds cannot be withdrawn prior.
+                </Text>
+              </View>
+
+              <View style={styles.policyRowItem}>
+                <MaterialCommunityIcons name={isEarlyWithdrawal ? "cash-refund" : "cash-multiple"} size={16} color={isEarlyWithdrawal ? '#D97706' : '#059669'} style={{ marginRight: 8, marginTop: 2 }} />
+                <Text style={[styles.policyRowText, { color: isEarlyWithdrawal ? '#92400E' : '#065F46' }]}>
+                  <Text style={{ fontWeight: '700' }}>Payout Eligibility:</Text> {isEarlyWithdrawal
+                    ? `You will only receive your original principal amount${formattedAmountText}. Interest returns are not eligible on early exit.`
+                    : `You will receive your full principal${formattedAmountText} + full ${selectedPlan?.interestRate}% interest returns upon completion (${formattedMaturityDate}).`}
+                </Text>
+              </View>
             </View>
           );
         })()}
@@ -457,21 +468,30 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Intended Withdrawal Date Selection Modal */}
+      {/* Intended Withdrawal Date Selection Bottom Sheet Modal */}
       <Modal visible={datePickerModalVisible} transparent animationType="slide" onRequestClose={() => setDatePickerModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxHeight: '88%' }]}>
-            <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <MaterialCommunityIcons name="calendar-clock" size={22} color={themeColors.primary} style={{ marginRight: 8 }} />
-                <Text style={styles.modalTitle}>Choose Withdrawal Date</Text>
+        <View style={styles.modalBottomSheetOverlay}>
+          <TouchableOpacity 
+            style={StyleSheet.absoluteFillObject} 
+            activeOpacity={1} 
+            onPress={() => setDatePickerModalVisible(false)} 
+          />
+          <View style={styles.modalBottomSheetCard}>
+            {/* Sheet Handle */}
+            <View style={styles.modalSheetHandle} />
+
+            {/* Header */}
+            <View style={styles.modalSheetHeader}>
+              <View>
+                <Text style={styles.modalSheetTitle}>Choose Withdrawal Date</Text>
+                <Text style={styles.modalSheetSubtitle}>Select when to unlock your funds</Text>
               </View>
-              <TouchableOpacity onPress={() => setDatePickerModalVisible(false)} style={styles.modalCloseBtn}>
-                <MaterialCommunityIcons name="close" size={18} color={themeColors.textSecondary} />
+              <TouchableOpacity onPress={() => setDatePickerModalVisible(false)} style={styles.modalSheetCloseBtn}>
+                <MaterialCommunityIcons name="close" size={20} color={themeColors.textSecondary} />
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
               {(() => {
                 const selectedPlan = getSelectedPlan();
                 const maxDays = selectedPlan?.durationDays || 365;
@@ -480,9 +500,12 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
                 const formattedTargetDate = targetDateObj.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
                 const isEarly = currentDaysVal < maxDays;
                 const hasAmt = amount && parseFloat(amount) > 0;
-                const formattedAmt = hasAmt ? `₹${parseFloat(amount).toLocaleString('en-IN')}` : 'your invested amount';
+                const numAmt = hasAmt ? parseFloat(amount) : 0;
+                const formattedAmt = hasAmt ? `₹${numAmt.toLocaleString('en-IN')}` : '₹0.00';
+                const estimatedInterest = hasAmt ? ((numAmt * (selectedPlan?.interestRate || 0)) / 100 / 365) * maxDays : 0;
+                const formattedInterest = `₹${estimatedInterest.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 
-                // Preset intervals for quick selection
+                // Presets
                 let presets = [];
                 if (maxDays <= 15) presets = [5, 10, 15];
                 else if (maxDays <= 30) presets = [7, 15, 21, 30];
@@ -491,171 +514,186 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
                 else presets = [30, 90, 180, 270, 365];
 
                 return (
-                  <View style={{ marginTop: 4 }}>
-                    {/* Section 1: Quick Presets */}
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: themeColors.text, marginBottom: 8 }}>
-                      Quick Presets:
-                    </Text>
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+                  <View>
+                    {/* Hero Card: Selected Date & Payout Matrix */}
+                    <LinearGradient
+                      colors={['#0E3D23', '#164E2D']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.modalHeroCard}
+                    >
+                      <View style={styles.modalHeroTopRow}>
+                        <Text style={styles.modalHeroTag}>TARGET WITHDRAWAL DATE</Text>
+                        <View style={[
+                          styles.modalHeroBadge,
+                          { backgroundColor: isEarly ? '#FEF3C7' : '#DCFCE7' }
+                        ]}>
+                          <MaterialCommunityIcons 
+                            name={isEarly ? 'lightning-bolt' : 'check-decagram'} 
+                            size={12} 
+                            color={isEarly ? '#92400E' : '#065F46'} 
+                            style={{ marginRight: 4 }}
+                          />
+                          <Text style={[
+                            styles.modalHeroBadgeText,
+                            { color: isEarly ? '#92400E' : '#065F46' }
+                          ]}>
+                            {isEarly ? `Day ${currentDaysVal} (Early Exit)` : `${maxDays} Days (Maturity)`}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <Text style={styles.modalHeroDateText}>
+                        {formattedTargetDate}
+                      </Text>
+
+                      <View style={styles.modalHeroDivider} />
+
+                      <View style={styles.modalHeroMetricsRow}>
+                        <View style={styles.modalHeroMetricCol}>
+                          <Text style={styles.modalHeroMetricLabel}>PRINCIPAL RETURN</Text>
+                          <Text style={styles.modalHeroMetricValue}>{formattedAmt}</Text>
+                          <Text style={styles.modalHeroMetricSubGreen}>✓ 100% Eligible</Text>
+                        </View>
+
+                        <View style={styles.modalHeroMetricDivider} />
+
+                        <View style={styles.modalHeroMetricCol}>
+                          <Text style={styles.modalHeroMetricLabel}>INTEREST RETURN</Text>
+                          <Text style={styles.modalHeroMetricValue}>
+                            {isEarly ? '₹0.00' : formattedInterest}
+                          </Text>
+                          <Text style={isEarly ? styles.modalHeroMetricSubAmber : styles.modalHeroMetricSubGreen}>
+                            {isEarly ? `Locked (${maxDays}d term)` : '✓ Full Interest'}
+                          </Text>
+                        </View>
+                      </View>
+                    </LinearGradient>
+
+                    {/* Section 1: Quick Select Duration Pills (Horizontal Scroll - Never Wraps or Stretches) */}
+                    <Text style={styles.modalSectionTitle}>QUICK SELECT DURATION</Text>
+                    <ScrollView 
+                      horizontal 
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.modalPresetsScrollContent}
+                    >
                       {presets.map((days) => {
                         const isSel = currentDaysVal === days;
                         const isMaturity = days >= maxDays;
                         return (
                           <TouchableOpacity
                             key={days}
-                            style={{
-                              flex: 1,
-                              minWidth: '22%',
-                              paddingVertical: 10,
-                              paddingHorizontal: 8,
-                              borderRadius: 10,
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              backgroundColor: isSel ? themeColors.primaryLight : (themeColors.surface2 || '#F1F5F9'),
-                              borderWidth: 1.5,
-                              borderColor: isSel ? themeColors.primary : 'transparent',
-                            }}
+                            style={[
+                              styles.modalPresetPill,
+                              isSel ? styles.modalPresetPillActive : styles.modalPresetPillInactive
+                            ]}
+                            activeOpacity={0.8}
                             onPress={() => {
                               setCustomDaysInput(String(days));
                               const d = new Date(today.getTime() + days * 24 * 60 * 60 * 1000);
                               setSelectedWithdrawalDate(d.toISOString().split('T')[0]);
                             }}
                           >
-                            <Text style={{ fontSize: 13, fontWeight: '700', color: isSel ? themeColors.primary : themeColors.text }}>
-                              {days} Days
-                            </Text>
-                            <Text style={{ fontSize: 10, color: isSel ? themeColors.primary : themeColors.textSecondary, marginTop: 2 }}>
-                              {isMaturity ? 'Maturity' : 'Early'}
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                              <Text style={[
+                                styles.modalPresetPillDays,
+                                isSel ? { color: '#FFFFFF' } : { color: themeColors.text }
+                              ]}>
+                                {days} Days
+                              </Text>
+                              {isSel && (
+                                <MaterialCommunityIcons name="check" size={13} color="#FFFFFF" style={{ marginLeft: 3 }} />
+                              )}
+                            </View>
+                            <Text style={[
+                              styles.modalPresetPillSub,
+                              isSel ? { color: '#A7F3D0' } : { color: themeColors.textTertiary }
+                            ]}>
+                              {isMaturity ? 'Full Maturity' : 'Early Exit'}
                             </Text>
                           </TouchableOpacity>
                         );
                       })}
-                    </View>
+                    </ScrollView>
 
-                    {/* Section 2: Custom Number of Days Stepper */}
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: themeColors.text, marginBottom: 8 }}>
-                      Or Pick Custom Days (1 to {maxDays} Days):
-                    </Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                      <TouchableOpacity
-                        style={{
-                          width: 44,
-                          height: 44,
-                          borderRadius: 12,
-                          backgroundColor: themeColors.surface2 || '#F1F5F9',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          borderWidth: 1,
-                          borderColor: themeColors.border,
-                        }}
-                        onPress={() => {
-                          const nextVal = Math.max(1, currentDaysVal - 1);
-                          setCustomDaysInput(String(nextVal));
-                          const d = new Date(today.getTime() + nextVal * 24 * 60 * 60 * 1000);
-                          setSelectedWithdrawalDate(d.toISOString().split('T')[0]);
-                        }}
-                      >
-                        <MaterialCommunityIcons name="minus" size={20} color={themeColors.text} />
-                      </TouchableOpacity>
+                    {/* Section 2: Custom Day Stepper & Visual Progress Slider */}
+                    <Text style={styles.modalSectionTitle}>OR ADJUST NUMBER OF DAYS</Text>
+                    <View style={styles.modalStepperContainer}>
+                      <View style={styles.modalStepperRow}>
+                        <TouchableOpacity
+                          style={[
+                            styles.modalStepperCircleBtn,
+                            currentDaysVal <= 1 && styles.modalStepperCircleBtnDisabled
+                          ]}
+                          disabled={currentDaysVal <= 1}
+                          onPress={() => {
+                            const nextVal = Math.max(1, currentDaysVal - 1);
+                            setCustomDaysInput(String(nextVal));
+                            const d = new Date(today.getTime() + nextVal * 24 * 60 * 60 * 1000);
+                            setSelectedWithdrawalDate(d.toISOString().split('T')[0]);
+                          }}
+                        >
+                          <MaterialCommunityIcons 
+                            name="minus" 
+                            size={20} 
+                            color={currentDaysVal <= 1 ? '#94A3B8' : '#0E3D23'} 
+                          />
+                        </TouchableOpacity>
 
-                      <View
-                        style={{
-                          flex: 1,
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          height: 44,
-                          borderRadius: 12,
-                          backgroundColor: themeColors.surface2 || '#F1F5F9',
-                          borderWidth: 1.5,
-                          borderColor: themeColors.primary,
-                          paddingHorizontal: 12,
-                        }}
-                      >
-                        <TextInput
-                          style={{
-                            fontSize: 16,
-                            fontWeight: '800',
-                            color: themeColors.text,
-                            textAlign: 'center',
-                            minWidth: 40,
+                        <View style={styles.modalStepperCenterInfo}>
+                          <Text style={styles.modalStepperDaysBig}>{currentDaysVal} Days</Text>
+                          <Text style={styles.modalStepperHintText}>Min 1 Day • Max {maxDays} Days</Text>
+                        </View>
+
+                        <TouchableOpacity
+                          style={[
+                            styles.modalStepperCircleBtn,
+                            currentDaysVal >= maxDays && styles.modalStepperCircleBtnDisabled
+                          ]}
+                          disabled={currentDaysVal >= maxDays}
+                          onPress={() => {
+                            const nextVal = Math.min(maxDays, currentDaysVal + 1);
+                            setCustomDaysInput(String(nextVal));
+                            const d = new Date(today.getTime() + nextVal * 24 * 60 * 60 * 1000);
+                            setSelectedWithdrawalDate(d.toISOString().split('T')[0]);
                           }}
-                          keyboardType="numeric"
-                          value={customDaysInput}
-                          onChangeText={(val) => {
-                            const clean = val.replace(/[^0-9]/g, '');
-                            setCustomDaysInput(clean);
-                            const parsed = parseInt(clean, 10);
-                            if (parsed && parsed >= 1 && parsed <= maxDays) {
-                              const d = new Date(today.getTime() + parsed * 24 * 60 * 60 * 1000);
-                              setSelectedWithdrawalDate(d.toISOString().split('T')[0]);
-                            }
-                          }}
-                        />
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: themeColors.textSecondary, marginLeft: 4 }}>
-                          Days
-                        </Text>
+                        >
+                          <MaterialCommunityIcons 
+                            name="plus" 
+                            size={20} 
+                            color={currentDaysVal >= maxDays ? '#94A3B8' : '#0E3D23'} 
+                          />
+                        </TouchableOpacity>
                       </View>
 
-                      <TouchableOpacity
-                        style={{
-                          width: 44,
-                          height: 44,
-                          borderRadius: 12,
-                          backgroundColor: themeColors.surface2 || '#F1F5F9',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          borderWidth: 1,
-                          borderColor: themeColors.border,
-                        }}
-                        onPress={() => {
-                          const nextVal = Math.min(maxDays, currentDaysVal + 1);
-                          setCustomDaysInput(String(nextVal));
-                          const d = new Date(today.getTime() + nextVal * 24 * 60 * 60 * 1000);
-                          setSelectedWithdrawalDate(d.toISOString().split('T')[0]);
-                        }}
-                      >
-                        <MaterialCommunityIcons name="plus" size={20} color={themeColors.text} />
-                      </TouchableOpacity>
+                      {/* Visual Timeline Track */}
+                      <View style={styles.modalTimelineTrack}>
+                        <View style={[styles.modalTimelineFill, { width: `${Math.min(100, Math.max(0, (currentDaysVal / maxDays) * 100))}%` }]} />
+                      </View>
                     </View>
 
-                    {/* Section 3: Live Date & Rule Preview Card */}
-                    <View
-                      style={{
-                        backgroundColor: isEarly ? '#FEF3C7' : '#ECFDF5',
-                        borderRadius: 14,
-                        padding: 14,
-                        borderWidth: 1,
-                        borderColor: isEarly ? '#FDE68A' : '#A7F3D0',
-                        marginBottom: 16,
-                      }}
-                    >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                        <MaterialCommunityIcons
-                          name={isEarly ? 'alert-circle' : 'check-decagram'}
-                          size={20}
-                          color={isEarly ? '#D97706' : '#059669'}
-                          style={{ marginRight: 6 }}
-                        />
-                        <Text style={{ fontSize: 14, fontWeight: '800', color: isEarly ? '#92400E' : '#065F46' }}>
-                          {isEarly ? `Early Withdrawal (${currentDaysVal} Days)` : `Full Maturity (${currentDaysVal} Days)`}
-                        </Text>
-                      </View>
-
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: isEarly ? '#92400E' : '#065F46', marginBottom: 4 }}>
-                        📅 Target Withdrawal Date: {formattedTargetDate}
-                      </Text>
-
-                      <Text style={{ fontSize: 12, color: isEarly ? '#92400E' : '#065F46', lineHeight: 17 }}>
+                    {/* Section 3: Simple, Clear Policy Note */}
+                    <View style={[
+                      styles.modalPolicyNoticeBox,
+                      { backgroundColor: isEarly ? '#FFFBEB' : '#ECFDF5', borderColor: isEarly ? '#FDE68A' : '#A7F3D0' }
+                    ]}>
+                      <MaterialCommunityIcons
+                        name={isEarly ? 'information' : 'shield-check'}
+                        size={18}
+                        color={isEarly ? '#D97706' : '#059669'}
+                        style={{ marginRight: 8, marginTop: 1 }}
+                      />
+                      <Text style={[
+                        styles.modalPolicyNoticeText,
+                        { color: isEarly ? '#92400E' : '#065F46' }
+                      ]}>
                         {isEarly ? (
                           <>
-                            • <Text style={{ fontWeight: '700' }}>Locked Status:</Text> Locked from today until {formattedTargetDate}.{'\n'}
-                            • <Text style={{ fontWeight: '700' }}>Early Withdrawal Rule:</Text> You will <Text style={{ fontWeight: '700' }}>ONLY be able to withdraw your original invested principal ({formattedAmt})</Text>. Interest return will be ₹0.
+                            <Text style={{ fontWeight: '700' }}>Early Exit Rule:</Text> Withdrawing on {formattedTargetDate} unlocks your <Text style={{ fontWeight: '700' }}>full principal amount ({formattedAmt})</Text>. Interest returns require keeping the investment for full {maxDays} days.
                           </>
                         ) : (
                           <>
-                            • <Text style={{ fontWeight: '700' }}>Locked Status:</Text> Locked for full {maxDays} days until plan completion.{'\n'}
-                            • <Text style={{ fontWeight: '700' }}>Full Return Eligible:</Text> You will receive your full principal ({formattedAmt}) + {selectedPlan?.interestRate}% plan interest returns!
+                            <Text style={{ fontWeight: '700' }}>Full Maturity Reward:</Text> You will receive your <Text style={{ fontWeight: '700' }}>100% principal ({formattedAmt}) + full {selectedPlan?.interestRate}% returns ({formattedInterest})</Text> on {formattedTargetDate}!
                           </>
                         )}
                       </Text>
@@ -665,8 +703,10 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
               })()}
             </ScrollView>
 
+            {/* Confirm Button */}
             <TouchableOpacity
-              style={styles.continueBtn}
+              style={styles.modalSheetConfirmBtn}
+              activeOpacity={0.88}
               onPress={() => {
                 const selectedPlan = getSelectedPlan();
                 const maxDays = selectedPlan?.durationDays || 365;
@@ -676,7 +716,15 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
                 setDatePickerModalVisible(false);
               }}
             >
-              <Text style={styles.continueBtnText}>Confirm Date</Text>
+              <LinearGradient
+                colors={['#0E3D23', '#1A5C39']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.modalSheetConfirmGradient}
+              >
+                <Text style={styles.modalSheetConfirmText}>Confirm Timeline</Text>
+                <MaterialCommunityIcons name="arrow-right" size={18} color="#FFFFFF" style={{ marginLeft: 6 }} />
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         </View>
@@ -847,41 +895,89 @@ const getStyles = (colors) => StyleSheet.create({
     marginTop: 8,
     marginHorizontal: 4,
   },
-  // Date Picker & Rule Card
-  datePickerRow: {
+  // Date Picker Trigger & Policy Card Modern
+  datePickerRowModern: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface,
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 16,
+    marginBottom:16,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.borderLight,
+    ...colors.shadow.card,
   },
-  changeDateBtn: {
+  datePickerIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  datePickerLabel: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  datePickerValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text,
+    marginTop: 2,
+  },
+  datePickerSub: {
+    fontSize: 11,
+    color: colors.textTertiary,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  changeDateBtnModern: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 10,
-    backgroundColor: colors.background,
+    borderRadius: 12,
+    backgroundColor: colors.primaryLight,
+    gap: 4,
   },
-  ruleCard: {
+  changeDateBtnText: {
+    color: colors.primary,
+    fontWeight: '700',
+    fontSize: 12,
+  },
+
+  // Policy Card Modern
+  policyCardContainer: {
     marginHorizontal: 20,
     marginBottom: 20,
     padding: 16,
-    borderRadius: 16,
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderColor: '#F59E0B',
-  },
-  ruleWarningBox: {
-    marginTop: 6,
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: '#FEF3C7',
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#FCD34D',
   },
+  policyCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  policyCardTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  policyRowItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 6,
+  },
+  policyRowText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+
   // Summary
   summaryContainer: {
     margin: 20,
@@ -985,9 +1081,287 @@ const getStyles = (colors) => StyleSheet.create({
     fontWeight: '700',
     color: colors.white,
   },
-  // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { width: '88%', backgroundColor: colors.surface, borderRadius: 28, padding: 24 },
+
+  // Modern Bottom Sheet Modal Styles
+  modalBottomSheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalBottomSheetCard: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 20,
+    maxHeight: '92%',
+    ...colors.shadow.card,
+  },
+  modalSheetHandle: {
+    width: 42,
+    height: 4.5,
+    borderRadius: 3,
+    backgroundColor: '#CBD5E1',
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  modalSheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  modalSheetTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.text,
+    letterSpacing: -0.3,
+  },
+  modalSheetSubtitle: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontWeight: '500',
+    marginTop: 1,
+  },
+  modalSheetCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // Modal Hero Gradient Card
+  modalHeroCard: {
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#0E3D23',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  modalHeroTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  modalHeroTag: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#A7F3D0',
+    letterSpacing: 0.5,
+  },
+  modalHeroBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  modalHeroBadgeText: {
+    fontSize: 10.5,
+    fontWeight: '800',
+  },
+  modalHeroDateText: {
+    fontSize: 19,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.3,
+    marginBottom: 12,
+  },
+  modalHeroDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    marginBottom: 12,
+  },
+  modalHeroMetricsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  modalHeroMetricCol: {
+    flex: 1,
+  },
+  modalHeroMetricLabel: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: '#A7F3D0',
+    letterSpacing: 0.4,
+    marginBottom: 2,
+  },
+  modalHeroMetricValue: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.2,
+  },
+  modalHeroMetricSubGreen: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#6EE7B7',
+    marginTop: 1,
+  },
+  modalHeroMetricSubAmber: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#FDE68A',
+    marginTop: 1,
+  },
+  modalHeroMetricDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    marginHorizontal: 12,
+  },
+
+  // Section Titles
+  modalSectionTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: colors.textTertiary,
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+
+  // Horizontal Presets Scroll
+  modalPresetsScrollContent: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 2,
+    marginBottom: 16,
+  },
+  modalPresetPill: {
+    width: 100,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalPresetPillActive: {
+    backgroundColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  modalPresetPillInactive: {
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  modalPresetPillDays: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  modalPresetPillSub: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+
+  // Custom Stepper Container & Visual Timeline
+  modalStepperContainer: {
+    backgroundColor: colors.background,
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    marginBottom: 14,
+  },
+  modalStepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  modalStepperCircleBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.borderLight,
+    ...colors.shadow.card,
+  },
+  modalStepperCircleBtnDisabled: {
+    opacity: 0.35,
+  },
+  modalStepperCenterInfo: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalStepperDaysBig: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: colors.text,
+    letterSpacing: -0.3,
+  },
+  modalStepperHintText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.textTertiary,
+    marginTop: 2,
+  },
+  modalTimelineTrack: {
+    height: 6,
+    backgroundColor: colors.surface2 || '#E2E8F0',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  modalTimelineFill: {
+    height: 6,
+    backgroundColor: colors.primary,
+    borderRadius: 3,
+  },
+
+  // Policy Notice Box
+  modalPolicyNoticeBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  modalPolicyNoticeText: {
+    flex: 1,
+    fontSize: 11.5,
+    lineHeight: 16,
+  },
+
+  // Sheet Confirm Button
+  modalSheetConfirmBtn: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+    marginTop: 4,
+  },
+  modalSheetConfirmGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+  },
+  modalSheetConfirmText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: -0.2,
+  },
+
+  // Email Modal
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   modalTitle: { fontSize: 19, fontWeight: '700', color: colors.text, letterSpacing: -0.4 },
   modalCloseBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },

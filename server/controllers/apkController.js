@@ -182,6 +182,49 @@ exports.downloadActiveAPK = async (req, res) => {
     // Increment download count atomically
     await APKRelease.findByIdAndUpdate(activeApk._id, { $inc: { downloadCount: 1 } });
 
+    // If ref query param is present, track referral lead
+    const refCode = (req.query.ref || '').toString().trim().toUpperCase();
+    if (refCode) {
+      try {
+        const ReferralLead = require('../models/ReferralLead');
+        const referrer = await User.findOne({ referralCode: refCode });
+        if (referrer) {
+          const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
+          const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000);
+          const existingLead = await ReferralLead.findOne({
+            referrerUserId: referrer._id,
+            referralCode: refCode,
+            type: 'APK_DOWNLOAD',
+            ipAddress: clientIp,
+            createdAt: { $gte: tenMinAgo },
+          });
+
+          if (!existingLead) {
+            await ReferralLead.create({
+              referrerUserId: referrer._id,
+              referralCode: refCode,
+              type: 'APK_DOWNLOAD',
+              ipAddress: clientIp,
+              userAgent: req.headers['user-agent'] || '',
+              device: 'Android Mobile',
+              status: 'DOWNLOADED',
+            });
+
+            const { sendNotification } = require('../services/notificationHelper');
+            await sendNotification({
+              userId: referrer._id,
+              title: '📱 Friend Downloaded the App!',
+              description: 'Someone just downloaded Growvest using your referral link. You will earn Coins once they register!',
+              type: 'referral_lead',
+              pushData: { screen: 'Referral' },
+            });
+          }
+        }
+      } catch (leadErr) {
+        console.warn('[APKDownload Lead Track Warning]', leadErr.message);
+      }
+    }
+
     const downloadsDir = path.join(__dirname, '../public/downloads');
     const physicalPath = path.join(downloadsDir, 'growvest-latest.apk');
 
