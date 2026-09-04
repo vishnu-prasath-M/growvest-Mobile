@@ -31,17 +31,22 @@ const sipSchema = new mongoose.Schema({
   },
   frequency: {
     type: String,
-    enum: ['monthly', 'weekly', 'quarterly'],
+    enum: ['daily', 'weekly', 'monthly', 'quarterly'],
     default: 'monthly',
   },
   sipDate: {
-    type: Number, // Day of month (1, 5, 10, 15, 20, 25)
-    required: true,
+    type: Number, // Day of month (1-31) for monthly
+    default: 1,
+  },
+  sipDayName: {
+    type: String, // 'Monday', 'Tuesday', etc. for weekly
   },
   durationMonths: {
     type: Number,
-    required: true,
     default: 12,
+  },
+  durationCount: {
+    type: Number, // Total number of intervals/contributions (days/weeks/months)
   },
   startDate: {
     type: Date,

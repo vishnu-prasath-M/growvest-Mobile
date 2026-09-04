@@ -70,6 +70,7 @@ const HomeScreen = ({ navigation }) => {
   const [userName, setUserName] = useState('');
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [coinsBalance, setCoinsBalance] = useState(0);
+  const [hideBalance, setHideBalance] = useState(false);
   const [kycModalVisible, setKycModalVisible] = useState(false);
   const [kycStatusInfo, setKycStatusInfo] = useState({ status: 'not_submitted', rejectionReason: null });
 
@@ -97,12 +98,24 @@ const HomeScreen = ({ navigation }) => {
         if (cachedCoins != null) {
           setCoinsBalance(Number(cachedCoins) || 0);
         }
+        const savedHide = await AsyncStorage.getItem('user_hide_balance');
+        if (savedHide != null) {
+          setHideBalance(savedHide === 'true');
+        }
       } catch (err) {
         console.warn('[HomeScreen] Cache hydration error:', err);
       }
     };
     hydrateCached();
   }, [authUser]);
+
+  const toggleHideBalance = () => {
+    setHideBalance((prev) => {
+      const next = !prev;
+      AsyncStorage.setItem('user_hide_balance', String(next)).catch(() => {});
+      return next;
+    });
+  };
 
   const fetchUserAndDashboard = async () => {
     try {
@@ -332,13 +345,22 @@ const HomeScreen = ({ navigation }) => {
               <View style={styles.balanceCardInner}>
                 <View style={styles.balanceTopRow}>
                   <Text style={styles.balanceLabelText}>Total Balance</Text>
-                  <View style={styles.eyeBtn}>
-                    <MaterialCommunityIcons name="eye-outline" size={16} color="rgba(255,255,255,0.9)" />
-                  </View>
+                  <TouchableOpacity
+                    style={styles.eyeBtn}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    onPress={toggleHideBalance}
+                  >
+                    <MaterialCommunityIcons
+                      name={hideBalance ? 'eye-off-outline' : 'eye-outline'}
+                      size={16}
+                      color="rgba(255,255,255,0.9)"
+                    />
+                  </TouchableOpacity>
                 </View>
 
                 <Text style={styles.balanceAmount}>
-                  {formatCurrency(balances?.totalBalance)}
+                  {hideBalance ? '₹ ••••••' : formatCurrency(balances?.totalBalance)}
                 </Text>
                 <View style={styles.balanceTrend}>
                   <MaterialCommunityIcons name="trending-up" size={14} color={colors.gold} />
@@ -348,9 +370,25 @@ const HomeScreen = ({ navigation }) => {
                 {/* Stats grid */}
                 <View style={styles.statsRow}>
                   {[
-                    { icon: 'shield-lock-outline', label: 'INVESTED', value: formatCurrency(balances?.totalInvested) },
-                    { icon: 'trending-up', label: 'EARNED', value: balances?.dailyInterest ? `${formatCurrency(balances.dailyInterest)}/day` : formatCurrency(0) },
-                    { icon: 'piggy-bank-outline', label: 'POCKET MONEY', value: formatCurrency(balances?.pocketMoneyRemaining ?? 0) },
+                    {
+                      icon: 'shield-lock-outline',
+                      label: 'INVESTED',
+                      value: hideBalance ? '••••' : formatCurrency(balances?.totalInvested),
+                    },
+                    {
+                      icon: 'trending-up',
+                      label: 'EARNED',
+                      value: hideBalance
+                        ? '••••'
+                        : balances?.dailyInterest
+                        ? `${formatCurrency(balances.dailyInterest)}/day`
+                        : formatCurrency(0),
+                    },
+                    {
+                      icon: 'piggy-bank-outline',
+                      label: 'POCKET MONEY',
+                      value: hideBalance ? '••••' : formatCurrency(balances?.pocketMoneyRemaining ?? 0),
+                    },
                   ].map((s) => (
                     <View key={s.label} style={styles.statPill}>
                       <MaterialCommunityIcons name={s.icon} size={16} color={colors.gold} />

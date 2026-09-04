@@ -20,11 +20,21 @@ export const sipService = {
   /**
    * Create a new SIP plan and get Razorpay order for Contribution #1
    */
-  createSIP: async ({ amount, sipDate, durationMonths, frequency = 'monthly', notes }) => {
+  createSIP: async ({
+    amount,
+    sipDate,
+    sipDayName,
+    durationMonths,
+    durationCount,
+    frequency = 'monthly',
+    notes,
+  }) => {
     const response = await api.post('/sip/create', {
       amount,
       sipDate,
+      sipDayName,
       durationMonths,
+      durationCount,
       frequency,
       notes,
     });

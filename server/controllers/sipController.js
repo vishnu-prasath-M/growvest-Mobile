@@ -14,14 +14,26 @@ const getRazorpayInstance = () => {
   return new Razorpay({ key_id, key_secret });
 };
 
-// Helper to calculate recurring monthly date safely
-const calculateMonthlyDueDate = (startDate, monthIndex, sipDay) => {
+// Helper to calculate recurring due date by frequency safely
+const calculateDueDate = (startDate, installmentIndex, frequency = 'monthly', sipDate = 10, sipDayName = 'Monday') => {
   const target = new Date(startDate);
-  target.setMonth(target.getMonth() + monthIndex);
-  
-  // Clamp day to valid days in that month (e.g. Feb 28/29)
+
+  if (frequency === 'daily') {
+    target.setDate(target.getDate() + installmentIndex);
+    target.setHours(23, 59, 59, 999);
+    return target;
+  }
+
+  if (frequency === 'weekly') {
+    target.setDate(target.getDate() + installmentIndex * 7);
+    target.setHours(23, 59, 59, 999);
+    return target;
+  }
+
+  // Monthly
+  target.setMonth(target.getMonth() + installmentIndex);
   const maxDays = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
-  target.setDate(Math.min(sipDay, maxDays));
+  target.setDate(Math.min(sipDate, maxDays));
   target.setHours(23, 59, 59, 999);
   return target;
 };
@@ -36,7 +48,15 @@ const generateSIPId = () => {
 // ─── 1. Create SIP & Order for First Contribution ───────────────────────────
 exports.createSIP = async (req, res) => {
   try {
-    const { amount, sipDate, durationMonths = 12, frequency = 'monthly', notes } = req.body;
+    const {
+      amount,
+      sipDate,
+      sipDayName = 'Monday',
+      durationMonths,
+      durationCount,
+      frequency = 'monthly',
+      notes,
+    } = req.body;
     const userId = req.user._id;
 
     const user = await User.findById(userId);
@@ -49,23 +69,45 @@ exports.createSIP = async (req, res) => {
       return res.status(400).json({ message: 'Minimum SIP contribution amount is ₹100' });
     }
 
-    const validDates = [1, 5, 10, 15, 20, 25];
-    const numSipDate = Number(sipDate) || 10;
-    if (!validDates.includes(numSipDate)) {
-      return res.status(400).json({ message: 'Please select a valid SIP date (1st, 5th, 10th, 15th, 20th, or 25th)' });
-    }
-
-    const validDurations = [6, 12, 24, 36];
-    const numDuration = Number(durationMonths) || 12;
-    if (!validDurations.includes(numDuration)) {
-      return res.status(400).json({ message: 'Please select a valid duration (6, 12, 24, or 36 months)' });
-    }
-
+    let totalInstallments = 12;
+    let numSipDate = 1;
+    let monthsEquivalent = 12;
     const startDate = new Date();
-    const endDate = new Date(startDate);
-    endDate.setMonth(endDate.getMonth() + numDuration);
+    let endDate = new Date(startDate);
 
-    const totalPlannedAmount = numAmount * numDuration;
+    if (frequency === 'daily') {
+      const days = Number(durationCount) || 30;
+      if (days < 7) {
+        return res.status(400).json({ message: 'Minimum daily SIP duration is 7 days' });
+      }
+      totalInstallments = days;
+      monthsEquivalent = Math.max(1, Math.round(days / 30));
+      endDate = new Date(startDate.getTime() + (days - 1) * 24 * 60 * 60 * 1000);
+    } else if (frequency === 'weekly') {
+      const weeks = Number(durationCount) || 12;
+      if (weeks < 4) {
+        return res.status(400).json({ message: 'Minimum weekly SIP duration is 4 weeks' });
+      }
+      totalInstallments = weeks;
+      monthsEquivalent = Math.max(1, Math.round(weeks / 4));
+      endDate = new Date(startDate.getTime() + (weeks - 1) * 7 * 24 * 60 * 60 * 1000);
+    } else {
+      // Monthly
+      const validDates = [1, 5, 10, 15, 20, 25];
+      numSipDate = Number(sipDate) || 10;
+      if (!validDates.includes(numSipDate)) {
+        return res.status(400).json({ message: 'Please select a valid monthly SIP date (1st, 5th, 10th, 15th, 20th, or 25th)' });
+      }
+      const months = Number(durationMonths || durationCount) || 12;
+      if (months < 1) {
+        return res.status(400).json({ message: 'Please select a valid duration' });
+      }
+      totalInstallments = months;
+      monthsEquivalent = months;
+      endDate.setMonth(endDate.getMonth() + months);
+    }
+
+    const totalPlannedAmount = numAmount * totalInstallments;
     const sipIdStr = generateSIPId();
 
     // 1. Create Parent SIP record
@@ -78,15 +120,17 @@ exports.createSIP = async (req, res) => {
       amount: numAmount,
       frequency,
       sipDate: numSipDate,
-      durationMonths: numDuration,
+      sipDayName,
+      durationMonths: monthsEquivalent,
+      durationCount: totalInstallments,
       startDate,
       endDate,
       totalPlannedAmount,
       totalPaidAmount: 0,
-      totalContributions: numDuration,
+      totalContributions: totalInstallments,
       contributionsCompleted: 0,
-      remainingContributions: numDuration,
-      nextContributionDate: calculateMonthlyDueDate(startDate, 1, numSipDate),
+      remainingContributions: totalInstallments,
+      nextContributionDate: calculateDueDate(startDate, 1, frequency, numSipDate, sipDayName),
       status: 'active',
       notes,
     });
@@ -94,8 +138,8 @@ exports.createSIP = async (req, res) => {
 
     // 2. Pre-create scheduled SIPContribution slots
     const contributions = [];
-    for (let i = 1; i <= numDuration; i++) {
-      const dueDate = i === 1 ? new Date() : calculateMonthlyDueDate(startDate, i - 1, numSipDate);
+    for (let i = 1; i <= totalInstallments; i++) {
+      const dueDate = i === 1 ? new Date() : calculateDueDate(startDate, i - 1, frequency, numSipDate, sipDayName);
       const contribution = new SIPContribution({
         contributionId: `SIPC-${sipIdStr.replace('SIP-', '')}-${String(i).padStart(2, '0')}`,
         sipId: sip._id,

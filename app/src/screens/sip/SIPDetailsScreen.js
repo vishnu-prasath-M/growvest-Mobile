@@ -263,7 +263,9 @@ const SIPDetailsScreen = ({ route, navigation }) => {
 
           <View style={styles.heroAmountRow}>
             <View>
-              <Text style={styles.heroSubLabel}>MONTHLY CONTRIBUTION</Text>
+              <Text style={styles.heroSubLabel}>
+                {`${(sip.frequency || 'monthly').toUpperCase()} CONTRIBUTION`}
+              </Text>
               <Text style={styles.heroBigAmount}>{formatCurrency(sip.amount)}</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
@@ -289,8 +291,14 @@ const SIPDetailsScreen = ({ route, navigation }) => {
 
           <View style={styles.heroFooterGrid}>
             <View style={styles.heroFooterItem}>
-              <Text style={styles.heroFooterLabel}>SIP Date</Text>
-              <Text style={styles.heroFooterValue}>{sip.sipDate}th monthly</Text>
+              <Text style={styles.heroFooterLabel}>Schedule</Text>
+              <Text style={styles.heroFooterValue}>
+                {sip.frequency === 'daily'
+                  ? 'Every day'
+                  : sip.frequency === 'weekly'
+                  ? `Every ${sip.sipDayName || 'week'}`
+                  : `${sip.sipDate}th monthly`}
+              </Text>
             </View>
             <View style={styles.heroFooterItem}>
               <Text style={styles.heroFooterLabel}>Start Date</Text>
@@ -306,6 +314,12 @@ const SIPDetailsScreen = ({ route, navigation }) => {
         {/* Plan Parameters Card */}
         <View style={styles.card}>
           <Text style={styles.cardSectionTitle}>Plan Breakdown</Text>
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>Frequency</Text>
+            <Text style={[styles.breakdownValue, { textTransform: 'capitalize' }]}>
+              {sip.frequency || 'monthly'}
+            </Text>
+          </View>
           <View style={styles.breakdownRow}>
             <Text style={styles.breakdownLabel}>Total Planned Contribution</Text>
             <Text style={styles.breakdownValue}>{formatCurrency(sip.totalPlannedAmount)}</Text>

@@ -42,6 +42,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
   const fifthWeekDate = new Date(today.getTime() + 35 * 24 * 60 * 60 * 1000);
 
   const [selectedWithdrawalDate, setSelectedWithdrawalDate] = useState(defaultWithdrawalDate.toISOString().split('T')[0]);
+  const [customDaysInput, setCustomDaysInput] = useState('365');
   const [datePickerModalVisible, setDatePickerModalVisible] = useState(false);
 
   useEffect(() => {
@@ -65,6 +66,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
       const days = plan?.durationDays || 365;
       const targetDate = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
       setSelectedWithdrawalDate(targetDate.toISOString().split('T')[0]);
+      setCustomDaysInput(String(days));
     }
   }, [investmentType, plans]);
 
@@ -458,74 +460,223 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
       {/* Intended Withdrawal Date Selection Modal */}
       <Modal visible={datePickerModalVisible} transparent animationType="slide" onRequestClose={() => setDatePickerModalVisible(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+          <View style={[styles.modalContent, { maxHeight: '88%' }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Choose Intended Withdrawal Date</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <MaterialCommunityIcons name="calendar-clock" size={22} color={themeColors.primary} style={{ marginRight: 8 }} />
+                <Text style={styles.modalTitle}>Choose Withdrawal Date</Text>
+              </View>
               <TouchableOpacity onPress={() => setDatePickerModalVisible(false)} style={styles.modalCloseBtn}>
                 <MaterialCommunityIcons name="close" size={18} color={themeColors.textSecondary} />
               </TouchableOpacity>
             </View>
 
-            <Text style={{ fontSize: 13, color: themeColors.textSecondary, marginVertical: 8 }}>
-              Select your intended target withdrawal date:
-            </Text>
-
-            <ScrollView style={{ maxHeight: 280 }} showsVerticalScrollIndicator={false}>
+            <ScrollView showsVerticalScrollIndicator={false}>
               {(() => {
                 const selectedPlan = getSelectedPlan();
                 const maxDays = selectedPlan?.durationDays || 365;
-                // Generate interval options up to maxDays
-                let intervals = [];
-                if (maxDays <= 15) intervals = [5, 10, 15];
-                else if (maxDays <= 30) intervals = [7, 15, 21, 30];
-                else if (maxDays <= 90) intervals = [15, 30, 60, 90];
-                else if (maxDays <= 180) intervals = [30, 60, 120, 180];
-                else intervals = [30, 90, 180, 270, 365];
+                const currentDaysVal = Math.max(1, Math.min(maxDays, parseInt(customDaysInput, 10) || maxDays));
+                const targetDateObj = new Date(today.getTime() + currentDaysVal * 24 * 60 * 60 * 1000);
+                const formattedTargetDate = targetDateObj.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+                const isEarly = currentDaysVal < maxDays;
+                const hasAmt = amount && parseFloat(amount) > 0;
+                const formattedAmt = hasAmt ? `₹${parseFloat(amount).toLocaleString('en-IN')}` : 'your invested amount';
 
-                return intervals.map((days) => {
-                  const d = new Date(today.getTime() + days * 24 * 60 * 60 * 1000);
-                  const isoDate = d.toISOString().split('T')[0];
-                  const isSel = selectedWithdrawalDate === isoDate;
-                  const isMaturity = days >= maxDays;
-                  return (
-                    <TouchableOpacity
-                      key={days}
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: 12,
-                        borderRadius: 10,
-                        backgroundColor: isSel ? themeColors.primaryLight : themeColors.surface,
-                        marginBottom: 8,
-                        borderWidth: 1,
-                        borderColor: isSel ? themeColors.primary : themeColors.border,
-                      }}
-                      onPress={() => {
-                        setSelectedWithdrawalDate(isoDate);
-                        setDatePickerModalVisible(false);
-                      }}
-                    >
-                      <View>
-                        <Text style={{ fontWeight: '700', color: themeColors.text, fontSize: 14 }}>
-                          {d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} ({days} Days)
-                        </Text>
-                        <Text style={{ fontSize: 11, color: isMaturity ? '#065F46' : '#B45309', marginTop: 2, fontWeight: '600' }}>
-                          {isMaturity ? '✓ Maturity Payout: Principal + Interest' : '⚠️ Early Withdrawal: Principal Only'}
+                // Preset intervals for quick selection
+                let presets = [];
+                if (maxDays <= 15) presets = [5, 10, 15];
+                else if (maxDays <= 30) presets = [7, 15, 21, 30];
+                else if (maxDays <= 90) presets = [15, 30, 60, 90];
+                else if (maxDays <= 180) presets = [30, 60, 120, 180];
+                else presets = [30, 90, 180, 270, 365];
+
+                return (
+                  <View style={{ marginTop: 4 }}>
+                    {/* Section 1: Quick Presets */}
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: themeColors.text, marginBottom: 8 }}>
+                      Quick Presets:
+                    </Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+                      {presets.map((days) => {
+                        const isSel = currentDaysVal === days;
+                        const isMaturity = days >= maxDays;
+                        return (
+                          <TouchableOpacity
+                            key={days}
+                            style={{
+                              flex: 1,
+                              minWidth: '22%',
+                              paddingVertical: 10,
+                              paddingHorizontal: 8,
+                              borderRadius: 10,
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              backgroundColor: isSel ? themeColors.primaryLight : (themeColors.surface2 || '#F1F5F9'),
+                              borderWidth: 1.5,
+                              borderColor: isSel ? themeColors.primary : 'transparent',
+                            }}
+                            onPress={() => {
+                              setCustomDaysInput(String(days));
+                              const d = new Date(today.getTime() + days * 24 * 60 * 60 * 1000);
+                              setSelectedWithdrawalDate(d.toISOString().split('T')[0]);
+                            }}
+                          >
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: isSel ? themeColors.primary : themeColors.text }}>
+                              {days} Days
+                            </Text>
+                            <Text style={{ fontSize: 10, color: isSel ? themeColors.primary : themeColors.textSecondary, marginTop: 2 }}>
+                              {isMaturity ? 'Maturity' : 'Early'}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+
+                    {/* Section 2: Custom Number of Days Stepper */}
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: themeColors.text, marginBottom: 8 }}>
+                      Or Pick Custom Days (1 to {maxDays} Days):
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                      <TouchableOpacity
+                        style={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: 12,
+                          backgroundColor: themeColors.surface2 || '#F1F5F9',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderWidth: 1,
+                          borderColor: themeColors.border,
+                        }}
+                        onPress={() => {
+                          const nextVal = Math.max(1, currentDaysVal - 1);
+                          setCustomDaysInput(String(nextVal));
+                          const d = new Date(today.getTime() + nextVal * 24 * 60 * 60 * 1000);
+                          setSelectedWithdrawalDate(d.toISOString().split('T')[0]);
+                        }}
+                      >
+                        <MaterialCommunityIcons name="minus" size={20} color={themeColors.text} />
+                      </TouchableOpacity>
+
+                      <View
+                        style={{
+                          flex: 1,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          height: 44,
+                          borderRadius: 12,
+                          backgroundColor: themeColors.surface2 || '#F1F5F9',
+                          borderWidth: 1.5,
+                          borderColor: themeColors.primary,
+                          paddingHorizontal: 12,
+                        }}
+                      >
+                        <TextInput
+                          style={{
+                            fontSize: 16,
+                            fontWeight: '800',
+                            color: themeColors.text,
+                            textAlign: 'center',
+                            minWidth: 40,
+                          }}
+                          keyboardType="numeric"
+                          value={customDaysInput}
+                          onChangeText={(val) => {
+                            const clean = val.replace(/[^0-9]/g, '');
+                            setCustomDaysInput(clean);
+                            const parsed = parseInt(clean, 10);
+                            if (parsed && parsed >= 1 && parsed <= maxDays) {
+                              const d = new Date(today.getTime() + parsed * 24 * 60 * 60 * 1000);
+                              setSelectedWithdrawalDate(d.toISOString().split('T')[0]);
+                            }
+                          }}
+                        />
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: themeColors.textSecondary, marginLeft: 4 }}>
+                          Days
                         </Text>
                       </View>
-                      {isSel && <MaterialCommunityIcons name="check-circle" size={20} color={themeColors.primary} />}
-                    </TouchableOpacity>
-                  );
-                });
+
+                      <TouchableOpacity
+                        style={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: 12,
+                          backgroundColor: themeColors.surface2 || '#F1F5F9',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderWidth: 1,
+                          borderColor: themeColors.border,
+                        }}
+                        onPress={() => {
+                          const nextVal = Math.min(maxDays, currentDaysVal + 1);
+                          setCustomDaysInput(String(nextVal));
+                          const d = new Date(today.getTime() + nextVal * 24 * 60 * 60 * 1000);
+                          setSelectedWithdrawalDate(d.toISOString().split('T')[0]);
+                        }}
+                      >
+                        <MaterialCommunityIcons name="plus" size={20} color={themeColors.text} />
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Section 3: Live Date & Rule Preview Card */}
+                    <View
+                      style={{
+                        backgroundColor: isEarly ? '#FEF3C7' : '#ECFDF5',
+                        borderRadius: 14,
+                        padding: 14,
+                        borderWidth: 1,
+                        borderColor: isEarly ? '#FDE68A' : '#A7F3D0',
+                        marginBottom: 16,
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                        <MaterialCommunityIcons
+                          name={isEarly ? 'alert-circle' : 'check-decagram'}
+                          size={20}
+                          color={isEarly ? '#D97706' : '#059669'}
+                          style={{ marginRight: 6 }}
+                        />
+                        <Text style={{ fontSize: 14, fontWeight: '800', color: isEarly ? '#92400E' : '#065F46' }}>
+                          {isEarly ? `Early Withdrawal (${currentDaysVal} Days)` : `Full Maturity (${currentDaysVal} Days)`}
+                        </Text>
+                      </View>
+
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: isEarly ? '#92400E' : '#065F46', marginBottom: 4 }}>
+                        📅 Target Withdrawal Date: {formattedTargetDate}
+                      </Text>
+
+                      <Text style={{ fontSize: 12, color: isEarly ? '#92400E' : '#065F46', lineHeight: 17 }}>
+                        {isEarly ? (
+                          <>
+                            • <Text style={{ fontWeight: '700' }}>Locked Status:</Text> Locked from today until {formattedTargetDate}.{'\n'}
+                            • <Text style={{ fontWeight: '700' }}>Early Withdrawal Rule:</Text> You will <Text style={{ fontWeight: '700' }}>ONLY be able to withdraw your original invested principal ({formattedAmt})</Text>. Interest return will be ₹0.
+                          </>
+                        ) : (
+                          <>
+                            • <Text style={{ fontWeight: '700' }}>Locked Status:</Text> Locked for full {maxDays} days until plan completion.{'\n'}
+                            • <Text style={{ fontWeight: '700' }}>Full Return Eligible:</Text> You will receive your full principal ({formattedAmt}) + {selectedPlan?.interestRate}% plan interest returns!
+                          </>
+                        )}
+                      </Text>
+                    </View>
+                  </View>
+                );
               })()}
             </ScrollView>
 
             <TouchableOpacity
-              style={[styles.continueBtn, { marginTop: 12 }]}
-              onPress={() => setDatePickerModalVisible(false)}
+              style={styles.continueBtn}
+              onPress={() => {
+                const selectedPlan = getSelectedPlan();
+                const maxDays = selectedPlan?.durationDays || 365;
+                const currentDaysVal = Math.max(1, Math.min(maxDays, parseInt(customDaysInput, 10) || maxDays));
+                const targetDateObj = new Date(today.getTime() + currentDaysVal * 24 * 60 * 60 * 1000);
+                setSelectedWithdrawalDate(targetDateObj.toISOString().split('T')[0]);
+                setDatePickerModalVisible(false);
+              }}
             >
-              <Text style={styles.continueBtnText}>Done</Text>
+              <Text style={styles.continueBtnText}>Confirm Date</Text>
             </TouchableOpacity>
           </View>
         </View>

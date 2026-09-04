@@ -20,34 +20,99 @@ import { colors } from '../../theme/theme';
 import { sipService } from '../../services/sipService';
 import { openRazorpayCheckout } from '../../services/razorpayHandler';
 
-const AMOUNT_PRESETS = [500, 1000, 2000, 5000];
-const SIP_DATES = [1, 5, 10, 15, 20, 25];
-const DURATIONS = [
-  { months: 6, label: '6 Months' },
-  { months: 12, label: '12 Months' },
-  { months: 24, label: '24 Months' },
-  { months: 36, label: '36 Months' },
+// Frequency Definitions
+const FREQUENCIES = [
+  { id: 'daily', label: 'Daily', sub: 'Every day', icon: 'calendar-today' },
+  { id: 'weekly', label: 'Weekly', sub: 'Every week', icon: 'calendar-week' },
+  { id: 'monthly', label: 'Monthly', sub: 'Every month', icon: 'calendar-month' },
 ];
+
+const PRESETS_BY_FREQ = {
+  daily: [100, 200, 500, 1000],
+  weekly: [250, 500, 1000, 2000],
+  monthly: [500, 1000, 2000, 5000],
+};
+
+const WEEK_DAYS = [
+  { id: 'Monday', short: 'Mon' },
+  { id: 'Tuesday', short: 'Tue' },
+  { id: 'Wednesday', short: 'Wed' },
+  { id: 'Thursday', short: 'Thu' },
+  { id: 'Friday', short: 'Fri' },
+  { id: 'Saturday', short: 'Sat' },
+  { id: 'Sunday', short: 'Sun' },
+];
+
+const MONTH_DATES = [1, 5, 10, 15, 20, 25];
+
+const DURATIONS_BY_FREQ = {
+  daily: [
+    { count: 30, label: '30 Days', sub: '1 Month' },
+    { count: 60, label: '60 Days', sub: '2 Months' },
+    { count: 90, label: '90 Days', sub: '3 Months' },
+    { count: 180, label: '180 Days', sub: '6 Months' },
+    { count: 365, label: '365 Days', sub: '1 Year' },
+  ],
+  weekly: [
+    { count: 12, label: '12 Weeks', sub: '~3 Months' },
+    { count: 24, label: '24 Weeks', sub: '~6 Months' },
+    { count: 52, label: '52 Weeks', sub: '1 Year' },
+  ],
+  monthly: [
+    { count: 6, label: '6 Months', sub: '6 Installments' },
+    { count: 12, label: '12 Months', sub: '12 Installments' },
+    { count: 24, label: '24 Months', sub: '24 Installments' },
+    { count: 36, label: '36 Months', sub: '36 Installments' },
+  ],
+};
 
 const CreateSIPScreen = ({ navigation }) => {
   const { colors: themeColors, isDark } = useTheme();
   const insets = useScreenInsets(16);
   const styles = React.useMemo(() => getStyles(themeColors, isDark), [themeColors, isDark]);
 
+  // Form State
+  const [selectedFrequency, setSelectedFrequency] = useState('monthly');
   const [selectedAmount, setSelectedAmount] = useState(1000);
   const [customAmount, setCustomAmount] = useState('');
   const [isCustom, setIsCustom] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(10);
-  const [selectedDuration, setSelectedDuration] = useState(12);
+  const [selectedDayName, setSelectedDayName] = useState('Monday');
+  const [selectedMonthDate, setSelectedMonthDate] = useState(10);
+  const [selectedDurationCount, setSelectedDurationCount] = useState(12);
+
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // Switch frequency
+  const handleFrequencyChange = (freq) => {
+    setSelectedFrequency(freq);
+    setIsCustom(false);
+    setCustomAmount('');
+
+    if (freq === 'daily') {
+      setSelectedAmount(100);
+      setSelectedDurationCount(30);
+    } else if (freq === 'weekly') {
+      setSelectedAmount(500);
+      setSelectedDurationCount(12);
+    } else {
+      setSelectedAmount(1000);
+      setSelectedDurationCount(12);
+    }
+  };
+
   const currentAmount = isCustom ? Number(customAmount) || 0 : selectedAmount;
-  const totalPlanned = currentAmount * selectedDuration;
+  const totalPlanned = currentAmount * selectedDurationCount;
 
   const calculateEndDate = () => {
     const d = new Date();
-    d.setMonth(d.getMonth() + selectedDuration);
+    if (selectedFrequency === 'daily') {
+      d.setDate(d.getDate() + (selectedDurationCount - 1));
+    } else if (selectedFrequency === 'weekly') {
+      d.setDate(d.getDate() + (selectedDurationCount - 1) * 7);
+    } else {
+      d.setMonth(d.getMonth() + selectedDurationCount);
+    }
     return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
@@ -79,9 +144,16 @@ const CreateSIPScreen = ({ navigation }) => {
       // 1. Create SIP & Order on backend
       const res = await sipService.createSIP({
         amount: currentAmount,
-        sipDate: selectedDate,
-        durationMonths: selectedDuration,
-        frequency: 'monthly',
+        frequency: selectedFrequency,
+        sipDate: selectedFrequency === 'monthly' ? selectedMonthDate : 1,
+        sipDayName: selectedFrequency === 'weekly' ? selectedDayName : undefined,
+        durationCount: selectedDurationCount,
+        durationMonths:
+          selectedFrequency === 'monthly'
+            ? selectedDurationCount
+            : selectedFrequency === 'weekly'
+            ? Math.max(1, Math.round(selectedDurationCount / 4))
+            : Math.max(1, Math.round(selectedDurationCount / 30)),
       });
 
       if (!res?.success) {
@@ -111,7 +183,7 @@ const CreateSIPScreen = ({ navigation }) => {
             if (verifyRes?.success) {
               Alert.alert(
                 '🎉 SIP Created Successfully!',
-                `Your SIP plan (${sip.sipId}) is now active with your first contribution of ₹${currentAmount.toLocaleString('en-IN')} paid.`,
+                `Your ${selectedFrequency.toUpperCase()} SIP plan (${sip.sipId}) is now active with your first contribution of ₹${currentAmount.toLocaleString('en-IN')} paid.`,
                 [
                   {
                     text: 'View SIP Details',
@@ -146,6 +218,9 @@ const CreateSIPScreen = ({ navigation }) => {
     }
   };
 
+  const activePresets = PRESETS_BY_FREQ[selectedFrequency] || PRESETS_BY_FREQ.monthly;
+  const activeDurations = DURATIONS_BY_FREQ[selectedFrequency] || DURATIONS_BY_FREQ.monthly;
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -178,26 +253,78 @@ const CreateSIPScreen = ({ navigation }) => {
           <View style={{ flex: 1, marginLeft: 12 }}>
             <Text style={styles.bannerTitle}>Set Your Recurring Plan</Text>
             <Text style={styles.bannerSubtitle}>
-              Select your preferred monthly amount, debit date, and duration.
+              Choose Daily, Weekly, or Monthly contributions to build your wealth effortlessly.
             </Text>
           </View>
         </View>
 
-        {/* Section 1: Monthly Amount */}
+        {/* Section 0: Frequency Selection */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={styles.stepBadge}>
               <Text style={styles.stepBadgeText}>1</Text>
             </View>
             <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={styles.cardTitle}>Monthly Contribution</Text>
-              <Text style={styles.cardSubtitle}>Amount you will invest each month</Text>
+              <Text style={styles.cardTitle}>Contribution Frequency</Text>
+              <Text style={styles.cardSubtitle}>How often would you like to invest?</Text>
+            </View>
+          </View>
+
+          <View style={styles.freqRow}>
+            {FREQUENCIES.map((freq) => {
+              const active = selectedFrequency === freq.id;
+              return (
+                <TouchableOpacity
+                  key={freq.id}
+                  style={[styles.freqChip, active && styles.freqChipActive]}
+                  activeOpacity={0.8}
+                  onPress={() => handleFrequencyChange(freq.id)}
+                >
+                  <MaterialCommunityIcons
+                    name={freq.icon}
+                    size={20}
+                    color={active ? '#085428' : themeColors.textMuted || '#64748B'}
+                  />
+                  <Text style={[styles.freqChipText, active && styles.freqChipTextActive]}>
+                    {freq.label}
+                  </Text>
+                  <Text style={[styles.freqChipSub, active && styles.freqChipSubActive]}>
+                    {freq.sub}
+                  </Text>
+                  {active && (
+                    <View style={styles.freqBadgeActive}>
+                      <MaterialCommunityIcons name="check" size={12} color="#FFFFFF" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Section 1: Contribution Amount */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={styles.stepBadge}>
+              <Text style={styles.stepBadgeText}>2</Text>
+            </View>
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={styles.cardTitle}>
+                {selectedFrequency === 'daily'
+                  ? 'Daily Contribution'
+                  : selectedFrequency === 'weekly'
+                  ? 'Weekly Contribution'
+                  : 'Monthly Contribution'}
+              </Text>
+              <Text style={styles.cardSubtitle}>
+                Amount you will contribute per {selectedFrequency === 'daily' ? 'day' : selectedFrequency === 'weekly' ? 'week' : 'month'}
+              </Text>
             </View>
           </View>
 
           {/* Quick Presets Grid */}
           <View style={styles.presetsGrid}>
-            {AMOUNT_PRESETS.map((amt) => {
+            {activePresets.map((amt) => {
               const active = !isCustom && selectedAmount === amt;
               return (
                 <TouchableOpacity
@@ -223,7 +350,7 @@ const CreateSIPScreen = ({ navigation }) => {
             <Text style={[styles.rupeeSymbol, isCustom && { color: '#085428' }]}>₹</Text>
             <TextInput
               style={styles.customInput}
-              placeholder="e.g. 3500"
+              placeholder="e.g. 1500"
               placeholderTextColor="#94A3B8"
               keyboardType="number-pad"
               value={customAmount}
@@ -232,67 +359,109 @@ const CreateSIPScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Section 2: SIP Date */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <View style={styles.stepBadge}>
-              <Text style={styles.stepBadgeText}>2</Text>
-            </View>
-            <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={styles.cardTitle}>Monthly SIP Date</Text>
-              <Text style={styles.cardSubtitle}>Day of month when installment is due</Text>
-            </View>
-          </View>
-
-          <View style={styles.datesGrid}>
-            {SIP_DATES.map((day) => {
-              const active = selectedDate === day;
-              return (
-                <TouchableOpacity
-                  key={day}
-                  style={[styles.dateChip, active && styles.dateChipActive]}
-                  activeOpacity={0.7}
-                  onPress={() => setSelectedDate(day)}
-                >
-                  <Text style={[styles.dateChipText, active && styles.dateChipTextActive]}>
-                    {day}th
-                  </Text>
-                  <Text style={[styles.dateChipSub, active && styles.dateChipSubActive]}>
-                    monthly
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* Section 3: Duration */}
+        {/* Section 2: Schedule / Timing */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={styles.stepBadge}>
               <Text style={styles.stepBadgeText}>3</Text>
             </View>
             <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={styles.cardTitle}>Duration</Text>
-              <Text style={styles.cardSubtitle}>Total investment commitment tenure</Text>
+              <Text style={styles.cardTitle}>
+                {selectedFrequency === 'daily'
+                  ? 'Daily Schedule'
+                  : selectedFrequency === 'weekly'
+                  ? 'Preferred Weekly Day'
+                  : 'Monthly SIP Date'}
+              </Text>
+              <Text style={styles.cardSubtitle}>
+                {selectedFrequency === 'daily'
+                  ? 'Contributions are due every single calendar day'
+                  : selectedFrequency === 'weekly'
+                  ? 'Select the day of week for your weekly contribution'
+                  : 'Day of month when installment is due'}
+              </Text>
+            </View>
+          </View>
+
+          {selectedFrequency === 'daily' ? (
+            <View style={styles.dailyScheduleBox}>
+              <MaterialCommunityIcons name="clock-fast" size={24} color="#085428" />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={styles.dailyScheduleTitle}>Daily Recurring Schedule</Text>
+                <Text style={styles.dailyScheduleSub}>
+                  Starts today. Each contribution is auto-scheduled every 24 hours.
+                </Text>
+              </View>
+            </View>
+          ) : selectedFrequency === 'weekly' ? (
+            <View style={styles.weekDaysGrid}>
+              {WEEK_DAYS.map((day) => {
+                const active = selectedDayName === day.id;
+                return (
+                  <TouchableOpacity
+                    key={day.id}
+                    style={[styles.weekDayChip, active && styles.weekDayChipActive]}
+                    activeOpacity={0.7}
+                    onPress={() => setSelectedDayName(day.id)}
+                  >
+                    <Text style={[styles.weekDayText, active && styles.weekDayTextActive]}>
+                      {day.short}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={styles.datesGrid}>
+              {MONTH_DATES.map((day) => {
+                const active = selectedMonthDate === day;
+                return (
+                  <TouchableOpacity
+                    key={day}
+                    style={[styles.dateChip, active && styles.dateChipActive]}
+                    activeOpacity={0.7}
+                    onPress={() => setSelectedMonthDate(day)}
+                  >
+                    <Text style={[styles.dateChipText, active && styles.dateChipTextActive]}>
+                      {day}th
+                    </Text>
+                    <Text style={[styles.dateChipSub, active && styles.dateChipSubActive]}>
+                      monthly
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+        </View>
+
+        {/* Section 3: Duration */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={styles.stepBadge}>
+              <Text style={styles.stepBadgeText}>4</Text>
+            </View>
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={styles.cardTitle}>Investment Duration</Text>
+              <Text style={styles.cardSubtitle}>Total commitment period</Text>
             </View>
           </View>
 
           <View style={styles.durationsGrid}>
-            {DURATIONS.map((dur) => {
-              const active = selectedDuration === dur.months;
+            {activeDurations.map((dur) => {
+              const active = selectedDurationCount === dur.count;
               return (
                 <TouchableOpacity
-                  key={dur.months}
+                  key={dur.count}
                   style={[styles.durationChip, active && styles.durationChipActive]}
                   activeOpacity={0.7}
-                  onPress={() => setSelectedDuration(dur.months)}
+                  onPress={() => setSelectedDurationCount(dur.count)}
                 >
                   <Text style={[styles.durationChipText, active && styles.durationChipTextActive]}>
                     {dur.label}
                   </Text>
                   <Text style={[styles.durationChipSub, active && styles.durationChipSubActive]}>
-                    {dur.months} Installments
+                    {dur.sub}
                   </Text>
                 </TouchableOpacity>
               );
@@ -309,16 +478,32 @@ const CreateSIPScreen = ({ navigation }) => {
           <View style={styles.summaryDivider} />
 
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Monthly Installment</Text>
+            <Text style={styles.summaryLabel}>Frequency</Text>
+            <Text style={[styles.summaryValue, { textTransform: 'capitalize' }]}>{selectedFrequency}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>
+              {selectedFrequency === 'daily'
+                ? 'Daily Installment'
+                : selectedFrequency === 'weekly'
+                ? 'Weekly Installment'
+                : 'Monthly Installment'}
+            </Text>
             <Text style={styles.summaryValue}>₹{currentAmount.toLocaleString('en-IN')}</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Recurring Date</Text>
-            <Text style={styles.summaryValue}>{selectedDate}th of every month</Text>
+            <Text style={styles.summaryLabel}>Schedule</Text>
+            <Text style={styles.summaryValue}>
+              {selectedFrequency === 'daily'
+                ? 'Every day'
+                : selectedFrequency === 'weekly'
+                ? `Every ${selectedDayName}`
+                : `${selectedMonthDate}th of every month`}
+            </Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Duration</Text>
-            <Text style={styles.summaryValue}>{selectedDuration} Months</Text>
+            <Text style={styles.summaryLabel}>Total Installments</Text>
+            <Text style={styles.summaryValue}>{selectedDurationCount} Contributions</Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Target Completion</Text>
@@ -372,14 +557,18 @@ const CreateSIPScreen = ({ navigation }) => {
               <MaterialCommunityIcons name="shield-check" size={36} color="#085428" />
             </View>
 
-            <Text style={styles.modalTitle}>Confirm SIP Plan</Text>
+            <Text style={styles.modalTitle}>Confirm {selectedFrequency.toUpperCase()} SIP Plan</Text>
             <Text style={styles.modalSubtitle}>
-              You will contribute ₹{currentAmount.toLocaleString('en-IN')} every month on the {selectedDate}th for {selectedDuration} months.
+              You will contribute ₹{currentAmount.toLocaleString('en-IN')} {selectedFrequency === 'daily' ? 'every day' : selectedFrequency === 'weekly' ? `every ${selectedDayName}` : `every month on the ${selectedMonthDate}th`} for {selectedDurationCount} contributions.
             </Text>
 
             <View style={styles.modalBreakdown}>
               <View style={styles.modalBreakdownRow}>
-                <Text style={styles.modalBreakdownLabel}>Monthly Contribution</Text>
+                <Text style={styles.modalBreakdownLabel}>Frequency</Text>
+                <Text style={[styles.modalBreakdownValue, { textTransform: 'capitalize' }]}>{selectedFrequency}</Text>
+              </View>
+              <View style={styles.modalBreakdownRow}>
+                <Text style={styles.modalBreakdownLabel}>Per Contribution</Text>
                 <Text style={styles.modalBreakdownValue}>₹{currentAmount.toLocaleString('en-IN')}</Text>
               </View>
               <View style={styles.modalBreakdownRow}>
@@ -519,6 +708,56 @@ const getStyles = (themeColors, isDark) =>
       color: themeColors.textMuted || '#64748B',
       marginTop: 2,
     },
+    freqRow: {
+      flexDirection: 'row',
+      gap: 8,
+      justifyContent: 'space-between',
+    },
+    freqChip: {
+      flex: 1,
+      paddingVertical: 12,
+      paddingHorizontal: 6,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 12,
+      backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
+      borderWidth: 1.5,
+      borderColor: 'transparent',
+      position: 'relative',
+    },
+    freqChipActive: {
+      backgroundColor: '#DCFCE7',
+      borderColor: '#085428',
+    },
+    freqChipText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: themeColors.text || '#0F172A',
+      marginTop: 4,
+    },
+    freqChipTextActive: {
+      color: '#085428',
+    },
+    freqChipSub: {
+      fontSize: 10,
+      color: themeColors.textMuted || '#64748B',
+      marginTop: 2,
+    },
+    freqChipSubActive: {
+      color: '#15803D',
+      fontWeight: '600',
+    },
+    freqBadgeActive: {
+      position: 'absolute',
+      top: 4,
+      right: 4,
+      width: 16,
+      height: 16,
+      borderRadius: 8,
+      backgroundColor: '#085428',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     presetsGrid: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -585,6 +824,53 @@ const getStyles = (themeColors, isDark) =>
       fontSize: 15,
       fontWeight: '700',
       color: themeColors.text || '#0F172A',
+    },
+    dailyScheduleBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#F0FDF4',
+      borderRadius: 12,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: '#BBF7D0',
+    },
+    dailyScheduleTitle: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: '#085428',
+      marginBottom: 2,
+    },
+    dailyScheduleSub: {
+      fontSize: 11,
+      color: '#166534',
+      lineHeight: 15,
+    },
+    weekDaysGrid: {
+      flexDirection: 'row',
+      gap: 6,
+      justifyContent: 'space-between',
+    },
+    weekDayChip: {
+      flex: 1,
+      paddingVertical: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 10,
+      backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
+      borderWidth: 1.5,
+      borderColor: 'transparent',
+    },
+    weekDayChipActive: {
+      backgroundColor: '#DCFCE7',
+      borderColor: '#085428',
+    },
+    weekDayText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: themeColors.text || '#0F172A',
+    },
+    weekDayTextActive: {
+      color: '#085428',
     },
     datesGrid: {
       flexDirection: 'row',
