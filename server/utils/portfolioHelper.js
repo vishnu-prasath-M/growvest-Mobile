@@ -84,12 +84,19 @@ async function getUserPortfolioSummary(userIdInput) {
     const totalInterestForDuration = dailyInterest * durationDays;
     const maturityAmount = inv.maturityAmount || (principal + totalInterestForDuration);
 
-    // Maturity date
+    // Maturity date (full plan completion)
     const maturityDate = inv.maturityDate
       ? new Date(inv.maturityDate)
       : new Date((inv.startDate ? new Date(inv.startDate) : new Date()).getTime() + durationDays * 86400000);
 
+    // Intended withdrawal date (user-picked custom date)
+    const intendedWithdrawalDate = inv.intendedWithdrawalDate
+      ? new Date(inv.intendedWithdrawalDate)
+      : (inv.selectedWithdrawalDate ? new Date(inv.selectedWithdrawalDate) : maturityDate);
+    intendedWithdrawalDate.setHours(0, 0, 0, 0);
+
     const isMatured = !isPending && !isWithdrawn && nowDate >= maturityDate;
+    const isUnlocked = !isPending && !isWithdrawn && nowDate >= intendedWithdrawalDate;
 
     // Accrue interest from startDate to today (capped at durationDays)
     let accruedInterest = 0;
@@ -101,16 +108,6 @@ async function getUserPortfolioSummary(userIdInput) {
     }
     accruedInterest = Math.max(accruedInterest, Number(inv.interestEarned) || 0);
 
-    // 5-week benefit eligibility date calculation (35 days from startDate)
-    const startDateObj = inv.startDate ? new Date(inv.startDate) : new Date();
-    const benefitEligibilityDate = inv.benefitEligibilityDate
-      ? new Date(inv.benefitEligibilityDate)
-      : new Date(startDateObj.getTime() + 35 * 24 * 60 * 60 * 1000);
-    benefitEligibilityDate.setHours(0, 0, 0, 0);
-
-    const fifthWeekCompleted = inv.fifthWeekPaymentCompleted !== false;
-    const isEligibleForFullBenefits = !isPending && !isWithdrawn && nowDate >= benefitEligibilityDate && fifthWeekCompleted;
-
     const extraBenefits = Number(inv.benefits) || 0;
     const fullBenefitAmount = principal + accruedInterest + extraBenefits;
     const earlyPrincipalOnlyAmount = principal;
@@ -121,17 +118,26 @@ async function getUserPortfolioSummary(userIdInput) {
     if (isWithdrawn) {
       withdrawalStatus = 'withdrawn';
       availableToWithdraw = 0;
-    } else if (isEligibleForFullBenefits) {
+    } else if (isMatured) {
+      // FULL MATURITY: Principal + Interest + Benefits available
       withdrawalStatus = 'available_full';
       availableToWithdraw = fullBenefitAmount;
       maturedWithdrawalAvailable += fullBenefitAmount;
       totalDurationInvested += principal;
       totalAccruedInterest += accruedInterest;
-    } else if (!isPending) {
-      // Early withdrawal before 5th week: Principal ONLY available
+    } else if (isUnlocked) {
+      // EARLY WITHDRAWAL on or after chosen Intended Withdrawal Date: Principal ONLY available
       withdrawalStatus = 'available_early_principal';
       availableToWithdraw = earlyPrincipalOnlyAmount;
       maturedWithdrawalAvailable += earlyPrincipalOnlyAmount;
+      totalDurationInvested += principal;
+      totalDurationLocked += principal;
+      totalDailyInterest += dailyInterest;
+      totalAccruedInterest += accruedInterest;
+    } else {
+      // LOCKED until chosen intended withdrawal date
+      withdrawalStatus = 'locked';
+      availableToWithdraw = 0;
       totalDurationInvested += principal;
       totalDurationLocked += principal;
       totalDailyInterest += dailyInterest;
@@ -146,18 +152,19 @@ async function getUserPortfolioSummary(userIdInput) {
       totalInterest: totalInterestForDuration,
       maturityAmount,
       maturityDate,
-      benefitEligibilityDate,
-      selectedWithdrawalDate: inv.selectedWithdrawalDate || maturityDate,
-      isEligibleForFullBenefits,
+      intendedWithdrawalDate,
+      selectedWithdrawalDate: intendedWithdrawalDate,
+      isEligibleForFullBenefits: isMatured,
       earlyPrincipalOnlyAmount,
       fullBenefitAmount,
-      lockedInterestAndBenefits: isEligibleForFullBenefits ? 0 : accruedInterest + extraBenefits,
+      lockedInterestAndBenefits: isMatured ? 0 : accruedInterest + extraBenefits,
       accruedInterest,
       availableToWithdraw,
       withdrawalStatus,
       isMatured,
-      isLocked: !isMatured && !isWithdrawn && !isPending,
-      lockUnlockDate: benefitEligibilityDate.toISOString(),
+      isUnlocked,
+      isLocked: !isWithdrawn && !isPending && !isUnlocked,
+      lockUnlockDate: intendedWithdrawalDate.toISOString(),
     };
   });
 

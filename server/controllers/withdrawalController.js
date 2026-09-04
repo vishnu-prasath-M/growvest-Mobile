@@ -29,27 +29,40 @@ exports.createWithdrawal = async (req, res) => {
     let available = enrichedUser.availableToWithdraw;
     if (targetInv) {
       const now = new Date();
-      const startDateObj = targetInv.startDate ? new Date(targetInv.startDate) : new Date();
-      const benefitEligibilityDate = targetInv.benefitEligibilityDate
-        ? new Date(targetInv.benefitEligibilityDate)
-        : new Date(startDateObj.getTime() + 35 * 24 * 60 * 60 * 1000);
-      benefitEligibilityDate.setHours(0, 0, 0, 0);
+      const durationDays = Number(targetInv.durationDays) || 365;
+      const maturityDate = targetInv.maturityDate
+        ? new Date(targetInv.maturityDate)
+        : new Date((targetInv.startDate ? new Date(targetInv.startDate) : new Date()).getTime() + durationDays * 86400000);
+      
+      const intendedDate = targetInv.intendedWithdrawalDate
+        ? new Date(targetInv.intendedWithdrawalDate)
+        : (targetInv.selectedWithdrawalDate ? new Date(targetInv.selectedWithdrawalDate) : maturityDate);
+      intendedDate.setHours(0, 0, 0, 0);
 
-      const isEligibleForFullBenefits = now >= benefitEligibilityDate && targetInv.fifthWeekPaymentCompleted !== false;
+      // Lock Guard: Cannot withdraw before chosen intended withdrawal date
+      if (now < intendedDate) {
+        const formattedDate = intendedDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        return res.status(400).json({
+          message: `This investment is currently locked. Withdrawal will unlock on your chosen intended withdrawal date: ${formattedDate}.`
+        });
+      }
+
+      const isMatured = now >= maturityDate;
       const principal = Number(targetInv.amount) || 0;
       const accruedInterest = Number(targetInv.interestEarned) || 0;
       const benefits = Number(targetInv.benefits) || 0;
 
-      if (!isEligibleForFullBenefits) {
-        // EARLY WITHDRAWAL: Principal ONLY allowed!
+      if (!isMatured) {
+        // EARLY WITHDRAWAL (on or after intended date, but before maturity): Principal ONLY allowed!
         available = principal;
         if (Number(amount) > principal) {
-          const formattedDate = benefitEligibilityDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+          const formattedMaturity = maturityDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
           return res.status(400).json({
-            message: `Early withdrawal before 5th-week benefit eligibility date (${formattedDate}) is restricted to original principal amount (₹${principal.toLocaleString('en-IN')}) only. Interest & extra benefits remain locked.`
+            message: `Early withdrawal before plan completion (${formattedMaturity}) is strictly restricted to your invested principal amount (₹${principal.toLocaleString('en-IN')}) only. Interest returns are only paid upon full maturity.`
           });
         }
       } else {
+        // FULL MATURITY: Principal + Interest + Extra Benefits
         available = principal + accruedInterest + benefits;
       }
     }

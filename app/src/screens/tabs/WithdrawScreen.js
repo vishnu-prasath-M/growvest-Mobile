@@ -478,13 +478,19 @@ const WithdrawScreen = ({ navigation }) => {
               const isWithdrawn = inv.status === 'withdrawn' || inv.withdrawalStatus === 'withdrawn';
               const isPendingWithdrawal = !isWithdrawn && inv.withdrawalStatus === 'pending';
               const isFullEligible = inv.isEligibleForFullBenefits === true;
+              const isLocked = inv.isLocked === true || inv.withdrawalStatus === 'locked';
               const principalAmt = inv.earlyPrincipalOnlyAmount || inv.amount || 0;
               const fullAmt = inv.fullBenefitAmount || inv.availableToWithdraw || principalAmt;
-              const withdrawableAmt = inv.availableToWithdraw || (isFullEligible ? fullAmt : principalAmt);
+              const withdrawableAmt = inv.availableToWithdraw || (isFullEligible ? fullAmt : (isLocked ? 0 : principalAmt));
               
-              const maturityDateVal = inv.maturityDate || inv.selectedWithdrawalDate || inv.benefitEligibilityDate;
+              const maturityDateVal = inv.maturityDate;
               const maturityDateStr = maturityDateVal
                 ? new Date(maturityDateVal).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                : 'N/A';
+
+              const intendedDateVal = inv.intendedWithdrawalDate || inv.selectedWithdrawalDate || maturityDateVal;
+              const intendedDateStr = intendedDateVal
+                ? new Date(intendedDateVal).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
                 : 'N/A';
 
               return (
@@ -505,18 +511,20 @@ const WithdrawScreen = ({ navigation }) => {
                       styles.statusBadge,
                       isWithdrawn ? { backgroundColor: themeColors.surface2 } :
                       isPendingWithdrawal ? { backgroundColor: '#FEF3C7' } :
-                      isFullEligible ? styles.statusBadgeMatured : styles.statusBadgeLocked
+                      isFullEligible ? styles.statusBadgeMatured :
+                      isLocked ? { backgroundColor: '#FEF3C7' } :
+                      styles.statusBadgeLocked
                     ]}>
                       <MaterialCommunityIcons 
-                        name={isWithdrawn ? 'check-all' : isPendingWithdrawal ? 'clock-outline' : isFullEligible ? 'check-circle' : 'alert-circle'} 
+                        name={isWithdrawn ? 'check-all' : isPendingWithdrawal ? 'clock-outline' : isFullEligible ? 'check-circle' : isLocked ? 'lock-outline' : 'alert-circle'} 
                         size={14} 
-                        color={isWithdrawn ? themeColors.textTertiary : isPendingWithdrawal ? '#92400E' : isFullEligible ? '#065F46' : '#B45309'} 
+                        color={isWithdrawn ? themeColors.textTertiary : isPendingWithdrawal ? '#92400E' : isFullEligible ? '#065F46' : isLocked ? '#92400E' : '#B45309'} 
                       />
                       <Text style={[
                         styles.statusBadgeText, 
-                        { color: isWithdrawn ? themeColors.textTertiary : isPendingWithdrawal ? '#92400E' : isFullEligible ? '#065F46' : '#B45309' }
+                        { color: isWithdrawn ? themeColors.textTertiary : isPendingWithdrawal ? '#92400E' : isFullEligible ? '#065F46' : isLocked ? '#92400E' : '#B45309' }
                       ]}>
-                        {isWithdrawn ? 'WITHDRAWN' : isPendingWithdrawal ? 'REQUESTED – PENDING APPROVAL' : isFullEligible ? 'MATURED (FULL RETURNS ELIGIBLE)' : 'EARLY (PRINCIPAL ONLY)'}
+                        {isWithdrawn ? 'WITHDRAWN' : isPendingWithdrawal ? 'REQUESTED – PENDING APPROVAL' : isFullEligible ? 'MATURED (FULL RETURNS ELIGIBLE)' : isLocked ? `LOCKED (UNLOCKS ${intendedDateStr.toUpperCase()})` : 'EARLY (PRINCIPAL ONLY)'}
                       </Text>
                     </View>
                   </View>
@@ -525,12 +533,14 @@ const WithdrawScreen = ({ navigation }) => {
 
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 4 }}>
                     <View>
-                      <Text style={{ fontSize: 11, color: themeColors.textSecondary }}>Plan Maturity Date</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: themeColors.text }}>{maturityDateStr}</Text>
+                      <Text style={{ fontSize: 11, color: themeColors.textSecondary }}>Intended / Maturity Date</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: themeColors.text }}>
+                        {intendedDateStr} {intendedDateVal !== maturityDateVal && `(Matures ${maturityDateStr})`}
+                      </Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
                       <Text style={{ fontSize: 11, color: themeColors.textSecondary }}>Available to Withdraw</Text>
-                      <Text style={{ fontSize: 15, fontWeight: '800', color: themeColors.primary }}>
+                      <Text style={{ fontSize: 15, fontWeight: '800', color: isLocked ? themeColors.textSecondary : themeColors.primary }}>
                         {formatCurrency(withdrawableAmt)}
                       </Text>
                     </View>
@@ -550,6 +560,18 @@ const WithdrawScreen = ({ navigation }) => {
                         </Text>
                         <Text style={{ fontSize: 11, color: '#92400E', marginTop: 4, textAlign: 'center' }}>
                           Your request of {formatCurrency(withdrawableAmt)} is pending admin approval. You will be notified once processed.
+                        </Text>
+                      </View>
+                    ) : isLocked ? (
+                      <View style={{ backgroundColor: themeColors.surface2 || '#F1F5F9', padding: 12, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: themeColors.border || '#E2E8F0' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <MaterialCommunityIcons name="lock" size={16} color={themeColors.textSecondary} style={{ marginRight: 4 }} />
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: themeColors.textSecondary }}>
+                            Investment Locked
+                          </Text>
+                        </View>
+                        <Text style={{ fontSize: 11, color: themeColors.textTertiary, marginTop: 4, textAlign: 'center' }}>
+                          Unlocks for withdrawal on your chosen intended date: {intendedDateStr}.
                         </Text>
                       </View>
                     ) : (
@@ -578,9 +600,9 @@ const WithdrawScreen = ({ navigation }) => {
                       </TouchableOpacity>
                     )}
 
-                    {!isFullEligible && !isWithdrawn && !isPendingWithdrawal && (
+                    {!isFullEligible && !isWithdrawn && !isPendingWithdrawal && !isLocked && (
                       <Text style={{ fontSize: 11, color: '#B45309', marginTop: 6, textAlign: 'center', fontStyle: 'italic' }}>
-                        🔒 Plan interest returns are locked until plan maturity date ({maturityDateStr}).
+                        🔒 Early withdrawal: Principal only. Plan interest returns will be available upon full maturity ({maturityDateStr}).
                       </Text>
                     )}
                   </View>
