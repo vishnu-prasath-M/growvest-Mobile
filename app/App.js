@@ -15,6 +15,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { navigationRef } from './src/navigation/navigationRef';
 import { theme } from './src/theme/theme';
 import { AuthProvider } from './src/context/AuthContext';
+import { DailyRewardProvider } from './src/context/DailyRewardContext';
 import { AppLockProvider } from './src/context/AppLockContext';
 import { AppLockOverlay } from './src/components/AppLockOverlay';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
@@ -84,45 +85,47 @@ function AppContent() {
     <SafeAreaProvider>
       <PaperProvider theme={activeTheme}>
         <AuthProvider>
-          <AppLockProvider>
-            <NavigationContainer
-              ref={navigationRef}
-              linking={{
-                prefixes: [
-                  'growvest://',
-                  'https://growvest-mobile.onrender.com',
-                ],
-                config: {
-                  screens: {
-                    // Deep link: growvest://reset-password?token=XXX
-                    // or https://growvest-mobile.onrender.com/reset-password?token=XXX
-                    ResetPassword: {
-                      path: 'reset-password',
-                      parse: { token: (token) => token },
+          <DailyRewardProvider>
+            <AppLockProvider>
+              <NavigationContainer
+                ref={navigationRef}
+                linking={{
+                  prefixes: [
+                    'growvest://',
+                    'https://growvest-mobile.onrender.com',
+                  ],
+                  config: {
+                    screens: {
+                      // Deep link: growvest://reset-password?token=XXX
+                      // or https://growvest-mobile.onrender.com/reset-password?token=XXX
+                      ResetPassword: {
+                        path: 'reset-password',
+                        parse: { token: (token) => token },
+                      },
+                      ForgotPassword: 'forgot-password',
+                      Login: 'login',
+                      Signup: 'signup',
                     },
-                    ForgotPassword: 'forgot-password',
-                    Login: 'login',
-                    Signup: 'signup',
                   },
-                },
-              }}
-              theme={{
-                colors: {
-                  primary: activeTheme.colors.primary,
-                  background: activeTheme.colors.background,
-                  card: activeTheme.colors.surface,
-                  text: activeTheme.colors.text,
-                  border: activeTheme.colors.border,
-                  notification: activeTheme.colors.primary,
-                },
-                dark: isDarkMode,
-              }}
-            >
-              <StatusBar style={isDarkMode ? 'light' : 'dark'} />
-              <AppNavigator />
-            </NavigationContainer>
-            <AppLockOverlay />
-          </AppLockProvider>
+                }}
+                theme={{
+                  colors: {
+                    primary: activeTheme.colors.primary,
+                    background: activeTheme.colors.background,
+                    card: activeTheme.colors.surface,
+                    text: activeTheme.colors.text,
+                    border: activeTheme.colors.border,
+                    notification: activeTheme.colors.primary,
+                  },
+                  dark: isDarkMode,
+                }}
+              >
+                <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+                <AppNavigator />
+              </NavigationContainer>
+              <AppLockOverlay />
+            </AppLockProvider>
+          </DailyRewardProvider>
         </AuthProvider>
       </PaperProvider>
     </SafeAreaProvider>

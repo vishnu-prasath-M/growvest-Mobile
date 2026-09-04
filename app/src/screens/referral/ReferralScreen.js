@@ -18,6 +18,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../context/ThemeContext';
+import { useDailyReward } from '../../context/DailyRewardContext';
 import { colors } from '../../theme/theme';
 import TopBar from '../../components/TopBar';
 import api from '../../services/apiService';
@@ -27,6 +28,13 @@ const ReferralScreen = ({ navigation }) => {
   const { colors: themeColors, isDarkMode } = useTheme();
   const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
   
+  const {
+    sessionSeconds,
+    hasClaimedDaily: globalHasClaimedDaily,
+    isClaiming: claimingDaily,
+    claimReward,
+  } = useDailyReward();
+
   const [walletData, setWalletData] = useState(null);
   const [referralInfo, setReferralInfo] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -35,10 +43,6 @@ const ReferralScreen = ({ navigation }) => {
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   
-  // Daily login state
-  const [claimingDaily, setClaimingDaily] = useState(false);
-  const [sessionSeconds, setSessionSeconds] = useState(0);
-
   // Withdrawal modal state
   const [withdrawModalVisible, setWithdrawModalVisible] = useState(false);
   const [withdrawUpiId, setWithdrawUpiId] = useState('');
@@ -70,15 +74,7 @@ const ReferralScreen = ({ navigation }) => {
 
   useEffect(() => {
     fetchAllData();
-  }, []);
-
-  // Track session timer for 30s daily login
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setSessionSeconds(prev => prev + 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
+  }, [globalHasClaimedDaily]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -120,21 +116,13 @@ const ReferralScreen = ({ navigation }) => {
   };
 
   const handleClaimDailyLogin = async () => {
-    if (claimingDaily) return;
-    setClaimingDaily(true);
-    try {
-      const res = await api.post('/referral/daily-login');
-      if (res.data?.success) {
-        Alert.alert('🎉 Reward Claimed!', res.data.message || '+2 Coins (₹0.10) added to your wallet!');
-        fetchAllData();
-      } else {
-        Alert.alert('Notice', res.data?.message || 'Daily reward already claimed today.');
-      }
-    } catch (err) {
-      const msg = err.response?.data?.message || 'Daily login already claimed today.';
-      Alert.alert('Notice', msg);
-    } finally {
-      setClaimingDaily(false);
+    if (claimingDaily || hasClaimedDaily) return;
+    const result = await claimReward(true);
+    if (result?.success) {
+      fetchAllData();
+    } else if (result?.message) {
+      Alert.alert('Notice', result.message);
+      fetchAllData();
     }
   };
 
@@ -180,7 +168,7 @@ const ReferralScreen = ({ navigation }) => {
   const isUnlocked = walletData?.isUnlocked ?? (availableCoins >= minThreshold);
   const remainingToUnlock = walletData?.remainingCoinsToUnlock ?? Math.max(0, minThreshold - availableCoins);
   const progressPercent = walletData?.progressPercent ?? Math.min(100, Math.round((availableCoins / minThreshold) * 100));
-  const hasClaimedDaily = walletData?.hasClaimedDailyToday ?? false;
+  const hasClaimedDaily = globalHasClaimedDaily || (walletData?.hasClaimedDailyToday ?? false);
 
   const stats = referralInfo?.stats || {};
   const history = referralInfo?.history || [];
@@ -283,7 +271,7 @@ const ReferralScreen = ({ navigation }) => {
                   ? '✓ Claimed +2 Coins today! Return tomorrow.'
                   : sessionSeconds >= 30
                   ? 'Ready to claim +2 Coins (₹0.10)!'
-                  : `Active session: ${sessionSeconds}s (claim after 30s)`}
+                  : `Active in app: ${sessionSeconds}s / 30s (claims automatically)`}
               </Text>
             </View>
           </View>
