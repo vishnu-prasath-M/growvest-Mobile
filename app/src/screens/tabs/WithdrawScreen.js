@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { userService } from '../../services/userService';
 import { authService } from '../../services/authService';
+import { dashboardService } from '../../services/dashboardService';
 import { withdrawalService } from '../../services/withdrawalService';
 import { investmentService } from '../../services/investmentService';
 import { chitFundService } from '../../services/chitFundService';
@@ -29,13 +30,12 @@ import { SkeletonLoader } from '../../components/SkeletonLoader';
 import DepositDetailModal from '../../components/DepositDetailModal';
 import { useTheme } from '../../context/ThemeContext';
 
-const QUICK_AMOUNTS = [500, 1000, 2500, 5000];
-
 const WithdrawScreen = ({ navigation }) => {
   const { colors: themeColors, isDarkMode } = useTheme();
   const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
   const insets = useScreenInsets(8);
   const [userData, setUserData] = useState(null);
+  const [dashboardData, setDashboardData] = useState(null);
   const [bankInfo, setBankInfo] = useState(null);
   const [selectedDeposit, setSelectedDeposit] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -50,14 +50,18 @@ const WithdrawScreen = ({ navigation }) => {
 
   const fetchUserData = async () => {
     try {
-      const [profile, user, kycRes] = await Promise.all([
+      const [profile, user, kycRes, dashRes] = await Promise.all([
         userService.getUserProfile().catch(() => null),
         authService.getUserData().catch(() => null),
         api.get(API_ENDPOINTS.KYC_STATUS).catch(() => null),
+        dashboardService.getDashboard().catch(() => null),
       ]);
       const currentUser = profile || user;
       if (currentUser) {
         setUserData(mapProfileToWithdrawUser(currentUser));
+      }
+      if (dashRes) {
+        setDashboardData(dashRes);
       }
       if (kycRes?.data?.data) {
         setBankInfo(kycRes.data.data);
@@ -160,9 +164,9 @@ const WithdrawScreen = ({ navigation }) => {
     return `₹${Math.round(Number(amount) || 0).toLocaleString('en-IN')}`;
   };
 
-  // ── Calculation of Available To Withdraw Breakdown ─────────────────────────
+  // ── Calculation of Available To Withdraw Breakdown (Matching Home Page) ──
   const investmentEarnings = investments.reduce((sum, inv) => {
-    if (inv.isPocketMoney) return sum;
+    if (inv.isPocketMoney) return sum; // Pocket money is NOT mixed in available to withdraw
     if (inv.isChit) {
       return sum + (inv.hasWon && inv.withdrawalStatus !== 'completed' ? (Number(inv.winningAmount) || 0) : 0);
     }
@@ -179,15 +183,13 @@ const WithdrawScreen = ({ navigation }) => {
     return sum;
   }, 0);
 
-  const pocketMoneyEarnings = investments
-    .filter(i => i.isPocketMoney)
-    .reduce((sum, pm) => {
-      return sum + (Number(pm.totalPaidOut) || (Number(pm.payoutAmount) * Number(pm.payoutCount)) || 0);
-    }, 0);
+  const activeInvestmentsCount = investments.filter(inv => !inv.isPocketMoney && inv.status !== 'withdrawn' && inv.status !== 'rejected').length;
 
-  const totalAvailableToWithdraw = userData?.availableToWithdraw > 0
-    ? Number(userData.availableToWithdraw)
-    : (investmentEarnings + pocketMoneyEarnings);
+  const totalAvailableToWithdraw = dashboardData?.balances?.availableToWithdraw != null
+    ? Number(dashboardData.balances.availableToWithdraw)
+    : (userData?.availableToWithdraw != null && userData?.availableToWithdraw > 0
+        ? Number(userData.availableToWithdraw)
+        : investmentEarnings);
 
   const openWithdrawModal = (type) => {
     setWithdrawType(type);
@@ -211,7 +213,7 @@ const WithdrawScreen = ({ navigation }) => {
       return;
     }
     if (totalAvailableToWithdraw <= 0) {
-      Alert.alert('No Available Balance', 'You currently do not have any matured investments or unlocked earnings ready to withdraw.');
+      Alert.alert('No Available Balance', 'You currently do not have any matured investments ready to withdraw.');
       return;
     }
     if (numAmt > totalAvailableToWithdraw) {
@@ -323,10 +325,10 @@ const WithdrawScreen = ({ navigation }) => {
           />
         }
       >
-        {/* ── Top Available to Withdraw Card (Exact Reference UI) ── */}
+        {/* ── Top Available to Withdraw Card (Brand Gradient & Styling) ── */}
         <View style={styles.heroOuter}>
           <LinearGradient
-            colors={['#0E3D23', '#144A2D', '#1B5B38']}
+            colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.heroCard}
@@ -334,18 +336,19 @@ const WithdrawScreen = ({ navigation }) => {
             <View style={styles.heroBlobGold} />
             <Text style={styles.heroLabel}>Available to withdraw</Text>
             <Text style={styles.heroAmount}>{formatCurrency(totalAvailableToWithdraw)}</Text>
+            <Text style={styles.heroNote}>Direct UPI Payouts • Bank Level Security</Text>
 
-            <View style={styles.heroDivider} />
-
-            {/* Breakdown Rows */}
-            <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>Investment earnings</Text>
-              <Text style={styles.breakdownValue}>{formatCurrencyNoDecimals(investmentEarnings)}</Text>
-            </View>
-
-            <View style={[styles.breakdownRow, { marginTop: 6 }]}>
-              <Text style={styles.breakdownLabel}>Pocket Money</Text>
-              <Text style={styles.breakdownValue}>{formatCurrencyNoDecimals(pocketMoneyEarnings)}</Text>
+            <View style={styles.heroBottomRow}>
+              <View>
+                <Text style={styles.heroBottomLabel}>Active Investments</Text>
+                <Text style={styles.heroBottomValue}>{activeInvestmentsCount}</Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={styles.heroBottomLabel}>Investment Earnings</Text>
+                <Text style={[styles.heroBottomValue, { color: colors.gold }]}>
+                  {formatCurrencyNoDecimals(investmentEarnings)}
+                </Text>
+              </View>
             </View>
           </LinearGradient>
         </View>
@@ -378,29 +381,6 @@ const WithdrawScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
-          {/* Quick Amounts Chips */}
-          <View style={styles.quickChipsContainer}>
-            {QUICK_AMOUNTS.map((q) => (
-              <TouchableOpacity
-                key={q}
-                style={styles.quickChip}
-                onPress={() => setAmount(String(q))}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.quickChipText}>+₹{q.toLocaleString()}</Text>
-              </TouchableOpacity>
-            ))}
-            {totalAvailableToWithdraw > 0 && (
-              <TouchableOpacity
-                style={[styles.quickChip, styles.quickChipMax]}
-                onPress={() => setAmount(String(totalAvailableToWithdraw))}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.quickChipMaxText}>Max</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
           {/* Bank Account / UPI Card */}
           <TouchableOpacity
             style={styles.bankAccountCard}
@@ -423,29 +403,33 @@ const WithdrawScreen = ({ navigation }) => {
             )}
           </TouchableOpacity>
 
-          {/* Request Withdrawal Button */}
-          <TouchableOpacity
-            style={styles.requestBtnOuter}
-            activeOpacity={0.85}
-            onPress={handleMainWithdrawRequest}
-          >
-            <LinearGradient
-              colors={['#0E3D23', '#1A5C39']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.requestBtnGradient}
-            >
-              <MaterialCommunityIcons name="arrow-top-right" size={18} color="#FFFFFF" />
-              <Text style={styles.requestBtnText}>Request Withdrawal</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+          {/* Request Withdrawal Button — Hidden if available to withdraw is 0 */}
+          {totalAvailableToWithdraw > 0 && (
+            <>
+              <TouchableOpacity
+                style={styles.requestBtnOuter}
+                activeOpacity={0.85}
+                onPress={handleMainWithdrawRequest}
+              >
+                <LinearGradient
+                  colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.requestBtnGradient}
+                >
+                  <MaterialCommunityIcons name="arrow-top-right" size={18} color="#FFFFFF" />
+                  <Text style={styles.requestBtnText}>Request Withdrawal</Text>
+                </LinearGradient>
+              </TouchableOpacity>
 
-          <View style={styles.securityFooterNote}>
-            <MaterialCommunityIcons name="shield-check-outline" size={14} color={isDarkMode ? '#34D399' : '#0E3D23'} />
-            <Text style={styles.securityFooterText}>
-              Withdrawals are processed only for eligible balances.
-            </Text>
-          </View>
+              <View style={styles.securityFooterNote}>
+                <MaterialCommunityIcons name="shield-check-outline" size={14} color={isDarkMode ? '#34D399' : '#0E3D23'} />
+                <Text style={styles.securityFooterText}>
+                  Withdrawals are processed only for eligible balances.
+                </Text>
+              </View>
+            </>
+          )}
         </View>
 
         {/* ── My Investments Overview List (Clean & Interactive) ── */}
@@ -645,24 +629,28 @@ const getStyles = (themeColors, isDarkMode) => StyleSheet.create({
   headerSub: { fontSize: 12, color: themeColors.textMuted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8 },
   headerTitle: { fontSize: 24, fontWeight: '800', color: themeColors.text, letterSpacing: -0.6, marginTop: 2 },
 
-  // Hero Card (Exact Matching Top Card)
+  // Hero Card (Exact Growvest Green Ambient Card)
   heroOuter: { marginHorizontal: 16, marginBottom: 12 },
   heroCard: {
     borderRadius: 24, padding: 22, overflow: 'hidden',
-    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.22, shadowRadius: 24, elevation: 12,
+    shadowColor: '#1A5C39', shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.28, shadowRadius: 30, elevation: 14,
   },
   heroBlobGold: {
     position: 'absolute', bottom: -30, right: -20,
     width: 140, height: 140, borderRadius: 70,
-    backgroundColor: 'rgba(212,168,67,0.14)',
+    backgroundColor: 'rgba(212,168,67,0.18)',
   },
-  heroLabel: { fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: '600' },
-  heroAmount: { fontSize: 34, fontWeight: '800', color: '#FFFFFF', letterSpacing: -1, marginTop: 6 },
-  heroDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.18)', marginVertical: 14 },
-  breakdownRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  breakdownLabel: { fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: '500' },
-  breakdownValue: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  heroLabel: { fontSize: 11, color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: '600' },
+  heroAmount: { fontSize: 32, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.8, marginTop: 4 },
+  heroNote: { fontSize: 11.5, color: 'rgba(255,255,255,0.7)', marginTop: 4, fontWeight: '500' },
+  heroBottomRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.15)',
+    paddingTop: 12, marginTop: 14,
+  },
+  heroBottomLabel: { fontSize: 10, color: 'rgba(255,255,255,0.65)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  heroBottomValue: { fontSize: 13, fontWeight: '700', color: '#F8FAF9', marginTop: 2 },
 
   // Section
   section: { paddingHorizontal: 16, marginTop: 14 },
@@ -682,7 +670,7 @@ const getStyles = (themeColors, isDarkMode) => StyleSheet.create({
     borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#ECEFE6',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   amountLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   currencyPrefix: { fontSize: 24, fontWeight: '700', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginRight: 6 },
@@ -690,18 +678,6 @@ const getStyles = (themeColors, isDarkMode) => StyleSheet.create({
   availableBadge: { alignItems: 'flex-end', paddingLeft: 8 },
   availableBadgeLabel: { fontSize: 11, fontWeight: '500', color: themeColors.textMuted },
   availableBadgeValue: { fontSize: 13, fontWeight: '700', color: themeColors.text, marginTop: 1 },
-
-  // Quick Chips
-  quickChipsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
-  quickChip: {
-    backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#F0F2EB',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  quickChipText: { fontSize: 12, fontWeight: '600', color: themeColors.text },
-  quickChipMax: { backgroundColor: isDarkMode ? 'rgba(16,185,129,0.2)' : '#DCFCE7' },
-  quickChipMaxText: { fontSize: 12, fontWeight: '700', color: isDarkMode ? '#34D399' : '#0E3D23' },
 
   // Bank Account / UPI Card
   bankAccountCard: {
