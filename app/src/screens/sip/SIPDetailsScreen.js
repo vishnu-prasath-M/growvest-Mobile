@@ -23,7 +23,8 @@ import { openRazorpayCheckout } from '../../services/razorpayHandler';
 
 const SIPDetailsScreen = ({ route, navigation }) => {
   const { sipId, sipRefId } = route.params || {};
-  const { colors: themeColors, isDark } = useTheme();
+  const { colors: themeColors, isDarkMode } = useTheme();
+  const isDark = Boolean(isDarkMode);
   const insets = useScreenInsets(16);
   const styles = React.useMemo(() => getStyles(themeColors, isDark), [themeColors, isDark]);
 
@@ -408,14 +409,24 @@ const SIPDetailsScreen = ({ route, navigation }) => {
                     style={[
                       styles.contribBadge,
                       {
-                        backgroundColor: isPaid ? '#DCFCE7' : isFailed ? '#FEE2E2' : '#FEF3C7',
+                        backgroundColor: isPaid
+                          ? (isDark ? 'rgba(16, 185, 129, 0.2)' : '#DCFCE7')
+                          : isFailed
+                          ? (isDark ? 'rgba(239, 68, 68, 0.2)' : '#FEE2E2')
+                          : (isDark ? 'rgba(245, 158, 11, 0.2)' : '#FEF3C7'),
                       },
                     ]}
                   >
                     <Text
                       style={[
                         styles.contribBadgeText,
-                        { color: isPaid ? '#15803D' : isFailed ? '#B91C1C' : '#B45309' },
+                        {
+                          color: isPaid
+                            ? (isDark ? '#34D399' : '#15803D')
+                            : isFailed
+                            ? (isDark ? '#F87171' : '#B91C1C')
+                            : (isDark ? '#FBBF24' : '#B45309'),
+                        },
                       ]}
                     >
                       {isPaid ? 'Paid' : isFailed ? 'Failed' : 'Pending'}
@@ -568,7 +579,7 @@ const getStyles = (themeColors, isDark) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: themeColors.background || '#F8FAFC',
+      backgroundColor: themeColors.background || (isDark ? '#08120B' : '#F8FAFC'),
     },
     header: {
       flexDirection: 'row',
@@ -576,9 +587,9 @@ const getStyles = (themeColors, isDark) =>
       justifyContent: 'space-between',
       paddingHorizontal: 16,
       paddingBottom: 12,
-      backgroundColor: themeColors.surface || '#FFFFFF',
+      backgroundColor: isDark ? '#0E1E15' : (themeColors.surface || '#FFFFFF'),
       borderBottomWidth: 1,
-      borderBottomColor: isDark ? '#334155' : '#E2E8F0',
+      borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
     },
     backBtn: {
       width: 40,
@@ -586,12 +597,12 @@ const getStyles = (themeColors, isDark) =>
       borderRadius: 20,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
+      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#F1F5F9',
     },
     headerTitle: {
       fontSize: 18,
       fontWeight: '700',
-      color: themeColors.text || '#0F172A',
+      color: themeColors.text || (isDark ? '#FFFFFF' : '#0F172A'),
     },
     scrollView: {
       flex: 1,
@@ -704,17 +715,17 @@ const getStyles = (themeColors, isDark) =>
       color: '#FFFFFF',
     },
     card: {
-      backgroundColor: themeColors.surface || '#FFFFFF',
+      backgroundColor: isDark ? '#0E1E15' : (themeColors.surface || '#FFFFFF'),
       borderRadius: 16,
       padding: 16,
       marginBottom: 16,
       borderWidth: 1,
-      borderColor: isDark ? '#334155' : '#E2E8F0',
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#E2E8F0',
     },
     cardSectionTitle: {
       fontSize: 15,
       fontWeight: '700',
-      color: themeColors.text || '#0F172A',
+      color: themeColors.text || (isDark ? '#FFFFFF' : '#0F172A'),
       marginBottom: 12,
     },
     breakdownRow: {
@@ -724,12 +735,12 @@ const getStyles = (themeColors, isDark) =>
     },
     breakdownLabel: {
       fontSize: 13,
-      color: themeColors.textMuted || '#64748B',
+      color: themeColors.textMuted || (isDark ? '#9CA3AF' : '#64748B'),
     },
     breakdownValue: {
       fontSize: 13,
       fontWeight: '700',
-      color: themeColors.text || '#0F172A',
+      color: themeColors.text || (isDark ? '#FFFFFF' : '#0F172A'),
     },
     actionButtonsRow: {
       flexDirection: 'row',
@@ -755,14 +766,14 @@ const getStyles = (themeColors, isDark) =>
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: isDark ? '#1E293B' : '#FEE2E2',
+      backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEE2E2',
       paddingHorizontal: 14,
       paddingVertical: 12,
       borderRadius: 12,
       gap: 4,
     },
     cancelBtnText: {
-      color: '#B91C1C',
+      color: isDark ? '#F87171' : '#B91C1C',
       fontSize: 13,
       fontWeight: '700',
     },
@@ -775,20 +786,20 @@ const getStyles = (themeColors, isDark) =>
     ledgerTitle: {
       fontSize: 16,
       fontWeight: '700',
-      color: themeColors.text || '#0F172A',
+      color: themeColors.text || (isDark ? '#FFFFFF' : '#0F172A'),
     },
     ledgerCount: {
       fontSize: 13,
       fontWeight: '600',
-      color: themeColors.textMuted || '#64748B',
+      color: themeColors.textMuted || (isDark ? '#9CA3AF' : '#64748B'),
     },
     contribCard: {
-      backgroundColor: themeColors.surface || '#FFFFFF',
+      backgroundColor: isDark ? '#0E1E15' : (themeColors.surface || '#FFFFFF'),
       borderRadius: 14,
       padding: 14,
       marginBottom: 10,
       borderWidth: 1,
-      borderColor: isDark ? '#334155' : '#E2E8F0',
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#E2E8F0',
     },
     contribHeader: {
       flexDirection: 'row',
@@ -798,24 +809,24 @@ const getStyles = (themeColors, isDark) =>
       width: 36,
       height: 36,
       borderRadius: 18,
-      backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
+      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#F1F5F9',
       alignItems: 'center',
       justifyContent: 'center',
     },
     contribTitle: {
       fontSize: 14,
       fontWeight: '700',
-      color: themeColors.text || '#0F172A',
+      color: themeColors.text || (isDark ? '#FFFFFF' : '#0F172A'),
     },
     contribSubtitle: {
       fontSize: 12,
-      color: themeColors.textMuted || '#64748B',
+      color: themeColors.textMuted || (isDark ? '#9CA3AF' : '#64748B'),
       marginTop: 2,
     },
     contribAmount: {
       fontSize: 14,
       fontWeight: '700',
-      color: themeColors.text || '#0F172A',
+      color: themeColors.text || (isDark ? '#FFFFFF' : '#0F172A'),
     },
     contribBadge: {
       paddingHorizontal: 8,
@@ -833,23 +844,23 @@ const getStyles = (themeColors, isDark) =>
       marginTop: 8,
       paddingTop: 8,
       borderTopWidth: 1,
-      borderTopColor: isDark ? '#334155' : '#F1F5F9',
+      borderTopColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#F1F5F9',
       gap: 4,
     },
     contribRefLabel: {
       fontSize: 11,
-      color: themeColors.textMuted || '#94A3B8',
+      color: themeColors.textMuted || (isDark ? '#9CA3AF' : '#94A3B8'),
     },
     contribRefVal: {
       fontSize: 11,
       fontWeight: '600',
-      color: themeColors.text || '#0F172A',
+      color: themeColors.text || (isDark ? '#FFFFFF' : '#0F172A'),
     },
     contribActionRow: {
       marginTop: 10,
       paddingTop: 8,
       borderTopWidth: 1,
-      borderTopColor: isDark ? '#334155' : '#F1F5F9',
+      borderTopColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#F1F5F9',
     },
     payContribBtn: {
       flexDirection: 'row',
@@ -867,23 +878,25 @@ const getStyles = (themeColors, isDark) =>
     },
     modalOverlay: {
       flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.6)',
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
       justifyContent: 'center',
       alignItems: 'center',
       padding: 20,
     },
     modalContent: {
       width: '100%',
-      backgroundColor: themeColors.surface || '#FFFFFF',
+      backgroundColor: isDark ? '#0E1E15' : (themeColors.surface || '#FFFFFF'),
       borderRadius: 20,
       padding: 20,
       alignItems: 'center',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
     },
     modalIconWrap: {
       width: 56,
       height: 56,
       borderRadius: 28,
-      backgroundColor: '#DCFCE7',
+      backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : '#DCFCE7',
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: 12,
@@ -891,44 +904,46 @@ const getStyles = (themeColors, isDark) =>
     modalTitle: {
       fontSize: 18,
       fontWeight: '800',
-      color: themeColors.text || '#0F172A',
+      color: themeColors.text || (isDark ? '#FFFFFF' : '#0F172A'),
       marginBottom: 4,
     },
     modalSubtitle: {
       fontSize: 13,
-      color: themeColors.textMuted || '#64748B',
+      color: themeColors.textMuted || (isDark ? '#9CA3AF' : '#64748B'),
       textAlign: 'center',
       marginBottom: 16,
       lineHeight: 18,
     },
     availableBox: {
       width: '100%',
-      backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+      backgroundColor: isDark ? '#14291D' : '#F8FAFC',
       padding: 12,
       borderRadius: 12,
       alignItems: 'center',
       marginBottom: 14,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.06)' : '#E2E8F0',
     },
     availableLabel: {
       fontSize: 12,
-      color: themeColors.textMuted || '#64748B',
+      color: themeColors.textMuted || (isDark ? '#9CA3AF' : '#64748B'),
       marginBottom: 2,
     },
     availableAmount: {
       fontSize: 20,
       fontWeight: '800',
-      color: '#085428',
+      color: isDark ? '#34D399' : '#085428',
     },
     modalInput: {
       width: '100%',
       height: 46,
       borderWidth: 1,
-      borderColor: isDark ? '#334155' : '#E2E8F0',
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0',
       borderRadius: 10,
       paddingHorizontal: 12,
       fontSize: 14,
-      color: themeColors.text || '#0F172A',
-      backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
+      color: themeColors.text || (isDark ? '#FFFFFF' : '#0F172A'),
+      backgroundColor: isDark ? '#14291D' : '#FFFFFF',
       marginBottom: 12,
     },
     modalBtnRow: {
@@ -942,12 +957,12 @@ const getStyles = (themeColors, isDark) =>
       paddingVertical: 12,
       alignItems: 'center',
       borderRadius: 12,
-      backgroundColor: isDark ? '#334155' : '#E2E8F0',
+      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
     },
     modalCancelBtnText: {
       fontSize: 14,
       fontWeight: '700',
-      color: themeColors.text || '#0F172A',
+      color: isDark ? '#E2E8F0' : '#0F172A',
     },
     modalConfirmBtn: {
       flex: 1.5,
