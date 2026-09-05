@@ -1,16 +1,24 @@
+const mongoose = require('mongoose');
 const Withdrawal = require('../models/Withdrawal');
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
+const Investment = require('../models/Investment');
 const { sendNotification } = require('../services/notificationHelper');
 
 exports.createWithdrawal = async (req, res) => {
   try {
     const { amount, upiId, userName, userEmail, withdrawType } = req.body;
     
-    // Find user to store userId
-    const user = await User.findOne({ 
-      $or: [{ email: userEmail }, { mobileNumber: userEmail }] 
-    });
+    // Find user (prioritize req.user if authenticated, fallback to email/mobile)
+    let user = null;
+    if (req.user?._id) {
+      user = await User.findById(req.user._id);
+    }
+    if (!user && userEmail) {
+      user = await User.findOne({ 
+        $or: [{ email: userEmail }, { mobileNumber: userEmail }, { username: userEmail }] 
+      });
+    }
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -20,20 +28,36 @@ exports.createWithdrawal = async (req, res) => {
     const enrichedUser = await getEnrichedUserData({ _id: user._id });
     
     // Check if withdrawing against a specific investment ID
-    const Investment = require('../models/Investment');
     let targetInv = null;
     if (withdrawType && withdrawType !== 'saving' && withdrawType !== 'fixed') {
-      targetInv = await Investment.findById(withdrawType);
+      if (mongoose.Types.ObjectId.isValid(withdrawType)) {
+        targetInv = await Investment.findById(withdrawType);
+      }
     }
 
-    let available = enrichedUser.availableToWithdraw;
+    let available = enrichedUser.availableToWithdraw || 0;
     if (targetInv) {
       const now = new Date();
-      const durationDays = Number(targetInv.durationDays) || 365;
+      const principal = Number(targetInv.amount) || 0;
+      
+      let rate = Number(targetInv.interestRate) || 12;
+      let durationDays = Number(targetInv.durationDays) || 365;
+      if (targetInv.type === '15_days')   { rate = 12;  durationDays = 15;  }
+      else if (targetInv.type === '1_month')  { rate = 15;  durationDays = 30;  }
+      else if (targetInv.type === '3_months') { rate = 18;  durationDays = 90;  }
+      else if (targetInv.type === '6_months') { rate = 20;  durationDays = 180; }
+      else if (targetInv.type === '1_year')   { rate = 24;  durationDays = 365; }
+      else if (targetInv.type === 'saving')   { rate = 12;  durationDays = 365; }
+      else if (targetInv.type === 'fixed')    { rate = 24;  durationDays = 365; }
+
+      const dailyInterest = (principal * rate) / 100 / 365;
+      const totalInterestForDuration = dailyInterest * durationDays;
+
       const maturityDate = targetInv.maturityDate
         ? new Date(targetInv.maturityDate)
         : new Date((targetInv.startDate ? new Date(targetInv.startDate) : new Date()).getTime() + durationDays * 86400000);
-      
+      maturityDate.setHours(0, 0, 0, 0);
+
       const intendedDate = targetInv.intendedWithdrawalDate
         ? new Date(targetInv.intendedWithdrawalDate)
         : (targetInv.selectedWithdrawalDate ? new Date(targetInv.selectedWithdrawalDate) : maturityDate);
@@ -47,15 +71,30 @@ exports.createWithdrawal = async (req, res) => {
         });
       }
 
+      if (targetInv.withdrawalStatus === 'pending') {
+        return res.status(400).json({ message: 'A withdrawal request for this investment is already pending admin approval.' });
+      }
+
+      if (targetInv.withdrawalStatus === 'withdrawn' || targetInv.status === 'withdrawn') {
+        return res.status(400).json({ message: 'This investment has already been withdrawn.' });
+      }
+
       const isMatured = now >= maturityDate;
-      const principal = Number(targetInv.amount) || 0;
-      const accruedInterest = Number(targetInv.interestEarned) || 0;
+      let accruedInterest = 0;
+      if (targetInv.startDate) {
+        const startDay = new Date(targetInv.startDate);
+        startDay.setHours(0, 0, 0, 0);
+        const elapsedDays = Math.max(0, Math.min(durationDays, Math.floor((now - startDay) / 86400000)));
+        accruedInterest = elapsedDays * dailyInterest;
+      }
+      accruedInterest = Math.max(accruedInterest, Number(targetInv.interestEarned) || 0, isMatured ? totalInterestForDuration : 0);
+
       const benefits = Number(targetInv.benefits) || 0;
 
       if (!isMatured) {
         // EARLY WITHDRAWAL (on or after intended date, but before maturity): Principal ONLY allowed!
         available = principal;
-        if (Number(amount) > principal) {
+        if (Number(amount) > principal + 1) {
           const formattedMaturity = maturityDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
           return res.status(400).json({
             message: `Early withdrawal before plan completion (${formattedMaturity}) is strictly restricted to your invested principal amount (₹${principal.toLocaleString('en-IN')}) only. Interest returns are only paid upon full maturity.`
@@ -67,44 +106,54 @@ exports.createWithdrawal = async (req, res) => {
       }
     }
 
-    if (Number(amount) > available) {
+    if (Number(amount) > available + 1) {
       return res.status(400).json({ message: `Insufficient eligible balance. Available to withdraw: ₹${available.toLocaleString('en-IN')}` });
     }
+
+    const resolvedEmail = userEmail || user.email || user.mobileNumber || user.username || 'user@growvest.in';
+    const resolvedName = userName || user.name || user.username || 'User';
 
     const newWithdrawal = new Withdrawal({
       userId: user._id,
       investmentId: targetInv ? targetInv._id : (mongoose.Types.ObjectId.isValid(withdrawType) ? withdrawType : undefined),
-      amount,
+      amount: Number(amount),
       upiId,
-      userName,
-      userEmail,
-      date: new Date().toLocaleDateString(),
+      userName: resolvedName,
+      userEmail: resolvedEmail,
+      date: new Date().toLocaleDateString('en-IN'),
       status: 'pending',
-      withdrawType: withdrawType || 'saving'
+      withdrawType: targetInv ? (targetInv.type || 'investment') : (withdrawType || 'saving'),
+      isEarlyWithdrawal: targetInv ? (new Date() < new Date(targetInv.maturityDate || Date.now())) : false,
     });
 
     await newWithdrawal.save();
 
-    // Create transaction record (user already found above)
-    if (user) {
-      const transaction = new Transaction({
-        userId: user._id,
-        userEmail,
-        type: 'withdrawal',
-        amount,
-        status: 'requested',
-        referenceId: newWithdrawal._id,
-        referenceType: 'Withdrawal',
-        description: `Withdrawal request from ${withdrawType || 'saving'} deposit - ₹${amount}`
+    // If withdrawing a specific investment, link request and mark pending
+    if (targetInv) {
+      await Investment.findByIdAndUpdate(targetInv._id, {
+        withdrawalStatus: 'pending',
+        withdrawalRequestId: newWithdrawal._id,
       });
-      await transaction.save();
     }
+
+    // Create transaction record
+    const transaction = new Transaction({
+      userId: user._id,
+      userEmail: resolvedEmail,
+      type: 'withdrawal',
+      amount: Number(amount),
+      status: 'requested',
+      referenceId: newWithdrawal._id,
+      referenceType: 'Withdrawal',
+      description: `Withdrawal request from ${targetInv ? targetInv.type : (withdrawType || 'saving')} deposit - ₹${amount}`
+    });
+    await transaction.save();
 
     try {
       const { notifyAdmins } = require('../services/notificationHelper');
       await notifyAdmins({
         title: '💸 New Withdrawal Request',
-        description: `${userName} (${userEmail}) requested to withdraw ₹${amount} (${withdrawType || 'saving'}).`,
+        description: `${resolvedName} (${resolvedEmail}) requested to withdraw ₹${amount} (${targetInv ? targetInv.type : (withdrawType || 'saving')}).`,
         type: 'general',
         metadata: { withdrawalId: newWithdrawal._id }
       });
@@ -112,8 +161,13 @@ exports.createWithdrawal = async (req, res) => {
       console.warn('[Withdrawal Create] Failed to notify admins:', notifErr.message);
     }
 
-    res.status(201).json(newWithdrawal);
+    res.status(201).json({
+      success: true,
+      message: 'Withdrawal request submitted successfully. Pending admin approval.',
+      withdrawal: newWithdrawal,
+    });
   } catch (error) {
+    console.error('Error creating withdrawal:', error);
     res.status(500).json({ message: 'Error creating withdrawal', error: error.message });
   }
 };

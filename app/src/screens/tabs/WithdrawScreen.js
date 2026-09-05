@@ -160,46 +160,42 @@ const WithdrawScreen = ({ navigation }) => {
     } else {
       setAmount('');
     }
-    setUpiId('');
+    if (userData?.upiId) {
+      setUpiId(userData.upiId);
+    }
     setWithdrawModalVisible(true);
   };
 
   const handleWithdraw = async () => {
-    if (!upiId.trim()) {
+    if (!upiId || !upiId.trim()) {
       Alert.alert('Error', 'Please enter your UPI ID');
-      return;
-    }
-    
-    // Check if user has email before proceeding
-    if (!userData?.email || !userData.email.trim()) {
-      setWithdrawModalVisible(false);
-      setEmailRequiredModalVisible(true);
       return;
     }
     
     setWithdrawing(true);
     try {
       if (withdrawType && withdrawType !== 'saving' && withdrawType !== 'fixed') {
-        await investmentService.withdrawInvestment(withdrawType, upiId);
+        const res = await investmentService.withdrawInvestment(withdrawType, upiId.trim());
         Alert.alert(
           'Withdrawal Requested ⏳',
-          'Your withdrawal request has been submitted and is pending admin approval. You will be notified once it is processed.',
+          res?.message || 'Your withdrawal request has been submitted and is pending admin approval.',
           [{ text: 'OK' }]
         );
       } else {
-        await withdrawalService.createWithdrawal({
+        const res = await withdrawalService.createWithdrawal({
           amount: parseFloat(amount),
-          upiId,
-          userName: userData?.name || userData?.username,
-          userEmail: userData?.email,
+          upiId: upiId.trim(),
+          userName: userData?.name || userData?.username || 'User',
+          userEmail: userData?.email || userData?.mobileNumber || '',
           withdrawType,
         });
-        Alert.alert('Success', 'Withdrawal request submitted successfully');
+        Alert.alert('Success', res?.message || 'Withdrawal request submitted successfully');
       }
       setWithdrawModalVisible(false);
       fetchUserData();
     } catch (error) {
-      Alert.alert('Withdrawal Failed', error.message || error.toString() || 'Failed to process withdrawal request');
+      const errMsg = error?.response?.data?.message || error?.message || error?.error || (typeof error === 'string' ? error : 'Failed to process withdrawal request');
+      Alert.alert('Withdrawal Failed', errMsg);
     } finally {
       setWithdrawing(false);
     }

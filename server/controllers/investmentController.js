@@ -294,12 +294,44 @@ exports.withdrawInvestment = async (req, res) => {
       : new Date(startDateObj.getTime() + planDurationDays * 24 * 60 * 60 * 1000);
     maturityDate.setHours(0, 0, 0, 0);
 
+    const intendedDate = investment.intendedWithdrawalDate
+      ? new Date(investment.intendedWithdrawalDate)
+      : (investment.selectedWithdrawalDate ? new Date(investment.selectedWithdrawalDate) : maturityDate);
+    intendedDate.setHours(0, 0, 0, 0);
+
+    // Lock Guard: Cannot withdraw before chosen intended withdrawal date
+    if (now < intendedDate) {
+      const formattedDate = intendedDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+      return res.status(400).json({
+        message: `This investment is currently locked. Withdrawal will unlock on your chosen intended withdrawal date: ${formattedDate}.`
+      });
+    }
+
     const isFullEligible = now >= maturityDate;
-
     const principal = Number(investment.amount) || 0;
-    const accruedInterest = Number(investment.interestEarned) || Number(investment.totalInterest) || 0;
-    const benefits = Number(investment.benefits) || 0;
 
+    let rate = Number(investment.interestRate) || 12;
+    if (investment.type === '15_days')   rate = 12;
+    else if (investment.type === '1_month')  rate = 15;
+    else if (investment.type === '3_months') rate = 18;
+    else if (investment.type === '6_months') rate = 20;
+    else if (investment.type === '1_year')   rate = 24;
+    else if (investment.type === 'saving')   rate = 12;
+    else if (investment.type === 'fixed')    rate = 24;
+
+    const dailyInterest = (principal * rate) / 100 / 365;
+    const totalInterestForDuration = dailyInterest * planDurationDays;
+
+    let accruedInterest = 0;
+    if (investment.startDate) {
+      const startDay = new Date(investment.startDate);
+      startDay.setHours(0, 0, 0, 0);
+      const elapsedDays = Math.max(0, Math.min(planDurationDays, Math.floor((now - startDay) / 86400000)));
+      accruedInterest = elapsedDays * dailyInterest;
+    }
+    accruedInterest = Math.max(accruedInterest, Number(investment.interestEarned) || 0, isFullEligible ? totalInterestForDuration : 0);
+
+    const benefits = Number(investment.benefits) || 0;
     const payoutAmount = isFullEligible ? (principal + accruedInterest + benefits) : principal;
 
     // Map investment type to allowed Withdrawal.withdrawType enum values
@@ -307,14 +339,31 @@ exports.withdrawInvestment = async (req, res) => {
     const rawType = (investment.type || '').toLowerCase().replace(/\s/g, '_');
     const resolvedWithdrawType = supportedTypes.includes(rawType) ? rawType : 'investment';
 
+    // Find user to ensure valid name and email
+    let user = null;
+    if (req.user?._id) {
+      user = await User.findById(req.user._id);
+    }
+    if (!user && investment.userId) {
+      user = await User.findById(investment.userId);
+    }
+    if (!user && investment.userEmail) {
+      user = await User.findOne({
+        $or: [{ email: investment.userEmail }, { mobileNumber: investment.userEmail }, { username: investment.userEmail }]
+      });
+    }
+
+    const resolvedEmail = investment.userEmail || user?.email || user?.mobileNumber || user?.username || req.user?.email || 'user@growvest.in';
+    const resolvedName = investment.userName || user?.name || user?.username || 'User';
+
     // STEP 1: Create withdrawal request record FIRST (so admin can see it)
     const Withdrawal = require('../models/Withdrawal');
     const withdrawal = new Withdrawal({
-      userId: req.user?._id || investment.userId,
+      userId: user?._id || req.user?._id || investment.userId,
       amount: payoutAmount,
       upiId: upiId || investment.upiId || 'Registered UPI',
-      userName: investment.userName || 'User',
-      userEmail: investment.userEmail || req.user?.email || '',
+      userName: resolvedName,
+      userEmail: resolvedEmail,
       date: new Date().toLocaleDateString('en-IN'),
       status: 'pending',
       withdrawType: resolvedWithdrawType,
@@ -325,8 +374,8 @@ exports.withdrawInvestment = async (req, res) => {
 
     // STEP 2: Create pending transaction record
     const transaction = new Transaction({
-      userId: req.user?._id || investment.userId,
-      userEmail: investment.userEmail,
+      userId: user?._id || req.user?._id || investment.userId,
+      userEmail: resolvedEmail,
       type: 'withdrawal',
       amount: payoutAmount,
       status: 'requested',
@@ -351,7 +400,7 @@ exports.withdrawInvestment = async (req, res) => {
       const { notifyAdmins } = require('../services/notificationHelper');
       await notifyAdmins({
         title: '💸 New Investment Withdrawal Request',
-        description: `${investment.userName || 'User'} requested a ${isFullEligible ? 'full benefit' : 'early principal'} withdrawal of ₹${payoutAmount.toLocaleString('en-IN')} from ${investment.type} plan.`,
+        description: `${resolvedName} requested a ${isFullEligible ? 'full benefit' : 'early principal'} withdrawal of ₹${payoutAmount.toLocaleString('en-IN')} from ${investment.type} plan.`,
         type: 'general',
         metadata: { withdrawalId: withdrawal._id, investmentId: investment._id },
       });
