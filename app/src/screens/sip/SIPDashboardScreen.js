@@ -17,7 +17,8 @@ import { sipService } from '../../services/sipService';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
 
 const SIPDashboardScreen = ({ navigation }) => {
-  const { colors: themeColors, isDark } = useTheme();
+  const { colors: themeColors, isDarkMode } = useTheme();
+  const isDark = Boolean(isDarkMode);
   const insets = useScreenInsets(16);
   const styles = React.useMemo(() => getStyles(themeColors, isDark), [themeColors, isDark]);
 
@@ -71,13 +72,33 @@ const SIPDashboardScreen = ({ navigation }) => {
   const getStatusBadge = (status) => {
     switch (status) {
       case 'active':
-        return { label: 'Active', bg: '#DCFCE7', text: '#15803D', icon: 'check-circle-outline' };
+        return {
+          label: 'Active',
+          bg: isDark ? 'rgba(16, 185, 129, 0.2)' : '#DCFCE7',
+          text: isDark ? '#34D399' : '#15803D',
+          icon: 'check-circle-outline',
+        };
       case 'completed':
-        return { label: 'Completed', bg: '#FEF3C7', text: '#B45309', icon: 'trophy-outline' };
+        return {
+          label: 'Completed',
+          bg: isDark ? 'rgba(245, 158, 11, 0.2)' : '#FEF3C7',
+          text: isDark ? '#FBBF24' : '#B45309',
+          icon: 'trophy-outline',
+        };
       case 'cancelled':
-        return { label: 'Cancelled', bg: '#FEE2E2', text: '#B91C1C', icon: 'close-circle-outline' };
+        return {
+          label: 'Cancelled',
+          bg: isDark ? 'rgba(239, 68, 68, 0.2)' : '#FEE2E2',
+          text: isDark ? '#F87171' : '#B91C1C',
+          icon: 'close-circle-outline',
+        };
       default:
-        return { label: status || 'Active', bg: '#F1F5F9', text: '#475569', icon: 'clock-outline' };
+        return {
+          label: status || 'Active',
+          bg: isDark ? 'rgba(148, 163, 184, 0.2)' : '#F1F5F9',
+          text: isDark ? '#CBD5E1' : '#475569',
+          icon: 'clock-outline',
+        };
     }
   };
 
@@ -299,7 +320,7 @@ const getStyles = (themeColors, isDark) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: themeColors.background || '#F8FAFC',
+      backgroundColor: themeColors.background || (isDark ? '#08120B' : '#F8FAFC'),
     },
     header: {
       flexDirection: 'row',
@@ -307,9 +328,9 @@ const getStyles = (themeColors, isDark) =>
       justifyContent: 'space-between',
       paddingHorizontal: 16,
       paddingBottom: 12,
-      backgroundColor: themeColors.surface || '#FFFFFF',
+      backgroundColor: isDark ? '#0E1E15' : (themeColors.surface || '#FFFFFF'),
       borderBottomWidth: 1,
-      borderBottomColor: isDark ? '#334155' : '#E2E8F0',
+      borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
     },
     backBtn: {
       width: 40,
@@ -317,12 +338,12 @@ const getStyles = (themeColors, isDark) =>
       borderRadius: 20,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
+      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#F1F5F9',
     },
     headerTitle: {
       fontSize: 18,
       fontWeight: '700',
-      color: themeColors.text || '#0F172A',
+      color: themeColors.text || (isDark ? '#FFFFFF' : '#0F172A'),
     },
     newSipHeaderBtn: {
       flexDirection: 'row',
@@ -350,12 +371,12 @@ const getStyles = (themeColors, isDark) =>
     mainTitle: {
       fontSize: 22,
       fontWeight: '800',
-      color: themeColors.text || '#0F172A',
+      color: themeColors.text || (isDark ? '#FFFFFF' : '#0F172A'),
       marginBottom: 4,
     },
     mainSubtitle: {
       fontSize: 14,
-      color: themeColors.textMuted || '#64748B',
+      color: themeColors.textMuted || (isDark ? '#9CA3AF' : '#64748B'),
       lineHeight: 20,
     },
     heroCard: {
@@ -447,20 +468,20 @@ const getStyles = (themeColors, isDark) =>
     sectionTitle: {
       fontSize: 16,
       fontWeight: '700',
-      color: themeColors.text || '#0F172A',
+      color: themeColors.text || (isDark ? '#FFFFFF' : '#0F172A'),
     },
     sectionCount: {
       fontSize: 13,
       fontWeight: '600',
-      color: themeColors.textMuted || '#64748B',
+      color: themeColors.textMuted || (isDark ? '#9CA3AF' : '#64748B'),
     },
     sipCard: {
-      backgroundColor: themeColors.surface || '#FFFFFF',
+      backgroundColor: isDark ? '#0E1E15' : (themeColors.surface || '#FFFFFF'),
       borderRadius: 16,
       padding: 16,
       marginBottom: 14,
       borderWidth: 1,
-      borderColor: isDark ? '#334155' : '#E2E8F0',
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#E2E8F0',
       elevation: 2,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 1 },
@@ -475,18 +496,18 @@ const getStyles = (themeColors, isDark) =>
       width: 44,
       height: 44,
       borderRadius: 12,
-      backgroundColor: '#DCFCE7',
+      backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#DCFCE7',
       alignItems: 'center',
       justifyContent: 'center',
     },
     sipCardId: {
       fontSize: 15,
       fontWeight: '700',
-      color: themeColors.text || '#0F172A',
+      color: themeColors.text || (isDark ? '#FFFFFF' : '#0F172A'),
     },
     sipCardSubtitle: {
       fontSize: 13,
-      color: themeColors.textMuted || '#64748B',
+      color: themeColors.textMuted || (isDark ? '#9CA3AF' : '#64748B'),
       marginTop: 2,
     },
     statusBadge: {
@@ -512,16 +533,16 @@ const getStyles = (themeColors, isDark) =>
     progressLabel: {
       fontSize: 12,
       fontWeight: '600',
-      color: themeColors.textMuted || '#64748B',
+      color: themeColors.textMuted || (isDark ? '#9CA3AF' : '#64748B'),
     },
     progressPercent: {
       fontSize: 12,
       fontWeight: '700',
-      color: '#085428',
+      color: isDark ? '#34D399' : '#085428',
     },
     progressBarBg: {
       height: 6,
-      backgroundColor: isDark ? '#334155' : '#E2E8F0',
+      backgroundColor: isDark ? '#1C3829' : '#E2E8F0',
       borderRadius: 3,
       overflow: 'hidden',
     },
@@ -533,7 +554,9 @@ const getStyles = (themeColors, isDark) =>
     cardDetailsGrid: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+      backgroundColor: isDark ? '#14291D' : '#F8FAFC',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.06)' : '#E2E8F0',
       padding: 12,
       borderRadius: 12,
     },
@@ -543,13 +566,13 @@ const getStyles = (themeColors, isDark) =>
     cardDetailLabel: {
       fontSize: 10,
       fontWeight: '700',
-      color: themeColors.textMuted || '#94A3B8',
+      color: isDark ? '#9CA3AF' : (themeColors.textMuted || '#94A3B8'),
       marginBottom: 2,
     },
     cardDetailValue: {
       fontSize: 13,
       fontWeight: '700',
-      color: themeColors.text || '#0F172A',
+      color: isDark ? '#FFFFFF' : (themeColors.text || '#0F172A'),
     },
     cardFooter: {
       flexDirection: 'row',
@@ -561,16 +584,16 @@ const getStyles = (themeColors, isDark) =>
     viewDetailsText: {
       fontSize: 13,
       fontWeight: '600',
-      color: '#085428',
+      color: isDark ? '#34D399' : '#085428',
     },
     emptyContainer: {
       alignItems: 'center',
       paddingVertical: 40,
       paddingHorizontal: 20,
-      backgroundColor: themeColors.surface || '#FFFFFF',
+      backgroundColor: isDark ? '#0E1E15' : (themeColors.surface || '#FFFFFF'),
       borderRadius: 16,
       borderWidth: 1,
-      borderColor: isDark ? '#334155' : '#E2E8F0',
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
     },
     emptyIconCircle: {
       width: 80,

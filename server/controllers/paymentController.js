@@ -361,7 +361,14 @@ const completeChitJoin = async (user, data, orderId, paymentId, signature) => {
   // 1. Create a NEW individual ChitMember subscription
   const memberCount = await ChitMember.countDocuments({ chitId: chit._id, status: { $ne: 'cancelled' } });
   const memberNumber = memberCount + 1;
-  const membershipId = `CM-${10000 + memberNumber}`;
+  let membershipId = '';
+  let isUnique = false;
+  while (!isUnique) {
+    const randomPart = Math.floor(100000 + Math.random() * 900000);
+    membershipId = `CM-${randomPart}`;
+    const exists = await ChitMember.findOne({ membershipId });
+    if (!exists) isUnique = true;
+  }
 
   const member = new ChitMember({
     chitId: chit._id,
