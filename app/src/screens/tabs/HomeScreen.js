@@ -272,7 +272,11 @@ const HomeScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="light-content" backgroundColor="#0E3D23" />
+      <StatusBar
+        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        backgroundColor="transparent"
+        translucent
+      />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -288,7 +292,7 @@ const HomeScreen = ({ navigation }) => {
       >
         <Animated.View style={{ opacity: fadeAnim }}>
           {/* ── Header ── */}
-          <SafeAreaView style={[styles.header]}>
+          <View style={styles.header}>
             <View style={styles.headerLeft}>
               <LinearGradient
                 colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
@@ -328,7 +332,7 @@ const HomeScreen = ({ navigation }) => {
                 )}
               </TouchableOpacity>
             </View>
-          </SafeAreaView>
+          </View>
 
           {/* ── Balance Card ── */}
           <View style={styles.balanceCardOuter}>

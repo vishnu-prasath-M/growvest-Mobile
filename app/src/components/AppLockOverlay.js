@@ -182,7 +182,7 @@ export const AppLockOverlay = () => {
 
   return (
     <View style={styles.fullScreenOverlay} pointerEvents="auto">
-      <StatusBar barStyle="light-content" backgroundColor="#071F12" />
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <LinearGradient
         colors={['#071F12', '#0E3D23', '#092918']}
         start={{ x: 0, y: 0 }}
