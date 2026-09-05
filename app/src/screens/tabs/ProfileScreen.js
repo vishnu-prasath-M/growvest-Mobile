@@ -9,6 +9,7 @@ import {
   Modal,
   TextInput,
   Linking,
+  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -21,14 +22,16 @@ import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
 import { useTheme } from '../../context/ThemeContext';
 import { useAppLock } from '../../context/AppLockContext';
+import { appLockService } from '../../services/appLockService';
 
 const ProfileScreen = ({ navigation }) => {
   const { isDarkMode, toggleTheme, colors: themeColors } = useTheme();
-  const { isAppLockEnabled } = useAppLock();
-  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
+  const { isAppLockEnabled, isBiometricEnabled, refreshLockPreferences, activeUserId } = useAppLock();
+  const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
   const insets = useScreenInsets(8);
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [personalInfoModalVisible, setPersonalInfoModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editMobileModalVisible, setEditMobileModalVisible] = useState(false);
   const [editEmailModalVisible, setEditEmailModalVisible] = useState(false);
@@ -98,19 +101,33 @@ const ProfileScreen = ({ navigation }) => {
     }
   };
 
-  const handleEditUsername = () => { setNewUsername(userData?.username || ''); setEditModalVisible(true); };
+  const handleOpenPersonalInfo = () => {
+    setPersonalInfoModalVisible(true);
+  };
+
+  const handleEditUsername = () => {
+    setPersonalInfoModalVisible(false);
+    setNewUsername((userData || authUser)?.name || (userData || authUser)?.username || '');
+    setEditModalVisible(true);
+  };
+
   const handleSaveUsername = async () => {
     if (!newUsername.trim()) { Alert.alert('Error', 'Username cannot be empty'); return; }
     setSavingUsername(true);
     try {
       const updatedUser = await authService.updateUsername(newUsername.trim());
       await updateUser(updatedUser); setUserData(updatedUser); setEditModalVisible(false);
-      Alert.alert('Success', 'Username updated successfully');
+      Alert.alert('Success', 'Profile name updated successfully');
     } catch (error) { Alert.alert('Error', getErrorMessage(error)); }
     finally { setSavingUsername(false); }
   };
 
-  const handleEditMobileNumber = () => { setNewMobileNumber(userData?.mobileNumber || ''); setEditMobileModalVisible(true); };
+  const handleEditMobileNumber = () => {
+    setPersonalInfoModalVisible(false);
+    setNewMobileNumber((userData || authUser)?.mobileNumber || '');
+    setEditMobileModalVisible(true);
+  };
+
   const handleSaveMobileNumber = async () => {
     if (!newMobileNumber.trim()) { Alert.alert('Error', 'Mobile number cannot be empty'); return; }
     if (newMobileNumber.trim().length !== 10 || !/^\d{10}$/.test(newMobileNumber.trim())) {
@@ -125,7 +142,12 @@ const ProfileScreen = ({ navigation }) => {
     finally { setSavingMobile(false); }
   };
 
-  const handleEditEmail = () => { setNewEmail(userData?.email || ''); setEditEmailModalVisible(true); };
+  const handleEditEmail = () => {
+    setPersonalInfoModalVisible(false);
+    setNewEmail((userData || authUser)?.email || '');
+    setEditEmailModalVisible(true);
+  };
+
   const handleSaveEmail = async () => {
     if (!newEmail.trim()) { Alert.alert('Error', 'Email cannot be empty'); return; }
     if (!/\S+@\S+\.\S+/.test(newEmail)) { Alert.alert('Error', 'Please enter a valid email address'); return; }
@@ -140,6 +162,31 @@ const ProfileScreen = ({ navigation }) => {
 
   const handleContactSupport = () => {
     Linking.openURL('https://wa.me/918300278515?text=Hello Growvest Support, I need assistance.');
+  };
+
+  const handleToggleBiometric = async () => {
+    if (!isAppLockEnabled) {
+      Alert.alert(
+        'App Lock Required',
+        'Please set up an App Lock PIN first to enable Biometric Unlock.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Setup App Lock', onPress: () => navigation.navigate('AppLockSettings') },
+        ]
+      );
+      return;
+    }
+    const currentUserId = (userData || authUser)?._id || (userData || authUser)?.id || activeUserId;
+    if (!currentUserId) return;
+    try {
+      const nextState = !isBiometricEnabled;
+      await appLockService.setBiometricEnabled(currentUserId, nextState);
+      if (refreshLockPreferences) {
+        await refreshLockPreferences();
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Failed to update biometric settings');
+    }
   };
 
   const getInitials = () => {
@@ -174,62 +221,8 @@ const ProfileScreen = ({ navigation }) => {
   };
 
   const kycInfo = getKYCStatusInfo();
-
-  // Bank Details is only shown when the user has submitted KYC (real bank data exists)
-  const hasBankDetails = kycStatus && kycStatus.hasKYC === true;
-
-  const accountItems = [
-    { icon: 'account-edit', label: 'Edit Profile', tint: colors.primaryLight, iconColor: colors.primary, onPress: handleEditUsername },
-    { icon: 'email-edit', label: 'Edit Email', tint: '#e0f2fe', iconColor: '#0284c7', onPress: handleEditEmail },
-    { icon: kycInfo.icon, label: 'KYC Verification', tint: kycInfo.tint, iconColor: kycInfo.iconColor, badge: kycInfo.badge, onPress: () => navigation.navigate('KYC') },
-    { icon: 'gift-outline', label: 'Refer & Earn', tint: '#d1fae5', iconColor: '#059669', onPress: () => navigation.navigate('Referral') },
-  ];
-
-  // Only add Bank Details when KYC bank data exists in MongoDB
-  if (hasBankDetails) {
-    accountItems.push({ icon: 'bank-outline', label: 'Bank Details', tint: colors.primaryLight, iconColor: colors.primary, onPress: () => navigation.navigate('BankDetails') });
-  }
-
-  const menuGroups = [
-    {
-      title: 'Account',
-      items: accountItems,
-    },
-    {
-      title: 'Security',
-      items: [
-        {
-          icon: 'shield-lock-outline',
-          label: 'App Lock',
-          badge: isAppLockEnabled ? 'Enabled 🔒' : 'Off 🔓',
-          tint: isAppLockEnabled ? '#DCFCE7' : '#F1F5F9',
-          iconColor: isAppLockEnabled ? '#16A34A' : '#64748B',
-          onPress: () => navigation.navigate('AppLockSettings'),
-        },
-      ],
-    },
-    {
-      title: 'Appearance',
-      items: [
-        {
-          icon: isDarkMode ? 'weather-sunny' : 'weather-night',
-          label: 'App Theme',
-          badge: isDarkMode ? 'Dark Mode 🌙' : 'Light Mode ☀️',
-          tint: isDarkMode ? '#312e81' : '#fef3c7',
-          iconColor: isDarkMode ? '#818cf8' : '#d97706',
-          onPress: toggleTheme,
-        },
-      ],
-    },
-    {
-      title: 'General',
-      items: [
-        { icon: 'information-outline', label: 'About Us', tint: '#ede9fe', iconColor: '#7c3aed', onPress: () => navigation.navigate('AboutUs') },
-        { icon: 'headset', label: 'Support', tint: '#fef3c7', iconColor: '#d97706', onPress: handleContactSupport },
-        { icon: 'file-document-outline', label: 'Terms & Privacy', tint: colors.muted, iconColor: colors.textSecondary, onPress: () => navigation.navigate('Terms') },
-      ],
-    },
-  ];
+  const coinBalance = (userData || authUser)?.coinBalance ?? (userData || authUser)?.totalCoins ?? 0;
+  const activeUserObj = userData || authUser;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -263,7 +256,7 @@ const ProfileScreen = ({ navigation }) => {
         {/* Name & Info */}
         <View style={styles.nameSection}>
           <View style={styles.nameRow}>
-            <Text style={styles.profileName}>{(userData || authUser)?.name || (userData || authUser)?.username || 'User'}</Text>
+            <Text style={styles.profileName}>{activeUserObj?.name || activeUserObj?.username || 'User'}</Text>
             <MaterialCommunityIcons name="check-decagram" size={18} color={colors.primary} />
           </View>
         </View>
@@ -271,7 +264,7 @@ const ProfileScreen = ({ navigation }) => {
         {/* Stats Row */}
         <View style={styles.statsRow}>
           {[
-            { label: 'Active Since', value: formatActiveSince((userData || authUser)?.createdAt) },
+            { label: 'Active Since', value: formatActiveSince(activeUserObj?.createdAt) },
             { label: 'Status', value: 'Active' },
             { label: 'KYC', value: kycInfo.label },
           ].map((s) => (
@@ -282,39 +275,170 @@ const ProfileScreen = ({ navigation }) => {
           ))}
         </View>
 
-        {/* Menu Groups */}
+        {/* Bottom Menu Section */}
         <View style={styles.menuSection}>
-          {menuGroups.map((group) => (
-            <View key={group.title} style={styles.menuGroup}>
-              <Text style={styles.menuGroupLabel}>{group.title}</Text>
-              <View style={styles.menuCard}>
-                {group.items.map((item, i) => (
-                  <View key={item.label}>
-                    {i > 0 && <View style={styles.menuDivider} />}
-                    <TouchableOpacity
-                      style={styles.menuRow}
-                      activeOpacity={0.7}
-                      onPress={item.onPress}
-                      disabled={!item.onPress}
-                    >
-                      <View style={[styles.menuIconBox, { backgroundColor: item.tint }]}>
-                        <MaterialCommunityIcons name={item.icon} size={18} color={item.iconColor} />
-                      </View>
-                      <Text style={styles.menuLabel}>{item.label}</Text>
-                      {item.badge ? (
-                        <View style={styles.menuBadge}>
-                          <Text style={styles.menuBadgeText}>{item.badge}</Text>
-                        </View>
-                      ) : null}
-                      <MaterialCommunityIcons name="chevron-right" size={18} color={colors.textMuted} />
-                    </TouchableOpacity>
+          {/* SECTION 1: ACCOUNT */}
+          <View style={styles.menuGroup}>
+            <Text style={styles.menuGroupLabel}>ACCOUNT</Text>
+            <View style={styles.menuCard}>
+              {/* Personal Information */}
+              <TouchableOpacity
+                style={styles.menuRow}
+                activeOpacity={0.7}
+                onPress={handleOpenPersonalInfo}
+              >
+                <View style={styles.mintIconBox}>
+                  <MaterialCommunityIcons name="account-outline" size={20} color={styles.mintIconColor.color} />
+                </View>
+                <Text style={styles.menuLabel}>Personal Information</Text>
+                <MaterialCommunityIcons name="chevron-right" size={20} color={styles.chevronColor.color} />
+              </TouchableOpacity>
+
+              <View style={styles.menuDivider} />
+
+              {/* KYC with Verified Badge */}
+              <TouchableOpacity
+                style={styles.menuRow}
+                activeOpacity={0.7}
+                onPress={() => navigation.navigate('KYC')}
+              >
+                <View style={styles.mintIconBox}>
+                  <MaterialCommunityIcons name="file-document-outline" size={20} color={styles.mintIconColor.color} />
+                </View>
+                <Text style={styles.menuLabel}>KYC</Text>
+                {kycInfo.badge ? (
+                  <View style={[styles.menuBadge, { backgroundColor: kycInfo.tint }]}>
+                    <Text style={[styles.menuBadgeText, { color: kycInfo.iconColor }]}>{kycInfo.badge}</Text>
                   </View>
-                ))}
+                ) : null}
+                <MaterialCommunityIcons name="chevron-right" size={20} color={styles.chevronColor.color} />
+              </TouchableOpacity>
+
+              <View style={styles.menuDivider} />
+
+              {/* Bank Details */}
+              <TouchableOpacity
+                style={styles.menuRow}
+                activeOpacity={0.7}
+                onPress={() => navigation.navigate('BankDetails')}
+              >
+                <View style={styles.mintIconBox}>
+                  <MaterialCommunityIcons name="bank-outline" size={20} color={styles.mintIconColor.color} />
+                </View>
+                <Text style={styles.menuLabel}>Bank Details</Text>
+                <MaterialCommunityIcons name="chevron-right" size={20} color={styles.chevronColor.color} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* SECTION 2: SECURITY */}
+          <View style={styles.menuGroup}>
+            <Text style={styles.menuGroupLabel}>SECURITY</Text>
+            <View style={styles.menuCard}>
+              {/* App Lock */}
+              <TouchableOpacity
+                style={styles.menuRow}
+                activeOpacity={0.7}
+                onPress={() => navigation.navigate('AppLockSettings')}
+              >
+                <View style={styles.mintIconBox}>
+                  <MaterialCommunityIcons name="lock-outline" size={20} color={styles.mintIconColor.color} />
+                </View>
+                <Text style={styles.menuLabel}>App Lock</Text>
+                <MaterialCommunityIcons name="chevron-right" size={20} color={styles.chevronColor.color} />
+              </TouchableOpacity>
+
+              <View style={styles.menuDivider} />
+
+              {/* Biometric Unlock */}
+              <View style={styles.menuRow}>
+                <View style={styles.mintIconBox}>
+                  <MaterialCommunityIcons name="shield-check-outline" size={20} color={styles.mintIconColor.color} />
+                </View>
+                <Text style={styles.menuLabel}>Biometric Unlock</Text>
+                <Switch
+                  value={Boolean(isBiometricEnabled)}
+                  onValueChange={handleToggleBiometric}
+                  trackColor={{ false: isDarkMode ? '#374151' : '#E2E4DC', true: '#0E3D23' }}
+                  thumbColor="#FFFFFF"
+                  ios_backgroundColor={isDarkMode ? '#374151' : '#E2E4DC'}
+                />
               </View>
             </View>
-          ))}
+          </View>
 
-          {/* Logout */}
+          {/* SECTION 3: PREFERENCES */}
+          <View style={styles.menuGroup}>
+            <Text style={styles.menuGroupLabel}>PREFERENCES</Text>
+            <View style={styles.menuCard}>
+              {/* Dark mode */}
+              <View style={styles.menuRow}>
+                <View style={styles.mintIconBox}>
+                  <MaterialCommunityIcons
+                    name={isDarkMode ? 'weather-night' : 'weather-sunny'}
+                    size={20}
+                    color={styles.mintIconColor.color}
+                  />
+                </View>
+                <Text style={styles.menuLabel}>Dark mode</Text>
+                <Switch
+                  value={isDarkMode}
+                  onValueChange={toggleTheme}
+                  trackColor={{ false: isDarkMode ? '#374151' : '#E2E4DC', true: '#0E3D23' }}
+                  thumbColor="#FFFFFF"
+                  ios_backgroundColor={isDarkMode ? '#374151' : '#E2E4DC'}
+                />
+              </View>
+
+              <View style={styles.menuDivider} />
+
+              {/* About Us */}
+              <TouchableOpacity
+                style={styles.menuRow}
+                activeOpacity={0.7}
+                onPress={() => navigation.navigate('AboutUs')}
+              >
+                <View style={styles.mintIconBox}>
+                  <MaterialCommunityIcons name="information-outline" size={20} color={styles.mintIconColor.color} />
+                </View>
+                <Text style={styles.menuLabel}>About Us</Text>
+                <MaterialCommunityIcons name="chevron-right" size={20} color={styles.chevronColor.color} />
+              </TouchableOpacity>
+
+              <View style={styles.menuDivider} />
+
+              {/* Contact Support */}
+              <TouchableOpacity
+                style={styles.menuRow}
+                activeOpacity={0.7}
+                onPress={handleContactSupport}
+              >
+                <View style={styles.mintIconBox}>
+                  <MaterialCommunityIcons name="navigation-variant-outline" size={20} color={styles.mintIconColor.color} />
+                </View>
+                <Text style={styles.menuLabel}>Contact Support</Text>
+                <MaterialCommunityIcons name="chevron-right" size={20} color={styles.chevronColor.color} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* SECTION 4: REFER & EARN (Standalone Card) */}
+          <TouchableOpacity
+            style={styles.rewardsCard}
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('Referral')}
+          >
+            <View style={styles.mintIconBox}>
+              <MaterialCommunityIcons name="gift-outline" size={20} color={styles.mintIconColor.color} />
+            </View>
+            <View style={styles.rewardsContent}>
+              <Text style={styles.rewardsTitle}>Refer & Earn</Text>
+              <Text style={styles.rewardsSubtitle}>{coinBalance} Coins · Invite friends & earn</Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={20} color={styles.chevronColor.color} />
+          </TouchableOpacity>
+
+          {/* SECTION 5: LOGOUT */}
           <TouchableOpacity style={styles.logoutCard} activeOpacity={0.85} onPress={handleLogout}>
             <View style={styles.logoutIconBox}>
               <MaterialCommunityIcons name="logout" size={18} color={colors.error} />
@@ -328,24 +452,88 @@ const ProfileScreen = ({ navigation }) => {
         <View style={{ height: 110 }} />
       </ScrollView>
 
+      {/* Personal Information Overview Sheet / Modal */}
+      <Modal visible={personalInfoModalVisible} transparent animationType="slide" onRequestClose={() => setPersonalInfoModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.personalInfoModalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Personal Information</Text>
+              <TouchableOpacity onPress={() => setPersonalInfoModalVisible(false)} style={styles.modalCloseBtn}>
+                <MaterialCommunityIcons name="close" size={18} color={themeColors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Profile / Username Row */}
+            <TouchableOpacity style={styles.personalInfoRow} activeOpacity={0.7} onPress={handleEditUsername}>
+              <View style={styles.personalInfoIconBox}>
+                <MaterialCommunityIcons name="account-edit-outline" size={20} color="#059669" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.personalInfoLabel}>Full Name / Username</Text>
+                <Text style={styles.personalInfoValue}>{activeUserObj?.name || activeUserObj?.username || 'Not set'}</Text>
+              </View>
+              <View style={styles.personalInfoEditBtn}>
+                <Text style={styles.personalInfoEditText}>Edit</Text>
+              </View>
+            </TouchableOpacity>
+
+            <View style={styles.personalInfoDivider} />
+
+            {/* Email Row */}
+            <TouchableOpacity style={styles.personalInfoRow} activeOpacity={0.7} onPress={handleEditEmail}>
+              <View style={[styles.personalInfoIconBox, { backgroundColor: '#E0F2FE' }]}>
+                <MaterialCommunityIcons name="email-edit-outline" size={20} color="#0284C7" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.personalInfoLabel}>Email Address</Text>
+                <Text style={styles.personalInfoValue}>{activeUserObj?.email || 'Not set'}</Text>
+              </View>
+              <View style={styles.personalInfoEditBtn}>
+                <Text style={styles.personalInfoEditText}>Edit</Text>
+              </View>
+            </TouchableOpacity>
+
+            <View style={styles.personalInfoDivider} />
+
+            {/* Mobile Number Row */}
+            <TouchableOpacity style={styles.personalInfoRow} activeOpacity={0.7} onPress={handleEditMobileNumber}>
+              <View style={[styles.personalInfoIconBox, { backgroundColor: '#FEF3C7' }]}>
+                <MaterialCommunityIcons name="phone-outline" size={20} color="#D97706" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.personalInfoLabel}>Mobile Number</Text>
+                <Text style={styles.personalInfoValue}>{activeUserObj?.mobileNumber ? `+91 ${activeUserObj.mobileNumber}` : 'Not set'}</Text>
+              </View>
+              <View style={styles.personalInfoEditBtn}>
+                <Text style={styles.personalInfoEditText}>Edit</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.modalDoneBtn} onPress={() => setPersonalInfoModalVisible(false)}>
+              <Text style={styles.modalDoneBtnText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Edit Username Modal */}
       <Modal visible={editModalVisible} transparent animationType="fade" onRequestClose={() => setEditModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit Username</Text>
+              <Text style={styles.modalTitle}>Edit Profile Name</Text>
               <TouchableOpacity onPress={() => setEditModalVisible(false)} style={styles.modalCloseBtn}>
-                <MaterialCommunityIcons name="close" size={18} color={colors.textSecondary} />
+                <MaterialCommunityIcons name="close" size={18} color={themeColors.textSecondary} />
               </TouchableOpacity>
             </View>
-            <Text style={styles.modalInputLabel}>Username</Text>
+            <Text style={styles.modalInputLabel}>Full Name / Username</Text>
             <TextInput
               style={styles.modalInput}
               value={newUsername}
               onChangeText={setNewUsername}
-              placeholder="Enter new username"
-              placeholderTextColor={colors.textMuted}
-              autoCapitalize="none"
+              placeholder="Enter name"
+              placeholderTextColor={themeColors.textMuted}
+              autoCapitalize="words"
               autoFocus
             />
             <View style={styles.modalBtns}>
@@ -378,7 +566,7 @@ const ProfileScreen = ({ navigation }) => {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Edit Mobile Number</Text>
               <TouchableOpacity onPress={() => setEditMobileModalVisible(false)} style={styles.modalCloseBtn}>
-                <MaterialCommunityIcons name="close" size={18} color={colors.textSecondary} />
+                <MaterialCommunityIcons name="close" size={18} color={themeColors.textSecondary} />
               </TouchableOpacity>
             </View>
             <Text style={styles.modalInputLabel}>Mobile Number</Text>
@@ -387,7 +575,7 @@ const ProfileScreen = ({ navigation }) => {
               value={newMobileNumber}
               onChangeText={setNewMobileNumber}
               placeholder="Enter new mobile number"
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={themeColors.textMuted}
               keyboardType="phone-pad"
               autoFocus
             />
@@ -421,7 +609,7 @@ const ProfileScreen = ({ navigation }) => {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Edit Email</Text>
               <TouchableOpacity onPress={() => setEditEmailModalVisible(false)} style={styles.modalCloseBtn}>
-                <MaterialCommunityIcons name="close" size={18} color={colors.textSecondary} />
+                <MaterialCommunityIcons name="close" size={18} color={themeColors.textSecondary} />
               </TouchableOpacity>
             </View>
             <Text style={styles.modalInputLabel}>Email Address</Text>
@@ -430,7 +618,7 @@ const ProfileScreen = ({ navigation }) => {
               value={newEmail}
               onChangeText={setNewEmail}
               placeholder="Enter new email address"
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={themeColors.textMuted}
               keyboardType="email-address"
               autoCapitalize="none"
               autoFocus
@@ -461,12 +649,16 @@ const ProfileScreen = ({ navigation }) => {
   );
 };
 
-const getStyles = (colors) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+const getStyles = (themeColors, isDarkMode) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: themeColors.background },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 20 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { fontSize: 14, color: colors.textMuted, marginTop: 12 },
+  loadingText: { fontSize: 14, color: themeColors.textMuted, marginTop: 12 },
+
+  // Colors helper for icons
+  mintIconColor: { color: isDarkMode ? '#34D399' : '#0E3D23' },
+  chevronColor: { color: isDarkMode ? '#6B7280' : '#8E9486' },
 
   // Hero
   heroBannerOuter: { position: 'relative', marginBottom: 60 },
@@ -483,7 +675,7 @@ const getStyles = (colors) => StyleSheet.create({
     shadowOpacity: 0.3, shadowRadius: 20, elevation: 12,
   },
   avatarInner: {
-    flex: 1, borderRadius: 24, backgroundColor: colors.surface,
+    flex: 1, borderRadius: 24, backgroundColor: themeColors.surface,
     justifyContent: 'center', alignItems: 'center',
   },
   avatarInitials: { fontSize: 28, fontWeight: '800', color: colors.primary, letterSpacing: -0.5 },
@@ -491,78 +683,212 @@ const getStyles = (colors) => StyleSheet.create({
   // Name
   nameSection: { alignItems: 'center', paddingHorizontal: 24, marginTop: 12 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  profileName: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: -0.5 },
-  profileMeta: { fontSize: 13, color: colors.textMuted, marginTop: 4, textAlign: 'center' },
-  joinDate: { fontSize: 12, color: colors.textMuted, marginTop: 4 },
+  profileName: { fontSize: 22, fontWeight: '800', color: themeColors.text, letterSpacing: -0.5 },
+  profileMeta: { fontSize: 13, color: themeColors.textMuted, marginTop: 4, textAlign: 'center' },
+  joinDate: { fontSize: 12, color: themeColors.textMuted, marginTop: 4 },
 
   // Stats
   statsRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginTop: 20 },
   statCard: {
-    flex: 1, backgroundColor: colors.surface, borderRadius: 18, padding: 12,
+    flex: 1, backgroundColor: themeColors.surface, borderRadius: 18, padding: 12,
     alignItems: 'center',
     shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
-  statLabel: { fontSize: 10, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: '600' },
-  statValue: { fontSize: 15, fontWeight: '700', color: colors.text, marginTop: 4 },
-  // Slightly smaller font for longer date strings
+  statLabel: { fontSize: 10, color: themeColors.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: '600' },
+  statValue: { fontSize: 15, fontWeight: '700', color: themeColors.text, marginTop: 4 },
   statValueSmall: { fontSize: 12 },
 
-  // Menu
-  menuSection: { paddingHorizontal: 16, marginTop: 20 },
-  menuGroup: { marginBottom: 16 },
+  // Menu Section
+  menuSection: { paddingHorizontal: 16, marginTop: 24 },
+  menuGroup: { marginBottom: 20 },
   menuGroupLabel: {
-    fontSize: 11, fontWeight: '700', color: colors.textMuted,
-    textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, paddingHorizontal: 4,
+    fontSize: 12, fontWeight: '800', color: isDarkMode ? '#9CA3AF' : '#686D62',
+    textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 10, paddingHorizontal: 4,
   },
   menuCard: {
-    backgroundColor: colors.surface, borderRadius: 24, overflow: 'hidden',
-    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+    backgroundColor: themeColors.surface,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#ECEFE6',
+    overflow: 'hidden',
+    shadowColor: '#0E3D23',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDarkMode ? 0 : 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  menuDivider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, opacity: 0.6, marginHorizontal: 16 },
-  menuRow: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
-  menuIconBox: { width: 36, height: 36, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  menuLabel: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text },
+  menuDivider: {
+    height: 1,
+    backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.06)' : '#EFF1E9',
+    marginHorizontal: 16,
+  },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 14,
+  },
+  mintIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.16)' : '#E3F6EC',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuLabel: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: themeColors.text,
+  },
   menuBadge: {
-    backgroundColor: colors.successLight, borderRadius: 999,
-    paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    marginRight: 4,
   },
-  menuBadgeText: { fontSize: 10, fontWeight: '700', color: colors.success },
+  menuBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+
+  // Refer & Earn Standalone Card
+  rewardsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: themeColors.surface,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#ECEFE6',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 14,
+    marginBottom: 20,
+    shadowColor: '#0E3D23',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDarkMode ? 0 : 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  rewardsContent: { flex: 1 },
+  rewardsTitle: { fontSize: 15, fontWeight: '700', color: themeColors.text },
+  rewardsSubtitle: { fontSize: 12, fontWeight: '500', color: themeColors.textMuted, marginTop: 2 },
 
   // Logout
   logoutCard: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.surface, borderRadius: 24,
-    padding: 16, gap: 12, marginBottom: 12,
-    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: themeColors.surface,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#ECEFE6',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 14,
+    marginBottom: 12,
+    shadowColor: '#0E3D23',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDarkMode ? 0 : 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   logoutIconBox: {
-    width: 36, height: 36, borderRadius: 12,
-    backgroundColor: colors.errorLight, justifyContent: 'center', alignItems: 'center',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#FEE2E2',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   logoutText: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.error },
-  versionText: { textAlign: 'center', fontSize: 12, color: colors.textMuted, marginTop: 8 },
+  versionText: { textAlign: 'center', fontSize: 12, color: themeColors.textMuted, marginTop: 8 },
+
+  // Personal Info Modal
+  personalInfoModalContent: {
+    width: '90%',
+    backgroundColor: themeColors.surface,
+    borderRadius: 28,
+    padding: 22,
+    borderWidth: 1,
+    borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#ECEFE6',
+  },
+  personalInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    gap: 12,
+  },
+  personalInfoIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#DCFCE7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  personalInfoLabel: {
+    fontSize: 11,
+    color: themeColors.textMuted,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  personalInfoValue: {
+    fontSize: 14,
+    color: themeColors.text,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  personalInfoEditBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#F0F2EB',
+  },
+  personalInfoEditText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: isDarkMode ? '#34D399' : '#0E3D23',
+  },
+  personalInfoDivider: {
+    height: 1,
+    backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.06)' : '#EFF1E9',
+  },
+  modalDoneBtn: {
+    marginTop: 16,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: '#0E3D23',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalDoneBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
 
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { width: '88%', backgroundColor: colors.surface, borderRadius: 28, padding: 24 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 19, fontWeight: '700', color: colors.text, letterSpacing: -0.4 },
-  modalCloseBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.muted, justifyContent: 'center', alignItems: 'center' },
-  modalInputLabel: { fontSize: 13, fontWeight: '600', color: colors.text, marginBottom: 8 },
+  modalContent: { width: '88%', backgroundColor: themeColors.surface, borderRadius: 28, padding: 24 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  modalTitle: { fontSize: 19, fontWeight: '700', color: themeColors.text, letterSpacing: -0.4 },
+  modalCloseBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#F0F2EB', justifyContent: 'center', alignItems: 'center' },
+  modalInputLabel: { fontSize: 13, fontWeight: '600', color: themeColors.text, marginBottom: 8 },
   modalInput: {
-    backgroundColor: colors.background, borderRadius: 14, height: 50,
-    paddingHorizontal: 16, fontSize: 15, color: colors.text,
-    borderWidth: 1.5, borderColor: colors.border, marginBottom: 20,
+    backgroundColor: themeColors.background, borderRadius: 14, height: 50,
+    paddingHorizontal: 16, fontSize: 15, color: themeColors.text,
+    borderWidth: 1.5, borderColor: themeColors.border, marginBottom: 20,
   },
   modalBtns: { flexDirection: 'row', gap: 12 },
   modalCancelBtn: {
-    flex: 1, height: 48, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border,
+    flex: 1, height: 48, borderRadius: 14, borderWidth: 1.5, borderColor: themeColors.border,
     justifyContent: 'center', alignItems: 'center',
   },
-  modalCancelText: { fontSize: 15, fontWeight: '600', color: colors.textSecondary },
+  modalCancelText: { fontSize: 15, fontWeight: '600', color: themeColors.textSecondary },
   modalSaveBtnOuter: { flex: 1 },
   modalSaveGradient: { height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
   modalSaveText: { fontSize: 15, fontWeight: '700', color: colors.white },
@@ -570,3 +896,4 @@ const getStyles = (colors) => StyleSheet.create({
 });
 
 export default ProfileScreen;
+

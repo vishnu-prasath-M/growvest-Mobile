@@ -290,44 +290,48 @@ export default function AppLockSettingsScreen({ navigation }) {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Hero Card */}
         <LinearGradient
-          colors={['#0E3D23', '#1A5C39']}
+          colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.heroCard}
         >
           <View style={styles.heroIconCircle}>
-            <MaterialCommunityIcons name="shield-lock-outline" size={28} color="#0E3D23" />
+            <MaterialCommunityIcons name="shield-lock-outline" size={26} color="#0E3D23" />
           </View>
-          <Text style={styles.heroTitle}>Growvest Device Protection</Text>
+          <Text style={styles.heroTitle}>Device Protection</Text>
           <Text style={styles.heroSubtitle}>
-            Protect your investments, wallet balance, and transactions with a local PIN or biometric unlock.
+            Protect your investments, wallet balance, and transactions with a secure PIN or biometric unlock.
           </Text>
         </LinearGradient>
 
         {/* Master Switch Card */}
-        <View style={[styles.card, { backgroundColor: themeColors.surface }]}>
-          <View style={styles.rowBetween}>
-            <View style={styles.iconLabelGroup}>
-              <View style={[styles.iconBox, { backgroundColor: isAppLockEnabled ? '#DCFCE7' : '#F1F5F9' }]}>
-                <MaterialCommunityIcons
-                  name={isAppLockEnabled ? 'lock' : 'lock-open-outline'}
-                  size={20}
-                  color={isAppLockEnabled ? '#16A34A' : '#64748B'}
-                />
+        <View style={styles.menuGroup}>
+          <Text style={styles.sectionHeader}>APP SECURITY</Text>
+          <View style={[styles.card, { backgroundColor: themeColors.surface, borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#ECEFE6' }]}>
+            <View style={styles.rowBetween}>
+              <View style={styles.iconLabelGroup}>
+                <View style={[styles.mintIconBox, { backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.16)' : '#E3F6EC' }]}>
+                  <MaterialCommunityIcons
+                    name={isAppLockEnabled ? 'lock' : 'lock-open-outline'}
+                    size={20}
+                    color={isDarkMode ? '#34D399' : '#0E3D23'}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.rowTitle, { color: themeColors.text }]}>App Lock</Text>
+                  <Text style={[styles.rowSubtitle, { color: themeColors.textMuted }]}>
+                    {isAppLockEnabled ? 'App is protected' : 'App opens without authentication'}
+                  </Text>
+                </View>
               </View>
-              <View>
-                <Text style={[styles.rowTitle, { color: themeColors.text }]}>App Lock</Text>
-                <Text style={styles.rowSubtitle}>
-                  {isAppLockEnabled ? 'App is protected' : 'App opens without authentication'}
-                </Text>
-              </View>
+              <Switch
+                value={isAppLockEnabled}
+                onValueChange={handleToggleLock}
+                trackColor={{ false: isDarkMode ? '#374151' : '#E2E4DC', true: '#0E3D23' }}
+                thumbColor="#FFFFFF"
+                ios_backgroundColor={isDarkMode ? '#374151' : '#E2E4DC'}
+              />
             </View>
-            <Switch
-              value={isAppLockEnabled}
-              onValueChange={handleToggleLock}
-              trackColor={{ false: '#E2E8F0', true: '#16A34A' }}
-              thumbColor="#FFFFFF"
-            />
           </View>
         </View>
 
@@ -335,133 +339,126 @@ export default function AppLockSettingsScreen({ navigation }) {
         {isAppLockEnabled && (
           <>
             {/* PIN & Biometric Settings Group */}
-            <Text style={styles.sectionHeader}>SECURITY METHOD</Text>
-            <View style={[styles.card, { backgroundColor: themeColors.surface }]}>
-              {/* Change PIN Option */}
-              <TouchableOpacity
-                style={styles.settingRow}
-                activeOpacity={0.7}
-                onPress={() => {
-                  resetPinInputs();
-                  setSelectedLength(currentPinLength || 4);
-                  setModalMode('change');
-                  setModalVisible(true);
-                }}
-              >
-                <View style={styles.iconLabelGroup}>
-                  <View style={[styles.iconBox, { backgroundColor: '#E0F2FE' }]}>
-                    <MaterialCommunityIcons name="form-textbox-password" size={20} color="#0284C7" />
+            <View style={styles.menuGroup}>
+              <Text style={styles.sectionHeader}>SECURITY METHOD</Text>
+              <View style={[styles.card, { backgroundColor: themeColors.surface, borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#ECEFE6' }]}>
+                {/* Change PIN Option */}
+                <TouchableOpacity
+                  style={styles.settingRow}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    resetPinInputs();
+                    setSelectedLength(currentPinLength || 4);
+                    setModalMode('change');
+                    setModalVisible(true);
+                  }}
+                >
+                  <View style={styles.iconLabelGroup}>
+                    <View style={[styles.mintIconBox, { backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.16)' : '#E3F6EC' }]}>
+                      <MaterialCommunityIcons name="form-textbox-password" size={20} color={isDarkMode ? '#34D399' : '#0E3D23'} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.rowTitle, { color: themeColors.text }]}>Change App Lock PIN</Text>
+                      <Text style={[styles.rowSubtitle, { color: themeColors.textMuted }]}>{currentPinLength}-digit PIN active</Text>
+                    </View>
                   </View>
-                  <View>
-                    <Text style={[styles.rowTitle, { color: themeColors.text }]}>Change App Lock PIN</Text>
-                    <Text style={styles.rowSubtitle}>{currentPinLength}-digit PIN active</Text>
-                  </View>
-                </View>
-                <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textMuted} />
-              </TouchableOpacity>
+                  <MaterialCommunityIcons name="chevron-right" size={20} color={isDarkMode ? '#6B7280' : '#8E9486'} />
+                </TouchableOpacity>
 
-              <View style={styles.divider} />
+                <View style={[styles.divider, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#EFF1E9' }]} />
 
-              {/* Biometric Toggle */}
-              <View style={styles.settingRow}>
-                <View style={styles.iconLabelGroup}>
-                  <View
-                    style={[
-                      styles.iconBox,
-                      {
-                        backgroundColor:
-                          biometricInfo.hasHardware && biometricInfo.isEnrolled
-                            ? '#FEF3C7'
-                            : '#F1F5F9',
-                      },
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name={biometricInfo.biometryType === 'Face' ? 'face-recognition' : 'fingerprint'}
-                      size={20}
-                      color={
-                        biometricInfo.hasHardware && biometricInfo.isEnrolled
-                          ? '#D97706'
-                          : '#94A3B8'
-                      }
-                    />
+                {/* Biometric Toggle */}
+                <View style={styles.settingRow}>
+                  <View style={styles.iconLabelGroup}>
+                    <View style={[styles.mintIconBox, { backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.16)' : '#E3F6EC' }]}>
+                      <MaterialCommunityIcons
+                        name={biometricInfo.biometryType === 'Face' ? 'face-recognition' : 'fingerprint'}
+                        size={20}
+                        color={isDarkMode ? '#34D399' : '#0E3D23'}
+                      />
+                    </View>
+                    <View style={{ flex: 1, paddingRight: 8 }}>
+                      <Text style={[styles.rowTitle, { color: themeColors.text }]}>
+                        {biometricInfo.label || 'Biometric Unlock'}
+                      </Text>
+                      <Text style={[styles.rowSubtitle, { color: themeColors.textMuted }]}>
+                        {!biometricInfo.hasHardware
+                          ? 'Biometric is not available on this device'
+                          : !biometricInfo.isEnrolled
+                          ? 'No biometrics enrolled in device settings'
+                          : `Unlock using ${biometricInfo.biometryType || 'Fingerprint'}`}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={{ flex: 1, paddingRight: 8 }}>
-                    <Text style={[styles.rowTitle, { color: themeColors.text }]}>
-                      {biometricInfo.label || 'Biometric Unlock'}
-                    </Text>
-                    <Text style={styles.rowSubtitle}>
-                      {!biometricInfo.hasHardware
-                        ? 'Biometric authentication is not available on this device'
-                        : !biometricInfo.isEnrolled
-                        ? 'No biometrics enrolled in device settings'
-                        : `Unlock using ${biometricInfo.biometryType || 'Fingerprint'}`}
-                    </Text>
-                  </View>
+                  <Switch
+                    value={Boolean(isBiometricEnabled && biometricInfo.hasHardware && biometricInfo.isEnrolled)}
+                    onValueChange={handleToggleBiometric}
+                    disabled={!biometricInfo.hasHardware || !biometricInfo.isEnrolled}
+                    trackColor={{ false: isDarkMode ? '#374151' : '#E2E4DC', true: '#0E3D23' }}
+                    thumbColor="#FFFFFF"
+                    ios_backgroundColor={isDarkMode ? '#374151' : '#E2E4DC'}
+                  />
                 </View>
-                <Switch
-                  value={isBiometricEnabled && biometricInfo.hasHardware && biometricInfo.isEnrolled}
-                  onValueChange={handleToggleBiometric}
-                  disabled={!biometricInfo.hasHardware || !biometricInfo.isEnrolled}
-                  trackColor={{ false: '#E2E8F0', true: '#16A34A' }}
-                  thumbColor="#FFFFFF"
-                />
               </View>
             </View>
 
             {/* Auto Lock Timeout Group */}
-            <Text style={styles.sectionHeader}>AUTO-LOCK TIMEOUT</Text>
-            <View style={[styles.card, { backgroundColor: themeColors.surface }]}>
-              {TIMEOUT_OPTIONS.map((opt, idx) => {
-                const isSelected = lockTimeout === opt.value;
-                return (
-                  <View key={opt.value}>
-                    {idx > 0 && <View style={styles.divider} />}
-                    <TouchableOpacity
-                      style={styles.settingRow}
-                      activeOpacity={0.7}
-                      onPress={() => handleSelectTimeout(opt.value)}
-                    >
-                      <View style={styles.iconLabelGroup}>
-                        <View
-                          style={[
-                            styles.iconBox,
-                            { backgroundColor: isSelected ? '#DCFCE7' : '#F8FAFC' },
-                          ]}
-                        >
-                          <MaterialCommunityIcons
-                            name="timer-outline"
-                            size={20}
-                            color={isSelected ? '#16A34A' : '#64748B'}
-                          />
+            <View style={styles.menuGroup}>
+              <Text style={styles.sectionHeader}>AUTO-LOCK TIMEOUT</Text>
+              <View style={[styles.card, { backgroundColor: themeColors.surface, borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#ECEFE6' }]}>
+                {TIMEOUT_OPTIONS.map((opt, idx) => {
+                  const isSelected = lockTimeout === opt.value;
+                  return (
+                    <View key={opt.value}>
+                      {idx > 0 && <View style={[styles.divider, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#EFF1E9' }]} />}
+                      <TouchableOpacity
+                        style={styles.settingRow}
+                        activeOpacity={0.7}
+                        onPress={() => handleSelectTimeout(opt.value)}
+                      >
+                        <View style={styles.iconLabelGroup}>
+                          <View
+                            style={[
+                              styles.mintIconBox,
+                              { backgroundColor: isSelected ? (isDarkMode ? 'rgba(16, 185, 129, 0.25)' : '#DCFCE7') : (isDarkMode ? 'rgba(255,255,255,0.05)' : '#F5F6F2') },
+                            ]}
+                          >
+                            <MaterialCommunityIcons
+                              name="timer-outline"
+                              size={20}
+                              color={isSelected ? (isDarkMode ? '#34D399' : '#0E3D23') : (isDarkMode ? '#9CA3AF' : '#8E9486')}
+                            />
+                          </View>
+                          <Text
+                            style={[
+                              styles.rowTitle,
+                              { color: isSelected ? (isDarkMode ? '#34D399' : '#0E3D23') : themeColors.text, fontWeight: isSelected ? '700' : '500' },
+                            ]}
+                          >
+                            {opt.label}
+                          </Text>
                         </View>
-                        <Text
-                          style={[
-                            styles.rowTitle,
-                            { color: isSelected ? '#16A34A' : themeColors.text, fontWeight: isSelected ? '700' : '500' },
-                          ]}
-                        >
-                          {opt.label}
-                        </Text>
-                      </View>
-                      {isSelected && (
-                        <MaterialCommunityIcons name="check-circle" size={20} color="#16A34A" />
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                );
-              })}
+                        {isSelected && (
+                          <MaterialCommunityIcons name="check-circle" size={20} color={isDarkMode ? '#34D399' : '#0E3D23'} />
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+              </View>
             </View>
           </>
         )}
 
         {/* Security Info Card */}
-        <View style={styles.infoBox}>
-          <MaterialCommunityIcons name="shield-check" size={20} color="#16A34A" />
-          <Text style={styles.infoText}>
-            App Lock is stored locally on this device using hardware encryption. Your PIN is never sent to our servers.
+        <View style={[styles.infoBox, { backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.12)' : '#E3F6EC', borderColor: isDarkMode ? 'rgba(16, 185, 129, 0.25)' : '#D1FAE5' }]}>
+          <MaterialCommunityIcons name="shield-check" size={20} color={isDarkMode ? '#34D399' : '#0E3D23'} />
+          <Text style={[styles.infoText, { color: isDarkMode ? '#A7F3D0' : '#0E3D23' }]}>
+            App Lock is secured locally on this device with hardware encryption. Your PIN is never uploaded to any server.
           </Text>
         </View>
+
+        <View style={{ height: 40 }} />
       </ScrollView>
 
       {/* Setup / Change / Verify PIN Modal */}
@@ -624,7 +621,7 @@ export default function AppLockSettingsScreen({ navigation }) {
       {/* Biometric Prompt Offer Modal after successful PIN setup */}
       <Modal visible={promptBiometricVisible} transparent animationType="fade">
         <View style={styles.confirmBackdrop}>
-          <View style={styles.confirmCard}>
+          <View style={[styles.confirmCard, { backgroundColor: themeColors.surface }]}>
             <View style={styles.confirmIconBox}>
               <MaterialCommunityIcons
                 name={biometricInfo.biometryType === 'Face' ? 'face-recognition' : 'fingerprint'}
@@ -632,17 +629,17 @@ export default function AppLockSettingsScreen({ navigation }) {
                 color="#0E3D23"
               />
             </View>
-            <Text style={styles.confirmTitle}>Enable {biometricInfo.label || 'Biometrics'}?</Text>
-            <Text style={styles.confirmSubtitle}>
+            <Text style={[styles.confirmTitle, { color: themeColors.text }]}>Enable {biometricInfo.label || 'Biometrics'}?</Text>
+            <Text style={[styles.confirmSubtitle, { color: themeColors.textMuted }]}>
               Would you like to use your {biometricInfo.biometryType || 'fingerprint'} for faster unlock?
             </Text>
 
             <View style={styles.confirmButtons}>
               <TouchableOpacity
-                style={styles.confirmBtnCancel}
+                style={[styles.confirmBtnCancel, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#F1F5F9' }]}
                 onPress={() => setPromptBiometricVisible(false)}
               >
-                <Text style={styles.confirmTextCancel}>PIN Only</Text>
+                <Text style={[styles.confirmTextCancel, { color: themeColors.textSecondary }]}>PIN Only</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -664,21 +661,21 @@ export default function AppLockSettingsScreen({ navigation }) {
       {/* Disable App Lock Confirmation Modal */}
       <Modal visible={disableModalVisible} transparent animationType="fade">
         <View style={styles.confirmBackdrop}>
-          <View style={styles.confirmCard}>
+          <View style={[styles.confirmCard, { backgroundColor: themeColors.surface }]}>
             <View style={[styles.confirmIconBox, { backgroundColor: '#FEE2E2' }]}>
               <MaterialCommunityIcons name="shield-off-outline" size={32} color="#DC2626" />
             </View>
-            <Text style={styles.confirmTitle}>Disable App Lock?</Text>
-            <Text style={styles.confirmSubtitle}>
+            <Text style={[styles.confirmTitle, { color: themeColors.text }]}>Disable App Lock?</Text>
+            <Text style={[styles.confirmSubtitle, { color: themeColors.textMuted }]}>
               Your app will open without requiring PIN or biometric verification.
             </Text>
 
             <View style={styles.confirmButtons}>
               <TouchableOpacity
-                style={styles.confirmBtnCancel}
+                style={[styles.confirmBtnCancel, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#F1F5F9' }]}
                 onPress={() => setDisableModalVisible(false)}
               >
-                <Text style={styles.confirmTextCancel}>Cancel</Text>
+                <Text style={[styles.confirmTextCancel, { color: themeColors.textSecondary }]}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -717,49 +714,62 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   scrollContent: {
-    padding: 16,
-    gap: 16,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 24,
+    gap: 18,
   },
   heroCard: {
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 20,
     alignItems: 'center',
     elevation: 4,
+    shadowColor: '#0E3D23',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
   },
   heroIconCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   heroTitle: {
     fontSize: 18,
     fontWeight: '800',
     color: '#FFFFFF',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   heroSubtitle: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: 'rgba(255, 255, 255, 0.85)',
     textAlign: 'center',
     lineHeight: 18,
   },
+  menuGroup: {
+    marginBottom: 2,
+  },
   card: {
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    borderWidth: 1,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: '#0E3D23',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.04,
     shadowRadius: 8,
+    overflow: 'hidden',
   },
   rowBetween: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingVertical: 12,
   },
   iconLabelGroup: {
     flexDirection: 'row',
@@ -767,10 +777,10 @@ const styles = StyleSheet.create({
     gap: 14,
     flex: 1,
   },
-  iconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+  mintIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -780,43 +790,40 @@ const styles = StyleSheet.create({
   },
   rowSubtitle: {
     fontSize: 12,
-    color: '#64748B',
     marginTop: 2,
   },
   sectionHeader: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#64748B',
-    letterSpacing: 0.8,
-    marginLeft: 4,
-    marginTop: 8,
+    fontWeight: '800',
+    color: '#686D62',
+    letterSpacing: 1.2,
+    marginBottom: 8,
+    paddingHorizontal: 4,
+    textTransform: 'uppercase',
   },
   settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 10,
+    paddingVertical: 12,
   },
   divider: {
     height: 1,
-    backgroundColor: '#F1F5F9',
-    marginVertical: 4,
+    marginHorizontal: 0,
   },
   infoBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: '#DCFCE7',
-    borderRadius: 14,
+    borderRadius: 18,
     padding: 14,
-    marginTop: 8,
+    borderWidth: 1,
   },
   infoText: {
     flex: 1,
     fontSize: 12,
-    color: '#166534',
     lineHeight: 17,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,
@@ -957,7 +964,6 @@ const styles = StyleSheet.create({
   confirmCard: {
     width: '100%',
     maxWidth: 340,
-    backgroundColor: '#FFFFFF',
     borderRadius: 24,
     padding: 24,
     alignItems: 'center',
@@ -974,13 +980,11 @@ const styles = StyleSheet.create({
   confirmTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#0F172A',
     marginBottom: 6,
     textAlign: 'center',
   },
   confirmSubtitle: {
     fontSize: 13,
-    color: '#64748B',
     textAlign: 'center',
     lineHeight: 18,
     marginBottom: 20,
@@ -994,12 +998,10 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 44,
     borderRadius: 12,
-    backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
   },
   confirmTextCancel: {
-    color: '#475569',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -1017,3 +1019,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+

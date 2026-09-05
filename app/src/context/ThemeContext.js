@@ -35,9 +35,6 @@ export const ThemeProvider = ({ children }) => {
   }, []);
 
   const toggleTheme = async () => {
-    // Apply smooth ease-in-out layout animation transition
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    
     const nextMode = !isDarkMode;
     setIsDarkMode(nextMode);
     updateActiveColors(nextMode ? 'dark' : 'light');

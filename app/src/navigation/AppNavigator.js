@@ -1,5 +1,5 @@
-import React, { useRef, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, Dimensions, ActivityIndicator, Image } from 'react-native';
+import React, { useRef, useCallback, useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, Dimensions, ActivityIndicator, Image, Keyboard, Platform } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -186,6 +186,25 @@ const TabItem = React.memo(({ tab, index, focused, onPress }) => {
 // ---------- Premium Floating Tab Bar ----------
 const PrimeTabBar = ({ state, descriptors, navigation }) => {
   const { colors: themeColors, isDarkMode } = useTheme();
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSubscription = Keyboard.addListener(showEvent, () => {
+      setKeyboardVisible(true);
+    });
+    const hideSubscription = Keyboard.addListener(hideEvent, () => {
+      setKeyboardVisible(false);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+
   const dynamicPillStyle = {
     backgroundColor: isDarkMode ? 'rgba(18,24,20,0.95)' : 'rgba(255,255,255,0.95)',
     borderColor: isDarkMode ? 'rgba(24,36,28,0.8)' : 'rgba(255,255,255,0.8)',
@@ -220,6 +239,10 @@ const PrimeTabBar = ({ state, descriptors, navigation }) => {
       width: pillWidth,
     };
   });
+
+  if (isKeyboardVisible) {
+    return null;
+  }
 
   return (
     <View style={tabStyles.outerContainer} pointerEvents="box-none">

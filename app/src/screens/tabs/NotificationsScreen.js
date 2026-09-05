@@ -9,7 +9,7 @@ import {
   Animated,
   Pressable,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/theme';
@@ -19,115 +19,150 @@ import TopBar from '../../components/TopBar';
 import api from '../../services/apiService';
 import { API_ENDPOINTS } from '../../config/api';
 
-// ─── SF-Symbols style icon map (using Ionicons) ───────────────────────────────
+// ─── Notification Type Configuration ─────────────────────────────────────────
 const TYPE_CONFIG = {
   investment_approved: {
-    icon: 'arrow.up.right.circle.fill',   // SF Symbols equivalent → Ionicons:
-    ionIcon: 'trending-up',
-    color: '#1A5C39',
-    bg: '#E8F5EE',
+    icon: 'trending-up',
+    color: '#0E3D23',
+    bg: '#E3F6EC',
+    darkColor: '#34D399',
+    darkBg: 'rgba(16, 185, 129, 0.16)',
     label: 'Investment',
   },
   investment_rejected: {
-    ionIcon: 'trending-down',
+    icon: 'trending-down',
     color: '#DC2626',
-    bg: '#FEE9E9',
+    bg: '#FEE2E2',
+    darkColor: '#F87171',
+    darkBg: 'rgba(239, 68, 68, 0.15)',
     label: 'Investment',
   },
   withdrawal_approved: {
-    ionIcon: 'arrow-up-circle',
-    color: '#059669',
-    bg: '#D1FAE5',
+    icon: 'arrow-up-circle-outline',
+    color: '#0E3D23',
+    bg: '#E3F6EC',
+    darkColor: '#34D399',
+    darkBg: 'rgba(16, 185, 129, 0.16)',
     label: 'Withdrawal',
   },
   withdrawal_rejected: {
-    ionIcon: 'arrow-down-circle',
+    icon: 'arrow-down-circle-outline',
     color: '#DC2626',
-    bg: '#FEE9E9',
+    bg: '#FEE2E2',
+    darkColor: '#F87171',
+    darkBg: 'rgba(239, 68, 68, 0.15)',
     label: 'Withdrawal',
   },
   chit_joined: {
-    ionIcon: 'people-circle',
-    color: '#1A5C39',
-    bg: '#E8F5EE',
+    icon: 'account-group-outline',
+    color: '#0E3D23',
+    bg: '#E3F6EC',
+    darkColor: '#34D399',
+    darkBg: 'rgba(16, 185, 129, 0.16)',
     label: 'Chit Fund',
   },
   chit_join_approved: {
-    ionIcon: 'checkmark-circle',
-    color: '#16A34A',
-    bg: '#DCFCE7',
+    icon: 'check-decagram-outline',
+    color: '#0E3D23',
+    bg: '#E3F6EC',
+    darkColor: '#34D399',
+    darkBg: 'rgba(16, 185, 129, 0.16)',
     label: 'Approved',
   },
   chit_join_rejected: {
-    ionIcon: 'close-circle',
+    icon: 'close-circle-outline',
     color: '#DC2626',
-    bg: '#FEE9E9',
+    bg: '#FEE2E2',
+    darkColor: '#F87171',
+    darkBg: 'rgba(239, 68, 68, 0.15)',
     label: 'Rejected',
   },
   chit_payment_approved: {
-    ionIcon: 'checkmark-done-circle',
-    color: '#16A34A',
-    bg: '#DCFCE7',
+    icon: 'cash-check',
+    color: '#0E3D23',
+    bg: '#E3F6EC',
+    darkColor: '#34D399',
+    darkBg: 'rgba(16, 185, 129, 0.16)',
     label: 'Payment',
   },
   chit_payment_rejected: {
-    ionIcon: 'close-circle',
+    icon: 'cash-remove',
     color: '#DC2626',
-    bg: '#FEE9E9',
+    bg: '#FEE2E2',
+    darkColor: '#F87171',
+    darkBg: 'rgba(239, 68, 68, 0.15)',
     label: 'Payment',
   },
   new_chit_available: {
-    ionIcon: 'layers',
-    color: '#2563EB',
-    bg: '#EEF2FF',
+    icon: 'sparkles',
+    color: '#0284C7',
+    bg: '#E0F2FE',
+    darkColor: '#38BDF8',
+    darkBg: 'rgba(14, 165, 233, 0.15)',
     label: 'New Chit',
   },
   chit_closed: {
-    ionIcon: 'lock-closed',
-    color: '#6B7280',
-    bg: '#F3F4F6',
-    label: 'Chit Closed',
+    icon: 'lock-check-outline',
+    color: '#64748B',
+    bg: '#F1F5F9',
+    darkColor: '#94A3B8',
+    darkBg: 'rgba(255, 255, 255, 0.08)',
+    label: 'Closed',
   },
   due_reminder: {
-    ionIcon: 'alarm',
+    icon: 'bell-ring-outline',
     color: '#D97706',
     bg: '#FEF3C7',
+    darkColor: '#FBBF24',
+    darkBg: 'rgba(245, 158, 11, 0.15)',
     label: 'Reminder',
   },
   kyc_approved: {
-    ionIcon: 'shield-checkmark',
-    color: '#16A34A',
-    bg: '#DCFCE7',
+    icon: 'shield-check-outline',
+    color: '#0E3D23',
+    bg: '#E3F6EC',
+    darkColor: '#34D399',
+    darkBg: 'rgba(16, 185, 129, 0.16)',
     label: 'KYC',
   },
   kyc_rejected: {
-    ionIcon: 'shield-outline',
+    icon: 'shield-alert-outline',
     color: '#DC2626',
-    bg: '#FEE9E9',
+    bg: '#FEE2E2',
+    darkColor: '#F87171',
+    darkBg: 'rgba(239, 68, 68, 0.15)',
     label: 'KYC',
   },
   auction_winner: {
-    ionIcon: 'ribbon',
+    icon: 'trophy-outline',
     color: '#7C3AED',
-    bg: '#F3F0FF',
+    bg: '#F5F3FF',
+    darkColor: '#A78BFA',
+    darkBg: 'rgba(124, 58, 237, 0.15)',
     label: 'Auction',
   },
   auction: {
-    ionIcon: 'ribbon',
+    icon: 'gavel',
     color: '#7C3AED',
-    bg: '#F3F0FF',
+    bg: '#F5F3FF',
+    darkColor: '#A78BFA',
+    darkBg: 'rgba(124, 58, 237, 0.15)',
     label: 'Auction',
   },
   welcome: {
-    ionIcon: 'hand-left',
-    color: '#1A5C39',
-    bg: '#E8F5EE',
+    icon: 'hand-wave-outline',
+    color: '#0E3D23',
+    bg: '#E3F6EC',
+    darkColor: '#34D399',
+    darkBg: 'rgba(16, 185, 129, 0.16)',
     label: 'Welcome',
   },
   general: {
-    ionIcon: 'notifications',
-    color: '#1A5C39',
-    bg: '#E8F5EE',
+    icon: 'bell-outline',
+    color: '#0E3D23',
+    bg: '#E3F6EC',
+    darkColor: '#34D399',
+    darkBg: 'rgba(16, 185, 129, 0.16)',
     label: 'Update',
   },
 };
@@ -184,21 +219,21 @@ const groupNotifications = (notifications) => {
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 const SkeletonCard = () => {
-  const { colors: themeColors } = useTheme();
-  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
-  const opacity = useRef(new Animated.Value(0.5)).current;
+  const { colors: themeColors, isDarkMode } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
+  const opacity = useRef(new Animated.Value(0.4)).current;
   useEffect(() => {
     const p = Animated.loop(
       Animated.sequence([
-        Animated.timing(opacity, { toValue: 1, duration: 750, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.5, duration: 750, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.9, duration: 800, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.4, duration: 800, useNativeDriver: true }),
       ])
     );
     p.start();
     return () => p.stop();
   }, []);
   return (
-    <Animated.View style={[styles.skeletonCard, { opacity }]}>
+    <Animated.View style={[styles.skeletonRow, { opacity }]}>
       <View style={styles.skeletonIcon} />
       <View style={styles.skeletonBody}>
         <View style={styles.skeletonLineA} />
@@ -210,13 +245,13 @@ const SkeletonCard = () => {
 
 // ─── Notification Row ─────────────────────────────────────────────────────────
 const NotificationRow = React.memo(({ notification: n, onMarkRead, isLast }) => {
-  const { colors: themeColors } = useTheme();
-  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
+  const { colors: themeColors, isDarkMode } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
   const cfg = getTypeConfig(n.type);
   const scale = useRef(new Animated.Value(1)).current;
 
   const onPressIn = () =>
-    Animated.spring(scale, { toValue: 0.975, useNativeDriver: true, speed: 60, bounciness: 2 }).start();
+    Animated.spring(scale, { toValue: 0.98, useNativeDriver: true, speed: 60, bounciness: 2 }).start();
 
   const onPressOut = () =>
     Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 50, bounciness: 5 }).start();
@@ -225,20 +260,20 @@ const NotificationRow = React.memo(({ notification: n, onMarkRead, isLast }) => 
     if (!n.read) onMarkRead(n._id);
   };
 
+  const iconBg = isDarkMode ? cfg.darkBg : cfg.bg;
+  const iconColor = isDarkMode ? cfg.darkColor : cfg.color;
+
   return (
     <Pressable onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut}>
-      <Animated.View style={[styles.row, { transform: [{ scale }] }, !isLast && styles.rowBorder]}>
-        {/* Unread left strip */}
-        {!n.read && <View style={styles.unreadStrip} />}
-
-        {/* Icon bubble */}
-        <View style={[styles.iconBubble, { backgroundColor: cfg.bg }]}>
-          <Ionicons name={cfg.ionIcon} size={22} color={cfg.color} />
+      <Animated.View style={[styles.row, { transform: [{ scale }] }]}>
+        {/* Left Mint Avatar Box */}
+        <View style={[styles.mintIconBox, { backgroundColor: iconBg }]}>
+          <MaterialCommunityIcons name={cfg.icon} size={20} color={iconColor} />
         </View>
 
         {/* Content */}
         <View style={styles.rowContent}>
-          {/* Title + time */}
+          {/* Title + Time */}
           <View style={styles.rowTopRow}>
             <Text
               style={[styles.rowTitle, !n.read && styles.rowTitleBold]}
@@ -254,23 +289,29 @@ const NotificationRow = React.memo(({ notification: n, onMarkRead, isLast }) => 
             {n.description}
           </Text>
 
-          {/* Label tag */}
-          <View style={[styles.tag, { backgroundColor: cfg.bg }]}>
-            <Text style={[styles.tagText, { color: cfg.color }]}>{cfg.label}</Text>
+          {/* Tag and Unread Indicator */}
+          <View style={styles.tagRow}>
+            <View style={[styles.tag, { backgroundColor: iconBg }]}>
+              <Text style={[styles.tagText, { color: iconColor }]}>{cfg.label}</Text>
+            </View>
+            {!n.read && (
+              <View style={styles.unreadBadge}>
+                <View style={styles.unreadDot} />
+                <Text style={styles.unreadBadgeText}>New</Text>
+              </View>
+            )}
           </View>
         </View>
-
-        {/* Unread dot */}
-        {!n.read && <View style={styles.unreadDot} />}
       </Animated.View>
+      {!isLast && <View style={styles.rowDivider} />}
     </Pressable>
   );
 });
 
 // ─── Empty State ──────────────────────────────────────────────────────────────
 const EmptyState = () => {
-  const { colors: themeColors } = useTheme();
-  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
+  const { colors: themeColors, isDarkMode } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
   const float = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const a = Animated.loop(
@@ -285,14 +326,21 @@ const EmptyState = () => {
 
   return (
     <View style={styles.emptyWrap}>
-      <Animated.View style={{ transform: [{ translateY: float }], marginBottom: 24 }}>
-        <LinearGradient colors={['#E8F5EE', '#D1FAE5']} style={styles.emptyIconWrap}>
-          <Ionicons name="notifications-off-outline" size={40} color={themeColors.primary} />
+      <Animated.View style={{ transform: [{ translateY: float }], marginBottom: 20 }}>
+        <LinearGradient
+          colors={isDarkMode ? ['#133324', '#0E2318'] : ['#E3F6EC', '#D1FAE5']}
+          style={styles.emptyIconWrap}
+        >
+          <MaterialCommunityIcons
+            name="bell-check-outline"
+            size={40}
+            color={isDarkMode ? '#34D399' : '#0E3D23'}
+          />
         </LinearGradient>
       </Animated.View>
       <Text style={styles.emptyTitle}>All Caught Up</Text>
       <Text style={styles.emptyBody}>
-        No notifications yet.{'\n'}We'll notify you when something happens.
+        You have no new notifications right now.{'\n'}We'll keep you updated on your investments & chits.
       </Text>
     </View>
   );
@@ -300,8 +348,8 @@ const EmptyState = () => {
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 const NotificationsScreen = ({ navigation }) => {
-  const { colors: themeColors } = useTheme();
-  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
+  const { colors: themeColors, isDarkMode } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
   const insets = useScreenInsets(8);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -372,8 +420,17 @@ const NotificationsScreen = ({ navigation }) => {
         showBack
         right={
           unreadCount > 0 ? (
-            <TouchableOpacity onPress={handleMarkAllAsRead} activeOpacity={0.7}>
-              <Text style={styles.markAllBtn}>Mark all read</Text>
+            <TouchableOpacity
+              onPress={handleMarkAllAsRead}
+              activeOpacity={0.7}
+              style={styles.markAllPill}
+            >
+              <MaterialCommunityIcons
+                name="check-all"
+                size={16}
+                color={isDarkMode ? '#34D399' : '#0E3D23'}
+              />
+              <Text style={styles.markAllText}>Read All</Text>
             </TouchableOpacity>
           ) : null
         }
@@ -392,25 +449,30 @@ const NotificationsScreen = ({ navigation }) => {
           />
         }
       >
-        {/* ── Unread pill ─────────────────────────────────── */}
-        {unreadCount > 0 && (
-          <View style={styles.unreadPill}>
-            <View style={styles.unreadPillDot} />
-            <Text style={styles.unreadPillText}>
-              {unreadCount} unread
-            </Text>
+        {/* ── Unread Summary Banner ────────────────────────── */}
+        {unreadCount > 0 ? (
+          <View style={styles.unreadBanner}>
+            <View style={styles.unreadBannerIconBox}>
+              <MaterialCommunityIcons name="bell-badge-outline" size={18} color="#0E3D23" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.unreadBannerTitle}>
+                {unreadCount} Unread {unreadCount === 1 ? 'Notification' : 'Notifications'}
+              </Text>
+              <Text style={styles.unreadBannerSubtitle}>Stay up to date with your activity</Text>
+            </View>
           </View>
-        )}
+        ) : null}
 
         {/* ── Groups ─────────────────────────────────────── */}
         {groups.length > 0 ? (
           groups.map((group) => (
-            <View key={group.label} style={styles.section}>
+            <View key={group.label} style={styles.menuGroup}>
               {/* Section header */}
-              <Text style={styles.sectionLabel}>{group.label}</Text>
+              <Text style={styles.menuGroupLabel}>{group.label}</Text>
 
-              {/* Card shell containing all rows */}
-              <View style={styles.card}>
+              {/* 24px Rounded Card Container */}
+              <View style={styles.menuCard}>
                 {group.items.map((n, idx) => (
                   <NotificationRow
                     key={n._id}
@@ -431,73 +493,89 @@ const NotificationsScreen = ({ navigation }) => {
 };
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-const getStyles = (colors) => StyleSheet.create({
+const getStyles = (themeColors, isDarkMode) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: themeColors.background,
   },
   scroll: { flex: 1 },
   scrollContent: {
-    paddingTop: 12,
+    paddingTop: 14,
     paddingHorizontal: 16,
   },
 
-  markAllBtn: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.primary,
-  },
-
-  // ── Unread pill ─────────────────────────────────────────────────────────────
-  unreadPill: {
+  // ── Mark All Button in TopBar ───────────────────────────────────────────────
+  markAllPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 6,
-    backgroundColor: colors.primaryLight,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
+    gap: 4,
+    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.16)' : '#E3F6EC',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
   },
-  unreadPillDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.primary,
-  },
-  unreadPillText: {
+  markAllText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: colors.primary,
+    fontWeight: '700',
+    color: isDarkMode ? '#34D399' : '#0E3D23',
   },
 
-  // ── Section ─────────────────────────────────────────────────────────────────
-  section: {
-    marginBottom: 24,
+  // ── Unread Banner ───────────────────────────────────────────────────────────
+  unreadBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.14)' : '#E3F6EC',
+    borderWidth: 1,
+    borderColor: isDarkMode ? 'rgba(16, 185, 129, 0.25)' : '#D1FAE5',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 18,
   },
-  sectionLabel: {
+  unreadBannerIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#A7F3D0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  unreadBannerTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 10,
-    marginLeft: 4,
+    color: isDarkMode ? '#A7F3D0' : '#0E3D23',
+  },
+  unreadBannerSubtitle: {
+    fontSize: 11,
+    color: isDarkMode ? 'rgba(167, 243, 208, 0.8)' : '#065F46',
+    marginTop: 1,
   },
 
-  // ── Card shell (groups all rows) ─────────────────────────────────────────────
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: 18,
+  // ── Section Groups ──────────────────────────────────────────────────────────
+  menuGroup: {
+    marginBottom: 20,
+  },
+  menuGroupLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: isDarkMode ? '#9CA3AF' : '#686D62',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    marginBottom: 10,
+    paddingHorizontal: 4,
+  },
+
+  // ── Card Shell (24px rounded card matching profile & app lock) ──────────────
+  menuCard: {
+    backgroundColor: themeColors.surface,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#ECEFE6',
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowColor: '#0E3D23',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDarkMode ? 0 : 0.04,
     shadowRadius: 8,
     elevation: 2,
   },
@@ -505,38 +583,29 @@ const getStyles = (colors) => StyleSheet.create({
   // ── Row ─────────────────────────────────────────────────────────────────────
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingVertical: 14,
     paddingHorizontal: 16,
-    gap: 13,
-    position: 'relative',
-    backgroundColor: colors.surface,
+    gap: 14,
+    backgroundColor: themeColors.surface,
   },
-  rowBorder: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderLight,
-  },
-  unreadStrip: {
-    position: 'absolute',
-    left: 0,
-    top: 14,
-    bottom: 14,
-    width: 3,
-    borderRadius: 2,
-    backgroundColor: colors.primary,
+  rowDivider: {
+    height: 1,
+    backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.06)' : '#EFF1E9',
+    marginHorizontal: 16,
   },
 
-  // Icon bubble
-  iconBubble: {
-    width: 48,
-    height: 48,
-    borderRadius: 15,
+  // Icon avatar box (38x38 mint pill circle)
+  mintIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     justifyContent: 'center',
     alignItems: 'center',
-    flexShrink: 0,
+    marginTop: 2,
   },
 
-  // Row content
+  // Row Content
   rowContent: {
     flex: 1,
     minWidth: 0,
@@ -546,122 +615,138 @@ const getStyles = (colors) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
-    marginBottom: 3,
+    marginBottom: 4,
   },
   rowTitle: {
     flex: 1,
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.text,
-    letterSpacing: -0.1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: themeColors.text,
+    letterSpacing: -0.2,
   },
   rowTitleBold: {
     fontWeight: '700',
-    color: colors.text,
+    color: themeColors.text,
   },
   rowTime: {
     fontSize: 11,
-    fontWeight: '400',
-    color: colors.textMuted,
+    fontWeight: '500',
+    color: themeColors.textMuted,
     flexShrink: 0,
   },
   rowDesc: {
     fontSize: 13,
-    color: colors.textSecondary,
-    lineHeight: 19,
-    marginBottom: 7,
+    color: themeColors.textMuted,
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  tagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   tag: {
     alignSelf: 'flex-start',
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 6,
+    borderRadius: 8,
   },
   tagText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 0.1,
+    letterSpacing: 0.3,
   },
-
-  // Unread dot top-right
+  unreadBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.2)' : '#DCFCE7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
   unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.primary,
-    flexShrink: 0,
-    alignSelf: 'flex-start',
-    marginTop: 18,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: isDarkMode ? '#34D399' : '#0E3D23',
+  },
+  unreadBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: isDarkMode ? '#34D399' : '#0E3D23',
   },
 
   // ── Skeleton ─────────────────────────────────────────────────────────────────
   skeletonWrap: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    gap: 1,
-    backgroundColor: colors.surface,
-    borderRadius: 18,
     marginHorizontal: 16,
+    marginTop: 16,
+    backgroundColor: themeColors.surface,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#ECEFE6',
     overflow: 'hidden',
   },
-  skeletonCard: {
+  skeletonRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
+    paddingVertical: 16,
     paddingHorizontal: 16,
-    gap: 13,
-    backgroundColor: colors.surface,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderLight,
+    gap: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: isDarkMode ? 'rgba(255, 255, 255, 0.06)' : '#EFF1E9',
   },
   skeletonIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 15,
-    backgroundColor: colors.border,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#E5E7EB',
   },
   skeletonBody: { flex: 1, gap: 8 },
   skeletonLineA: {
-    height: 13,
-    width: '80%',
+    height: 14,
+    width: '75%',
     borderRadius: 6,
-    backgroundColor: colors.border,
+    backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#E5E7EB',
   },
   skeletonLineB: {
     height: 11,
-    width: '55%',
+    width: '50%',
     borderRadius: 6,
-    backgroundColor: colors.border,
+    backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#E5E7EB',
   },
 
-  // ── Empty ─────────────────────────────────────────────────────────────────
+  // ── Empty State ─────────────────────────────────────────────────────────────
   emptyWrap: {
     alignItems: 'center',
-    paddingTop: 100,
-    paddingHorizontal: 40,
+    paddingTop: 80,
+    paddingHorizontal: 32,
   },
   emptyIconWrap: {
-    width: 92,
-    height: 92,
-    borderRadius: 28,
+    width: 88,
+    height: 88,
+    borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#0E3D23',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 3,
   },
   emptyTitle: {
     fontSize: 20,
-    fontWeight: '700',
-    color: colors.text,
+    fontWeight: '800',
+    color: themeColors.text,
     letterSpacing: -0.4,
     marginBottom: 8,
   },
   emptyBody: {
     fontSize: 14,
-    color: colors.textSecondary,
+    color: themeColors.textMuted,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 21,
   },
 });
 
-export default NotificationsScreen;
+export default NotificationsScreen;
