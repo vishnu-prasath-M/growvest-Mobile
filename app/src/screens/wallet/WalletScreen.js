@@ -14,10 +14,12 @@ import { useTheme } from '../../context/ThemeContext';
 import { colors } from '../../theme/theme';
 import TopBar from '../../components/TopBar';
 import api from '../../services/apiService';
+import { useScreenInsets } from '../../hooks/useScreenInsets';
 
 const WalletScreen = ({ navigation }) => {
   const { colors: themeColors, isDarkMode } = useTheme();
   const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
+  const insets = useScreenInsets(8);
   const [coinBalance, setCoinBalance] = useState(0);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -60,6 +62,7 @@ const WalletScreen = ({ navigation }) => {
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
         }
@@ -91,57 +94,94 @@ const WalletScreen = ({ navigation }) => {
           </LinearGradient>
         </View>
 
-        {/* Quick Info Banner */}
+        {/* Quick Info Referral Banner */}
         <TouchableOpacity
           style={styles.referralBanner}
           activeOpacity={0.88}
           onPress={() => navigation.navigate('Referral')}
         >
           <View style={styles.bannerIconWrap}>
-            <MaterialCommunityIcons name="gift-outline" size={24} color="#1A5C39" />
+            <MaterialCommunityIcons name="gift-outline" size={22} color={isDarkMode ? '#34D399' : '#0E3D23'} />
           </View>
-          <View style={{ flex: 1 }}>
+          <View style={styles.bannerTextContent}>
             <Text style={styles.bannerTitle}>Earn More Coins</Text>
             <Text style={styles.bannerSub}>Invite friends and earn +100 Coins on every successful investment!</Text>
           </View>
           <MaterialCommunityIcons name="chevron-right" size={20} color={themeColors.textSecondary} />
         </TouchableOpacity>
 
-        {/* Transactions History Header */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Coin Transaction History</Text>
+        {/* Coin Transaction History Section */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionHeaderTitle}>COIN TRANSACTION HISTORY</Text>
+            {transactions.length > 0 && (
+              <View style={styles.countBadge}>
+                <Text style={styles.countBadgeText}>{transactions.length} Records</Text>
+              </View>
+            )}
+          </View>
+
+          {loading ? (
+            <View style={styles.loadingBox}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          ) : transactions.length > 0 ? (
+            <View style={styles.historyGroupCard}>
+              {transactions.map((tx, idx) => {
+                const coinAmount = Number(tx.coins !== undefined ? tx.coins : tx.amount) || 0;
+                const isPositive = coinAmount >= 0;
+                const formattedAmount = isPositive ? `+${coinAmount}` : `${coinAmount}`;
+                const rupeeValue = (tx.rupeeValue !== undefined ? tx.rupeeValue : (Math.abs(coinAmount) * 0.05)).toFixed(2);
+
+                return (
+                  <View key={String(tx._id || idx)}>
+                    {idx > 0 && <View style={styles.cardDivider} />}
+                    <View style={styles.txRow}>
+                      {/* Coin Emoji Icon Container */}
+                      <View style={styles.coinEmojiBox}>
+                        <Text style={styles.coinEmoji}>🪙</Text>
+                      </View>
+
+                      {/* Details Column */}
+                      <View style={styles.txContent}>
+                        <Text style={styles.txTitle} numberOfLines={1}>
+                          {tx.description || 'Reward Coins'}
+                        </Text>
+                        <View style={styles.txMetaRow}>
+                          <Text style={styles.txDate}>{formatDate(tx.createdAt)}</Text>
+                          <Text style={styles.txDot}>•</Text>
+                          <Text style={styles.txStatusText}>
+                            {tx.status || 'Completed'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Coin Amount & Rupee Value */}
+                      <View style={styles.txRight}>
+                        <Text style={[styles.txAmountText, { color: isPositive ? (isDarkMode ? '#34D399' : '#059669') : '#EF4444' }]}>
+                          {formattedAmount} Coins
+                        </Text>
+                        <Text style={styles.txRupeeValue}>≈ ₹{rupeeValue}</Text>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={styles.emptyCard}>
+              <View style={styles.emptyIconCircle}>
+                <Text style={{ fontSize: 28 }}>🪙</Text>
+              </View>
+              <Text style={styles.emptyTitle}>No Coin Transactions Yet</Text>
+              <Text style={styles.emptySub}>
+                Share your referral link with friends to earn your first 100 reward coins!
+              </Text>
+            </View>
+          )}
         </View>
 
-        {loading ? (
-          <View style={styles.loadingBox}>
-            <ActivityIndicator size="small" color={colors.primary} />
-          </View>
-        ) : transactions.length > 0 ? (
-          <View style={styles.txList}>
-            {transactions.map((tx) => (
-              <View key={tx._id} style={styles.txCard}>
-                <View style={styles.txIconWrap}>
-                  <MaterialCommunityIcons name="star-circle" size={24} color="#B45309" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.txDesc}>{tx.description || 'Coin Reward'}</Text>
-                  <Text style={styles.txDate}>{formatDate(tx.createdAt)}</Text>
-                </View>
-                <Text style={styles.txAmount}>+{tx.amount} Coins</Text>
-              </View>
-            ))}
-          </View>
-        ) : (
-          <View style={styles.emptyCard}>
-            <MaterialCommunityIcons name="database-remove-outline" size={44} color={themeColors.textSecondary} />
-            <Text style={styles.emptyTitle}>No Coin Transactions Yet</Text>
-            <Text style={styles.emptySub}>
-              Share your referral link with friends to earn your first 100 reward coins!
-            </Text>
-          </View>
-        )}
-
-        <View style={{ height: 40 }} />
+        <View style={{ height: 60 }} />
       </ScrollView>
     </View>
   );
@@ -223,109 +263,183 @@ const getStyles = (themeColors, isDarkMode) =>
       color: 'rgba(255,255,255,0.75)',
       lineHeight: 18,
     },
+    // Referral Banner
     referralBanner: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 14,
+      gap: 12,
       marginHorizontal: 20,
       marginBottom: 20,
-      padding: 16,
-      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : '#E8F5E9',
+      padding: 14,
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.03)' : '#F4F9F4',
       borderRadius: 20,
       borderWidth: 1,
-      borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(14,61,35,0.1)',
+      borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#E0EAE0',
     },
     bannerIconWrap: {
-      width: 44,
-      height: 44,
+      width: 42,
+      height: 42,
       borderRadius: 14,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.16)' : '#E3F6EC',
       justifyContent: 'center',
       alignItems: 'center',
-      elevation: 2,
+    },
+    bannerTextContent: {
+      flex: 1,
+      minWidth: 0,
     },
     bannerTitle: {
-      fontSize: 15,
+      fontSize: 14.5,
       fontWeight: '700',
       color: themeColors.text,
       marginBottom: 2,
     },
     bannerSub: {
-      fontSize: 12,
+      fontSize: 11.5,
       color: themeColors.textSecondary,
       lineHeight: 16,
     },
-    sectionHeader: {
+    // Transaction History Section
+    sectionContainer: {
       paddingHorizontal: 20,
+      marginBottom: 16,
+    },
+    sectionHeaderRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
       marginBottom: 12,
     },
-    sectionTitle: {
-      fontSize: 17,
+    sectionHeaderTitle: {
+      fontSize: 12,
       fontWeight: '800',
-      color: themeColors.text,
+      color: themeColors.textTertiary || '#8E9486',
+      letterSpacing: 0.8,
+      textTransform: 'uppercase',
+    },
+    countBadge: {
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#EFF3EB',
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 10,
+    },
+    countBadgeText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: themeColors.textSecondary,
     },
     loadingBox: {
       paddingVertical: 40,
       alignItems: 'center',
     },
-    txList: {
-      paddingHorizontal: 20,
-      gap: 10,
+    // Grouped Card Layout (Modern Unique Design)
+    historyGroupCard: {
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.03)' : '#F8FAF8',
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#ECEFE6',
+      overflow: 'hidden',
     },
-    txCard: {
+    txRow: {
       flexDirection: 'row',
       alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
       gap: 12,
-      padding: 16,
-      backgroundColor: themeColors.surface || (isDarkMode ? '#141E18' : '#FFFFFF'),
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: themeColors.border,
     },
-    txIconWrap: {
-      width: 40,
-      height: 40,
-      borderRadius: 12,
-      backgroundColor: '#FEF3C7',
+    coinEmojiBox: {
+      width: 42,
+      height: 42,
+      borderRadius: 14,
+      backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.14)' : '#FEF3C7',
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(245, 158, 11, 0.25)' : 'rgba(245, 158, 11, 0.2)',
       justifyContent: 'center',
       alignItems: 'center',
     },
-    txDesc: {
+    coinEmoji: {
+      fontSize: 20,
+    },
+    txContent: {
+      flex: 1,
+      minWidth: 0,
+    },
+    txTitle: {
       fontSize: 14,
       fontWeight: '700',
       color: themeColors.text,
+      marginBottom: 3,
+    },
+    txMetaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
     },
     txDate: {
-      fontSize: 11,
+      fontSize: 11.5,
       color: themeColors.textSecondary,
-      marginTop: 2,
+      fontWeight: '500',
     },
-    txAmount: {
-      fontSize: 14,
+    txDot: {
+      fontSize: 10,
+      color: themeColors.textMuted || '#9CA3AF',
+    },
+    txStatusText: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: isDarkMode ? '#34D399' : '#059669',
+      textTransform: 'capitalize',
+    },
+    txRight: {
+      alignItems: 'flex-end',
+      justifyContent: 'center',
+    },
+    txAmountText: {
+      fontSize: 14.5,
       fontWeight: '800',
-      color: '#1A5C39',
+      letterSpacing: -0.2,
+      marginBottom: 2,
     },
+    txRupeeValue: {
+      fontSize: 11,
+      color: themeColors.textMuted || '#9CA3AF',
+      fontWeight: '600',
+    },
+    cardDivider: {
+      height: 1,
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#EFF1E9',
+      marginHorizontal: 16,
+    },
+    // Empty State
     emptyCard: {
-      marginHorizontal: 20,
       padding: 32,
       alignItems: 'center',
-      backgroundColor: themeColors.surface2 || (isDarkMode ? 'rgba(255,255,255,0.03)' : '#F8FAF9'),
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.03)' : '#F8FAF8',
       borderRadius: 20,
       borderWidth: 1,
-      borderColor: themeColors.border,
+      borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#ECEFE6',
+    },
+    emptyIconCircle: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.14)' : '#FEF3C7',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 12,
     },
     emptyTitle: {
       fontSize: 15,
       fontWeight: '700',
       color: themeColors.text,
-      marginTop: 12,
+      marginBottom: 6,
     },
     emptySub: {
       fontSize: 12,
       color: themeColors.textSecondary,
       textAlign: 'center',
-      marginTop: 6,
       lineHeight: 18,
+      paddingHorizontal: 12,
     },
   });
 
