@@ -313,7 +313,7 @@ const HomeScreen = ({ navigation }) => {
                 onPress={() => navigation.navigate('Wallet')}
                 activeOpacity={0.8}
               >
-                <MaterialCommunityIcons name="database" size={16} color="#F59E0B" />
+                {/* <MaterialCommunityIcons name="database" size={16} color="#F59E0B" /> */}
                 <Text style={styles.walletCoinText}>🪙 {coinsBalance} Coins</Text>
               </TouchableOpacity>
 
@@ -530,7 +530,8 @@ const getStyles = (colors) => StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingBottom: 16,
-    marginTop: -20,
+    marginTop: 0,
+    paddingTop: 20,
     backgroundColor: colors.surface,
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
