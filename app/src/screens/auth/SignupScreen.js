@@ -109,7 +109,7 @@ const SignupScreen = ({ navigation }) => {
 
   return (
     <View style={styles.rootContainer}>
-      <StatusBar barStyle="light-content" backgroundColor="#0E3D23" />
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <SafeAreaView style={styles.headerSafeArea} edges={['top']}>
         <View style={styles.headerGradientBg}>
           <LinearGradient

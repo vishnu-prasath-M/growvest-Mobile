@@ -120,7 +120,11 @@ function AppContent() {
                   dark: isDarkMode,
                 }}
               >
-                <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+                <StatusBar
+                  style={isDarkMode ? 'light' : 'dark'}
+                  translucent
+                  backgroundColor="transparent"
+                />
                 <AppNavigator />
               </NavigationContainer>
               <AppLockOverlay />

@@ -12,13 +12,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { investmentService } from '../../services/investmentService';
 import { chitFundService } from '../../services/chitFundService';
-import { authService } from '../../services/authService';
 import { userService } from '../../services/userService';
 import api from '../../services/apiService';
 import { colors } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import TopBar from '../../components/TopBar';
-import StatusChip from '../../components/StatusChip';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
 import { useTheme } from '../../context/ThemeContext';
 import DepositDetailModal from '../../components/DepositDetailModal';
@@ -27,8 +25,8 @@ import DepositDetailModal from '../../components/DepositDetailModal';
 const FILTERS = ['All', 'Active', 'Pending'];
 
 const InvestmentsScreen = ({ navigation }) => {
-  const { colors: themeColors } = useTheme();
-  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
+  const { colors: themeColors, isDarkMode } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
   const insets = useScreenInsets(8);
   // Combined list of all investment types
   const [allItems, setAllItems] = useState([]);
@@ -82,7 +80,7 @@ const InvestmentsScreen = ({ navigation }) => {
         .map(pm => ({
           _id: pm._id,
           _itemType: 'pocket_money',
-          displayName: 'Pocket Money',
+          displayName: 'Pocket Money Plan',
           amount: pm.investedAmount || 0,
           investedAmount: pm.investedAmount || 0,
           remainingAmount: pm.remainingAmount || 0,
@@ -124,24 +122,24 @@ const InvestmentsScreen = ({ navigation }) => {
 
   const getStatusLabel = (item) => {
     if (item._itemType === 'chit') {
-      return item.hasWon ? 'Won' : 'Active';
+      return item.hasWon ? 'AUCTION WON' : 'ACTIVE';
     }
     if (item._itemType === 'pocket_money') {
-      if (item.status === 'completed') return 'Completed';
-      return 'Active';
+      if (item.status === 'completed') return 'COMPLETED';
+      return 'ACTIVE';
     }
     // Savings/Fixed
-    if (item.status === 'pending') return 'Pending';
-    if (item.status === 'rejected') return 'Failed';
-    if (item.status === 'withdrawn') return 'Withdrawn';
+    if (item.status === 'pending') return 'PENDING';
+    if (item.status === 'rejected') return 'FAILED';
+    if (item.status === 'withdrawn') return 'WITHDRAWN';
     if (item.status === 'approved') {
       const isDuration = ['15_days', '1_month', '3_months', '6_months', '1_year'].includes(item.type);
       if (isDuration) {
-        return item.maturityDate && new Date() >= new Date(item.maturityDate) ? 'Matured' : 'Locked';
+        return item.maturityDate && new Date() >= new Date(item.maturityDate) ? 'MATURED' : 'LOCKED';
       }
-      return 'Active';
+      return 'ACTIVE';
     }
-    return 'Pending';
+    return 'PENDING';
   };
 
   const filteredItems = allItems.filter((item) => {
@@ -203,7 +201,7 @@ const InvestmentsScreen = ({ navigation }) => {
           />
         }
       >
-        {/* Summary Banner */}
+        {/* ── Main Summary Banner (Untouched Original) ── */}
         <View style={styles.bannerOuter}>
           <LinearGradient
             colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
@@ -224,7 +222,7 @@ const InvestmentsScreen = ({ navigation }) => {
           </LinearGradient>
         </View>
 
-        {/* Filter Chips */}
+        {/* ── Filter Chips ── */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -251,193 +249,97 @@ const InvestmentsScreen = ({ navigation }) => {
           ))}
         </ScrollView>
 
-        {/* Investment Cards */}
-        <View style={styles.cardsList}>
+        {/* ── Investments Grouped Cards (Profile/Withdraw UI Theme) ── */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionHeaderTitle}>INVESTMENT PORTFOLIO</Text>
+            <Text style={styles.sectionHeaderCount}>{filteredItems.length} Plans</Text>
+          </View>
+
           {filteredItems.length > 0 ? (
-            filteredItems.map((item) => {
-              const statusLabel = getStatusLabel(item);
+            <View style={styles.investmentsGroupCard}>
+              {filteredItems.map((item, idx) => {
+                const statusLabel = getStatusLabel(item);
 
-              // ── CHIT FUND CARD ────────────────────────────────────────────
-              if (item._itemType === 'chit') {
+                let iconName = 'trending-up';
+                let planSubtitle = `Invested: ${formatCurrency(item.amount)} • ${item.interestRate || 12}% p.a.`;
+                let badgeBg = isDarkMode ? 'rgba(255,255,255,0.06)' : '#FEF3C7';
+                let badgeColor = isDarkMode ? '#F59E0B' : '#D97706';
+
+                if (statusLabel === 'MATURED' || statusLabel === 'AUCTION WON' || statusLabel === 'COMPLETED') {
+                  badgeBg = isDarkMode ? 'rgba(16,185,129,0.2)' : '#DCFCE7';
+                  badgeColor = isDarkMode ? '#34D399' : '#059669';
+                } else if (statusLabel === 'ACTIVE') {
+                  badgeBg = isDarkMode ? 'rgba(16,185,129,0.15)' : '#DCFCE7';
+                  badgeColor = isDarkMode ? '#34D399' : '#059669';
+                } else if (statusLabel === 'PENDING') {
+                  badgeBg = isDarkMode ? 'rgba(245,158,11,0.18)' : '#FEF3C7';
+                  badgeColor = isDarkMode ? '#FBBF24' : '#D97706';
+                } else if (statusLabel === 'WITHDRAWN' || statusLabel === 'FAILED') {
+                  badgeBg = isDarkMode ? 'rgba(255,255,255,0.06)' : '#F1F5F9';
+                  badgeColor = isDarkMode ? '#9CA3AF' : '#64748B';
+                }
+
+                if (item._itemType === 'chit') {
+                  iconName = 'account-group-outline';
+                  planSubtitle = `Paid: ${formatCurrency(item.amount)} • Wk ${item.paidWeeks || item.currentWeek}/${item.totalWeeks}`;
+                } else if (item._itemType === 'pocket_money') {
+                  iconName = 'wallet-giftcard';
+                  const freqLabel = item.frequency === 'daily' ? 'Daily' : item.frequency === 'every_2_days' ? 'Every 2 Days' : 'Weekly';
+                  planSubtitle = `Invested: ${formatCurrency(item.investedAmount || item.amount)} • ${freqLabel}`;
+                } else if (item.type === 'fixed') {
+                  iconName = 'lock-outline';
+                }
+
+                const handlePress = () => {
+                  if (item._itemType === 'chit') {
+                    navigation.navigate('ChitDetails', { chitId: item.chitId || item._id });
+                  } else if (item._itemType === 'pocket_money') {
+                    navigation.navigate('PocketMoney');
+                  } else {
+                    setSelectedDeposit(item);
+                  }
+                };
+
                 return (
-                  <TouchableOpacity
-                    key={String(item._id)}
-                    style={styles.investCard}
-                    activeOpacity={0.88}
-                    onPress={() => navigation.navigate('ChitDetails', { chitId: item.chitId || item._id })}
-                  >
-                    <View style={styles.investCardTop}>
-                      <View style={[styles.investIcon, { backgroundColor: '#E8F5E9' }]}>
-                        <MaterialCommunityIcons name="handshake-outline" size={22} color="#1A5C39" />
+                  <View key={String(item._id || idx)}>
+                    {idx > 0 && <View style={styles.cardDivider} />}
+                    <TouchableOpacity
+                      style={styles.investmentRow}
+                      activeOpacity={0.7}
+                      onPress={handlePress}
+                    >
+                      <View style={styles.mintIconBox}>
+                        <MaterialCommunityIcons name={iconName} size={20} color={isDarkMode ? '#34D399' : '#0E3D23'} />
                       </View>
-                      <View style={styles.investCardInfo}>
-                        <View style={styles.investNameRow}>
-                          <Text style={styles.investName} numberOfLines={1}>{item.displayName}</Text>
-                          <StatusChip status={statusLabel} />
-                        </View>
-                        <Text style={styles.investRate}>
-                          Week {item.paidWeeks}/{item.totalWeeks} • ₹{item.weeklyAmount}/wk
-                        </Text>
-                      </View>
-                      <Text style={styles.investAmount}>{formatCurrency(item.amount)}</Text>
-                    </View>
-                    <View style={styles.investDateRow}>
-                      <View style={styles.investDateItem}>
-                        <MaterialCommunityIcons name="calendar-start" size={13} color={colors.textMuted} />
-                        <Text style={styles.investDateText}>Joined: {formatDate(item.joinedAt)}</Text>
-                      </View>
-                      <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                        <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '600' }}>View Details →</Text>
-                      </View>
-                    </View>
-                    {item.hasWon && (
-                      <View style={[styles.investEarningsRow, { backgroundColor: '#E8F5E9' }]}>
-                        <Text style={[styles.investEarningsLabel, { color: '#1A5C39' }]}>🏆 Auction Won</Text>
-                        <Text style={[styles.investEarningsValue, { color: '#1A5C39' }]}>+{formatCurrency(item.winningAmount)}</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                );
-              }
 
-              // ── POCKET MONEY CARD ────────────────────────────────────────
-              if (item._itemType === 'pocket_money') {
-                const freqLabel = item.frequency === 'daily' ? 'Daily'
-                  : item.frequency === 'every_2_days' ? 'Every 2 Days' : 'Weekly';
-                const progressPct = Math.min(100, ((item.payoutCount || 0) / 10) * 100);
-                return (
-                  <TouchableOpacity
-                    key={String(item._id)}
-                    style={styles.investCard}
-                    activeOpacity={0.88}
-                    onPress={() => navigation.navigate('PocketMoney')}
-                  >
-                    <View style={styles.investCardTop}>
-                      <View style={[styles.investIcon, { backgroundColor: '#FFF8E1' }]}>
-                        <MaterialCommunityIcons name="piggy-bank-outline" size={22} color="#B45309" />
-                      </View>
-                      <View style={styles.investCardInfo}>
-                        <View style={styles.investNameRow}>
-                          <Text style={styles.investName} numberOfLines={1}>{item.displayName}</Text>
-                          <StatusChip status={statusLabel} />
-                        </View>
-                        <Text style={styles.investRate}>
-                          {freqLabel} • {item.payoutCount || 0}/10 payouts released
-                        </Text>
-                      </View>
-                      <Text style={styles.investAmount}>{formatCurrency(item.investedAmount)}</Text>
-                    </View>
-
-                    {/* Progress bar */}
-                    <View style={{ marginTop: 10 }}>
-                      <View style={{ height: 5, backgroundColor: themeColors.surface2, borderRadius: 3 }}>
-                        <View style={{ height: 5, width: `${progressPct}%`, backgroundColor: '#1A5C39', borderRadius: 3 }} />
-                      </View>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
-                        <Text style={{ fontSize: 11, color: themeColors.textSecondary }}>
-                          Released: {formatCurrency(item.totalPaidOut)}
-                        </Text>
-                        <Text style={{ fontSize: 11, color: themeColors.textSecondary }}>
-                          Remaining: {formatCurrency(item.remainingAmount)}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.investDateRow}>
-                      <View style={styles.investDateItem}>
-                        <MaterialCommunityIcons name="calendar-start" size={13} color={colors.textMuted} />
-                        <Text style={styles.investDateText}>Started: {formatDate(item.startDate)}</Text>
-                      </View>
-                      <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                        <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '600' }}>Manage Payouts →</Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                );
-              }
-
-              // ── SAVINGS / FIXED / DURATION PLAN CARD ─────────────────────
-              const isSaving = item.type === 'saving';
-              return (
-                <TouchableOpacity
-                  key={item._id}
-                  style={styles.investCard}
-                  activeOpacity={0.88}
-                  onPress={() => setSelectedDeposit(item)}
-                >
-                  <View style={styles.investCardTop}>
-                    <View style={[styles.investIcon, isSaving ? styles.investIconSaving : styles.investIconFixed]}>
-                      <MaterialCommunityIcons
-                        name={isSaving ? 'piggy-bank' : 'lock-outline'}
-                        size={22}
-                        color={isSaving ? colors.success : colors.primary}
-                      />
-                    </View>
-                    <View style={styles.investCardInfo}>
-                      <View style={styles.investNameRow}>
-                        <Text style={styles.investName} numberOfLines={1}>
+                      <View style={styles.textContent}>
+                        <Text style={styles.titleText} numberOfLines={1}>
                           {item.displayName}
                         </Text>
-                        <StatusChip status={statusLabel} />
+                        <Text style={styles.subText} numberOfLines={1}>
+                          {planSubtitle}
+                        </Text>
                       </View>
-                      <Text style={styles.investRate}>
-                        {item.interestRate}%{['saving', 'fixed'].includes(item.type) ? ' p.a.' : ''}{item.ref ? ` • Ref: ${item.ref}` : ''}
-                      </Text>
-                    </View>
-                    <Text style={styles.investAmount}>{formatCurrency(item.amount)}</Text>
+
+                      <View style={[styles.badgePill, { backgroundColor: badgeBg }]}>
+                        <Text style={[styles.badgePillText, { color: badgeColor }]}>
+                          {statusLabel}
+                        </Text>
+                      </View>
+
+                      <MaterialCommunityIcons name="chevron-right" size={20} color={isDarkMode ? '#6B7280' : '#8E9486'} />
+                    </TouchableOpacity>
                   </View>
-
-                  {/* Date row */}
-                  <View style={styles.investDateRow}>
-                    <View style={styles.investDateItem}>
-                      <MaterialCommunityIcons name="calendar-start" size={13} color={colors.textMuted} />
-                      <Text style={styles.investDateText}>{formatDate(item.startDate)}</Text>
-                    </View>
-                    {item.maturityDate && (
-                      <>
-                        <Text style={styles.investDateArrow}>→</Text>
-                        <View style={styles.investDateItem}>
-                          <MaterialCommunityIcons name="calendar-end" size={13} color={colors.textMuted} />
-                          <Text style={styles.investDateText}>{formatDate(item.maturityDate)}</Text>
-                        </View>
-                      </>
-                    )}
-                  </View>
-
-                  {/* Earnings */}
-                  {(item.interestEarned || 0) > 0 && (
-                    <View style={styles.investEarningsRow}>
-                      <Text style={styles.investEarningsLabel}>Interest earned</Text>
-                      <Text style={styles.investEarningsValue}>+{formatCurrency(item.interestEarned)}</Text>
-                    </View>
-                  )}
-
-                  {/* Reinvest quick button if matured */}
-                  {item.maturityDate && new Date() >= new Date(item.maturityDate) && item.status === 'approved' && (
-                    <View style={{ marginTop: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#ECFDF5', padding: 8, borderRadius: 12, borderWidth: 1, borderColor: '#A7F3D0' }}>
-                      <Text style={{ fontSize: 11, color: '#065F46', fontWeight: '700' }}>✅ Plan Matured</Text>
-                      <TouchableOpacity
-                        onPress={(e) => {
-                          e.stopPropagation?.();
-                          navigation.navigate('InvestmentAmount', { initialPlan: item.type, initialAmount: String(item.amount) });
-                        }}
-                        style={{ backgroundColor: '#10B981', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8 }}
-                      >
-                        <Text style={{ fontSize: 11, color: '#FFFFFF', fontWeight: '800' }}>Reinvest ↺</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })
+                );
+              })}
+            </View>
           ) : (
-            <View style={styles.emptyState}>
-              <View style={styles.emptyIconBox}>
-                <MaterialCommunityIcons name="chart-box-outline" size={48} color={colors.border} />
-              </View>
+            <View style={styles.emptyCard}>
+              <MaterialCommunityIcons name="chart-box-outline" size={44} color={themeColors.textTertiary} />
               <Text style={styles.emptyTitle}>No Investments Found</Text>
               <Text style={styles.emptyBody}>
-                {activeFilter !== 'All' ? `No ${activeFilter.toLowerCase()} investments` : 'Start investing to see your plans here'}
+                {activeFilter !== 'All' ? `No ${activeFilter.toLowerCase()} investments found in your account.` : 'Start investing in a plan to grow your wealth!'}
               </Text>
             </View>
           )}
@@ -446,7 +348,7 @@ const InvestmentsScreen = ({ navigation }) => {
         <View style={{ height: 110 }} />
       </ScrollView>
 
-      {/* Deposit Detail Breakdown Modal */}
+      {/* Deposit Detail Breakdown Modal Popup */}
       <DepositDetailModal
         visible={!!selectedDeposit}
         item={selectedDeposit}
@@ -469,12 +371,12 @@ function getPlanDisplayName(type) {
   return 'Investment';
 }
 
-const getStyles = (colors) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+const getStyles = (themeColors, isDarkMode) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: themeColors.background },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 20 },
 
-  // Banner
+  // Summary Banner (Untouched)
   bannerOuter: { margin: 16 },
   bannerCard: {
     borderRadius: 24, padding: 20, overflow: 'hidden',
@@ -494,62 +396,94 @@ const getStyles = (colors) => StyleSheet.create({
   bannerStatMuted: { fontSize: 12, color: 'rgba(255,255,255,0.6)' },
 
   // Filters
-  filterScroll: { marginBottom: 4 },
+  filterScroll: { marginBottom: 10 },
   filterRow: { paddingHorizontal: 16, paddingVertical: 4, gap: 8 },
   filterChip: {
-    backgroundColor: colors.surface, borderRadius: 999,
+    backgroundColor: themeColors.surface, borderRadius: 999,
     paddingHorizontal: 16, paddingVertical: 9,
-    borderWidth: 1, borderColor: colors.borderLight,
+    borderWidth: 1, borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#ECEFE6',
     shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+    shadowOpacity: isDarkMode ? 0 : 0.04, shadowRadius: 6, elevation: 2,
   },
   filterChipActive: { borderRadius: 999, paddingHorizontal: 16, paddingVertical: 9 },
-  filterChipText: { fontSize: 13, fontWeight: '600', color: colors.text },
+  filterChipText: { fontSize: 13, fontWeight: '600', color: themeColors.textSecondary },
   filterChipTextActive: { fontSize: 13, fontWeight: '700', color: '#F8FAF9' },
 
-  // Cards
-  cardsList: { paddingHorizontal: 16 },
-  investCard: {
-    backgroundColor: colors.surface, borderRadius: 24, padding: 16, marginBottom: 12,
-    borderWidth: 1, borderColor: colors.borderLight,
-    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+  // Section Group Container (Profile/Withdraw theme)
+  sectionContainer: { paddingHorizontal: 16, marginTop: 4 },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+    paddingHorizontal: 4,
   },
-  investCardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  investIcon: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  investIconSaving: { backgroundColor: colors.successLight },
-  investIconFixed: { backgroundColor: colors.primaryLight },
-  investCardInfo: { flex: 1, minWidth: 0 },
-  investNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  investName: { fontSize: 14, fontWeight: '700', color: colors.text },
-  investRate: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
-  investAmount: { fontSize: 16, fontWeight: '800', color: colors.text, letterSpacing: -0.5 },
-  investDateRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    marginTop: 14, paddingTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border,
+  sectionHeaderTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: isDarkMode ? '#9CA3AF' : '#686D62',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
   },
-  investDateItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  investDateText: { fontSize: 12, color: colors.textMuted },
-  investDateArrow: { fontSize: 12, color: colors.textMuted, flex: 1, textAlign: 'center' },
-  investEarningsRow: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginTop: 8,
-    backgroundColor: colors.successLight, borderRadius: 10, padding: 8,
+  sectionHeaderCount: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: themeColors.textMuted,
   },
-  investEarningsLabel: { fontSize: 12, color: colors.success, fontWeight: '600' },
-  investEarningsValue: { fontSize: 14, fontWeight: '800', color: colors.success },
+  investmentsGroupCard: {
+    backgroundColor: themeColors.surface,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#ECEFE6',
+    overflow: 'hidden',
+    shadowColor: '#0E3D23',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDarkMode ? 0 : 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  cardDivider: {
+    height: 1,
+    backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.06)' : '#EFF1E9',
+    marginHorizontal: 16,
+  },
+  investmentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  mintIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.16)' : '#E3F6EC',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  textContent: { flex: 1, minWidth: 0 },
+  titleText: { fontSize: 15, fontWeight: '700', color: themeColors.text },
+  subText: { fontSize: 12, fontWeight: '500', color: themeColors.textMuted, marginTop: 2 },
+  badgePill: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginRight: 2,
+  },
+  badgePillText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.3 },
 
   // Empty
-  emptyState: { alignItems: 'center', paddingVertical: 60 },
-  emptyIconBox: {
-    width: 96, height: 96, borderRadius: 48, backgroundColor: colors.surface,
-    justifyContent: 'center', alignItems: 'center', marginBottom: 20,
-    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+  emptyCard: {
+    backgroundColor: themeColors.surface,
+    borderRadius: 24,
+    padding: 32,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#ECEFE6',
   },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: 8 },
-  emptyBody: { fontSize: 14, color: colors.textMuted, textAlign: 'center' },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: themeColors.text, marginTop: 10 },
+  emptyBody: { fontSize: 13, color: themeColors.textMuted, textAlign: 'center', marginTop: 4, lineHeight: 18 },
 });
 
 export default InvestmentsScreen;
