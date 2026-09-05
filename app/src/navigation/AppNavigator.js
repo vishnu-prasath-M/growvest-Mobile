@@ -292,7 +292,7 @@ const PrimeTabBar = ({ state, descriptors, navigation }) => {
 const tabStyles = StyleSheet.create({
   outerContainer: {
     position: 'absolute',
-    bottom: 24,
+    bottom: 14,
     left: 16,
     right: 16,
     alignItems: 'center',

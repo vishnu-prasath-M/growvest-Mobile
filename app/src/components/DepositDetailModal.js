@@ -6,7 +6,6 @@ import {
   Modal,
   TouchableOpacity,
   ScrollView,
-  TouchableWithoutFeedback,
   Dimensions,
   Platform,
 } from 'react-native';
@@ -14,12 +13,12 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 /**
  * DepositDetailModal
  *
- * Detailed breakdown modal for Savings / Fixed / Duration deposits.
+ * Premium detailed breakdown bottom-sheet modal for Investments.
  */
 const DepositDetailModal = ({ visible, item, onClose, onWithdraw, onReinvest }) => {
   const { colors: themeColors, isDarkMode } = useTheme();
@@ -37,7 +36,10 @@ const DepositDetailModal = ({ visible, item, onClose, onWithdraw, onReinvest }) 
   };
 
   const isSaving = item.type === 'saving';
-  const isFixed = item.type === 'fixed';
+  const isFixed = item.type === 'fixed' || item.type === '15_days' || item.type === '1_month' || item.type === '3_months' || item.type === '6_months' || item.type === '1_year';
+  const isChit = item._itemType === 'chit' || item.isChit;
+  const isPocketMoney = item._itemType === 'pocket_money' || item.isPocketMoney;
+
   const isMatured = item.maturityDate && new Date() >= new Date(item.maturityDate);
   const isWithdrawn = item.status === 'withdrawn' || item.withdrawalStatus === 'withdrawn';
   const isPending = item.status === 'pending';
@@ -62,6 +64,14 @@ const DepositDetailModal = ({ visible, item, onClose, onWithdraw, onReinvest }) 
     statusLabel = 'FAILED';
     badgeBg = isDarkMode ? 'rgba(239, 68, 68, 0.18)' : '#FEE2E2';
     badgeColor = isDarkMode ? '#F87171' : '#DC2626';
+  } else if (isChit && item.hasWon) {
+    statusLabel = 'AUCTION WON';
+    badgeBg = isDarkMode ? 'rgba(16, 185, 129, 0.2)' : '#DCFCE7';
+    badgeColor = isDarkMode ? '#34D399' : '#059669';
+  } else if (isPocketMoney && item.status === 'completed') {
+    statusLabel = 'COMPLETED';
+    badgeBg = isDarkMode ? 'rgba(16, 185, 129, 0.2)' : '#DCFCE7';
+    badgeColor = isDarkMode ? '#34D399' : '#059669';
   }
 
   const principal = Number(item.amount || item.investedAmount) || 0;
@@ -72,191 +82,255 @@ const DepositDetailModal = ({ visible, item, onClose, onWithdraw, onReinvest }) 
 
   let iconName = 'trending-up';
   if (isSaving) iconName = 'piggy-bank-outline';
-  else if (isFixed) iconName = 'lock-outline';
-  else if (item._itemType === 'chit') iconName = 'account-group-outline';
-  else if (item._itemType === 'pocket_money') iconName = 'wallet-giftcard';
+  else if (isChit) iconName = 'account-group-outline';
+  else if (isPocketMoney) iconName = 'wallet-giftcard';
+  else iconName = 'lock-outline';
+
+  const planTitle = item.displayName || item.chitName || (isSaving ? 'Savings Plan' : isChit ? 'Chit Fund Plan' : isPocketMoney ? 'Pocket Money' : 'Fixed Deposit');
+  const refId = item.ref || item.refId || (item._id ? `INV-${String(item._id).slice(-6).toUpperCase()}` : null);
 
   return (
-    <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.overlay}>
-          <TouchableWithoutFeedback>
-            <View style={styles.card}>
-              <View style={styles.modalHandle} />
+    <Modal
+      transparent
+      visible={visible}
+      animationType="slide"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <View style={styles.overlay}>
+        {/* Backdrop for dismiss */}
+        <TouchableOpacity
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={onClose}
+        />
 
-              {/* Header */}
-              <View style={styles.header}>
-                <View style={styles.headerIconWrap}>
-                  <MaterialCommunityIcons
-                    name={iconName}
-                    size={22}
-                    color={isDarkMode ? '#34D399' : '#0E3D23'}
-                  />
+        <View style={styles.card}>
+          {/* Handle bar */}
+          <View style={styles.modalHandle} />
+
+          {/* Header */}
+          <View style={styles.header}>
+            <View style={styles.headerIconWrap}>
+              <MaterialCommunityIcons
+                name={iconName}
+                size={20}
+                color={isDarkMode ? '#34D399' : '#0E3D23'}
+              />
+            </View>
+            <View style={styles.headerTextWrap}>
+              <Text style={styles.title} numberOfLines={1}>
+                {planTitle}
+              </Text>
+              <Text style={styles.refText}>
+                {refId ? `Ref ID: ${refId}` : (isSaving ? 'Flexible Savings' : 'Guaranteed Returns')}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <MaterialCommunityIcons name="close" size={18} color={themeColors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Scrollable Content */}
+          <ScrollView
+            style={styles.scrollArea}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            bounces={true}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled={true}
+            overScrollMode="always"
+          >
+            {/* Hero Principal Card */}
+            <View style={styles.heroCardOuter}>
+              <LinearGradient
+                colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.heroCard}
+              >
+                <View style={styles.heroBlob} />
+                <View style={styles.heroTopRow}>
+                  <Text style={styles.heroLabel}>Principal Invested</Text>
+                  <View style={[styles.heroBadgePill, { backgroundColor: badgeBg }]}>
+                    <Text style={[styles.heroBadgeText, { color: badgeColor }]}>{statusLabel}</Text>
+                  </View>
                 </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={styles.title} numberOfLines={1}>
-                    {item.displayName || 'Investment Details'}
-                  </Text>
-                  {item.ref ? (
-                    <Text style={styles.refText}>Ref ID: {item.ref}</Text>
-                  ) : (
-                    <Text style={styles.refText}>{isSaving ? 'Savings Plan' : 'Fixed Duration Plan'}</Text>
-                  )}
+                <Text style={styles.heroAmount}>{formatCurrency(principal)}</Text>
+              </LinearGradient>
+            </View>
+
+            {/* Status Notice Banner */}
+            <View style={styles.statusBox}>
+              <MaterialCommunityIcons
+                name={isWithdrawn ? 'check-all' : isMatured ? 'check-circle' : isPending ? 'clock-outline' : 'shield-lock-outline'}
+                size={16}
+                color={isDarkMode ? '#34D399' : '#0E3D23'}
+              />
+              <Text style={styles.statusNote}>
+                {isWithdrawn
+                  ? 'Already withdrawn to your verified bank account.'
+                  : isMatured
+                  ? 'Plan matured — ready for instant withdrawal or reinvestment.'
+                  : isPending
+                  ? 'Payment awaiting admin approval.'
+                  : item.maturityDate
+                  ? `Principal locked with guaranteed returns until ${formatDate(item.maturityDate)}.`
+                  : 'Active investment earning daily returns.'}
+              </Text>
+            </View>
+
+            {/* Grouped Details Card (Modern unified card matching Profile & Settings design) */}
+            <View style={styles.groupedCard}>
+              {/* Interest Rate */}
+              <View style={styles.cardRow}>
+                <View style={styles.cardRowLeft}>
+                  <View style={styles.rowIconWrap}>
+                    <MaterialCommunityIcons name="percent-outline" size={16} color={isDarkMode ? '#34D399' : '#0E3D23'} />
+                  </View>
+                  <Text style={styles.cardRowLabel}>Interest Rate</Text>
                 </View>
-                <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
-                  <MaterialCommunityIcons name="close" size={18} color={themeColors.textSecondary} />
-                </TouchableOpacity>
+                <Text style={styles.cardRowValue}>{rate}% p.a.</Text>
               </View>
 
-              <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollArea}>
-                {/* Hero Principal Card */}
-                <View style={styles.heroCardOuter}>
-                  <LinearGradient
-                    colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.heroCard}
-                  >
-                    <View style={styles.heroBlob} />
-                    <View style={styles.heroTopRow}>
-                      <Text style={styles.heroLabel}>Principal Invested</Text>
-                      <View style={[styles.heroBadgePill, { backgroundColor: badgeBg }]}>
-                        <Text style={[styles.heroBadgeText, { color: badgeColor }]}>{statusLabel}</Text>
+              <View style={styles.rowDivider} />
+
+              {/* Daily Earnings */}
+              <View style={styles.cardRow}>
+                <View style={styles.cardRowLeft}>
+                  <View style={styles.rowIconWrap}>
+                    <MaterialCommunityIcons name="cash-fast" size={16} color={isDarkMode ? '#34D399' : '#0E3D23'} />
+                  </View>
+                  <Text style={styles.cardRowLabel}>Daily Earnings</Text>
+                </View>
+                <Text style={styles.cardRowValue}>{formatCurrency(dailyInterest)}/day</Text>
+              </View>
+
+              <View style={styles.rowDivider} />
+
+              {/* Accrued Interest */}
+              <View style={styles.cardRow}>
+                <View style={styles.cardRowLeft}>
+                  <View style={styles.rowIconWrap}>
+                    <MaterialCommunityIcons name="trending-up" size={16} color={isDarkMode ? '#34D399' : '#0E3D23'} />
+                  </View>
+                  <Text style={styles.cardRowLabel}>Accrued Interest</Text>
+                </View>
+                <Text style={[styles.cardRowValue, { color: isDarkMode ? '#34D399' : '#059669' }]}>
+                  +{formatCurrency(accrued)}
+                </Text>
+              </View>
+
+              <View style={styles.rowDivider} />
+
+              {/* Maturity Payout */}
+              <View style={styles.cardRow}>
+                <View style={styles.cardRowLeft}>
+                  <View style={styles.rowIconWrap}>
+                    <MaterialCommunityIcons name="trophy-outline" size={16} color="#F59E0B" />
+                  </View>
+                  <Text style={styles.cardRowLabel}>Maturity Payout</Text>
+                </View>
+                <Text style={[styles.cardRowValue, { color: '#F59E0B' }]}>
+                  {formatCurrency(maturityAmount)}
+                </Text>
+              </View>
+
+              <View style={styles.rowDivider} />
+
+              {/* Start Date */}
+              <View style={styles.cardRow}>
+                <View style={styles.cardRowLeft}>
+                  <View style={styles.rowIconWrap}>
+                    <MaterialCommunityIcons name="calendar-start" size={16} color={themeColors.textMuted} />
+                  </View>
+                  <Text style={styles.cardRowLabel}>Start Date</Text>
+                </View>
+                <Text style={styles.cardRowValue}>{formatDate(item.startDate || item.joinedAt || item.createdAt)}</Text>
+              </View>
+
+              {item.maturityDate ? (
+                <>
+                  <View style={styles.rowDivider} />
+                  {/* Maturity Date */}
+                  <View style={styles.cardRow}>
+                    <View style={styles.cardRowLeft}>
+                      <View style={styles.rowIconWrap}>
+                        <MaterialCommunityIcons name="calendar-check" size={16} color={themeColors.textMuted} />
                       </View>
+                      <Text style={styles.cardRowLabel}>Maturity Date</Text>
                     </View>
-                    <Text style={styles.heroAmount}>{formatCurrency(principal)}</Text>
-                  </LinearGradient>
+                    <Text style={styles.cardRowValue}>{formatDate(item.maturityDate)}</Text>
+                  </View>
+                </>
+              ) : null}
+
+              {/* Payout Destination */}
+              <View style={styles.rowDivider} />
+              <View style={styles.cardRow}>
+                <View style={styles.cardRowLeft}>
+                  <View style={styles.rowIconWrap}>
+                    <MaterialCommunityIcons name="bank-outline" size={16} color={themeColors.textMuted} />
+                  </View>
+                  <Text style={styles.cardRowLabel}>Payout Target</Text>
                 </View>
-
-                {/* Status Notice Banner */}
-                <View style={styles.statusBox}>
-                  <MaterialCommunityIcons
-                    name={isWithdrawn ? 'check-all' : isMatured ? 'check-circle' : isPending ? 'clock-outline' : 'shield-lock-outline'}
-                    size={18}
-                    color={isDarkMode ? '#34D399' : '#0E3D23'}
-                  />
-                  <Text style={styles.statusNote}>
-                    {isWithdrawn
-                      ? 'Already withdrawn to your verified bank account.'
-                      : isMatured
-                      ? 'Plan matured — ready for instant withdrawal or reinvestment.'
-                      : isPending
-                      ? 'Payment awaiting admin approval.'
-                      : `Principal locked with guaranteed returns until ${formatDate(item.maturityDate)}.`}
-                  </Text>
-                </View>
-
-                {/* 2x2 Metric Tiles */}
-                <View style={styles.metricsGrid}>
-                  <View style={styles.metricTile}>
-                    <View style={styles.tileHeader}>
-                      <MaterialCommunityIcons name="percent-outline" size={16} color={isDarkMode ? '#34D399' : '#0E3D23'} />
-                      <Text style={styles.tileLabel}>Interest Rate</Text>
-                    </View>
-                    <Text style={styles.tileValue}>{rate}% p.a.</Text>
-                  </View>
-
-                  <View style={styles.metricTile}>
-                    <View style={styles.tileHeader}>
-                      <MaterialCommunityIcons name="cash-fast" size={16} color={isDarkMode ? '#34D399' : '#0E3D23'} />
-                      <Text style={styles.tileLabel}>Daily Earnings</Text>
-                    </View>
-                    <Text style={styles.tileValue}>{formatCurrency(dailyInterest)}/d</Text>
-                  </View>
-
-                  <View style={styles.metricTile}>
-                    <View style={styles.tileHeader}>
-                      <MaterialCommunityIcons name="trending-up" size={16} color={isDarkMode ? '#34D399' : '#0E3D23'} />
-                      <Text style={styles.tileLabel}>Accrued Interest</Text>
-                    </View>
-                    <Text style={[styles.tileValue, { color: isDarkMode ? '#34D399' : '#059669' }]}>
-                      +{formatCurrency(accrued)}
-                    </Text>
-                  </View>
-
-                  <View style={styles.metricTile}>
-                    <View style={styles.tileHeader}>
-                      <MaterialCommunityIcons name="trophy-outline" size={16} color="#F59E0B" />
-                      <Text style={styles.tileLabel}>Maturity Payout</Text>
-                    </View>
-                    <Text style={[styles.tileValue, { color: '#F59E0B' }]}>
-                      {formatCurrency(maturityAmount)}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Timeline Box */}
-                <View style={styles.timelineBox}>
-                  <View style={styles.timelineRow}>
-                    <View style={styles.timelineItem}>
-                      <Text style={styles.timelineLabel}>START DATE</Text>
-                      <Text style={styles.timelineValue}>{formatDate(item.startDate)}</Text>
-                    </View>
-                    {item.maturityDate ? (
-                      <>
-                        <MaterialCommunityIcons name="arrow-right" size={16} color={themeColors.textMuted} />
-                        <View style={[styles.timelineItem, { alignItems: 'flex-end' }]}>
-                          <Text style={styles.timelineLabel}>MATURITY DATE</Text>
-                          <Text style={styles.timelineValue}>{formatDate(item.maturityDate)}</Text>
-                        </View>
-                      </>
-                    ) : null}
-                  </View>
-                </View>
-              </ScrollView>
-
-              {/* Actions Footer */}
-              <View style={styles.actionRow}>
-                <TouchableOpacity onPress={onClose} style={styles.dismissBtn} activeOpacity={0.7}>
-                  <Text style={styles.dismissBtnText}>Close</Text>
-                </TouchableOpacity>
-
-                {isMatured && onReinvest ? (
-                  <TouchableOpacity
-                    onPress={() => {
-                      onClose();
-                      onReinvest(item);
-                    }}
-                    style={styles.reinvestBtn}
-                    activeOpacity={0.85}
-                  >
-                    <LinearGradient
-                      colors={['#10B981', '#059669']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.btnGradient}
-                    >
-                      <MaterialCommunityIcons name="refresh" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
-                      <Text style={styles.btnText}>Reinvest</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                ) : null}
-
-                {isMatured && !isWithdrawn && onWithdraw ? (
-                  <TouchableOpacity
-                    onPress={() => {
-                      onClose();
-                      onWithdraw(item);
-                    }}
-                    style={styles.withdrawBtn}
-                    activeOpacity={0.85}
-                  >
-                    <LinearGradient
-                      colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.btnGradient}
-                    >
-                      <MaterialCommunityIcons name="cash-multiple" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
-                      <Text style={styles.btnText}>Withdraw</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                ) : null}
+                <Text style={styles.cardRowValue}>Verified Bank Account</Text>
               </View>
             </View>
-          </TouchableWithoutFeedback>
+
+            <View style={{ height: 16 }} />
+          </ScrollView>
+
+          {/* Actions Footer (Fixed at bottom for instant access) */}
+          <View style={styles.actionRow}>
+            <TouchableOpacity onPress={onClose} style={styles.dismissBtn} activeOpacity={0.7}>
+              <Text style={styles.dismissBtnText}>Close</Text>
+            </TouchableOpacity>
+
+            {isMatured && onReinvest ? (
+              <TouchableOpacity
+                onPress={() => {
+                  onClose();
+                  onReinvest(item);
+                }}
+                style={styles.reinvestBtn}
+                activeOpacity={0.85}
+              >
+                <LinearGradient
+                  colors={['#10B981', '#059669']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.btnGradient}
+                >
+                  <MaterialCommunityIcons name="refresh" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
+                  <Text style={styles.btnText}>Reinvest</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            ) : null}
+
+            {isMatured && !isWithdrawn && onWithdraw ? (
+              <TouchableOpacity
+                onPress={() => {
+                  onClose();
+                  onWithdraw(item);
+                }}
+                style={styles.withdrawBtn}
+                activeOpacity={0.85}
+              >
+                <LinearGradient
+                  colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.btnGradient}
+                >
+                  <MaterialCommunityIcons name="cash-multiple" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
+                  <Text style={styles.btnText}>Withdraw</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            ) : null}
+          </View>
         </View>
-      </TouchableWithoutFeedback>
+      </View>
     </Modal>
   );
 };
@@ -265,50 +339,64 @@ const getStyles = (themeColors, isDarkMode) =>
   StyleSheet.create({
     overlay: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.6)',
+      backgroundColor: 'rgba(0,0,0,0.65)',
       justifyContent: 'flex-end',
+    },
+    backdrop: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
     },
     card: {
       width: '100%',
       backgroundColor: themeColors.surface,
       borderTopLeftRadius: 28,
       borderTopRightRadius: 28,
-      padding: 20,
-      paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+      paddingHorizontal: 20,
+      paddingTop: 12,
+      paddingBottom: Platform.OS === 'ios' ? 34 : 20,
       borderWidth: 1,
       borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#ECEFE6',
-      maxHeight: Dimensions.get('window').height * 0.85,
+      maxHeight: SCREEN_HEIGHT * 0.85,
+      display: 'flex',
+      flexDirection: 'column',
     },
     modalHandle: {
       width: 40,
       height: 4,
       borderRadius: 2,
-      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.15)' : '#E5E7EB',
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.18)' : '#D1D5DB',
       alignSelf: 'center',
-      marginBottom: 16,
+      marginBottom: 12,
     },
     header: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 12,
-      marginBottom: 16,
+      marginBottom: 14,
     },
     headerIconWrap: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
+      width: 38,
+      height: 38,
+      borderRadius: 19,
       backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.16)' : '#E3F6EC',
       justifyContent: 'center',
       alignItems: 'center',
     },
+    headerTextWrap: {
+      flex: 1,
+      minWidth: 0,
+    },
     title: {
-      fontSize: 18,
+      fontSize: 17,
       fontWeight: '800',
       color: themeColors.text,
-      letterSpacing: -0.4,
+      letterSpacing: -0.3,
     },
     refText: {
-      fontSize: 12,
+      fontSize: 11,
       color: themeColors.textMuted,
       marginTop: 2,
       fontWeight: '500',
@@ -322,27 +410,33 @@ const getStyles = (themeColors, isDarkMode) =>
       alignItems: 'center',
     },
     scrollArea: {
-      marginBottom: 10,
+      flexGrow: 0,
+      flexShrink: 1,
+      marginBottom: 12,
+    },
+    scrollContent: {
+      paddingBottom: 4,
     },
 
     // Hero Principal Card
     heroCardOuter: {
-      borderRadius: 20,
+      borderRadius: 18,
       overflow: 'hidden',
-      marginBottom: 12,
+      marginBottom: 10,
     },
     heroCard: {
-      padding: 16,
-      borderRadius: 20,
+      paddingHorizontal: 18,
+      paddingVertical: 16,
+      borderRadius: 18,
       position: 'relative',
     },
     heroBlob: {
       position: 'absolute',
       right: -20,
       bottom: -20,
-      width: 100,
-      height: 100,
-      borderRadius: 50,
+      width: 90,
+      height: 90,
+      borderRadius: 45,
       backgroundColor: 'rgba(212,168,67,0.14)',
     },
     heroTopRow: {
@@ -351,9 +445,9 @@ const getStyles = (themeColors, isDarkMode) =>
       alignItems: 'center',
     },
     heroLabel: {
-      fontSize: 12,
-      color: 'rgba(255,255,255,0.8)',
-      fontWeight: '600',
+      fontSize: 11,
+      color: 'rgba(255,255,255,0.82)',
+      fontWeight: '700',
       textTransform: 'uppercase',
       letterSpacing: 0.5,
     },
@@ -368,7 +462,7 @@ const getStyles = (themeColors, isDarkMode) =>
       letterSpacing: 0.3,
     },
     heroAmount: {
-      fontSize: 28,
+      fontSize: 26,
       fontWeight: '800',
       color: '#FFFFFF',
       letterSpacing: -0.6,
@@ -379,90 +473,74 @@ const getStyles = (themeColors, isDarkMode) =>
     statusBox: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 10,
+      gap: 8,
       backgroundColor: isDarkMode ? 'rgba(255,255,255,0.04)' : '#F0F4EC',
-      padding: 12,
-      borderRadius: 16,
-      marginBottom: 14,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 14,
+      marginBottom: 12,
       borderWidth: 1,
       borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#E6EAE0',
     },
     statusNote: {
       flex: 1,
-      fontSize: 12,
+      fontSize: 11.5,
       color: themeColors.textSecondary,
       fontWeight: '500',
       lineHeight: 16,
     },
 
-    // 2x2 Metrics Grid
-    metricsGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 10,
-      marginBottom: 14,
-    },
-    metricTile: {
-      width: (SCREEN_WIDTH - 50) / 2,
+    // Unified Grouped Details Card (Consistent with Profile & Settings Cards)
+    groupedCard: {
       backgroundColor: isDarkMode ? 'rgba(255,255,255,0.03)' : '#F8FAF8',
-      borderRadius: 16,
-      padding: 12,
+      borderRadius: 18,
       borderWidth: 1,
-      borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#ECEFE6',
+      borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#ECEFE6',
+      overflow: 'hidden',
     },
-    tileHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      marginBottom: 6,
-    },
-    tileLabel: {
-      fontSize: 11,
-      fontWeight: '600',
-      color: themeColors.textMuted,
-    },
-    tileValue: {
-      fontSize: 15,
-      fontWeight: '800',
-      color: themeColors.text,
-      letterSpacing: -0.3,
-    },
-
-    // Timeline Box
-    timelineBox: {
-      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.03)' : '#F8FAF8',
-      borderRadius: 16,
-      padding: 14,
-      borderWidth: 1,
-      borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#ECEFE6',
-      marginBottom: 10,
-    },
-    timelineRow: {
+    cardRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
+      paddingHorizontal: 14,
+      paddingVertical: 11,
     },
-    timelineItem: {
+    cardRowLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
       flex: 1,
     },
-    timelineLabel: {
-      fontSize: 10,
-      fontWeight: '700',
-      color: themeColors.textMuted,
-      letterSpacing: 0.5,
+    rowIconWrap: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : '#EFF3EB',
+      justifyContent: 'center',
+      alignItems: 'center',
     },
-    timelineValue: {
+    cardRowLabel: {
       fontSize: 13,
+      fontWeight: '600',
+      color: themeColors.textSecondary,
+    },
+    cardRowValue: {
+      fontSize: 13.5,
       fontWeight: '700',
       color: themeColors.text,
-      marginTop: 2,
+      textAlign: 'right',
+    },
+    rowDivider: {
+      height: 1,
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#EFF1E9',
+      marginHorizontal: 14,
     },
 
     // Actions
     actionRow: {
       flexDirection: 'row',
       gap: 10,
-      marginTop: 6,
+      paddingTop: 4,
     },
     dismissBtn: {
       flex: 1,
@@ -472,10 +550,11 @@ const getStyles = (themeColors, isDarkMode) =>
       alignItems: 'center',
       borderWidth: 1.5,
       borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#ECEFE6',
+      backgroundColor: themeColors.surface,
     },
     dismissBtnText: {
       fontSize: 15,
-      fontWeight: '600',
+      fontWeight: '700',
       color: themeColors.textSecondary,
     },
     reinvestBtn: {
