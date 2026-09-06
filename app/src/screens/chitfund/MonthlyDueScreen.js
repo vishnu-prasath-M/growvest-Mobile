@@ -202,13 +202,20 @@ const MonthlyDueScreen = ({ navigation }) => {
         const isClosed = c.status === 'closed' || c.status === 'completed' || c.status === 'archived';
         
         const joinedDate = new Date(c.joinedAt || c.createdAt || Date.now());
-        const nextDue = new Date(joinedDate);
+        let nextDue = new Date(joinedDate);
         if (isWeekly) {
-          // Exactly (nextUnpaidMonth - 1) * 7 days from joinedAt date
-          nextDue.setDate(joinedDate.getDate() + (nextUnpaidMonth - 1) * 7);
+          // All weekly chits start on Sunday; dues fall on subsequent Sundays
+          const day = joinedDate.getDay();
+          const daysToSunday = (7 - day) % 7;
+          const startSunday = new Date(joinedDate);
+          startSunday.setDate(joinedDate.getDate() + daysToSunday);
+          startSunday.setHours(0, 0, 0, 0);
+          
+          nextDue = new Date(startSunday.getTime() + (nextUnpaidMonth - 1) * 7 * 24 * 60 * 60 * 1000);
         } else {
-          // Exactly (nextUnpaidMonth - 1) months from joinedAt date
+          // Monthly chits: due on 1st of month
           nextDue.setMonth(joinedDate.getMonth() + (nextUnpaidMonth - 1));
+          nextDue.setDate(1);
         }
         nextDue.setHours(23, 59, 59, 999);
         
@@ -218,6 +225,9 @@ const MonthlyDueScreen = ({ navigation }) => {
         const remainingDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
         const isOverdue = diffTime < 0;
         
+        const dayName = isWeekly ? 'Sunday, ' : '';
+        const formattedDate = `${dayName}${nextDue.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+
         return {
           ...c,
           isWeekly,
@@ -226,7 +236,7 @@ const MonthlyDueScreen = ({ navigation }) => {
           isClosed,
           nextUnpaidMonth,
           displayWeek: nextUnpaidMonth <= durationLimit ? nextUnpaidMonth : durationLimit,
-          nextDueDateFormatted: nextDue.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+          nextDueDateFormatted: formattedDate,
           remainingDays,
           isOverdue,
           daysUntilDue: remainingDays,

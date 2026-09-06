@@ -14,12 +14,15 @@ const chitSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  weeklyAmount: {
+    type: Number,
+  },
   totalPot: {
     type: Number,
     required: true,
   },
   duration: {
-    type: Number, // in months
+    type: Number, // in weeks (if weekly) or months (if monthly)
     required: true,
   },
   totalMembers: {
@@ -49,9 +52,6 @@ const chitSchema = new mongoose.Schema({
     type: [String],
     default: [],
   },
-  weeklyAmount: {
-    type: Number,
-  },
   totalWeeks: {
     type: Number,
   },
@@ -60,6 +60,7 @@ const chitSchema = new mongoose.Schema({
   },
   paymentFrequency: {
     type: String,
+    enum: ['weekly', 'monthly'],
     default: 'weekly',
   },
   paymentDay: {
@@ -79,3 +80,4 @@ const chitSchema = new mongoose.Schema({
 chitSchema.index({ status: 1 });
 
 module.exports = mongoose.model('Chit', chitSchema);
+

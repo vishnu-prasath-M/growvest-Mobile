@@ -7,18 +7,30 @@ const Settings = require('../models/Settings');
 const mongoose = require('mongoose');
 const { sendNotification } = require('../services/notificationHelper');
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Sunday Helpers ─────────────────────────────────────────────────────────
+
+const getChitStartSunday = (joinedAt) => {
+  const base = new Date(joinedAt || Date.now());
+  const day = base.getDay(); // 0 is Sunday
+  const daysUntilSunday = (7 - day) % 7;
+  const startSunday = new Date(base);
+  startSunday.setDate(base.getDate() + daysUntilSunday);
+  startSunday.setHours(0, 0, 0, 0);
+  return startSunday;
+};
 
 const calcNextDueDate = (joinedAt, currentMonth) => {
-  const base = new Date(joinedAt);
+  const base = new Date(joinedAt || Date.now());
   base.setMonth(base.getMonth() + currentMonth);
+  base.setDate(1); // 1st of month for monthly chits
   base.setHours(23, 59, 59, 999);
   return base;
 };
 
 const calcNextWeeklyDueDate = (joinedAt, weekIndex) => {
-  const base = new Date(joinedAt);
-  const targetDueDate = new Date(base.getTime() + (weekIndex) * 7 * 24 * 60 * 60 * 1000);
+  const startSunday = getChitStartSunday(joinedAt);
+  // weekIndex = 0 is Week 1 (Start Sunday), weekIndex = 1 is Week 2 (Next Sunday), etc.
+  const targetDueDate = new Date(startSunday.getTime() + (weekIndex) * 7 * 24 * 60 * 60 * 1000);
   targetDueDate.setHours(23, 59, 59, 999);
   return targetDueDate;
 };

@@ -6,31 +6,31 @@ import { useScreenInsets } from '../../hooks/useScreenInsets';
 const RULES_DATA = {
   whatIsChitFund: {
     title: 'What is Chit Fund?',
-    content: 'A chit fund is a traditional savings and borrowing mechanism that has been modernized by Growvest. It brings together a group of members who contribute a fixed amount every month for a predetermined duration. The total monthly collection (called the "pot") is awarded to one member through a transparent auction process. This continues until every member has had a chance to win the pot. Chit funds combine the discipline of regular savings with the excitement of winning a large sum, while also providing dividends to non-winning members.',
+    content: 'A chit fund is a structured savings and borrowing mechanism modernized by Growvest. Members contribute a fixed installment every week (or month) for a predetermined duration. In our weekly plans, all chit batches start every Sunday, with guaranteed returns, auction payouts, and weekly dividends credited transparently.',
   },
-  monthlyPayment: {
-    title: 'Monthly Payment',
-    content: 'Every member must pay a fixed monthly installment on or before the due date (usually the 1st of every month). Payments can be made via UPI, Net Banking, Debit Card, or Credit Card. A grace period of 3 days is provided. Late payments attract a nominal late fee of ₹10 per day. Consistent timely payments ensure you remain eligible for auctions and dividends.',
+  sundaySchedule: {
+    title: 'Weekly Sunday Schedule & Start Day',
+    content: 'All weekly chit batches officially start on Sunday. When you join during any day of the week, your membership and 1st week payment are confirmed immediately, and your official chit cycle starts on the upcoming Sunday. All subsequent installment dues and auctions take place every Sunday.',
+  },
+  weeklyPayment: {
+    title: 'Weekly Installment & Due Dates',
+    content: 'Every member must pay their weekly installment on or before Sunday. Payments can be made seamlessly via UPI, Net Banking, or Card through Razorpay. Timely payments keep your membership active and ensure you remain eligible for weekly auctions, dividends, and full settlement payouts.',
   },
   auction: {
-    title: 'Auction Process',
-    content: 'Auctions are held monthly on a scheduled date. During the auction, members bid to take the pot. The member who bids the lowest amount (offering the highest discount) wins. The winning amount is the pot minus the discount. The discount is then distributed as dividend among all non-winning members. Members who have already won are not eligible for future auctions. Auctions are conducted online through the Growvest platform in real-time.',
+    title: 'Auction & Payout Process',
+    content: 'Auctions are scheduled on Sundays. Members who wish to withdraw their pot early can claim the prize amount based on the plan schedule. Non-withdrawing members accumulate dividend returns every week, leading to a high maturity settlement payout.',
   },
   winner: {
     title: 'Winner Selection & Benefits',
-    content: 'The winner is selected through the auction process. The winner receives the pot amount minus the discount they offered and a small processing fee. The winner is then excluded from future auctions but continues to pay monthly installments. Winners also receive a certificate of winning. The winning amount is credited to the member\'s wallet within 24 hours of the auction.',
+    content: 'When an auction is claimed or won, the payout amount is credited directly to the member\'s verified account balance. The member continues paying regular weekly installments until the completion of the tenure.',
   },
   penalty: {
-    title: 'Penalty & Default',
-    content: 'Late Payment: ₹10 per day after the 3-day grace period. Missed Payment (1 month): ₹500 penalty + late fees. Missed Payment (2 consecutive months): ₹1,000 penalty + late fees + membership suspension. Missed Payment (3 consecutive months): Automatic cancellation with forfeiture of 20% of total paid amount as penalty. The remaining amount is refunded within 30 days.',
+    title: 'Penalty & Missed Payments',
+    content: 'Members should ensure their weekly installments are completed on Sunday. A grace period is provided, but repeated delayed payments may incur late charges or affect dividend eligibility.',
   },
   cancellation: {
-    title: 'Cancellation Policy',
-    content: 'Members can request cancellation at any time. Cancellation within 3 months of joining: 10% of total paid amount is deducted as processing fee. Cancellation after 3 months: 5% of total paid amount is deducted. Cancellation after 12 months: No deduction, full refund of paid amount minus any winnings received. Refunds are processed within 15 working days of cancellation approval.',
-  },
-  refund: {
-    title: 'Refund Policy',
-    content: 'Refunds are processed for cancelled memberships or overpayments. Refund timeline: 15-30 working days from the date of request. Refunds are credited to the original payment method or bank account on file. A refund confirmation will be sent via email and SMS. For any refund-related queries, please contact our support team.',
+    title: 'Cancellation & Settlement',
+    content: 'Members receive their full settlement payout at the end of the total weeks tenure, which includes the total principal contribution plus all accumulated weekly dividends.',
   },
 };
 
