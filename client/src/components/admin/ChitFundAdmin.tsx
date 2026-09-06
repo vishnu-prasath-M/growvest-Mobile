@@ -29,6 +29,8 @@ const statusStyle: Record<string, string> = {
 const defaultChitForm = {
   name: "",
   description: "",
+  paymentFrequency: "weekly",
+  amount: "",
   monthlyAmount: "",
   totalPot: "",
   duration: "",
@@ -185,12 +187,23 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
     setFormSuccess("");
 
     try {
+      const isWeekly = chitForm.paymentFrequency === "weekly";
+      const amt = Number(chitForm.amount || chitForm.monthlyAmount || 0);
+      const dur = Number(chitForm.duration || 0);
+      const pot = Number(chitForm.totalPot) || (amt * dur);
+
       const payload = {
         name: chitForm.name,
         description: chitForm.description,
-        monthlyAmount: Number(chitForm.monthlyAmount),
-        totalPot: Number(chitForm.totalPot),
-        duration: Number(chitForm.duration),
+        paymentFrequency: chitForm.paymentFrequency || (isWeekly ? 'weekly' : 'monthly'),
+        isWeekly,
+        paymentDay: isWeekly ? 'Sunday' : '1st of Month',
+        monthlyAmount: amt,
+        weeklyAmount: isWeekly ? amt : Math.round(amt / 4),
+        totalPot: pot,
+        totalContribution: pot,
+        duration: dur,
+        totalWeeks: isWeekly ? dur : dur * 4,
         totalMembers: Number(chitForm.totalMembers),
         availableSlots: Number(chitForm.availableSlots),
         processingFee: Number(chitForm.processingFee),
@@ -225,12 +238,23 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
     setFormSuccess("");
 
     try {
+      const isWeekly = chitForm.paymentFrequency === "weekly";
+      const amt = Number(chitForm.amount || chitForm.monthlyAmount || 0);
+      const dur = Number(chitForm.duration || 0);
+      const pot = Number(chitForm.totalPot) || (amt * dur);
+
       const payload = {
         name: chitForm.name,
         description: chitForm.description,
-        monthlyAmount: Number(chitForm.monthlyAmount),
-        totalPot: Number(chitForm.totalPot),
-        duration: Number(chitForm.duration),
+        paymentFrequency: chitForm.paymentFrequency || (isWeekly ? 'weekly' : 'monthly'),
+        isWeekly,
+        paymentDay: isWeekly ? 'Sunday' : '1st of Month',
+        monthlyAmount: amt,
+        weeklyAmount: isWeekly ? amt : Math.round(amt / 4),
+        totalPot: pot,
+        totalContribution: pot,
+        duration: dur,
+        totalWeeks: isWeekly ? dur : dur * 4,
         totalMembers: Number(chitForm.totalMembers),
         availableSlots: Number(chitForm.availableSlots),
         processingFee: Number(chitForm.processingFee),
@@ -260,16 +284,19 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
   };
 
   const startEdit = (chit: any) => {
+    const isMonthly = chit.paymentFrequency === 'monthly' || chit.isWeekly === false;
     setEditingChit(chit);
     setChitForm({
       name: chit.name || "",
       description: chit.description || "",
+      paymentFrequency: isMonthly ? "monthly" : "weekly",
+      amount: String((isMonthly ? chit.monthlyAmount : (chit.weeklyAmount || chit.monthlyAmount)) || ""),
       monthlyAmount: String(chit.monthlyAmount || ""),
-      totalPot: String(chit.totalPot || ""),
-      duration: String(chit.duration || ""),
+      totalPot: String(chit.totalPot || chit.totalContribution || ""),
+      duration: String((isMonthly ? chit.duration : (chit.totalWeeks || chit.duration)) || ""),
       totalMembers: String(chit.totalMembers || ""),
-      availableSlots: String(chit.availableSlots || ""),
-      processingFee: String(chit.processingFee || "2"),
+      availableSlots: String(chit.availableSlots !== undefined ? chit.availableSlots : chit.totalMembers || ""),
+      processingFee: String(chit.processingFee !== undefined ? chit.processingFee : "2"),
       status: chit.status || "upcoming",
       features: (chit.features || []).join(", "),
     });
@@ -277,7 +304,17 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
   };
 
   const handleFormChange = (field: string, value: string) => {
-    setChitForm(prev => ({ ...prev, [field]: value }));
+    setChitForm(prev => {
+      const updated = { ...prev, [field]: value };
+      if (field === 'amount' || field === 'duration') {
+        const amt = Number(field === 'amount' ? value : prev.amount) || 0;
+        const dur = Number(field === 'duration' ? value : prev.duration) || 0;
+        if (amt > 0 && dur > 0) {
+          updated.totalPot = String(amt * dur);
+        }
+      }
+      return updated;
+    });
   };
 
   // ─── Filtered Data ─────────────────────────────────────────────────

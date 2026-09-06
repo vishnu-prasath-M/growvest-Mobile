@@ -113,7 +113,14 @@ const ChitPaymentScreen = ({ navigation, route }) => {
               </Text>
             </View>
             <View style={styles.summaryAmountRow}>
-              <Text style={styles.summaryAmountLabel}>Amount to Pay</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.summaryAmountLabel}>Amount to Pay</Text>
+                {lateFee > 0 && (
+                  <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', marginTop: 2 }}>
+                    (Due: {formatCurrency(amount)} + Late Fee: {formatCurrency(lateFee)})
+                  </Text>
+                )}
+              </View>
               <Text style={styles.summaryAmountValue}>{formatCurrency(totalAmount)}</Text>
             </View>
           </LinearGradient>
