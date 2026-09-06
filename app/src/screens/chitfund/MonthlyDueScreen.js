@@ -220,11 +220,16 @@ const MonthlyDueScreen = ({ navigation }) => {
         nextDue.setHours(23, 59, 59, 999);
         
         const today = new Date();
-        today.setHours(0, 0, 0, 0);
         const diffTime = nextDue.getTime() - today.getTime();
         const remainingDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
         const isOverdue = diffTime < 0;
         
+        // Calculate late days and Rs 5/day late fee
+        const daysLate = isOverdue ? Math.max(1, Math.floor((today.getTime() - nextDue.getTime()) / (1000 * 60 * 60 * 24))) : 0;
+        const lateFee = isOverdue ? daysLate * 5 : 0;
+        const baseDueAmount = c.nextDueAmount || (isWeekly ? (c.weeklyAmount || c.monthlyAmount) : c.monthlyAmount) || 0;
+        const totalDueAmount = baseDueAmount + lateFee;
+
         const dayName = isWeekly ? 'Sunday, ' : '';
         const formattedDate = `${dayName}${nextDue.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`;
 
@@ -239,6 +244,10 @@ const MonthlyDueScreen = ({ navigation }) => {
           nextDueDateFormatted: formattedDate,
           remainingDays,
           isOverdue,
+          daysLate,
+          lateFee,
+          baseDueAmount,
+          totalDueAmount,
           daysUntilDue: remainingDays,
         };
       });
@@ -284,8 +293,8 @@ const MonthlyDueScreen = ({ navigation }) => {
       chitId: selectedChit?.chitId,
       memberId: selectedChit?._id,
       month: selectedChit?.nextUnpaidMonth || (selectedChit?.currentMonth || 0) + 1,
-      amount: selectedChit?.nextDueAmount,
-      lateFee: 0,
+      amount: selectedChit?.nextDueAmount || selectedChit?.baseDueAmount || 0,
+      lateFee: selectedChit?.lateFee || 0,
       type: 'due',
       chitName: selectedChit?.chitName,
       isWeekly: selectedChit?.isWeekly || (selectedChit?.totalWeeks && selectedChit?.totalWeeks > 0),
@@ -348,8 +357,15 @@ const MonthlyDueScreen = ({ navigation }) => {
             {/* Amount & Due Date Row */}
             <View style={styles.dueAmountRow}>
               <View>
-                <Text style={styles.dueLabel}>CURRENT DUE</Text>
-                <Text style={styles.dueAmount}>{formatCurrency(chit.nextDueAmount)}</Text>
+                <Text style={styles.dueLabel}>{chit.isOverdue && chit.lateFee > 0 ? 'TOTAL DUE (INC. LATE FEE)' : 'CURRENT DUE'}</Text>
+                <Text style={[styles.dueAmount, chit.isOverdue && { color: colors.error }]}>
+                  {formatCurrency(chit.totalDueAmount || chit.nextDueAmount)}
+                </Text>
+                {chit.isOverdue && chit.lateFee > 0 && (
+                  <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+                    (Due: {formatCurrency(chit.nextDueAmount)} + Late Fee: {formatCurrency(chit.lateFee)})
+                  </Text>
+                )}
               </View>
               <View style={styles.dueDateWrap}>
                 <Text style={styles.dueLabel}>DUE DATE</Text>
@@ -360,17 +376,25 @@ const MonthlyDueScreen = ({ navigation }) => {
             {/* Remaining Days Row */}
             <View style={styles.dueAmountRow}>
               <View>
-                <Text style={styles.dueLabel}>REMAINING DAYS</Text>
+                <Text style={styles.dueLabel}>STATUS</Text>
                 <Text style={[styles.remainingDays, chit.isOverdue && { color: colors.error }]}>
-                  {chit.isOverdue ? 'Overdue' : `${chit.remainingDays} days`}
+                  {chit.isOverdue ? `Overdue (${chit.daysLate} day${chit.daysLate > 1 ? 's' : ''} late)` : `${chit.remainingDays} days remaining`}
                 </Text>
               </View>
             </View>
 
             {/* Late Fee Notice Strip */}
-            <View style={styles.lateFeeRow}>
-              <MaterialCommunityIcons name="alert-circle-outline" size={16} color={colors.warning} />
-              <Text style={styles.lateFeeText}>Late fee of ₹10/day applies after due date</Text>
+            <View style={[styles.lateFeeRow, chit.isOverdue && chit.lateFee > 0 && { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}>
+              <MaterialCommunityIcons 
+                name={chit.isOverdue ? "alert-circle" : "alert-circle-outline"} 
+                size={16} 
+                color={chit.isOverdue ? colors.error : colors.warning} 
+              />
+              <Text style={[styles.lateFeeText, chit.isOverdue && { color: colors.error, fontWeight: '600' }]}>
+                {chit.isOverdue && chit.lateFee > 0
+                  ? `Late fee of ₹${chit.lateFee} applied (₹5/day × ${chit.daysLate} day${chit.daysLate > 1 ? 's' : ''})`
+                  : 'Late fee of ₹5/day applies after due date'}
+              </Text>
             </View>
 
             {/* Actions */}
@@ -382,7 +406,9 @@ const MonthlyDueScreen = ({ navigation }) => {
                     activeOpacity={0.85}
                     onPress={() => handlePayNow(chit)}
                   >
-                    <Text style={styles.payNowBtnText}>Pay Now</Text>
+                    <Text style={styles.payNowBtnText}>
+                      Pay {formatCurrency(chit.totalDueAmount || chit.nextDueAmount)}
+                    </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.reminderBtn}
@@ -441,17 +467,23 @@ const MonthlyDueScreen = ({ navigation }) => {
             </View>
             <Text style={styles.modalTitle}>Confirm Payment</Text>
             <View style={styles.modalRow}>
-              <Text style={styles.modalLabel}>Amount</Text>
-              <Text style={styles.modalValue}>{formatCurrency(selectedChit?.nextDueAmount)}</Text>
+              <Text style={styles.modalLabel}>Due Installment</Text>
+              <Text style={styles.modalValue}>{formatCurrency(selectedChit?.nextDueAmount || selectedChit?.baseDueAmount)}</Text>
             </View>
             <View style={styles.modalRow}>
-              <Text style={styles.modalLabel}>Late Fee</Text>
-              <Text style={styles.modalValue}>₹0</Text>
+              <Text style={styles.modalLabel}>
+                Late Fee {selectedChit?.lateFee > 0 ? `(₹5 × ${selectedChit?.daysLate} days)` : ''}
+              </Text>
+              <Text style={[styles.modalValue, selectedChit?.lateFee > 0 && { color: colors.error, fontWeight: '700' }]}>
+                {formatCurrency(selectedChit?.lateFee || 0)}
+              </Text>
             </View>
             <View style={styles.modalDivider} />
             <View style={styles.modalRow}>
-              <Text style={styles.modalTotalLabel}>Total</Text>
-              <Text style={styles.modalTotalValue}>{formatCurrency(selectedChit?.nextDueAmount)}</Text>
+              <Text style={styles.modalTotalLabel}>Total Amount</Text>
+              <Text style={styles.modalTotalValue}>
+                {formatCurrency((selectedChit?.nextDueAmount || selectedChit?.baseDueAmount || 0) + (selectedChit?.lateFee || 0))}
+              </Text>
             </View>
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowConfirm(false)}>
@@ -461,7 +493,9 @@ const MonthlyDueScreen = ({ navigation }) => {
                 style={styles.payBtn}
                 onPress={handlePaymentSuccess}
               >
-                <Text style={styles.payBtnText}>Pay {formatCurrency(selectedChit?.nextDueAmount)}</Text>
+                <Text style={styles.payBtnText}>
+                  Pay {formatCurrency((selectedChit?.nextDueAmount || selectedChit?.baseDueAmount || 0) + (selectedChit?.lateFee || 0))}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

@@ -424,7 +424,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
 
               <View style={styles.summaryDivider} />
 
-              <View style={styles.summaryRow}>
+              <View style={[styles.summaryRow, { alignItems: 'flex-start' }]}>
                 <Text style={styles.summaryLabel}>Withdrawal Eligibility</Text>
                 <Text style={[styles.summaryValue, { color: isEarlyWithdrawal ? '#D97706' : '#059669', fontWeight: '700' }]}>
                   {isEarlyWithdrawal ? 'Early: Principal Only' : 'Full Return (Principal + Interest)'}
@@ -997,22 +997,29 @@ const getStyles = (colors) => StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 4,
+    paddingVertical: 5,
+    gap: 10,
   },
   summaryLabel: {
     fontSize: 14,
     color: colors.textSecondary,
     fontWeight: '500',
+    flexShrink: 0,
+    maxWidth: '48%',
   },
   summaryValue: {
     fontSize: 14,
     color: colors.text,
     fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
   },
   summaryAmount: {
     fontSize: 16,
     color: colors.text,
     fontWeight: '700',
+    flex: 1,
+    textAlign: 'right',
   },
   summaryDivider: {
     height: 1,
