@@ -56,14 +56,45 @@ const pocketMoneySchema = new mongoose.Schema({
     enum: ['pending', 'active', 'paused', 'completed'],
     default: 'pending',
   },
-  // Bonus fields
+  // 6% p.a. Interest Reward in Growvest Coins
+  annualInterestRate: {
+    type: Number,
+    default: 6,
+  },
+  eligibleDurationDays: {
+    type: Number,
+    default: 10,
+  },
+  eligibleInterestAmount: {
+    type: Number,
+    default: 0,
+  },
+  rewardCoins: {
+    type: Number,
+    default: 0,
+  },
+  rewardStatus: {
+    type: String,
+    enum: ['locked', 'credited'],
+    default: 'locked',
+  },
+  rewardCreditedAt: {
+    type: Date,
+    default: null,
+  },
+  rewardReferenceId: {
+    type: String,
+    sparse: true,
+    index: true,
+  },
+  // Legacy bonus fields (kept for backward compatibility)
   bonusRate: {
     type: Number,
     default: 6,
   },
   bonusAmount: {
     type: Number,
-    required: true,
+    default: 0,
   },
   totalFinalValue: {
     type: Number,
