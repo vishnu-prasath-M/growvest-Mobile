@@ -339,113 +339,82 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
 
       {/* ─── DASHBOARD ──────────────────────────────────────────────── */}
       {subTab === "dashboard" && (
-        <div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="card-premium p-5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="p-2 rounded-lg bg-green-50">
-                  <Users className="w-5 h-5 text-green-600" />
-                </div>
-                <p className="text-sm text-muted-foreground">Enrolled Members</p>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="card-premium p-4 flex items-center gap-3">
+              <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
+                <Users className="w-5 h-5" />
               </div>
-              <p className="text-3xl font-bold text-green-600">{joins.length || overview.totalMembers || 0}</p>
+              <div>
+                <p className="text-xs text-muted-foreground">Total Enrolled</p>
+                <p className="text-xl font-bold">{joins.length || overview.totalMembers || 0}</p>
+              </div>
             </div>
+            <div className="card-premium p-4 flex items-center gap-3">
+              <div className="p-3 bg-green-50 text-green-600 rounded-xl">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Active Chits</p>
+                <p className="text-xl font-bold">{overview.activeChits || chits.filter(c => c.status === 'active').length || 0}</p>
+              </div>
+            </div>
+            <div className="card-premium p-4 flex items-center gap-3">
+              <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Pending Payments</p>
+                <p className="text-xl font-bold">{payments.filter((p: any) => p.status === 'pending').length || overview.pendingPayments || 0}</p>
+              </div>
+            </div>
+            <div className="card-premium p-4 flex items-center gap-3">
+              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+                <DollarSign className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Total Collected</p>
+                <p className="text-xl font-bold">₹{(overview.totalCollected || 0).toLocaleString('en-IN')}</p>
+              </div>
+            </div>
+          </div>
 
-            <div className="card-premium p-5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="p-2 rounded-lg bg-amber-50">
-                  <Clock className="w-5 h-5 text-amber-600" />
-                </div>
-                <p className="text-sm text-muted-foreground">Pending Monthly Payments</p>
-              </div>
-              <p className="text-3xl font-bold text-amber-600">{overview.pendingPayments || 0}</p>
-            </div>
-
-            <div className="card-premium p-5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="p-2 rounded-lg bg-green-50">
-                  <Users className="w-5 h-5 text-green-600" />
-                </div>
-                <p className="text-sm text-muted-foreground">Approved Members</p>
-              </div>
-              <p className="text-3xl font-bold text-green-600">{overview.approvedMembers || overview.totalMembers || 0}</p>
-            </div>
-
-            <div className="card-premium p-5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="p-2 rounded-lg bg-red-50">
-                  <XCircle className="w-5 h-5 text-red-600" />
-                </div>
-                <p className="text-sm text-muted-foreground">Rejected Requests</p>
-              </div>
-              <p className="text-3xl font-bold text-red-600">{overview.rejectedRequests || 0}</p>
-            </div>
-
-            <div className="card-premium p-5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="p-2 rounded-lg bg-blue-50">
-                  <Activity className="w-5 h-5 text-blue-600" />
-                </div>
-                <p className="text-sm text-muted-foreground">Active Chits</p>
-              </div>
-              <p className="text-3xl font-bold text-blue-600">{overview.activeChits || 0}</p>
-            </div>
-
-            <div className="card-premium p-5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="p-2 rounded-lg bg-red-50">
-                  <XCircle className="w-5 h-5 text-red-600" />
-                </div>
-                <p className="text-sm text-muted-foreground">Closed Chits</p>
-              </div>
-              <p className="text-3xl font-bold text-red-600">{overview.closedChits || 0}</p>
-            </div>
-
-            <div className="card-premium p-5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="p-2 rounded-lg bg-gray-50">
-                  <CheckCircle className="w-5 h-5 text-gray-600" />
-                </div>
-                <p className="text-sm text-muted-foreground">Completed Chits</p>
-              </div>
-              <p className="text-3xl font-bold text-gray-600">{overview.completedChits || 0}</p>
-            </div>
-
-            <div className="card-premium p-5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="p-2 rounded-lg bg-green-50">
-                  <DollarSign className="w-5 h-5 text-green-600" />
-                </div>
-                <p className="text-sm text-muted-foreground">Total Collected</p>
-              </div>
-              <p className="text-3xl font-bold text-green-600">₹{(overview.totalCollected || 0).toLocaleString('en-IN')}</p>
-            </div>
+          <div className="flex gap-3">
+            <Button onClick={() => { setEditingChit(null); setChitForm(defaultChitForm); setSubTab("create"); }}>
+              <Plus className="w-4 h-4 mr-2" /> Create New Chit
+            </Button>
+            <Button variant="outline" onClick={() => setSubTab("joins")}>
+              View Enrolled Members
+            </Button>
+            <Button variant="outline" onClick={() => setSubTab("payments")}>
+              Review Payments ({payments.length})
+            </Button>
           </div>
         </div>
       )}
 
-      {/* ─── CHITS ──────────────────────────────────────────────────── */}
+      {/* ─── ALL CHITS ──────────────────────────────────────────────── */}
       {subTab === "chits" && (
-        <div>
-          <div className="flex flex-col sm:flex-row gap-4 mb-4">
-            <div className="relative flex-1">
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+            <div className="relative flex-1 w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="Search chits..."
+                placeholder="Search chits by name..."
                 className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
             <select
-              className="px-3 py-2 border rounded-lg text-sm"
+              className="px-3 py-2 border rounded-lg text-sm w-full sm:w-auto"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
+              <option value="all">All Statuses</option>
               <option value="upcoming">Upcoming</option>
+              <option value="active">Active</option>
               <option value="paused">Paused</option>
               <option value="completed">Completed</option>
               <option value="closed">Closed</option>
@@ -457,71 +426,82 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
           </div>
 
           <div className="space-y-4">
-            {filteredChits.map(chit => (
-              <div key={chit._id} className="card-premium p-4">
-                <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-bold text-lg">{chit.name}</h3>
-                      <span className={`text-[10px] font-bold px-2 py-1 rounded-full border ${statusStyle[chit.status] || ''}`}>
-                        {chit.status}
-                      </span>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-2">{chit.description}</p>
-                    <div className="flex flex-wrap gap-4 text-sm">
-                      <span className="font-semibold">
-                        {chit.isWeekly 
-                          ? `₹${(chit.weeklyAmount || chit.monthlyAmount)?.toLocaleString('en-IN')}/wk` 
-                          : `₹${chit.monthlyAmount?.toLocaleString('en-IN')}/mo`}
-                      </span>
-                      <span>
-                        {chit.isWeekly 
-                          ? `${chit.totalWeeks || chit.duration} Weeks` 
-                          : `${chit.duration} Months`}
-                      </span>
-                      <span>{chit.totalMembers} Members</span>
-                      <span>{chit.availableSlots} Slots Left</span>
-                      <span>Pot: ₹{chit.totalPot?.toLocaleString('en-IN')}</span>
-                    </div>
-                    {chit.features?.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {chit.features.map((f: string, i: number) => (
-                          <span key={i} className="text-xs bg-gray-100 px-2 py-1 rounded-full">{f}</span>
-                        ))}
+            {filteredChits.map(chit => {
+              const isWeekly = chit.isWeekly !== false && chit.paymentFrequency !== 'monthly';
+              return (
+                <div key={chit._id} className="card-premium p-4">
+                  <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="font-bold text-lg">{chit.name}</h3>
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded-full border ${statusStyle[chit.status] || ''}`}>
+                          {chit.status}
+                        </span>
+                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${isWeekly ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                          {isWeekly ? '📅 Weekly (Sunday)' : '🗓️ Monthly'}
+                        </span>
                       </div>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" onClick={() => startEdit(chit)} disabled={loading}>
-                      <Edit className="w-4 h-4 mr-1" /> Edit
-                    </Button>
-                    {chit.status === 'active' && (
-                      <Button size="sm" variant="outline" onClick={() => handleAction('chit', chit._id, 'paused')} disabled={loading}>
-                        <Pause className="w-4 h-4 mr-1" /> Pause
+                      <p className="text-sm text-muted-foreground mb-2">{chit.description}</p>
+                      <div className="flex flex-wrap gap-4 text-sm">
+                        <span className="font-semibold text-emerald-700">
+                          {isWeekly 
+                            ? `₹${(chit.weeklyAmount || chit.monthlyAmount)?.toLocaleString('en-IN')}/wk` 
+                            : `₹${chit.monthlyAmount?.toLocaleString('en-IN')}/mo`}
+                        </span>
+                        <span>
+                          {isWeekly 
+                            ? `${chit.totalWeeks || chit.duration} Weeks` 
+                            : `${chit.duration} Months`}
+                        </span>
+                        <span>{chit.totalMembers} Members</span>
+                        <span>{chit.availableSlots} Slots Left</span>
+                        <span className="font-bold">Pot: ₹{chit.totalPot?.toLocaleString('en-IN')}</span>
+                        {isWeekly && (
+                          <span className="text-xs bg-amber-50 text-amber-800 px-2 py-0.5 rounded border border-amber-200 font-medium">
+                            Starts & Due Every Sunday
+                          </span>
+                        )}
+                      </div>
+                      {chit.features?.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {chit.features.map((f: string, i: number) => (
+                            <span key={i} className="text-xs bg-gray-100 px-2 py-1 rounded-full">{f}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline" onClick={() => startEdit(chit)} disabled={loading}>
+                        <Edit className="w-4 h-4 mr-1" /> Edit
                       </Button>
-                    )}
-                    {chit.status === 'paused' && (
-                      <Button size="sm" variant="outline" onClick={() => handleAction('chit', chit._id, 'active')} disabled={loading}>
-                        <Play className="w-4 h-4 mr-1" /> Resume
+                      {chit.status === 'active' && (
+                        <Button size="sm" variant="outline" onClick={() => handleAction('chit', chit._id, 'paused')} disabled={loading}>
+                          <Pause className="w-4 h-4 mr-1" /> Pause
+                        </Button>
+                      )}
+                      {chit.status === 'paused' && (
+                        <Button size="sm" variant="outline" onClick={() => handleAction('chit', chit._id, 'active')} disabled={loading}>
+                          <Play className="w-4 h-4 mr-1" /> Resume
+                        </Button>
+                      )}
+                      {chit.status !== 'completed' && chit.status !== 'closed' && chit.status !== 'archived' && (
+                        <Button size="sm" variant="outline" onClick={() => handleAction('chit', chit._id, 'closed')} disabled={loading}>
+                          <X className="w-4 h-4 mr-1" /> Close
+                        </Button>
+                      )}
+                      {chit.status !== 'archived' && (
+                        <Button size="sm" variant="outline" onClick={() => handleAction('chit', chit._id, 'archived')} disabled={loading}>
+                          <Archive className="w-4 h-4 mr-1" /> Archive
+                        </Button>
+                      )}
+                      <Button size="sm" variant="outline" className="text-red-600 border-red-200" onClick={() => handleDeleteChit(chit._id)} disabled={loading}>
+                        <Trash2 className="w-4 h-4 mr-1" /> Delete
                       </Button>
-                    )}
-                    {chit.status !== 'completed' && chit.status !== 'closed' && chit.status !== 'archived' && (
-                      <Button size="sm" variant="outline" onClick={() => handleAction('chit', chit._id, 'closed')} disabled={loading}>
-                        <X className="w-4 h-4 mr-1" /> Close
-                      </Button>
-                    )}
-                    {chit.status !== 'archived' && (
-                      <Button size="sm" variant="outline" onClick={() => handleAction('chit', chit._id, 'archived')} disabled={loading}>
-                        <Archive className="w-4 h-4 mr-1" /> Archive
-                      </Button>
-                    )}
-                    <Button size="sm" variant="outline" className="text-red-600 border-red-200" onClick={() => handleDeleteChit(chit._id)} disabled={loading}>
-                      <Trash2 className="w-4 h-4 mr-1" /> Delete
-                    </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             {filteredChits.length === 0 && <p className="text-muted-foreground p-4">No chits found.</p>}
           </div>
         </div>
@@ -543,97 +523,164 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
 
           <form onSubmit={editingChit ? handleUpdateChit : handleCreateChit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Selectable Frequency Section */}
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium mb-1.5">Chit Frequency *</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleFormChange("paymentFrequency", "weekly");
+                      if (!chitForm.features) {
+                        handleFormChange("features", "Weekly Contribution, Due Every Sunday, Guaranteed Returns");
+                      }
+                    }}
+                    className={`p-3.5 rounded-xl border text-left transition-all ${
+                      chitForm.paymentFrequency === "weekly"
+                        ? "border-emerald-600 bg-emerald-50 text-emerald-950 ring-2 ring-emerald-600 shadow-sm"
+                        : "border-gray-200 hover:bg-gray-50 text-gray-700"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-bold text-sm">Weekly Chit</span>
+                      {chitForm.paymentFrequency === "weekly" && <CheckCircle className="w-4 h-4 text-emerald-600" />}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Starts & due every Sunday (e.g. 10w / 20w)</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleFormChange("paymentFrequency", "monthly");
+                      if (!chitForm.features) {
+                        handleFormChange("features", "Monthly Contribution, Due 1st of Month, High Returns");
+                      }
+                    }}
+                    className={`p-3.5 rounded-xl border text-left transition-all ${
+                      chitForm.paymentFrequency === "monthly"
+                        ? "border-emerald-600 bg-emerald-50 text-emerald-950 ring-2 ring-emerald-600 shadow-sm"
+                        : "border-gray-200 hover:bg-gray-50 text-gray-700"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-bold text-sm">Monthly Chit</span>
+                      {chitForm.paymentFrequency === "monthly" && <CheckCircle className="w-4 h-4 text-emerald-600" />}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Due monthly on 1st (e.g. 12mo / 24mo)</p>
+                  </button>
+                </div>
+              </div>
+
               <div className="sm:col-span-2">
                 <label className="block text-sm font-medium mb-1">Chit Name *</label>
                 <input
                   type="text"
                   required
-                  className="w-full px-3 py-2 border rounded-lg"
+                  className="w-full px-3 py-2 border rounded-lg text-sm"
                   value={chitForm.name}
                   onChange={(e) => handleFormChange("name", e.target.value)}
-                  placeholder="e.g. Silver Chit"
+                  placeholder={chitForm.paymentFrequency === 'weekly' ? "e.g. ₹500 Weekly Plan – 10 Weeks" : "e.g. ₹2,000 Monthly Plan – 12 Months"}
                 />
               </div>
+
               <div className="sm:col-span-2">
                 <label className="block text-sm font-medium mb-1">Description</label>
                 <textarea
-                  className="w-full px-3 py-2 border rounded-lg"
+                  className="w-full px-3 py-2 border rounded-lg text-sm"
                   value={chitForm.description}
                   onChange={(e) => handleFormChange("description", e.target.value)}
                   placeholder="Describe the chit plan..."
                   rows={2}
                 />
               </div>
+
               <div>
-                <label className="block text-sm font-medium mb-1">Monthly Amount (₹) *</label>
+                <label className="block text-sm font-medium mb-1">
+                  {chitForm.paymentFrequency === 'weekly' ? 'Weekly Amount (₹) *' : 'Monthly Amount (₹) *'}
+                </label>
                 <input
                   type="number"
                   required
                   min="1"
-                  className="w-full px-3 py-2 border rounded-lg"
-                  value={chitForm.monthlyAmount}
-                  onChange={(e) => handleFormChange("monthlyAmount", e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg text-sm"
+                  value={chitForm.amount}
+                  onChange={(e) => handleFormChange("amount", e.target.value)}
+                  placeholder={chitForm.paymentFrequency === 'weekly' ? "e.g. 500" : "e.g. 2000"}
                 />
               </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  {chitForm.paymentFrequency === 'weekly' ? 'Duration (Weeks) *' : 'Duration (Months) *'}
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  className="w-full px-3 py-2 border rounded-lg text-sm"
+                  value={chitForm.duration}
+                  onChange={(e) => handleFormChange("duration", e.target.value)}
+                  placeholder={chitForm.paymentFrequency === 'weekly' ? "e.g. 10 or 20" : "e.g. 12 or 24"}
+                />
+              </div>
+
               <div>
                 <label className="block text-sm font-medium mb-1">Total Pot (₹) *</label>
                 <input
                   type="number"
                   required
                   min="1"
-                  className="w-full px-3 py-2 border rounded-lg"
+                  className="w-full px-3 py-2 border rounded-lg text-sm font-semibold"
                   value={chitForm.totalPot}
                   onChange={(e) => handleFormChange("totalPot", e.target.value)}
+                  placeholder="Auto-calculated (Amount × Duration)"
                 />
+                <span className="text-[11px] text-muted-foreground">Calculated automatically</span>
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Duration (Months) *</label>
-                <input
-                  type="number"
-                  required
-                  min="1"
-                  className="w-full px-3 py-2 border rounded-lg"
-                  value={chitForm.duration}
-                  onChange={(e) => handleFormChange("duration", e.target.value)}
-                />
-              </div>
+
               <div>
                 <label className="block text-sm font-medium mb-1">Total Members *</label>
                 <input
                   type="number"
                   required
                   min="1"
-                  className="w-full px-3 py-2 border rounded-lg"
+                  className="w-full px-3 py-2 border rounded-lg text-sm"
                   value={chitForm.totalMembers}
                   onChange={(e) => handleFormChange("totalMembers", e.target.value)}
+                  placeholder="e.g. 100 or 9999"
                 />
               </div>
+
               <div>
                 <label className="block text-sm font-medium mb-1">Available Slots *</label>
                 <input
                   type="number"
                   required
                   min="0"
-                  className="w-full px-3 py-2 border rounded-lg"
+                  className="w-full px-3 py-2 border rounded-lg text-sm"
                   value={chitForm.availableSlots}
                   onChange={(e) => handleFormChange("availableSlots", e.target.value)}
+                  placeholder="e.g. 100"
                 />
               </div>
+
               <div>
                 <label className="block text-sm font-medium mb-1">Processing Fee (%)</label>
                 <input
                   type="number"
                   min="0"
                   step="0.1"
-                  className="w-full px-3 py-2 border rounded-lg"
+                  className="w-full px-3 py-2 border rounded-lg text-sm"
                   value={chitForm.processingFee}
                   onChange={(e) => handleFormChange("processingFee", e.target.value)}
+                  placeholder="0"
                 />
               </div>
+
               <div>
                 <label className="block text-sm font-medium mb-1">Status</label>
                 <select
-                  className="w-full px-3 py-2 border rounded-lg"
+                  className="w-full px-3 py-2 border rounded-lg text-sm"
                   value={chitForm.status}
                   onChange={(e) => handleFormChange("status", e.target.value)}
                 >
@@ -643,16 +690,26 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
                   <option value="closed">Closed</option>
                 </select>
               </div>
+
               <div className="sm:col-span-2">
                 <label className="block text-sm font-medium mb-1">Features (comma separated)</label>
                 <input
                   type="text"
-                  className="w-full px-3 py-2 border rounded-lg"
+                  className="w-full px-3 py-2 border rounded-lg text-sm"
                   value={chitForm.features}
                   onChange={(e) => handleFormChange("features", e.target.value)}
-                  placeholder="e.g. Low entry cost, Quick duration, High returns"
+                  placeholder="e.g. Weekly Contribution, Due Every Sunday, High Returns"
                 />
               </div>
+            </div>
+
+            <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-900 flex items-center gap-2">
+              <span className="text-base">📅</span>
+              <span>
+                {chitForm.paymentFrequency === 'weekly' 
+                  ? "Rule: Weekly chits start every Sunday. Installments and due dates occur every Sunday." 
+                  : "Rule: Monthly chits are due on the 1st of every calendar month."}
+              </span>
             </div>
 
             <div className="flex gap-3 pt-4">

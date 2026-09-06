@@ -317,12 +317,44 @@ const getAllChits = async (req, res) => {
   }
 };
 
+// Helper to normalize chit data for weekly vs monthly
+const normalizeChitData = (data) => {
+  const isWeekly = data.paymentFrequency === 'monthly' ? false : (data.isWeekly !== undefined ? Boolean(data.isWeekly) : true);
+  const paymentFrequency = isWeekly ? 'weekly' : 'monthly';
+  const paymentDay = isWeekly ? 'Sunday' : (data.paymentDay || '1st of Month');
+  
+  const baseAmount = Number(data.weeklyAmount || data.monthlyAmount || 0);
+  const durationUnits = Number(data.totalWeeks || data.duration || 0);
+  const potAmount = Number(data.totalPot || data.totalContribution || (baseAmount * durationUnits));
+
+  return {
+    ...data,
+    name: data.name?.trim(),
+    description: data.description || '',
+    isWeekly,
+    paymentFrequency,
+    paymentDay,
+    monthlyAmount: baseAmount,
+    weeklyAmount: isWeekly ? baseAmount : Math.round(baseAmount / 4),
+    duration: durationUnits,
+    totalWeeks: isWeekly ? durationUnits : durationUnits * 4,
+    totalPot: potAmount,
+    totalContribution: potAmount,
+    totalMembers: Number(data.totalMembers || 100),
+    availableSlots: data.availableSlots !== undefined ? Number(data.availableSlots) : Number(data.totalMembers || 100),
+    processingFee: Number(data.processingFee || 0),
+    status: data.status || 'upcoming',
+    features: Array.isArray(data.features) ? data.features : (data.features ? String(data.features).split(',').map(f => f.trim()).filter(Boolean) : []),
+  };
+};
+
 // @desc    Create a chit (admin)
 // @route   POST /api/chits
 // @access  Private/Admin
 const createChit = async (req, res) => {
   try {
-    const chit = await Chit.create(req.body);
+    const normalizedData = normalizeChitData(req.body);
+    const chit = await Chit.create(normalizedData);
     // Notify all users about new chit (DB notification + push) using unified helper
     try {
       const users = await User.find({ role: 'user' });
@@ -330,7 +362,7 @@ const createChit = async (req, res) => {
         await sendNotification({
           userId: u._id,
           title: '🆕 New Chit Available',
-          description: `A new Chit Plan "${chit.name}" has been added. Explore and join now!`,
+          description: `A new ${chit.isWeekly ? 'Weekly (Sunday)' : 'Monthly'} Chit Plan "${chit.name}" has been added. Explore and join now!`,
           type: 'new_chit_available',
           metadata: { chitId: chit._id, chitName: chit.name },
           pushData: { screen: 'ExploreChits' },
@@ -351,7 +383,8 @@ const createChit = async (req, res) => {
 // @access  Private/Admin
 const updateChit = async (req, res) => {
   try {
-    const chit = await Chit.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const normalizedData = normalizeChitData(req.body);
+    const chit = await Chit.findByIdAndUpdate(req.params.id, normalizedData, { new: true });
     if (!chit) return res.status(404).json({ message: 'Chit not found' });
     res.json(chit);
   } catch (error) {

@@ -178,12 +178,12 @@ const ExploreChitsScreen = ({ navigation }) => {
 
                 <View style={styles.chitDetailsGrid}>
                   <View style={styles.chitDetailItem}>
-                    <Text style={styles.chitDetailLabel}>{chit.isWeekly ? 'Weekly' : 'Monthly'}</Text>
-                    <Text style={styles.chitDetailValue}>{formatCurrency(chit.isWeekly ? (chit.weeklyAmount || chit.monthlyAmount) : chit.monthlyAmount)}</Text>
+                    <Text style={styles.chitDetailLabel}>{chit.isWeekly !== false ? 'Weekly' : 'Monthly'}</Text>
+                    <Text style={styles.chitDetailValue}>{formatCurrency(chit.isWeekly !== false ? (chit.weeklyAmount || chit.monthlyAmount) : chit.monthlyAmount)}</Text>
                   </View>
                   <View style={styles.chitDetailItem}>
                     <Text style={styles.chitDetailLabel}>Duration</Text>
-                    <Text style={styles.chitDetailValue}>{chit.isWeekly ? `${chit.totalWeeks || chit.duration} wks` : `${chit.duration} mo`}</Text>
+                    <Text style={styles.chitDetailValue}>{chit.isWeekly !== false ? `${chit.totalWeeks || chit.duration} wks` : `${chit.duration} mo`}</Text>
                   </View>
                   <View style={styles.chitDetailItem}>
                     <Text style={styles.chitDetailLabel}>Slots Left</Text>
@@ -195,12 +195,10 @@ const ExploreChitsScreen = ({ navigation }) => {
 
                 <View style={styles.chitDates}>
                   <View style={styles.chitDateItem}>
-                    <MaterialCommunityIcons name="calendar-start" size={14} color={colors.textTertiary} />
-                    <Text style={styles.chitDateText}>Start: {chit.startDate}</Text>
-                  </View>
-                  <View style={styles.chitDateItem}>
-                    <MaterialCommunityIcons name="calendar-end" size={14} color={colors.textTertiary} />
-                    <Text style={styles.chitDateText}>End: {chit.endDate}</Text>
+                    <MaterialCommunityIcons name="calendar-clock" size={14} color="#10B981" />
+                    <Text style={[styles.chitDateText, { color: '#059669', fontWeight: '600' }]}>
+                      {chit.isWeekly !== false ? 'Starts Every Sunday • Due on Sunday' : 'Monthly Plan • Due 1st of Month'}
+                    </Text>
                   </View>
                 </View>
 

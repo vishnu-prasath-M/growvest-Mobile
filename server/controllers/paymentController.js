@@ -358,7 +358,22 @@ const completeChitJoin = async (user, data, orderId, paymentId, signature) => {
   const totalWeeks = chit.totalWeeks || chit.duration || 10;
   const totalContribution = chit.totalContribution || chit.totalPot || (weeklyAmount * totalWeeks);
 
-  // 1. Create a NEW individual ChitMember subscription
+  // 1. Calculate Sunday-based Start and Due Date
+  const isWeekly = chit.isWeekly !== false && chit.paymentFrequency !== 'monthly';
+  const now = new Date();
+  let startSunday = new Date(now);
+  if (isWeekly) {
+    const day = now.getDay();
+    const daysUntilSunday = (7 - day) % 7;
+    startSunday.setDate(now.getDate() + daysUntilSunday);
+    startSunday.setHours(0, 0, 0, 0);
+  }
+  const nextDueDate = isWeekly
+    ? new Date(startSunday.getTime() + 7 * 24 * 60 * 60 * 1000)
+    : new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  nextDueDate.setHours(23, 59, 59, 999);
+
+  // 2. Create a NEW individual ChitMember subscription
   const memberCount = await ChitMember.countDocuments({ chitId: chit._id, status: { $ne: 'cancelled' } });
   const memberNumber = memberCount + 1;
   let membershipId = '';
@@ -389,7 +404,8 @@ const completeChitJoin = async (user, data, orderId, paymentId, signature) => {
     totalContribution,
     withdrawalStatus: 'pending',
     hasWon: false,
-    joinedAt: new Date(),
+    joinedAt: startSunday,
+    nextDueDate: nextDueDate,
   });
   await member.save();
 

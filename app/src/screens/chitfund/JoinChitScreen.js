@@ -148,17 +148,46 @@ const JoinChitScreen = ({ navigation, route }) => {
           </LinearGradient>
         </View>
 
-        {/* Fee Details */}
+        {/* Payment & Schedule Summary */}
         <View style={styles.feeCard}>
-          <Text style={styles.feeTitle}>Payment Summary</Text>
+          <Text style={styles.feeTitle}>Payment & Schedule Summary</Text>
           <View style={styles.feeRow}>
             <Text style={styles.feeLabel}>{isWeekly ? 'First Week Installment' : 'First Month Installment'}</Text>
             <Text style={styles.feeValue}>{formatCurrency(baseAmount)}</Text>
           </View>
           <View style={styles.feeDivider} />
           <View style={styles.feeRow}>
-            <Text style={styles.feeTotalLabel}>Total Payable</Text>
+            <Text style={styles.feeLabel}>Chit Cycle Starts</Text>
+            <Text style={[styles.feeValue, { color: '#059669', fontWeight: '700' }]}>
+              {isWeekly ? 'Every Sunday' : '1st of Month'}
+            </Text>
+          </View>
+          <View style={styles.feeDivider} />
+          <View style={styles.feeRow}>
+            <Text style={styles.feeLabel}>Payment Due Day</Text>
+            <Text style={[styles.feeValue, { color: '#059669', fontWeight: '700' }]}>
+              {isWeekly ? 'Weekly Sunday' : 'Monthly 1st'}
+            </Text>
+          </View>
+          <View style={styles.feeDivider} />
+          <View style={styles.feeRow}>
+            <Text style={styles.feeTotalLabel}>Total Payable Now</Text>
             <Text style={styles.feeTotalValue}>{formatCurrency(totalPayable)}</Text>
+          </View>
+        </View>
+
+        {/* Schedule Notice */}
+        <View style={{ marginHorizontal: 20, marginBottom: 16, backgroundColor: '#ECFDF5', padding: 14, borderRadius: 14, borderWidth: 1, borderColor: '#A7F3D0', flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+          <MaterialCommunityIcons name="calendar-clock" size={24} color="#059669" />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: '#065F46' }}>
+              {isWeekly ? 'Sunday Chit Cycle' : 'Monthly Chit Cycle'}
+            </Text>
+            <Text style={{ fontSize: 11.5, color: '#047857', marginTop: 2, lineHeight: 16 }}>
+              {isWeekly 
+                ? 'All weekly chit batches start on Sunday. All subsequent installment dues and auctions fall on Sundays.'
+                : 'Monthly chit cycles are scheduled on a calendar month basis.'}
+            </Text>
           </View>
         </View>
 
@@ -166,9 +195,9 @@ const JoinChitScreen = ({ navigation, route }) => {
         <View style={styles.termsCard}>
           <Text style={styles.termsTitle}>Terms & Conditions</Text>
           <Text style={styles.termsText}>
-            By joining this chit fund, you agree to pay the monthly installment on or before the due date each month. 
+            By joining this chit fund, you agree to pay the weekly installment on or before the due date each Sunday. 
             Late payments will incur additional fees as per the chit fund rules. You also agree to participate in 
-            monthly auctions and accept the dividend distribution as per the scheme.
+            auctions and accept the dividend distribution as per the scheme.
           </Text>
         </View>
 
