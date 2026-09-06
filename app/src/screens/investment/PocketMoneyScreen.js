@@ -323,7 +323,7 @@ const PocketMoneyScreen = ({ navigation }) => {
                   badgeBg: isCredited ? '#D1FAE5' : '#FEF3C7',
                   valueColor: isCredited ? themeColors.success : themeColors.text,
                 },
-                { label: 'Total Final Cash Value', value: formatCurrency(activePlan.totalFinalValue || activePlan.investedAmount), valueColor: themeColors.text },
+                { label: 'Total Final Cash Value', value: formatCurrency(activePlan.investedAmount), valueColor: themeColors.text },
                 { 
                   label: 'Reward Status', 
                   value: isCredited ? 'Credited to Wallet 🎉' : 'Locked until Payout #10',

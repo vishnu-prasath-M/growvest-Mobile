@@ -323,29 +323,60 @@ const normalizeChitData = (data) => {
   const paymentFrequency = isWeekly ? 'weekly' : 'monthly';
   const paymentDay = isWeekly ? 'Sunday' : (data.paymentDay || '1st of Month');
   
-  const baseAmount = Number(data.weeklyAmount || data.monthlyAmount || 0);
-  const durationUnits = Number(data.totalWeeks || data.duration || 0);
-  const potAmount = Number(data.totalPot || data.totalContribution || (baseAmount * durationUnits));
+  const rawDuration = Number(data.duration || 0);
+  const rawTotalWeeks = Number(data.totalWeeks || 0);
+  const rawMonthlyAmount = Number(data.monthlyAmount || 0);
+  const rawWeeklyAmount = Number(data.weeklyAmount || 0);
 
-  return {
-    ...data,
-    name: data.name?.trim(),
-    description: data.description || '',
-    isWeekly,
-    paymentFrequency,
-    paymentDay,
-    monthlyAmount: baseAmount,
-    weeklyAmount: isWeekly ? baseAmount : Math.round(baseAmount / 4),
-    duration: durationUnits,
-    totalWeeks: isWeekly ? durationUnits : durationUnits * 4,
-    totalPot: potAmount,
-    totalContribution: potAmount,
-    totalMembers: Number(data.totalMembers || 100),
-    availableSlots: data.availableSlots !== undefined ? Number(data.availableSlots) : Number(data.totalMembers || 100),
-    processingFee: Number(data.processingFee || 0),
-    status: data.status || 'upcoming',
-    features: Array.isArray(data.features) ? data.features : (data.features ? String(data.features).split(',').map(f => f.trim()).filter(Boolean) : []),
-  };
+  if (isWeekly) {
+    const weeks = rawDuration || rawTotalWeeks || 10;
+    const baseAmt = rawWeeklyAmount || rawMonthlyAmount || 0;
+    const pot = Number(data.totalPot || data.totalContribution || (baseAmt * weeks));
+
+    return {
+      ...data,
+      name: data.name?.trim(),
+      description: data.description || '',
+      isWeekly: true,
+      paymentFrequency: 'weekly',
+      paymentDay: 'Sunday',
+      monthlyAmount: baseAmt,
+      weeklyAmount: baseAmt,
+      duration: weeks,
+      totalWeeks: weeks,
+      totalPot: pot,
+      totalContribution: pot,
+      totalMembers: Number(data.totalMembers || 100),
+      availableSlots: data.availableSlots !== undefined ? Number(data.availableSlots) : Number(data.totalMembers || 100),
+      processingFee: Number(data.processingFee || 0),
+      status: data.status || 'upcoming',
+      features: Array.isArray(data.features) ? data.features : (data.features ? String(data.features).split(',').map(f => f.trim()).filter(Boolean) : []),
+    };
+  } else {
+    const months = rawDuration || (rawTotalWeeks ? Math.round(rawTotalWeeks / 4) : 12);
+    const baseAmt = rawMonthlyAmount || (rawWeeklyAmount ? rawWeeklyAmount * 4 : 0);
+    const pot = Number(data.totalPot || data.totalContribution || (baseAmt * months));
+
+    return {
+      ...data,
+      name: data.name?.trim(),
+      description: data.description || '',
+      isWeekly: false,
+      paymentFrequency: 'monthly',
+      paymentDay: data.paymentDay || '1st of Month',
+      monthlyAmount: baseAmt,
+      weeklyAmount: Math.round(baseAmt / 4),
+      duration: months,
+      totalWeeks: months * 4,
+      totalPot: pot,
+      totalContribution: pot,
+      totalMembers: Number(data.totalMembers || 100),
+      availableSlots: data.availableSlots !== undefined ? Number(data.availableSlots) : Number(data.totalMembers || 100),
+      processingFee: Number(data.processingFee || 0),
+      status: data.status || 'upcoming',
+      features: Array.isArray(data.features) ? data.features : (data.features ? String(data.features).split(',').map(f => f.trim()).filter(Boolean) : []),
+    };
+  }
 };
 
 // @desc    Create a chit (admin)
