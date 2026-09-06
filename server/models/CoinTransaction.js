@@ -23,6 +23,7 @@ const coinTransactionSchema = new mongoose.Schema({
       'COIN_REFUND',
       'ADMIN_CREDIT',
       'ADMIN_DEBIT',
+      'POCKET_MONEY_INTEREST_REWARD',
       'OTHER_REWARD',
     ],
     required: true,

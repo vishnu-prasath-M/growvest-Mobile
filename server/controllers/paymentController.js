@@ -574,12 +574,10 @@ const completePocketMoney = async (user, data, orderId, paymentId, signature) =>
   }
 
   const payoutAmount = Number(amount) / 10;       // Each of the 10 payouts = amount/10
-  const bonusRate = 6;
-  const bonusAmount = Number(amount) * 6 / 100;   // 6% bonus on full amount
-  const totalFinalValue = Number(amount) + bonusAmount;
+  const startDate = new Date();
 
   // Next payout date: first payout becomes eligible after one frequency cycle
-  const nextPayoutDate = new Date();
+  const nextPayoutDate = new Date(startDate);
   if (frequency === 'daily') {
     nextPayoutDate.setDate(nextPayoutDate.getDate() + 1);
   } else if (frequency === 'every_2_days') {
@@ -588,15 +586,28 @@ const completePocketMoney = async (user, data, orderId, paymentId, signature) =>
     nextPayoutDate.setDate(nextPayoutDate.getDate() + 7);
   }
 
-  // Final payout date = after 10 cycles
-  const finalPayoutDate = new Date();
+  // Final payout date = 10 payout cycles
+  const finalPayoutDate = new Date(startDate);
+  let eligibleDurationDays = 10;
   if (frequency === 'daily') {
-    finalPayoutDate.setDate(finalPayoutDate.getDate() + 9);
+    finalPayoutDate.setDate(finalPayoutDate.getDate() + 10);
+    eligibleDurationDays = 10;
   } else if (frequency === 'every_2_days') {
-    finalPayoutDate.setDate(finalPayoutDate.getDate() + 18);
+    finalPayoutDate.setDate(finalPayoutDate.getDate() + 19);
+    eligibleDurationDays = 19;
   } else if (frequency === 'weekly') {
-    finalPayoutDate.setDate(finalPayoutDate.getDate() + 63);
+    finalPayoutDate.setDate(finalPayoutDate.getDate() + 64);
+    eligibleDurationDays = 64;
   }
+
+  // 6% p.a. (Per Annum) Interest & Growvest Coin Reward Calculation
+  // Annual Interest = Principal × 6%
+  // Period Interest = Principal × 6% × (Eligible Duration in Days / 365)
+  // Reward Coins = Math.round(Period Interest × 20) [20 Coins = ₹1]
+  const annualInterestRate = 6;
+  const eligibleInterestAmount = Number(((Number(amount) * 0.06 * eligibleDurationDays) / 365).toFixed(2));
+  const rewardCoins = Math.round(eligibleInterestAmount * 20);
+  const totalFinalValue = Number(amount); // Cash value is strictly principal (₹1,000)
 
   // Create the PocketMoney investment record.
   // remainingAmount = full investedAmount (no payout deducted yet)
@@ -611,14 +622,20 @@ const completePocketMoney = async (user, data, orderId, paymentId, signature) =>
     remainingAmount: Number(amount),  // FULL amount — no deduction at investment time
     payoutAmount,
     frequency,
-    startDate: new Date(),
+    startDate,
     nextPayoutDate,
     finalPayoutDate,
     totalPaidOut: 0,      // Nothing paid out yet
     payoutCount: 0,       // No payout completed yet
     status: 'active',
-    bonusRate,
-    bonusAmount,
+    annualInterestRate,
+    eligibleDurationDays,
+    eligibleInterestAmount,
+    rewardCoins,
+    rewardStatus: 'locked',
+    rewardReferenceId: `PM_REWARD_${orderId || paymentId || Date.now()}`,
+    bonusRate: annualInterestRate,
+    bonusAmount: eligibleInterestAmount,
     totalFinalValue,
     bonusReleased: false,
     paymentProvider: 'Razorpay',

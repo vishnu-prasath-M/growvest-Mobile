@@ -2,7 +2,78 @@ const PocketMoney = require('../models/PocketMoney');
 const PocketMoneyPayout = require('../models/PocketMoneyPayout');
 const Transaction = require('../models/Transaction');
 const User = require('../models/User');
+const CoinTransaction = require('../models/CoinTransaction');
 const { sendNotification } = require('../services/notificationHelper');
+
+// Helper to credit 6% p.a. interest reward in Coins upon final payout / plan completion
+const creditPocketMoneyCoinReward = async (pocket, date = new Date()) => {
+  if (pocket.rewardStatus === 'credited') {
+    return false; // Idempotency check: Already credited
+  }
+
+  // Calculate or retrieve eligible coins
+  let rewardCoins = pocket.rewardCoins;
+  let eligibleInterest = pocket.eligibleInterestAmount;
+
+  if (!rewardCoins || rewardCoins <= 0) {
+    const durationDays = pocket.eligibleDurationDays || (pocket.frequency === 'daily' ? 10 : pocket.frequency === 'every_2_days' ? 19 : 64);
+    eligibleInterest = Number(((pocket.investedAmount * 0.06 * durationDays) / 365).toFixed(2));
+    rewardCoins = Math.round(eligibleInterest * 20); // 20 Coins = ₹1
+    pocket.eligibleInterestAmount = eligibleInterest;
+    pocket.rewardCoins = rewardCoins;
+  }
+
+  const idempotencyKey = `PM_COIN_${pocket._id}`;
+
+  // Double check in CoinTransaction collection for idempotency
+  const existingCoinTx = await CoinTransaction.findOne({ idempotencyKey });
+  if (existingCoinTx) {
+    pocket.rewardStatus = 'credited';
+    pocket.rewardCreditedAt = existingCoinTx.createdAt;
+    await pocket.save();
+    return false;
+  }
+
+  // 1. Credit Coins to user's wallet balance
+  await User.findByIdAndUpdate(pocket.userId, { $inc: { coinBalance: rewardCoins } });
+
+  // 2. Create Coin Transaction
+  const planShortId = String(pocket._id).slice(-6).toUpperCase();
+  const coinTx = new CoinTransaction({
+    userId: pocket.userId,
+    type: 'POCKET_MONEY_INTEREST_REWARD',
+    coins: rewardCoins,
+    amount: rewardCoins,
+    rupeeValue: eligibleInterest,
+    description: `Pocket Money Interest Reward (6% p.a. • ${pocket.eligibleDurationDays || 10} days) - Plan PM-${planShortId}`,
+    referenceId: pocket._id,
+    idempotencyKey,
+    status: 'COMPLETED',
+  });
+  await coinTx.save();
+
+  // 3. Update pocket status
+  pocket.rewardStatus = 'credited';
+  pocket.rewardCreditedAt = date;
+  pocket.bonusReleased = true;
+  await pocket.save();
+
+  // 4. Send push & in-app notification
+  try {
+    await sendNotification({
+      userId: pocket.userId,
+      title: '🎉 Pocket Money Completed',
+      description: `Your reward of 🪙 ${rewardCoins} Coins has been added to your Growvest Wallet.`,
+      type: 'pocket_money_completed',
+      metadata: { pocketMoneyId: pocket._id, coins: rewardCoins },
+      pushData: { screen: 'CoinWallet' },
+    });
+  } catch (notifErr) {
+    console.warn('[PocketMoney] Coin reward notification error:', notifErr.message);
+  }
+
+  return true;
+};
 
 // Helper scheduler function
 const runPocketMoneyPayouts = async () => {
@@ -30,7 +101,8 @@ const runPocketMoneyPayouts = async () => {
         continue;
       }
       
-      const amountToPay = Math.min(pocket.payoutAmount, pocket.remainingAmount) + (payoutNum === 10 ? (pocket.bonusAmount || 0) : 0);
+      // Cash payout contains ONLY the user's principal (no cash bonus added)
+      const amountToPay = Math.min(pocket.payoutAmount, pocket.remainingAmount);
       
       // Create Transaction first
       const transaction = new Transaction({
@@ -58,19 +130,15 @@ const runPocketMoneyPayouts = async () => {
       });
       await payout.save();
       
-      const regularPayoutPart = amountToPay - (payoutNum === 10 ? (pocket.bonusAmount || 0) : 0);
       // Update Pocket Money record
-      pocket.remainingAmount = Math.max(0, pocket.remainingAmount - regularPayoutPart);
+      pocket.remainingAmount = Math.max(0, pocket.remainingAmount - amountToPay);
       pocket.totalPaidOut += amountToPay;
       pocket.payoutCount = payoutNum;
       
-      if (payoutNum === 10) {
-        pocket.bonusReleased = true;
-      }
-      
-      if (pocket.remainingAmount <= 0) {
+      if (payoutNum >= 10 || pocket.remainingAmount <= 0) {
         pocket.status = 'completed';
         pocket.completedAt = now;
+        await creditPocketMoneyCoinReward(pocket, now);
       } else {
         // Calculate next payout date based on frequency
         const nextDate = new Date(pocket.nextPayoutDate);
@@ -94,16 +162,6 @@ const runPocketMoneyPayouts = async () => {
         type: 'pocket_money_payout',
         metadata: { pocketMoneyId: pocket._id }
       });
-      
-      if (pocket.status === 'completed') {
-        await sendNotification({
-          userId: pocket.userId,
-          title: '🏆 Pocket Money Completed',
-          description: `Your ₹${pocket.investedAmount} Pocket Money investment has been fully paid out!`,
-          type: 'pocket_money_completed',
-          metadata: { pocketMoneyId: pocket._id }
-        });
-      }
       
       // Notify Admin
       const admins = await User.find({ role: 'admin' });
@@ -154,6 +212,18 @@ exports.getMyPocketMoney = async (req, res) => {
       pocketMonies.map(async (pocket) => {
         const pocketObj = pocket.toObject();
 
+        // Ensure 6% p.a. interest fields are calculated for backward compatibility
+        const durationDays = pocket.eligibleDurationDays || (pocket.frequency === 'daily' ? 10 : pocket.frequency === 'every_2_days' ? 19 : 64);
+        const eligibleInterest = pocket.eligibleInterestAmount || Number(((pocket.investedAmount * 0.06 * durationDays) / 365).toFixed(2));
+        const rewardCoins = pocket.rewardCoins || Math.round(eligibleInterest * 20);
+
+        pocketObj.annualInterestRate = pocket.annualInterestRate || 6;
+        pocketObj.eligibleDurationDays = durationDays;
+        pocketObj.eligibleInterestAmount = eligibleInterest;
+        pocketObj.rewardCoins = rewardCoins;
+        pocketObj.rewardStatus = pocket.rewardStatus || (pocket.status === 'completed' && pocket.bonusReleased ? 'credited' : 'locked');
+        pocketObj.totalFinalValue = pocket.investedAmount; // Cash final value is principal (₹1,000)
+
         if (pocket.status === 'completed' || pocket.remainingAmount <= 0) {
           pocketObj.todayPayoutStatus = 'completed';
           return pocketObj;
@@ -183,7 +253,7 @@ exports.getMyPocketMoney = async (req, res) => {
 
         const payoutNum = pocket.payoutCount + 1;
         pocketObj.currentPayoutNumber = payoutNum;
-        pocketObj.currentPayoutAmount = Math.min(pocket.payoutAmount, pocket.remainingAmount) + (payoutNum === 10 ? (pocket.bonusAmount || 0) : 0);
+        pocketObj.currentPayoutAmount = Math.min(pocket.payoutAmount, pocket.remainingAmount);
 
         return pocketObj;
       })
@@ -318,7 +388,7 @@ exports.releaseSinglePayout = async (req, res) => {
       return res.status(400).json({ message: 'Payout already released for this plan today.' });
     }
     
-    const amountToPay = Math.min(pocket.payoutAmount, pocket.remainingAmount) + (payoutNum === 10 ? (pocket.bonusAmount || 0) : 0);
+    const amountToPay = Math.min(pocket.payoutAmount, pocket.remainingAmount);
     
     const transaction = new Transaction({
       userId: pocket.userId,
@@ -358,18 +428,14 @@ exports.releaseSinglePayout = async (req, res) => {
     }
     await payout.save();
     
-    const regularPayoutPart = amountToPay - (payoutNum === 10 ? (pocket.bonusAmount || 0) : 0);
-    pocket.remainingAmount = Math.max(0, pocket.remainingAmount - regularPayoutPart);
+    pocket.remainingAmount = Math.max(0, pocket.remainingAmount - amountToPay);
     pocket.totalPaidOut += amountToPay;
     pocket.payoutCount = payoutNum;
     
-    if (payoutNum === 10) {
-      pocket.bonusReleased = true;
-    }
-    
-    if (pocket.remainingAmount <= 0) {
+    if (payoutNum >= 10 || pocket.remainingAmount <= 0) {
       pocket.status = 'completed';
       pocket.completedAt = now;
+      await creditPocketMoneyCoinReward(pocket, now);
     } else {
       // Increment next payout date based on frequency from today/now
       const baseDate = (pocket.nextPayoutDate && new Date(pocket.nextPayoutDate) > now)
@@ -395,16 +461,6 @@ exports.releaseSinglePayout = async (req, res) => {
       type: 'pocket_money_payout',
       metadata: { pocketMoneyId: pocket._id }
     });
-    
-    if (pocket.status === 'completed') {
-      await sendNotification({
-        userId: pocket.userId,
-        title: '🏆 Pocket Money Completed',
-        description: `Your ₹${pocket.investedAmount} Pocket Money plan has been fully paid out!`,
-        type: 'pocket_money_completed',
-        metadata: { pocketMoneyId: pocket._id }
-      });
-    }
     
     res.json({ success: true, message: `Successfully released ₹${amountToPay} payout.`, pocket });
   } catch (error) {
@@ -466,7 +522,7 @@ exports.requestPayout = async (req, res) => {
       }
     }
 
-    const amountToPay = Math.min(pocket.payoutAmount, pocket.remainingAmount) + (payoutNum === 10 ? (pocket.bonusAmount || 0) : 0);
+    const amountToPay = Math.min(pocket.payoutAmount, pocket.remainingAmount);
 
     const payout = new PocketMoneyPayout({
       pocketMoneyId: pocket._id,
@@ -515,7 +571,7 @@ exports.getPayoutStatus = async (req, res) => {
     const todayIST = getTodayISTString();
     const nextDateIST = getISTDateString(pocket.nextPayoutDate);
     const payoutNum = pocket.payoutCount + 1;
-    const payoutAmt = Math.min(pocket.payoutAmount, pocket.remainingAmount) + (payoutNum === 10 ? (pocket.bonusAmount || 0) : 0);
+    const payoutAmt = Math.min(pocket.payoutAmount, pocket.remainingAmount);
 
     const existingPayouts = await PocketMoneyPayout.find({ pocketMoneyId: pocket._id }).sort({ createdAt: -1 });
     const todayPayout = existingPayouts.find(p => getISTDateString(p.createdAt || p.payoutDate) === todayIST);
@@ -598,19 +654,15 @@ exports.confirmReleasePayout = async (req, res) => {
     payout.transactionId = transaction._id;
     await payout.save();
     
-    const regularPayoutPart = payout.amount - (payout.payoutNumber === 10 ? (pocket.bonusAmount || 0) : 0);
-    // Update Pocket Money record
-    pocket.remainingAmount = Math.max(0, pocket.remainingAmount - regularPayoutPart);
+    // Update Pocket Money record (pure principal amount)
+    pocket.remainingAmount = Math.max(0, pocket.remainingAmount - payout.amount);
     pocket.totalPaidOut += payout.amount;
     pocket.payoutCount = payout.payoutNumber;
     
-    if (payout.payoutNumber === 10) {
-      pocket.bonusReleased = true;
-    }
-    
-    if (pocket.remainingAmount <= 0) {
+    if (payout.payoutNumber >= 10 || pocket.remainingAmount <= 0) {
       pocket.status = 'completed';
       pocket.completedAt = now;
+      await creditPocketMoneyCoinReward(pocket, now);
     } else {
       // Calculate next payout date based on frequency from today/now
       const baseDate = (pocket.nextPayoutDate && new Date(pocket.nextPayoutDate) > now)
@@ -637,16 +689,6 @@ exports.confirmReleasePayout = async (req, res) => {
         type: 'pocket_money_payout',
         metadata: { pocketMoneyId: pocket._id }
       });
-      
-      if (pocket.status === 'completed') {
-        await sendNotification({
-          userId: pocket.userId,
-          title: '🏆 Pocket Money Plan Completed',
-          description: `Congratulations! Your pocket money plan of ₹${pocket.investedAmount} is fully paid out!`,
-          type: 'pocket_money_completed',
-          metadata: { pocketMoneyId: pocket._id }
-        });
-      }
     } catch (notifErr) {
       console.error('[PocketMoneyConfirm] User notification error:', notifErr);
     }

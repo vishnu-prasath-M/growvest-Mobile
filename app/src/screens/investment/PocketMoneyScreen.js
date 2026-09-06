@@ -296,40 +296,55 @@ const PocketMoneyScreen = ({ navigation }) => {
               </ScrollView>
             )}
             
-            {[
-              { label: 'Original Investment', value: formatCurrency(activePlan.investedAmount) },
-              { label: 'Payout Frequency', value: activePlan.frequency === 'daily' ? 'Daily' : activePlan.frequency === 'every_2_days' ? 'Every 2 Days' : 'Weekly' },
-              { label: 'Regular Payout Amount', value: formatCurrency(activePlan.payoutAmount) },
-              { 
-                label: '6% Bonus Amount', 
-                value: formatCurrency(activePlan.bonusAmount),
-                badge: activePlan.bonusReleased ? 'Released' : 'Locked',
-                badgeColor: activePlan.bonusReleased ? '#065F46' : '#B45309',
-                badgeBg: activePlan.bonusReleased ? '#D1FAE5' : '#FEF3C7',
-              },
-              { label: 'Total Final Value', value: formatCurrency(activePlan.totalFinalValue || ((activePlan.investedAmount || 0) * 1.06)) },
-              { label: 'Payouts Completed', value: `${activePlan.payoutCount || 0} Completed` },
-              { label: 'Remaining Payouts', value: `${Math.max(0, 10 - (activePlan.payoutCount || 0))} Remaining` },
-              { label: 'Next Payout Date', value: formatDate(activePlan.nextPayoutDate) },
-              { label: 'Final Payout Date', value: formatDate(activePlan.finalPayoutDate || activePlan.completedAt) },
-              { 
-                label: 'Bonus Status', 
-                value: activePlan.bonusReleased ? 'Released (Paid with Final Payout)' : 'Locked until Payout #10',
-                valueColor: activePlan.bonusReleased ? themeColors.success : '#B45309',
-              },
-            ].map((detail, idx) => (
-              <View key={idx} style={styles.detailRow}>
-                <Text style={styles.detailLabel}>{detail.label}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  {detail.badge && (
-                    <View style={{ backgroundColor: detail.badgeBg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginRight: 8 }}>
-                      <Text style={{ fontSize: 10, fontWeight: '700', color: detail.badgeColor }}>{detail.badge}</Text>
-                    </View>
-                  )}
-                  <Text style={[styles.detailValue, detail.valueColor && { color: detail.valueColor }]}>{detail.value}</Text>
+            {(() => {
+              const durationDays = activePlan.eligibleDurationDays || (activePlan.frequency === 'daily' ? 10 : activePlan.frequency === 'every_2_days' ? 19 : 64);
+              const interestAmt = activePlan.eligibleInterestAmount !== undefined 
+                ? activePlan.eligibleInterestAmount 
+                : Number(((activePlan.investedAmount * 0.06 * durationDays) / 365).toFixed(2));
+              const coins = activePlan.rewardCoins || Math.round(interestAmt * 20);
+              const isCredited = activePlan.rewardStatus === 'credited' || activePlan.bonusReleased;
+
+              const detailsList = [
+                { label: 'Original Investment', value: formatCurrency(activePlan.investedAmount) },
+                { label: 'Payout Frequency', value: activePlan.frequency === 'daily' ? 'Daily' : activePlan.frequency === 'every_2_days' ? 'Every 2 Days' : 'Weekly' },
+                { label: 'Regular Payout Amount', value: formatCurrency(activePlan.payoutAmount) },
+                { label: 'Number of Payouts', value: '10 Payouts' },
+                { label: 'Payouts Completed', value: `${activePlan.payoutCount || 0} Completed` },
+                { label: 'Remaining Payouts', value: `${Math.max(0, 10 - (activePlan.payoutCount || 0))} Remaining` },
+                { label: 'Next Payout Date', value: formatDate(activePlan.nextPayoutDate) },
+                { label: 'Final Payout Date', value: formatDate(activePlan.finalPayoutDate || activePlan.completedAt) },
+                { label: 'Interest Rate', value: '6% p.a.', valueColor: themeColors.primary },
+                { label: 'Estimated Interest Reward', value: `₹${interestAmt.toFixed(2)} equivalent`, valueColor: themeColors.success },
+                { 
+                  label: 'Expected Reward Coins', 
+                  value: `🪙 ${coins} Coins`,
+                  badge: isCredited ? 'Credited' : 'Locked',
+                  badgeColor: isCredited ? '#065F46' : '#B45309',
+                  badgeBg: isCredited ? '#D1FAE5' : '#FEF3C7',
+                  valueColor: isCredited ? themeColors.success : themeColors.text,
+                },
+                { label: 'Total Final Cash Value', value: formatCurrency(activePlan.totalFinalValue || activePlan.investedAmount), valueColor: themeColors.text },
+                { 
+                  label: 'Reward Status', 
+                  value: isCredited ? 'Credited to Wallet 🎉' : 'Locked until Payout #10',
+                  valueColor: isCredited ? themeColors.success : '#B45309',
+                },
+              ];
+
+              return detailsList.map((detail, idx) => (
+                <View key={idx} style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>{detail.label}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    {detail.badge && (
+                      <View style={{ backgroundColor: detail.badgeBg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginRight: 8 }}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: detail.badgeColor }}>{detail.badge}</Text>
+                      </View>
+                    )}
+                    <Text style={[styles.detailValue, detail.valueColor && { color: detail.valueColor }]}>{detail.value}</Text>
+                  </View>
                 </View>
-              </View>
-            ))}
+              ));
+            })()}
           </View>
         )}
 

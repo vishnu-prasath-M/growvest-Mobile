@@ -78,14 +78,20 @@ const PocketMoneyAmountScreen = ({ navigation }) => {
     });
   };
 
-  const getBonusAmount = () => {
-    const amt = parseFloat(amount) || 0;
-    return amt * 6 / 100;
+  const getEstimatedDurationDays = () => {
+    if (frequency === 'daily') return 10;
+    if (frequency === 'every_2_days') return 19;
+    return 64; // weekly
   };
 
-  const getFinalValue = () => {
+  const getEstimatedInterest = () => {
     const amt = parseFloat(amount) || 0;
-    return amt + getBonusAmount();
+    const days = getEstimatedDurationDays();
+    return (amt * 0.06 * days) / 365;
+  };
+
+  const getExpectedRewardCoins = () => {
+    return Math.round(getEstimatedInterest() * 20);
   };
 
   const getPayoutAmount = () => {
@@ -211,18 +217,36 @@ const PocketMoneyAmountScreen = ({ navigation }) => {
             <View style={styles.summaryDivider} />
 
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>6% Bonus</Text>
+              <Text style={styles.summaryLabel}>Interest Rate</Text>
               <Text style={[styles.summaryValue, { color: themeColors.primary, fontWeight: '700' }]}>
-                +₹{getBonusAmount().toLocaleString('en-IN')}
+                6% p.a.
               </Text>
             </View>
 
             <View style={styles.summaryDivider} />
 
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Final Payout Value</Text>
+              <Text style={styles.summaryLabel}>Estimated Interest</Text>
+              <Text style={[styles.summaryValue, { color: themeColors.success, fontWeight: '700' }]}>
+                ₹{getEstimatedInterest().toFixed(2)} equivalent
+              </Text>
+            </View>
+
+            <View style={styles.summaryDivider} />
+
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Reward at Completion</Text>
+              <Text style={[styles.summaryValue, { color: themeColors.success, fontWeight: '800' }]}>
+                🪙 {getExpectedRewardCoins()} Coins
+              </Text>
+            </View>
+
+            <View style={styles.summaryDivider} />
+
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Cash Final Value</Text>
               <Text style={[styles.summaryValue, { fontWeight: '800' }]}>
-                ₹{getFinalValue().toLocaleString('en-IN')}
+                ₹{parseFloat(amount).toLocaleString('en-IN')}
               </Text>
             </View>
 
@@ -234,7 +258,7 @@ const PocketMoneyAmountScreen = ({ navigation }) => {
             <View style={styles.bonusLockedNote}>
               <MaterialCommunityIcons name="lock-clock" size={16} color="#B45309" style={{ marginRight: 6 }} />
               <Text style={styles.bonusLockedText}>
-                Your 6% bonus is locked and will be added only to your final payout.
+                Interest is earned at 6% p.a. and credited as Growvest Coins to your Wallet upon final payout completion.
               </Text>
             </View>
           </View>
