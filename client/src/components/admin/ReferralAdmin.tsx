@@ -60,6 +60,9 @@ const ReferralAdmin = ({ token }: ReferralAdminProps) => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState("");
   const [copiedUrl, setCopiedUrl] = useState(false);
+  const [externalUrlInput, setExternalUrlInput] = useState("");
+  const [savingExternalUrl, setSavingExternalUrl] = useState(false);
+  const [externalUrlMsg, setExternalUrlMsg] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchReferralOverview = async () => {
@@ -212,6 +215,43 @@ const ReferralAdmin = ({ token }: ReferralAdminProps) => {
     navigator.clipboard.writeText(fullUrl);
     setCopiedUrl(true);
     setTimeout(() => setCopiedUrl(false), 2000);
+  };
+
+  const handleSaveExternalUrl = async () => {
+    if (!token || !externalUrlInput.trim()) return;
+    if (!externalUrlInput.trim().startsWith("http")) {
+      alert("Please enter a valid HTTP or HTTPS download URL");
+      return;
+    }
+    setSavingExternalUrl(true);
+    setExternalUrlMsg("");
+    try {
+      const res = await fetch(`${API_URL}/api/referral/admin/apk/url`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          externalUrl: externalUrlInput.trim(),
+          fileName: "Growvest v1.2.apk",
+          version: `v1.0.${Date.now().toString().slice(-3)}`,
+        }),
+      });
+      if (res.ok) {
+        setExternalUrlMsg("External APK download URL configured successfully!");
+        setExternalUrlInput("");
+        fetchApkDetails();
+        fetchReferralOverview();
+      } else {
+        const err = await res.json();
+        alert(err.message || "Failed to set external APK URL");
+      }
+    } catch (e: any) {
+      alert(e.message || "Network error");
+    } finally {
+      setSavingExternalUrl(false);
+    }
   };
 
   const handleDeleteApk = async (id: string) => {
@@ -594,7 +634,7 @@ const ReferralAdmin = ({ token }: ReferralAdminProps) => {
             {uploading && (
               <div className="mt-6 space-y-2">
                 <div className="flex justify-between text-xs font-body text-foreground font-semibold">
-                  <span>Uploading APK...</span>
+                  <span>Uploading APK to GridFS & Local Storage...</span>
                   <span>{uploadProgress}%</span>
                 </div>
                 <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
@@ -605,6 +645,33 @@ const ReferralAdmin = ({ token }: ReferralAdminProps) => {
                 </div>
               </div>
             )}
+
+            {/* Optional: External Download URL */}
+            <div className="mt-6 pt-6 border-t border-border">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-heading font-bold text-foreground">OR Configure External Download URL</span>
+                <span className="text-[10px] text-muted-foreground">(Google Drive, Cloudinary, AWS S3, GitHub Release)</span>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <input
+                  type="url"
+                  placeholder="https://github.com/.../growvest.apk or https://drive.google.com/..."
+                  value={externalUrlInput}
+                  onChange={(e) => setExternalUrlInput(e.target.value)}
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-border bg-background text-xs font-body focus:outline-none focus:border-primary"
+                />
+                <Button
+                  onClick={handleSaveExternalUrl}
+                  disabled={savingExternalUrl || !externalUrlInput.trim()}
+                  className="rounded-xl font-body text-xs h-10 px-5"
+                >
+                  {savingExternalUrl ? "Saving..." : "Save External Link"}
+                </Button>
+              </div>
+              {externalUrlMsg && (
+                <p className="text-xs text-green-600 font-semibold mt-2">✓ {externalUrlMsg}</p>
+              )}
+            </div>
           </div>
 
           {/* Current Active APK Details */}

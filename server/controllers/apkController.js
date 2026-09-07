@@ -137,6 +137,111 @@ exports.uploadAPK = async (req, res) => {
   }
 };
 
+let restorePromise = null;
+
+// Helper to ensure APK file is physically on local disk (restored from GridFS if ephemeral disk was cleared on Render restart)
+async function syncApkFromGridFSToDisk() {
+  if (restorePromise) return restorePromise;
+
+  restorePromise = (async () => {
+    try {
+      const downloadsDir = path.join(__dirname, '../public/downloads');
+      if (!fs.existsSync(downloadsDir)) {
+        fs.mkdirSync(downloadsDir, { recursive: true });
+      }
+
+      const physicalPath = path.join(downloadsDir, 'growvest-latest.apk');
+      const activeApk = await APKRelease.findOne({ status: 'active' })
+        .select('+apkData')
+        .sort({ createdAt: -1 });
+
+      if (!activeApk) return false;
+
+      // Check if file already exists on disk with matching valid size
+      if (fs.existsSync(physicalPath)) {
+        const stats = fs.statSync(physicalPath);
+        if (stats.size > 1000 && (!activeApk.fileSize || Math.abs(stats.size - activeApk.fileSize) < 100)) {
+          return true; // Already on disk and intact!
+        }
+      }
+
+      // 1. Restore from GridFS if available
+      const gridFsBucket = getGridFSBucket();
+      if (activeApk.gridFsFileId && gridFsBucket) {
+        console.log(`[APKRestore] Auto-restoring APK from MongoDB GridFS (${activeApk.gridFsFileId}) to local disk...`);
+        const tempPath = path.join(downloadsDir, `growvest-latest.tmp.${Date.now()}`);
+        const writeStream = fs.createWriteStream(tempPath);
+        const downloadStream = gridFsBucket.openDownloadStream(new mongoose.Types.ObjectId(activeApk.gridFsFileId));
+
+        await new Promise((resolve, reject) => {
+          downloadStream.pipe(writeStream)
+            .on('finish', resolve)
+            .on('error', reject);
+        });
+
+        if (fs.existsSync(tempPath) && fs.statSync(tempPath).size > 1000) {
+          fs.renameSync(tempPath, physicalPath);
+          console.log(`[APKRestore] APK restored successfully to ${physicalPath} (${fs.statSync(physicalPath).size} bytes)`);
+          return true;
+        }
+      }
+
+      // 2. Fallback: restore from DB buffer if present
+      if (activeApk.apkData && activeApk.apkData.length > 0) {
+        fs.writeFileSync(physicalPath, activeApk.apkData);
+        console.log(`[APKRestore] APK restored from DB buffer to ${physicalPath}`);
+        return true;
+      }
+
+      return false;
+    } catch (err) {
+      console.error('[APKRestore] Error restoring APK from GridFS to disk:', err.message);
+      return false;
+    } finally {
+      restorePromise = null;
+    }
+  })();
+
+  return restorePromise;
+}
+
+exports.syncApkFromGridFSToDisk = syncApkFromGridFSToDisk;
+
+// ─── ADMIN: Set External APK Download URL ────────────────────────────────────
+exports.setExternalApkUrl = async (req, res) => {
+  try {
+    const adminId = req.user._id || req.user.id;
+    const { externalUrl, fileName, version } = req.body;
+
+    if (!externalUrl || !externalUrl.trim().startsWith('http')) {
+      return res.status(400).json({ message: 'Valid external HTTP/HTTPS download URL is required' });
+    }
+
+    const name = (fileName || 'Growvest.apk').trim();
+
+    await APKRelease.updateMany({}, { status: 'inactive' });
+
+    const newAPK = await APKRelease.create({
+      fileName: name,
+      fileSize: 0,
+      storagePath: '/downloads/growvest-latest.apk',
+      externalUrl: externalUrl.trim(),
+      version: version || '1.0.0',
+      uploadedBy: adminId,
+      status: 'active',
+      downloadCount: 0,
+    });
+
+    res.status(201).json({
+      message: 'External APK URL configured successfully!',
+      apk: newAPK,
+    });
+  } catch (error) {
+    console.error('Error setting external APK URL:', error);
+    res.status(500).json({ message: 'Server error setting external APK URL' });
+  }
+};
+
 // ─── PUBLIC: Get Active APK Info ─────────────────────────────────────────────
 exports.getActiveAPK = async (req, res) => {
   try {
@@ -155,9 +260,10 @@ exports.getActiveAPK = async (req, res) => {
       fileName: activeApk.fileName,
       fileSize: activeApk.fileSize,
       version: activeApk.version,
+      externalUrl: activeApk.externalUrl || '',
       uploadedAt: activeApk.uploadedAt,
       downloadCount: activeApk.downloadCount,
-      downloadUrl: '/api/referral/apk/download',
+      downloadUrl: activeApk.externalUrl || '/api/referral/apk/download',
     });
   } catch (error) {
     console.error('Error getting active APK:', error);
@@ -177,6 +283,12 @@ exports.downloadActiveAPK = async (req, res) => {
         return res.redirect(process.env.APK_DOWNLOAD_URL);
       }
       return res.status(404).send('Android app download is currently unavailable');
+    }
+
+    // Direct redirection if external CDN/S3/Drive URL is configured
+    if (activeApk.externalUrl && activeApk.externalUrl.trim().startsWith('http')) {
+      await APKRelease.findByIdAndUpdate(activeApk._id, { $inc: { downloadCount: 1 } });
+      return res.redirect(activeApk.externalUrl.trim());
     }
 
     // Increment download count atomically
@@ -227,57 +339,59 @@ exports.downloadActiveAPK = async (req, res) => {
 
     const downloadsDir = path.join(__dirname, '../public/downloads');
     const physicalPath = path.join(downloadsDir, 'growvest-latest.apk');
+    const filename = activeApk.fileName || 'Growvest.apk';
 
-    // Set standard download headers for Android browsers & download managers
-    const filename = activeApk.fileName || 'growvest.apk';
-    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('Accept-Ranges', 'bytes');
-    if (activeApk.fileSize) {
-      res.setHeader('Content-Length', activeApk.fileSize);
+    // 1. Ensure file exists on local disk (restores from MongoDB GridFS if wiped during Render cold restart)
+    if (!fs.existsSync(physicalPath) || fs.statSync(physicalPath).size < 1000) {
+      await syncApkFromGridFSToDisk();
     }
 
-    // 1. If physical file exists on local disk, serve directly
-    if (fs.existsSync(physicalPath)) {
-      return res.sendFile(physicalPath);
+    // 2. Serve from disk using Express res.download (handles Range headers, HTTP 206 Partial Content, Resuming, Android Download Manager)
+    if (fs.existsSync(physicalPath) && fs.statSync(physicalPath).size > 1000) {
+      return res.download(physicalPath, filename, (err) => {
+        if (err && !res.headersSent) {
+          console.error('[APKDownload] res.download error:', err.message);
+        }
+      });
     }
 
-    // 2. Stream directly from MongoDB GridFS (permanent across all Render cold restarts)
+    // 3. Fallback: Stream directly from MongoDB GridFS
     const gridFsBucket = getGridFSBucket();
     if (activeApk.gridFsFileId && gridFsBucket) {
-      try {
-        console.log(`[APKDownload] Streaming APK from MongoDB GridFS (ID: ${activeApk.gridFsFileId})`);
-        const downloadStream = gridFsBucket.openDownloadStream(activeApk.gridFsFileId);
-        
-        downloadStream.on('error', (err) => {
-          console.error('[APKDownload] GridFS stream error:', err);
-          if (!res.headersSent) res.status(500).send('Error streaming APK file');
-        });
-
-        return downloadStream.pipe(res);
-      } catch (gridErr) {
-        console.error('[APKDownload] GridFS open stream error:', gridErr);
+      console.log(`[APKDownload] Fallback: Streaming APK directly from MongoDB GridFS (ID: ${activeApk.gridFsFileId})`);
+      res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Accept-Ranges', 'bytes');
+      if (activeApk.fileSize) {
+        res.setHeader('Content-Length', activeApk.fileSize);
       }
+
+      const downloadStream = gridFsBucket.openDownloadStream(new mongoose.Types.ObjectId(activeApk.gridFsFileId));
+      downloadStream.on('error', (err) => {
+        console.error('[APKDownload] GridFS stream error:', err);
+        if (!res.headersSent) res.status(500).send('Error streaming APK file');
+      });
+
+      return downloadStream.pipe(res);
     }
 
-    // 3. Fallback to MongoDB persistent buffer (for small APKs)
+    // 4. Fallback to MongoDB persistent buffer
     if (activeApk.apkData && activeApk.apkData.length > 0) {
+      res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       return res.send(activeApk.apkData);
-    }
-
-    // 4. Fallback to external URL if configured
-    if (activeApk.externalUrl) {
-      return res.redirect(activeApk.externalUrl);
     }
 
     if (process.env.APK_DOWNLOAD_URL) {
       return res.redirect(process.env.APK_DOWNLOAD_URL);
     }
 
-    return res.status(404).send('APK file currently updating');
+    return res.status(404).send('APK file currently updating. Please try again in a few moments.');
   } catch (error) {
     console.error('Error downloading APK:', error);
-    res.status(500).send('Error streaming APK file');
+    if (!res.headersSent) {
+      res.status(500).send('Error streaming APK file');
+    }
   }
 };
 

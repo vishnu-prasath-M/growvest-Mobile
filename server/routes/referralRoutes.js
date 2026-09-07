@@ -26,6 +26,7 @@ router.post('/withdraw-coins', protect, walletController.requestCoinWithdrawal);
 router.get('/admin/overview', protect, admin, apkController.getReferralAdminOverview);
 router.put('/admin/threshold', protect, admin, walletController.setRewardWithdrawalThreshold);
 router.post('/admin/apk', protect, admin, upload.single('apkFile'), apkController.uploadAPK);
+router.post('/admin/apk/url', protect, admin, apkController.setExternalApkUrl);
 router.get('/admin/apk/all', protect, admin, apkController.getAllAPKs);
 router.delete('/admin/apk/:id', protect, admin, apkController.deleteAPK);
 
