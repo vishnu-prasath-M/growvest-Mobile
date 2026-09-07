@@ -292,6 +292,10 @@ mongoose.connect(MONGO_URI)
         });
         console.log(`Admin user seeded successfully with email: ${admin.email}`);
       }
+    } catch (error) {
+      console.error('Error seeding admin user:', error);
+    }
+
     // Automatically restore active APK from MongoDB GridFS to local disk on startup/cold-start
     try {
       await apkController.syncApkFromGridFSToDisk();
