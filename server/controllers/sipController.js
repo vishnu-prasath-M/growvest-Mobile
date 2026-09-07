@@ -478,8 +478,8 @@ exports.withdrawSIP = async (req, res) => {
       return res.status(400).json({ message: 'Valid withdrawal amount is required' });
     }
 
-    if (!upiId || !upiId.trim()) {
-      return res.status(400).json({ message: 'Valid UPI ID is required for withdrawal' });
+    if (!upiId || typeof upiId !== 'string' || !/^[a-zA-Z0-9.\-_]{2,100}@[a-zA-Z0-9.\-_]{2,64}$/.test(upiId.trim())) {
+      return res.status(400).json({ message: 'Valid UPI ID format is required (e.g. username@okhdfcbank or 9876543210@paytm)' });
     }
 
     const sip = await SIP.findOne({ _id: id, userId });

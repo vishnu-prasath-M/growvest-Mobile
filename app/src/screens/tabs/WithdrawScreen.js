@@ -253,7 +253,12 @@ const WithdrawScreen = ({ navigation }) => {
 
   const handleWithdraw = async () => {
     if (!upiId || !upiId.trim()) {
-      Alert.alert('Error', 'Please enter your UPI ID or Bank account identifier');
+      Alert.alert('Invalid UPI ID', 'Please enter your UPI ID (e.g. username@okhdfcbank)');
+      return;
+    }
+    
+    if (!/^[a-zA-Z0-9.\-_]{2,100}@[a-zA-Z0-9.\-_]{2,64}$/.test(upiId.trim())) {
+      Alert.alert('Invalid UPI ID', 'Please enter a valid UPI ID format (e.g. username@okhdfcbank or 9876543210@paytm).');
       return;
     }
     
@@ -563,16 +568,18 @@ const WithdrawScreen = ({ navigation }) => {
             </View>
 
             {/* UPI / Bank Input */}
-            <Text style={[styles.inputLabel, { marginTop: 14 }]}>Payout UPI ID / Bank Identifier</Text>
+            <Text style={[styles.inputLabel, { marginTop: 14 }]}>Payout UPI ID</Text>
             <View style={styles.upiInputRow}>
               <MaterialCommunityIcons name="bank" size={18} color={themeColors.textMuted} />
               <TextInput
                 style={styles.upiInput}
                 value={upiId}
-                onChangeText={setUpiId}
-                placeholder="yourname@upi or bank details"
+                onChangeText={(v) => setUpiId(v.toLowerCase().trim())}
+                placeholder="e.g. username@okhdfcbank"
                 placeholderTextColor={themeColors.textMuted}
                 autoCapitalize="none"
+                keyboardType="email-address"
+                autoCorrect={false}
               />
             </View>
 
