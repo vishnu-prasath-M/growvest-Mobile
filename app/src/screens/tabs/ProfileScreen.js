@@ -10,6 +10,7 @@ import {
   TextInput,
   Linking,
   Switch,
+  ImageBackground,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -422,20 +423,28 @@ const ProfileScreen = ({ navigation }) => {
             </View>
           </View>
 
-          {/* SECTION 4: REFER & EARN (Standalone Card) */}
+          {/* SECTION 4: REFER & EARN (Premium Banner Card) */}
           <TouchableOpacity
-            style={styles.rewardsCard}
-            activeOpacity={0.7}
+            style={styles.referralBannerCard}
+            activeOpacity={0.88}
             onPress={() => navigation.navigate('Referral')}
           >
-            <View style={styles.mintIconBox}>
-              <MaterialCommunityIcons name="gift-outline" size={20} color={styles.mintIconColor.color} />
-            </View>
-            <View style={styles.rewardsContent}>
-              <Text style={styles.rewardsTitle}>Refer & Earn</Text>
-              <Text style={styles.rewardsSubtitle}>{coinBalance} Coins · Invite friends & earn</Text>
-            </View>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={styles.chevronColor.color} />
+            <ImageBackground
+              source={require('../../../assets/referral-banner.jpg')}
+              style={styles.referralBannerBg}
+              imageStyle={styles.referralBannerImage}
+              resizeMode="cover"
+            >
+              <View style={styles.referralBannerInner}>
+                <View style={styles.referralTextCol}>
+                  <Text style={styles.referralBannerTitle}>Invite your friends{'\n'}& earn rewards</Text>
+                  <Text style={styles.referralBannerSub}>Grow together</Text>
+                </View>
+                <View style={styles.referralArrowCircle}>
+                  <MaterialCommunityIcons name="arrow-right" size={18} color="#FFFFFF" />
+                </View>
+              </View>
+            </ImageBackground>
           </TouchableOpacity>
 
           {/* SECTION 5: LOGOUT */}
@@ -755,23 +764,59 @@ const getStyles = (themeColors, isDarkMode) => StyleSheet.create({
     fontWeight: '700',
   },
 
-  // Refer & Earn Standalone Card
-  rewardsCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: themeColors.surface,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#ECEFE6',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    gap: 14,
+  // Refer & Earn Standalone Banner Card
+  referralBannerCard: {
+    borderRadius: 20,
+    overflow: 'hidden',
     marginBottom: 20,
     shadowColor: '#0E3D23',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: isDarkMode ? 0 : 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: isDarkMode ? 0.35 : 0.12,
+    shadowRadius: 10,
+    elevation: 4,
+    backgroundColor: '#072517',
+  },
+  referralBannerBg: {
+    width: '100%',
+    minHeight: 88,
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  referralBannerImage: {
+    borderRadius: 20,
+  },
+  referralBannerInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    maxWidth: '65%',
+  },
+  referralTextCol: {
+    justifyContent: 'center',
+  },
+  referralBannerTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    lineHeight: 18,
+    letterSpacing: -0.2,
+  },
+  referralBannerSub: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#A3D9BE',
+    marginTop: 4,
+  },
+  referralArrowCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(28, 77, 54, 0.85)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   rewardsContent: { flex: 1 },
   rewardsTitle: { fontSize: 15, fontWeight: '700', color: themeColors.text },

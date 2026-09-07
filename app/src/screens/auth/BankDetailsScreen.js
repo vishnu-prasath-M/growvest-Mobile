@@ -89,6 +89,11 @@ const BankDetailsScreen = ({ navigation }) => {
       newErrors.ifscCode = 'Invalid IFSC code format (e.g. SBIN0001234)';
     }
     if (!form.branchName.trim()) newErrors.branchName = 'Branch name is required';
+    if (form.upiId && form.upiId.trim()) {
+      if (!/^[a-zA-Z0-9.\-_]{2,100}@[a-zA-Z0-9.\-_]{2,64}$/.test(form.upiId.trim())) {
+        newErrors.upiId = 'Invalid UPI ID format (e.g. username@okhdfcbank or 9876543210@paytm)';
+      }
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -242,13 +247,16 @@ const BankDetailsScreen = ({ navigation }) => {
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>UPI ID <Text style={styles.optionalLabel}>(Optional)</Text></Text>
             <TextInput
-              style={styles.fieldInput}
+              style={[styles.fieldInput, errors.upiId && styles.fieldInputError]}
               value={form.upiId}
-              onChangeText={(v) => updateField('upiId', v)}
-              placeholder="e.g. name@upi"
+              onChangeText={(v) => updateField('upiId', v.toLowerCase().trim())}
+              placeholder="e.g. username@okhdfcbank"
               placeholderTextColor={colors.textTertiary}
               autoCapitalize="none"
+              keyboardType="email-address"
+              autoCorrect={false}
             />
+            {errors.upiId && <Text style={styles.errorText}>{errors.upiId}</Text>}
           </View>
         </View>
 

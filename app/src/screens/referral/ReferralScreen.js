@@ -127,8 +127,8 @@ const ReferralScreen = ({ navigation }) => {
   };
 
   const handleWithdrawCoins = async () => {
-    if (!withdrawUpiId.trim() || !withdrawUpiId.includes('@')) {
-      Alert.alert('Invalid UPI ID', 'Please enter a valid UPI ID (e.g. name@okhdfcbank)');
+    if (!withdrawUpiId.trim() || !/^[a-zA-Z0-9.\-_]{2,100}@[a-zA-Z0-9.\-_]{2,64}$/.test(withdrawUpiId.trim())) {
+      Alert.alert('Invalid UPI ID', 'Please enter a valid UPI ID (e.g. name@okhdfcbank or 9876543210@paytm).');
       return;
     }
 
@@ -525,8 +525,10 @@ const ReferralScreen = ({ navigation }) => {
               placeholder="e.g. yourname@okhdfcbank"
               placeholderTextColor={colors.textTertiary}
               value={withdrawUpiId}
-              onChangeText={setWithdrawUpiId}
+              onChangeText={(v) => setWithdrawUpiId(v.toLowerCase().trim())}
               autoCapitalize="none"
+              keyboardType="email-address"
+              autoCorrect={false}
             />
 
             <TouchableOpacity

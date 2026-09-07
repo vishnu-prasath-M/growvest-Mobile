@@ -9,6 +9,10 @@ exports.createWithdrawal = async (req, res) => {
   try {
     const { amount, upiId, userName, userEmail, withdrawType } = req.body;
     
+    if (!upiId || typeof upiId !== 'string' || !/^[a-zA-Z0-9.\-_]{2,100}@[a-zA-Z0-9.\-_]{2,64}$/.test(upiId.trim())) {
+      return res.status(400).json({ message: 'Please provide a valid UPI ID (e.g. username@okhdfcbank or 9876543210@paytm)' });
+    }
+    
     // Find user (prioritize req.user if authenticated, fallback to email/mobile)
     let user = null;
     if (req.user?._id) {

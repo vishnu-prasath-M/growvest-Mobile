@@ -105,8 +105,8 @@ exports.requestCoinWithdrawal = async (req, res) => {
     const userId = req.user._id;
     const { upiId, coinsToWithdraw } = req.body;
 
-    if (!upiId || typeof upiId !== 'string' || !upiId.trim().includes('@')) {
-      return res.status(400).json({ message: 'Valid UPI ID is required (e.g. name@okhdfcbank)' });
+    if (!upiId || typeof upiId !== 'string' || !/^[a-zA-Z0-9.\-_]{2,100}@[a-zA-Z0-9.\-_]{2,64}$/.test(upiId.trim())) {
+      return res.status(400).json({ message: 'Valid UPI ID format is required (e.g. username@okhdfcbank or 9876543210@paytm)' });
     }
 
     const user = await User.findById(userId);

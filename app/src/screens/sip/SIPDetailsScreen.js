@@ -143,8 +143,8 @@ const SIPDetailsScreen = ({ route, navigation }) => {
       return;
     }
 
-    if (!withdrawUpi.trim()) {
-      Alert.alert('Invalid UPI ID', 'Please enter your UPI ID (e.g. name@okhdfcbank).');
+    if (!withdrawUpi.trim() || !/^[a-zA-Z0-9.\-_]{2,100}@[a-zA-Z0-9.\-_]{2,64}$/.test(withdrawUpi.trim())) {
+      Alert.alert('Invalid UPI ID', 'Please enter a valid UPI ID (e.g. name@okhdfcbank or 9876543210@paytm).');
       return;
     }
 
@@ -502,11 +502,13 @@ const SIPDetailsScreen = ({ route, navigation }) => {
 
             <TextInput
               style={styles.modalInput}
-              placeholder="Enter UPI ID (e.g. name@okaxis)"
+              placeholder="Enter UPI ID (e.g. name@okhdfcbank)"
               placeholderTextColor="#94A3B8"
               autoCapitalize="none"
+              keyboardType="email-address"
+              autoCorrect={false}
               value={withdrawUpi}
-              onChangeText={setWithdrawUpi}
+              onChangeText={(v) => setWithdrawUpi(v.toLowerCase().trim())}
             />
 
             <View style={styles.modalBtnRow}>

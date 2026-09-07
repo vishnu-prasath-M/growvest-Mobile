@@ -13,6 +13,7 @@ import {
   Platform,
   StatusBar,
   Image,
+  ImageBackground,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -471,24 +472,36 @@ const HomeScreen = ({ navigation }) => {
           {/* ── Tip Card ── */}
           <View style={[styles.section, { marginBottom: 4 }]}>
             <View style={styles.tipCard}>
-              <View style={styles.tipAmbient} />
-              <View style={styles.tipInner}>
+              <ImageBackground
+                source={require('../../../assets/tip-of-the-day-banner.jpg')}
+                style={styles.tipCardBg}
+                imageStyle={styles.tipCardImage}
+                resizeMode="cover"
+              >
+                {/* Soft gradient overlay on right side to ensure text is crystal clear */}
                 <LinearGradient
-                  colors={['#E8D083', '#C89A30']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.tipIconBox}
-                >
-                  <MaterialCommunityIcons name="lightbulb-on-outline" size={20} color={colors.goldFg} />
-                </LinearGradient>
-                <View style={styles.tipText}>
-                  <Text style={styles.tipCategory}>Tip of the day</Text>
-                  <Text style={styles.tipTitle}>{tipOfTheDay.title}</Text>
-                  <Text style={styles.tipBody}>
-                    {tipOfTheDay.body}
-                  </Text>
+                  colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.45)', 'rgba(255,255,255,0.85)']}
+                  start={{ x: 0.15, y: 0 }}
+                  end={{ x: 0.85, y: 0 }}
+                  style={StyleSheet.absoluteFillObject}
+                />
+                <View style={styles.tipInner}>
+                  {/* Left spacer so 3D target on the left remains uncovered */}
+                  <View style={styles.tipArtSpacer} />
+                  
+                  {/* Right Content */}
+                  <View style={styles.tipText}>
+                    <View style={styles.tipCategoryBadge}>
+                      <MaterialCommunityIcons name="lightbulb-on" size={12} color="#92400E" style={{ marginRight: 4 }} />
+                      <Text style={styles.tipCategory}>TIP OF THE DAY</Text>
+                    </View>
+                    <Text style={styles.tipTitle} numberOfLines={1}>{tipOfTheDay.title}</Text>
+                    <Text style={styles.tipBody} numberOfLines={3}>
+                      {tipOfTheDay.body}
+                    </Text>
+                  </View>
                 </View>
-              </View>
+              </ImageBackground>
             </View>
           </View>
 
@@ -707,29 +720,69 @@ const getStyles = (colors) => StyleSheet.create({
 
   // Tip Card
   tipCard: {
-    backgroundColor: colors.surface, borderRadius: 24,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: 'rgba(235, 215, 185, 0.4)',
     overflow: 'hidden',
-    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+    shadowColor: '#8C6D3B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 1,
+    backgroundColor: '#FDF7EC',
   },
-  tipAmbient: {
-    position: 'absolute', top: -20, right: -20,
-    width: 100, height: 100, borderRadius: 50,
-    backgroundColor: 'rgba(212,168,67,0.12)',
+  tipCardBg: {
+    width: '100%',
+    minHeight: 110,
+    justifyContent: 'center',
   },
-  tipInner: { flexDirection: 'row', alignItems: 'flex-start', padding: 20, gap: 14 },
-  tipIconBox: {
-    width: 44, height: 44, borderRadius: 14,
-    justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#C89A30', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2, shadowRadius: 8, elevation: 6,
+  tipCardImage: {
+    borderRadius: 22,
   },
-  tipText: { flex: 1 },
-  tipCategory: { fontSize: 10, color: colors.gold, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
-  tipTitle: { fontSize: 15, fontWeight: '700', color: colors.text, letterSpacing: -0.3, marginTop: 4 },
-  tipBody: { fontSize: 13, color: colors.textMuted, lineHeight: 18, marginTop: 4 },
+  tipInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    gap: 8,
+  },
+  tipArtSpacer: {
+    width: 80, // Leaves the 3D target on the left uncovered
+  },
+  tipText: {
+    flex: 1,
+  },
+  tipCategoryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(254, 243, 199, 0.95)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.35)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    marginBottom: 4,
+  },
+  tipCategory: {
+    fontSize: 9.5,
+    color: '#92400E',
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  tipTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#1A2E22',
+    letterSpacing: -0.2,
+    marginBottom: 2,
+  },
+  tipBody: {
+    fontSize: 11.5,
+    color: '#374151',
+    lineHeight: 16,
+    fontWeight: '500',
+  },
 
   // Modal
   modalOverlay: {
