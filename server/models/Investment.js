@@ -12,7 +12,7 @@ const investmentSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'approved', 'rejected', 'withdrawn'],
+    enum: ['pending', 'approved', 'rejected', 'withdrawn', 'reinvested'],
     default: 'pending',
   },
   type: {
@@ -71,7 +71,7 @@ const investmentSchema = new mongoose.Schema({
   },
   withdrawalStatus: {
     type: String,
-    enum: ['locked', 'available', 'none', 'pending', 'withdrawn'],
+    enum: ['locked', 'available', 'none', 'pending', 'withdrawn', 'reinvested'],
     default: 'locked',
   },
   lastInterestCalculatedAt: {
@@ -115,6 +115,42 @@ const investmentSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Withdrawal',
     required: false,
+  },
+  // Reinvestment Tracking
+  reinvestedFrom: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Investment',
+    required: false,
+  },
+  reinvestedInto: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Investment',
+    required: false,
+  },
+  reinvestedAt: {
+    type: Date,
+  },
+  // Payment Provider & Metadata
+  paymentProvider: {
+    type: String,
+  },
+  paymentStatus: {
+    type: String,
+  },
+  paidAt: {
+    type: Date,
+  },
+  verified: {
+    type: Boolean,
+  },
+  orderId: {
+    type: String,
+  },
+  paymentId: {
+    type: String,
+  },
+  signature: {
+    type: String,
   },
 }, { timestamps: true });
 

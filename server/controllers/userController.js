@@ -9,6 +9,10 @@ const DeviceToken = require('../models/DeviceToken');
 // Helper function to sync interest for an investment (Feature 3 & 4)
 // strictly calculates ONLY after midnight and once per day
 const syncInvestmentInterest = async (inv) => {
+  if (inv.status === 'reinvested' || inv.status === 'withdrawn' || inv.withdrawalStatus === 'reinvested' || inv.withdrawalStatus === 'withdrawn') {
+    return inv.interestEarned || 0;
+  }
+
   const startDate = new Date(inv.startDate);
   startDate.setHours(0, 0, 0, 0);
 

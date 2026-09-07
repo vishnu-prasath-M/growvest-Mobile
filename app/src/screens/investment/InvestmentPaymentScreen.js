@@ -12,14 +12,26 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/theme';
 import { executeRazorpayPayment } from '../../services/razorpayHandler';
+import { investmentService } from '../../services/investmentService';
 import { useTheme } from '../../context/ThemeContext';
 import KycRequiredModal from '../../components/KycRequiredModal';
 import { kycService } from '../../services/kycService';
 
 const InvestmentPaymentScreen = ({ navigation, route }) => {
-  const { colors: themeColors } = useTheme();
-  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
-  const { amount, type, userData, frequency, selectedWithdrawalDate, benefitEligibilityDate } = route.params;
+  const { colors: themeColors, isDarkMode } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
+  const {
+    amount,
+    type,
+    userData,
+    frequency,
+    selectedWithdrawalDate,
+    benefitEligibilityDate,
+    isReinvestment,
+    sourceInvestmentId,
+    sourceRef,
+  } = route.params;
+
   const [loading, setLoading] = useState(false);
   const [kycModalVisible, setKycModalVisible] = useState(false);
 
@@ -36,6 +48,45 @@ const InvestmentPaymentScreen = ({ navigation, route }) => {
     if (planType === '6_months') return '6 Months Plan';
     if (planType === '1_year') return '1 Year Plan';
     return 'Investment';
+  };
+
+  const handleConfirmReinvestment = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      await investmentService.reinvestInvestment({
+        sourceInvestmentId,
+        amount: Number(amount),
+        type,
+        selectedWithdrawalDate,
+        intendedWithdrawalDate: selectedWithdrawalDate,
+      });
+
+      Alert.alert(
+        'Reinvestment Successful! 🎉',
+        `Your ₹${Number(amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} has been successfully reinvested into ${getPlanDisplayName(type)}. No external payment was required.`,
+        [
+          {
+            text: 'View My Investments',
+            onPress: () => {
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'MainTabs', state: { routes: [{ name: 'Investments' }] } }]
+              });
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('[InvestmentPayment] Reinvestment failed:', error);
+      Alert.alert(
+        'Reinvestment Failed',
+        error?.message || error || 'Could not complete reinvestment. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handlePayNow = async () => {
@@ -87,59 +138,96 @@ const InvestmentPaymentScreen = ({ navigation, route }) => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Payment Summary */}
+        {/* Payment / Reinvestment Summary */}
         <View style={styles.summaryCard}>
           <View style={styles.summaryHeader}>
             <MaterialCommunityIcons
-              name={type === 'pocket_money' ? 'wallet-giftcard' : type === 'saving' ? 'piggy-bank' : 'lock'}
+              name={isReinvestment ? 'refresh-circle' : type === 'pocket_money' ? 'wallet-giftcard' : type === 'saving' ? 'piggy-bank' : 'lock'}
               size={28}
-              color={type === 'pocket_money' ? colors.primary : type === 'saving' ? colors.saving : colors.fixed}
+              color={isReinvestment ? '#059669' : type === 'pocket_money' ? colors.primary : type === 'saving' ? colors.saving : colors.fixed}
             />
-            <Text style={styles.summaryType}>
-              {type === 'pocket_money' ? 'Pocket Money Plan' : getPlanDisplayName(type)}
-            </Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.summaryType}>
+                {type === 'pocket_money' ? 'Pocket Money Plan' : getPlanDisplayName(type)}
+              </Text>
+              {isReinvestment ? (
+                <Text style={styles.reinvestSubtitle}>
+                  Funded via Matured Investment {sourceRef ? `(${sourceRef})` : ''}
+                </Text>
+              ) : null}
+            </View>
           </View>
           <View style={styles.summaryAmountRow}>
-            <Text style={styles.summaryAmountLabel}>Total Amount</Text>
-            <Text style={styles.summaryAmountValue}>{formatCurrency(amount)}</Text>
+            <Text style={styles.summaryAmountLabel}>{isReinvestment ? 'Reinvest Amount' : 'Total Amount'}</Text>
+            <Text style={[styles.summaryAmountValue, isReinvestment && { color: isDarkMode ? '#34D399' : '#059669' }]}>
+              {formatCurrency(amount)}
+            </Text>
           </View>
         </View>
 
-        {/* Razorpay Banner */}
-        <View style={styles.razorpayCard}>
-          <View style={styles.razorpayHeader}>
-            <MaterialCommunityIcons name="shield-check" size={24} color={colors.primary} />
-            <Text style={styles.razorpayTitle}>Razorpay Secure Checkout</Text>
-          </View>
-          <Text style={styles.razorpayDesc}>
-            Instant payment processing via UPI, Credit/Debit Card, Netbanking & Wallets. Your deposit will be automatically verified and credited to your account.
-          </Text>
+        {/* Reinvestment Transfer Card vs Razorpay Banner */}
+        {isReinvestment ? (
+          <View style={styles.reinvestDetailCard}>
+            <View style={styles.reinvestDetailHeader}>
+              <MaterialCommunityIcons name="shield-check" size={24} color={isDarkMode ? '#34D399' : '#059669'} />
+              <Text style={styles.reinvestDetailTitle}>Internal Matured Reinvestment</Text>
+            </View>
+            <Text style={styles.reinvestDetailDesc}>
+              This investment will be funded 100% internally from your already-earned matured payout. No external payment will be created and your bank/UPI will not be charged.
+            </Text>
 
-          <View style={styles.featureList}>
-            <View style={styles.featureRow}>
-              <MaterialCommunityIcons name="check-circle" size={16} color={colors.success} />
-              <Text style={styles.featureText}>Instant automatic approval</Text>
-            </View>
-            <View style={styles.featureRow}>
-              <MaterialCommunityIcons name="check-circle" size={16} color={colors.success} />
-              <Text style={styles.featureText}>256-bit bank-grade encryption</Text>
-            </View>
-            <View style={styles.featureRow}>
-              <MaterialCommunityIcons name="check-circle" size={16} color={colors.success} />
-              <Text style={styles.featureText}>Zero transaction fee</Text>
+            <View style={styles.featureList}>
+              <View style={styles.featureRow}>
+                <MaterialCommunityIcons name="check-circle" size={16} color={colors.success} />
+                <Text style={styles.featureText}>Funded from matured balance (Principal + Interest)</Text>
+              </View>
+              <View style={styles.featureRow}>
+                <MaterialCommunityIcons name="check-circle" size={16} color={colors.success} />
+                <Text style={styles.featureText}>Instant automatic activation & approval</Text>
+              </View>
+              <View style={styles.featureRow}>
+                <MaterialCommunityIcons name="check-circle" size={16} color={colors.success} />
+                <Text style={styles.featureText}>Zero payment fees • No bank account deduction</Text>
+              </View>
             </View>
           </View>
-        </View>
+        ) : (
+          /* Razorpay Secure Checkout Card (Untouched for standard investments) */
+          <View style={styles.razorpayCard}>
+            <View style={styles.razorpayHeader}>
+              <MaterialCommunityIcons name="shield-check" size={24} color={colors.primary} />
+              <Text style={styles.razorpayTitle}>Razorpay Secure Checkout</Text>
+            </View>
+            <Text style={styles.razorpayDesc}>
+              Instant payment processing via UPI, Credit/Debit Card, Netbanking & Wallets. Your deposit will be automatically verified and credited to your account.
+            </Text>
 
-        {/* Pay Button */}
+            <View style={styles.featureList}>
+              <View style={styles.featureRow}>
+                <MaterialCommunityIcons name="check-circle" size={16} color={colors.success} />
+                <Text style={styles.featureText}>Instant automatic approval</Text>
+              </View>
+              <View style={styles.featureRow}>
+                <MaterialCommunityIcons name="check-circle" size={16} color={colors.success} />
+                <Text style={styles.featureText}>256-bit bank-grade encryption</Text>
+              </View>
+              <View style={styles.featureRow}>
+                <MaterialCommunityIcons name="check-circle" size={16} color={colors.success} />
+                <Text style={styles.featureText}>Zero transaction fee</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Action Button */}
         <TouchableOpacity
           style={styles.payBtn}
           activeOpacity={0.85}
-          onPress={handlePayNow}
+          onPress={isReinvestment ? handleConfirmReinvestment : handlePayNow}
           disabled={loading}
         >
           <LinearGradient
-            colors={['#0E3D23', '#1A5C39']}
+            colors={isReinvestment ? ['#059669', '#047857'] : ['#0E3D23', '#1A5C39']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.payGradient}
@@ -148,15 +236,17 @@ const InvestmentPaymentScreen = ({ navigation, route }) => {
               <ActivityIndicator size="small" color={colors.white} />
             ) : (
               <>
-                <MaterialCommunityIcons name="lock-check" size={20} color={colors.white} />
-                <Text style={styles.payBtnText}>Pay {formatCurrency(amount)} with Razorpay</Text>
+                <MaterialCommunityIcons name={isReinvestment ? 'refresh-circle' : 'lock-check'} size={22} color={colors.white} />
+                <Text style={styles.payBtnText}>
+                  {isReinvestment ? `Confirm Reinvestment (${formatCurrency(amount)})` : `Pay ${formatCurrency(amount)} with Razorpay`}
+                </Text>
               </>
             )}
           </LinearGradient>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.backBtnText}>Cancel Payment</Text>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} disabled={loading}>
+          <Text style={styles.backBtnText}>{isReinvestment ? 'Cancel' : 'Cancel Payment'}</Text>
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />
@@ -171,7 +261,7 @@ const InvestmentPaymentScreen = ({ navigation, route }) => {
   );
 };
 
-const getStyles = (colors) => StyleSheet.create({
+const getStyles = (colors, isDarkMode) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, paddingTop: 50 },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
@@ -190,9 +280,27 @@ const getStyles = (colors) => StyleSheet.create({
   },
   summaryHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
   summaryType: { fontSize: 18, fontWeight: '700', color: colors.text },
+  reinvestSubtitle: { fontSize: 12, fontWeight: '600', color: isDarkMode ? '#34D399' : '#059669', marginTop: 2 },
   summaryAmountRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   summaryAmountLabel: { fontSize: 14, color: colors.textMuted },
   summaryAmountValue: { fontSize: 24, fontWeight: '800', color: colors.primary },
+
+  reinvestDetailCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1.5,
+    borderColor: isDarkMode ? 'rgba(52, 211, 153, 0.3)' : '#A7F3D0',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  reinvestDetailHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+  reinvestDetailTitle: { fontSize: 16, fontWeight: '700', color: isDarkMode ? '#34D399' : '#065F46' },
+  reinvestDetailDesc: { fontSize: 13, color: colors.textMuted, lineHeight: 18, marginBottom: 16 },
 
   razorpayCard: {
     backgroundColor: colors.surface,

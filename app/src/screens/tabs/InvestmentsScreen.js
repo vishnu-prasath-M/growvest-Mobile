@@ -129,6 +129,7 @@ const InvestmentsScreen = ({ navigation }) => {
       return 'ACTIVE';
     }
     // Savings/Fixed
+    if (item.status === 'reinvested' || item.withdrawalStatus === 'reinvested') return 'REINVESTED';
     if (item.status === 'pending') return 'PENDING';
     if (item.status === 'rejected') return 'FAILED';
     if (item.status === 'withdrawn') return 'WITHDRAWN';
@@ -144,16 +145,16 @@ const InvestmentsScreen = ({ navigation }) => {
 
   const filteredItems = allItems.filter((item) => {
     if (activeFilter === 'All') return true;
-    if (activeFilter === 'Active') return (item.status === 'approved' || item.status === 'active') && item.status !== 'withdrawn';
+    if (activeFilter === 'Active') return (item.status === 'approved' || item.status === 'active') && item.status !== 'withdrawn' && item.status !== 'reinvested';
     if (activeFilter === 'Pending') return item.status === 'pending';
     return true;
   });
 
-  // Summary totals — strictly excludes withdrawn investments
+  // Summary totals — strictly excludes withdrawn and reinvested investments
   const computedActiveInvested = allItems.reduce((s, i) => {
     if (i._itemType === 'savings') {
-      const isWithdrawn = i.status === 'withdrawn' || i.withdrawalStatus === 'withdrawn';
-      return s + (i.status === 'approved' && !isWithdrawn ? (i.amount || 0) : 0);
+      const isClosed = i.status === 'withdrawn' || i.withdrawalStatus === 'withdrawn' || i.status === 'reinvested' || i.withdrawalStatus === 'reinvested';
+      return s + (i.status === 'approved' && !isClosed ? (i.amount || 0) : 0);
     }
     if (i._itemType === 'chit') {
       const isWithdrawn = i.hasWon && i.withdrawalStatus === 'completed';
@@ -354,7 +355,24 @@ const InvestmentsScreen = ({ navigation }) => {
         item={selectedDeposit}
         onClose={() => setSelectedDeposit(null)}
         onWithdraw={() => navigation.navigate('Withdraw')}
-        onReinvest={(item) => navigation.navigate('InvestmentAmount', { initialPlan: item.type, initialAmount: String(item.amount) })}
+        onReinvest={(item) => {
+          const principal = Number(item.amount || item.investedAmount) || 0;
+          const rate = Number(item.interestRate) || 12;
+          const durationDays = Number(item.durationDays) || 365;
+          const dailyInterest = (principal * rate) / 100 / 365;
+          const totalInterest = dailyInterest * durationDays;
+          const maturedAmount = Number(item.maturityAmount) || (principal + (item.totalInterest || totalInterest));
+          const sourceRef = item.ref || item.refId || (item._id ? `INV-${String(item._id).slice(-6).toUpperCase()}` : '');
+
+          navigation.navigate('InvestmentAmount', {
+            isReinvestment: true,
+            sourceInvestmentId: item._id,
+            sourceRef,
+            initialPlan: item.type,
+            initialAmount: String(Number(maturedAmount.toFixed(2))),
+            maturedAmount: Number(maturedAmount.toFixed(2)),
+          });
+        }}
       />
     </View>
   );

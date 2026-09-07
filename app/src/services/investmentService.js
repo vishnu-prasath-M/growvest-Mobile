@@ -50,4 +50,14 @@ export const investmentService = {
       throw error.response?.data || error.message;
     }
   },
+
+  // Reinvest matured investment internally
+  reinvestInvestment: async (reinvestData) => {
+    try {
+      const response = await api.post('/investments/reinvest', reinvestData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
 };

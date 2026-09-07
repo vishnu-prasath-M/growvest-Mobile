@@ -42,6 +42,7 @@ const DepositDetailModal = ({ visible, item, onClose, onWithdraw, onReinvest }) 
 
   const isMatured = item.maturityDate && new Date() >= new Date(item.maturityDate);
   const isWithdrawn = item.status === 'withdrawn' || item.withdrawalStatus === 'withdrawn';
+  const isReinvested = item.status === 'reinvested' || item.withdrawalStatus === 'reinvested';
   const isPending = item.status === 'pending';
 
   let statusLabel = 'ACTIVE';
@@ -52,6 +53,10 @@ const DepositDetailModal = ({ visible, item, onClose, onWithdraw, onReinvest }) 
     statusLabel = 'WITHDRAWN';
     badgeBg = isDarkMode ? 'rgba(255,255,255,0.06)' : '#F1F5F9';
     badgeColor = isDarkMode ? '#9CA3AF' : '#64748B';
+  } else if (isReinvested) {
+    statusLabel = 'REINVESTED';
+    badgeBg = isDarkMode ? 'rgba(59, 130, 246, 0.18)' : '#DBEAFE';
+    badgeColor = isDarkMode ? '#60A5FA' : '#2563EB';
   } else if (isMatured && item.status === 'approved') {
     statusLabel = 'MATURED';
     badgeBg = isDarkMode ? 'rgba(16, 185, 129, 0.2)' : '#DCFCE7';
@@ -163,13 +168,15 @@ const DepositDetailModal = ({ visible, item, onClose, onWithdraw, onReinvest }) 
             {/* Status Notice Banner */}
             <View style={styles.statusBox}>
               <MaterialCommunityIcons
-                name={isWithdrawn ? 'check-all' : isMatured ? 'check-circle' : isPending ? 'clock-outline' : 'shield-lock-outline'}
+                name={isWithdrawn ? 'check-all' : isReinvested ? 'refresh-circle' : isMatured ? 'check-circle' : isPending ? 'clock-outline' : 'shield-lock-outline'}
                 size={16}
                 color={isDarkMode ? '#34D399' : '#0E3D23'}
               />
               <Text style={styles.statusNote}>
                 {isWithdrawn
                   ? 'Already withdrawn to your verified bank account.'
+                  : isReinvested
+                  ? 'Matured funds successfully reinvested into a new plan.'
                   : isMatured
                   ? 'Plan matured — ready for instant withdrawal or reinvestment.'
                   : isPending
@@ -282,53 +289,51 @@ const DepositDetailModal = ({ visible, item, onClose, onWithdraw, onReinvest }) 
           </ScrollView>
 
           {/* Actions Footer (Fixed at bottom for instant access) */}
-          <View style={styles.actionRow}>
-            <TouchableOpacity onPress={onClose} style={styles.dismissBtn} activeOpacity={0.7}>
-              <Text style={styles.dismissBtnText}>Close</Text>
-            </TouchableOpacity>
-
-            {isMatured && onReinvest ? (
-              <TouchableOpacity
-                onPress={() => {
-                  onClose();
-                  onReinvest(item);
-                }}
-                style={styles.reinvestBtn}
-                activeOpacity={0.85}
-              >
-                <LinearGradient
-                  colors={['#10B981', '#059669']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.btnGradient}
+          {isMatured && !isWithdrawn && !isReinvested && (onReinvest || onWithdraw) ? (
+            <View style={styles.actionRow}>
+              {onReinvest ? (
+                <TouchableOpacity
+                  onPress={() => {
+                    onClose();
+                    onReinvest(item);
+                  }}
+                  style={styles.actionBtn}
+                  activeOpacity={0.85}
                 >
-                  <MaterialCommunityIcons name="refresh" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
-                  <Text style={styles.btnText}>Reinvest</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            ) : null}
+                  <LinearGradient
+                    colors={['#10B981', '#059669']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.btnGradient}
+                  >
+                    <MaterialCommunityIcons name="refresh" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={styles.btnText}>Reinvest</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              ) : null}
 
-            {isMatured && !isWithdrawn && onWithdraw ? (
-              <TouchableOpacity
-                onPress={() => {
-                  onClose();
-                  onWithdraw(item);
-                }}
-                style={styles.withdrawBtn}
-                activeOpacity={0.85}
-              >
-                <LinearGradient
-                  colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.btnGradient}
+              {onWithdraw ? (
+                <TouchableOpacity
+                  onPress={() => {
+                    onClose();
+                    onWithdraw(item);
+                  }}
+                  style={styles.actionBtn}
+                  activeOpacity={0.85}
                 >
-                  <MaterialCommunityIcons name="cash-multiple" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
-                  <Text style={styles.btnText}>Withdraw</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            ) : null}
-          </View>
+                  <LinearGradient
+                    colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.btnGradient}
+                  >
+                    <MaterialCommunityIcons name="cash-multiple" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={styles.btnText}>Withdraw</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          ) : null}
         </View>
       </View>
     </Modal>
@@ -539,32 +544,11 @@ const getStyles = (themeColors, isDarkMode) =>
     // Actions
     actionRow: {
       flexDirection: 'row',
-      gap: 10,
-      paddingTop: 4,
+      gap: 12,
+      paddingTop: 8,
     },
-    dismissBtn: {
+    actionBtn: {
       flex: 1,
-      height: 48,
-      borderRadius: 16,
-      justifyContent: 'center',
-      alignItems: 'center',
-      borderWidth: 1.5,
-      borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#ECEFE6',
-      backgroundColor: themeColors.surface,
-    },
-    dismissBtnText: {
-      fontSize: 15,
-      fontWeight: '700',
-      color: themeColors.textSecondary,
-    },
-    reinvestBtn: {
-      flex: 1.2,
-      height: 48,
-      borderRadius: 16,
-      overflow: 'hidden',
-    },
-    withdrawBtn: {
-      flex: 1.2,
       height: 48,
       borderRadius: 16,
       overflow: 'hidden',

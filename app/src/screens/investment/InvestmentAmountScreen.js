@@ -22,11 +22,15 @@ import KycRequiredModal from '../../components/KycRequiredModal';
 import { kycService } from '../../services/kycService';
 
 const InvestmentAmountScreen = ({ navigation, route }) => {
-  const { colors: themeColors } = useTheme();
-  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
+  const { colors: themeColors, isDarkMode } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
   
   const initialPlan = route.params?.initialPlan || route.params?.type || null;
   const initialAmount = route.params?.initialAmount || (route.params?.amount ? String(route.params.amount) : '');
+  const isReinvestment = Boolean(route.params?.isReinvestment);
+  const sourceInvestmentId = route.params?.sourceInvestmentId || null;
+  const sourceRef = route.params?.sourceRef || '';
+  const maturedAmount = route.params?.maturedAmount ? Number(route.params.maturedAmount) : null;
 
   const [amount, setAmount] = useState(initialAmount);
   const [investmentType, setInvestmentType] = useState(initialPlan || '1_year');
@@ -145,7 +149,19 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
       return;
     }
 
+    if (isReinvestment && maturedAmount && parseFloat(amount) > maturedAmount) {
+      Alert.alert(
+        'Amount Exceeds Available',
+        `The maximum available amount to reinvest from this matured investment is ₹${maturedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}.`
+      );
+      return;
+    }
+
     navigation.navigate('InvestmentPayment', {
+      isReinvestment,
+      sourceInvestmentId,
+      sourceRef,
+      maturedAmount,
       amount: parseFloat(amount),
       type: investmentType,
       userData,
@@ -191,12 +207,37 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
 
   return (
     <View style={styles.container}>
-      <TopBar title="New Investment" navigation={navigation} showBack={navigation?.canGoBack?.() ?? false} />
+      <TopBar title={isReinvestment ? 'Reinvest Funds' : 'New Investment'} navigation={navigation} showBack={navigation?.canGoBack?.() ?? false} />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Reinvest Banner */}
+        {isReinvestment && (
+          <View style={styles.reinvestBanner}>
+            <View style={styles.reinvestBannerHeader}>
+              <View style={styles.reinvestBadge}>
+                <MaterialCommunityIcons name="refresh" size={14} color="#059669" />
+                <Text style={styles.reinvestBadgeText}>REINVESTING MATURED FUNDS</Text>
+              </View>
+              {sourceRef ? (
+                <Text style={styles.reinvestRefText}>Source: {sourceRef}</Text>
+              ) : null}
+            </View>
+            <Text style={styles.reinvestAvailableTitle}>Available to Reinvest</Text>
+            <Text style={styles.reinvestAvailableAmount}>
+              ₹{(maturedAmount || parseFloat(amount) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </Text>
+            <View style={styles.reinvestNoticeRow}>
+              <MaterialCommunityIcons name="shield-check" size={16} color="#059669" style={{ marginRight: 6, marginTop: 1 }} />
+              <Text style={styles.reinvestNoticeText}>
+                Transferring internally from your matured investment balance. No external payment will be deducted from your bank.
+              </Text>
+            </View>
+          </View>
+        )}
+
         {/* Investment Type Selection */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Investment Plan</Text>
@@ -461,7 +502,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
           onPress={handleContinue}
           disabled={!amount || parseFloat(amount) <= 0}
         >
-          <Text style={styles.continueBtnText}>Continue to Payment</Text>
+          <Text style={styles.continueBtnText}>{isReinvestment ? 'Proceed to Reinvest' : 'Continue to Payment'}</Text>
           <MaterialCommunityIcons name="arrow-right" size={20} color={themeColors.white || colors.white} />
         </TouchableOpacity>
 
@@ -779,7 +820,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
   );
 };
 
-const getStyles = (colors) => StyleSheet.create({
+const getStyles = (colors, isDarkMode) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -789,6 +830,69 @@ const getStyles = (colors) => StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 20,
+  },
+  reinvestBanner: {
+    margin: 20,
+    marginBottom: 0,
+    backgroundColor: isDarkMode ? 'rgba(5, 150, 105, 0.12)' : '#ECFDF5',
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1.5,
+    borderColor: isDarkMode ? 'rgba(52, 211, 153, 0.3)' : '#A7F3D0',
+  },
+  reinvestBannerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  reinvestBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: isDarkMode ? 'rgba(52, 211, 153, 0.2)' : '#D1FAE5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+  },
+  reinvestBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: isDarkMode ? '#34D399' : '#059669',
+    letterSpacing: 0.5,
+  },
+  reinvestRefText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textSecondary || '#64748B',
+  },
+  reinvestAvailableTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSecondary || '#64748B',
+    marginBottom: 2,
+  },
+  reinvestAvailableAmount: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: isDarkMode ? '#34D399' : '#059669',
+    marginBottom: 10,
+  },
+  reinvestNoticeRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: isDarkMode ? 'rgba(255,255,255,0.04)' : '#FFFFFF',
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#E2E8F0',
+  },
+  reinvestNoticeText: {
+    flex: 1,
+    fontSize: 11.5,
+    lineHeight: 16,
+    color: colors.textSecondary || '#475569',
+    fontWeight: '500',
   },
   section: {
     padding: 20,

@@ -423,3 +423,291 @@ exports.withdrawInvestment = async (req, res) => {
   }
 };
 
+exports.reinvestInvestment = async (req, res) => {
+  try {
+    const sourceId = req.params?.id || req.body?.sourceInvestmentId || req.body?.investmentId;
+    const { amount: clientAmount, type: requestedPlanType, selectedWithdrawalDate } = req.body || {};
+
+    if (!sourceId) {
+      return res.status(400).json({ success: false, message: 'Source investment ID is required for reinvestment.' });
+    }
+
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required.' });
+    }
+
+    // 1. Fetch user
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    // 2. Fetch source investment and verify ownership
+    const sourceInvestment = await Investment.findById(sourceId);
+    if (!sourceInvestment) {
+      return res.status(404).json({ success: false, message: 'Source investment not found.' });
+    }
+
+    const isOwner = (sourceInvestment.userId && sourceInvestment.userId.toString() === userId.toString()) ||
+                    (sourceInvestment.userEmail && user.email && sourceInvestment.userEmail.toLowerCase() === user.email.toLowerCase()) ||
+                    (sourceInvestment.mobileNumber && user.mobileNumber && sourceInvestment.mobileNumber === user.mobileNumber);
+    if (!isOwner) {
+      return res.status(403).json({ success: false, message: 'You do not have permission to reinvest this investment.' });
+    }
+
+    // Status validation
+    if (sourceInvestment.status !== 'approved') {
+      return res.status(400).json({ success: false, message: 'Only approved investments can be reinvested.' });
+    }
+
+    if (sourceInvestment.status === 'withdrawn' || sourceInvestment.withdrawalStatus === 'withdrawn') {
+      return res.status(400).json({ success: false, message: 'This investment has already been withdrawn.' });
+    }
+
+    if (sourceInvestment.status === 'reinvested' || sourceInvestment.withdrawalStatus === 'reinvested') {
+      return res.status(400).json({ success: false, message: 'This investment has already been reinvested.' });
+    }
+
+    if (sourceInvestment.withdrawalStatus === 'pending') {
+      return res.status(400).json({ success: false, message: 'A withdrawal request for this investment is currently pending admin approval.' });
+    }
+
+    // 3. Verify Server-Side Maturity
+    const now = new Date();
+    const startDateObj = sourceInvestment.startDate ? new Date(sourceInvestment.startDate) : new Date();
+
+    const durationDaysMap = {
+      '15_days': 15,
+      '1_month': 30,
+      '3_months': 90,
+      '6_months': 180,
+      '1_year': 365,
+      '2_years': 730,
+    };
+    const planDurationDays = sourceInvestment.durationDays || durationDaysMap[sourceInvestment.type] || 365;
+
+    const maturityDate = sourceInvestment.maturityDate
+      ? new Date(sourceInvestment.maturityDate)
+      : new Date(startDateObj.getTime() + planDurationDays * 24 * 60 * 60 * 1000);
+    maturityDate.setHours(0, 0, 0, 0);
+
+    if (now < maturityDate) {
+      const formattedDate = maturityDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+      return res.status(400).json({
+        success: false,
+        message: `This investment has not reached maturity yet. Maturity date is ${formattedDate}.`
+      });
+    }
+
+    // 4. Server-Authoritative Matured Amount Calculation
+    const principal = Number(sourceInvestment.amount) || 0;
+    let rate = Number(sourceInvestment.interestRate) || 12;
+    if (sourceInvestment.type === '15_days')   rate = 12;
+    else if (sourceInvestment.type === '1_month')  rate = 15;
+    else if (sourceInvestment.type === '3_months') rate = 18;
+    else if (sourceInvestment.type === '6_months') rate = 20;
+    else if (sourceInvestment.type === '1_year')   rate = 24;
+    else if (sourceInvestment.type === 'saving')   rate = 12;
+    else if (sourceInvestment.type === 'fixed')    rate = 24;
+
+    const dailyInterest = (principal * rate) / 100 / 365;
+    const totalInterestForDuration = dailyInterest * planDurationDays;
+
+    let accruedInterest = 0;
+    if (sourceInvestment.startDate) {
+      const startDay = new Date(sourceInvestment.startDate);
+      startDay.setHours(0, 0, 0, 0);
+      const elapsedDays = Math.max(0, Math.min(planDurationDays, Math.floor((now - startDay) / 86400000)));
+      accruedInterest = elapsedDays * dailyInterest;
+    }
+    accruedInterest = Math.max(accruedInterest, Number(sourceInvestment.interestEarned) || 0, totalInterestForDuration);
+
+    const benefits = Number(sourceInvestment.benefits) || 0;
+    const authoritativeMaturityAmount = Number((principal + accruedInterest + benefits).toFixed(2));
+
+    if (authoritativeMaturityAmount <= 0) {
+      return res.status(400).json({ success: false, message: 'Invalid maturity amount available for reinvestment.' });
+    }
+
+    // Validate Reinvestment Amount
+    let reinvestAmount = authoritativeMaturityAmount;
+    if (clientAmount && Number(clientAmount) > 0) {
+      const parsedClientAmt = Number(Number(clientAmount).toFixed(2));
+      if (parsedClientAmt > authoritativeMaturityAmount) {
+        return res.status(400).json({
+          success: false,
+          message: `Reinvestment amount (₹${parsedClientAmt}) cannot exceed available matured amount (₹${authoritativeMaturityAmount}).`
+        });
+      }
+      if (parsedClientAmt < 100) {
+        return res.status(400).json({
+          success: false,
+          message: 'Minimum reinvestment amount is ₹100.'
+        });
+      }
+      reinvestAmount = parsedClientAmt;
+    }
+
+    // 5. Atomic Idempotent State Transition on Source Investment
+    const lockedSource = await Investment.findOneAndUpdate(
+      {
+        _id: sourceInvestment._id,
+        status: 'approved',
+        withdrawalStatus: { $nin: ['withdrawn', 'pending', 'reinvested'] }
+      },
+      {
+        $set: {
+          status: 'reinvested',
+          withdrawalStatus: 'reinvested',
+          reinvestedAt: new Date(),
+        }
+      },
+      { new: true }
+    );
+
+    if (!lockedSource) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reinvestment failed: This investment is already being processed, withdrawn, or has already been reinvested.'
+      });
+    }
+
+    // 6. Create the New Investment Record
+    const newPlanType = requestedPlanType || sourceInvestment.type || '1_year';
+    let newInterestRate = 12;
+    let newDurationDays = 365;
+    let resolvedPlanType = 'saving';
+
+    if (newPlanType === 'fixed') {
+      newInterestRate = 24;
+      newDurationDays = 365;
+      resolvedPlanType = 'fixed';
+    } else if (newPlanType === '15_days') {
+      newInterestRate = 12;
+      newDurationDays = 15;
+      resolvedPlanType = '15_days';
+    } else if (newPlanType === '1_month') {
+      newInterestRate = 15;
+      newDurationDays = 30;
+      resolvedPlanType = '1_month';
+    } else if (newPlanType === '3_months') {
+      newInterestRate = 18;
+      newDurationDays = 90;
+      resolvedPlanType = '3_months';
+    } else if (newPlanType === '6_months') {
+      newInterestRate = 20;
+      newDurationDays = 180;
+      resolvedPlanType = '6_months';
+    } else if (newPlanType === '1_year') {
+      newInterestRate = 24;
+      newDurationDays = 365;
+      resolvedPlanType = '1_year';
+    }
+
+    const newDailyInterest = (reinvestAmount * newInterestRate) / 100 / 365;
+    const newTotalInterest = newDailyInterest * newDurationDays;
+    const newMaturityAmount = Number((reinvestAmount + newTotalInterest).toFixed(2));
+
+    const newStartDate = new Date();
+    const newMaturityDate = new Date(newStartDate.getTime() + newDurationDays * 24 * 60 * 60 * 1000);
+    const newBenefitEligibilityDate = new Date(newStartDate.getTime() + 35 * 24 * 60 * 60 * 1000);
+    newBenefitEligibilityDate.setHours(0, 0, 0, 0);
+
+    const chosenWithdrawalDateObj = selectedWithdrawalDate
+      ? new Date(selectedWithdrawalDate)
+      : newMaturityDate;
+
+    const refCode = `INV-${Date.now().toString().slice(-6)}`;
+
+    const newInvestment = new Investment({
+      amount: reinvestAmount,
+      ref: refCode,
+      status: 'approved',
+      type: newPlanType,
+      userId: user._id,
+      userName: user.name || user.username || 'Investor',
+      userEmail: user.email || '',
+      mobileNumber: user.mobileNumber || '',
+      interestRate: newInterestRate,
+      startDate: newStartDate,
+      paymentProvider: 'Internal_Reinvestment',
+      paymentStatus: 'paid',
+      paidAt: new Date(),
+      verified: true,
+
+      // Reference linking to source
+      reinvestedFrom: sourceInvestment._id,
+
+      // Duration plan fields
+      planType: resolvedPlanType,
+      durationDays: newDurationDays,
+      totalInterest: newTotalInterest,
+      dailyInterest: newDailyInterest,
+      maturityAmount: newMaturityAmount,
+      maturityDate: newMaturityDate,
+      withdrawalStatus: 'locked',
+
+      selectedWithdrawalDate: chosenWithdrawalDateObj,
+      intendedWithdrawalDate: chosenWithdrawalDateObj,
+      benefitEligibilityDate: newBenefitEligibilityDate,
+      benefits: 0,
+      fifthWeekPaymentCompleted: true,
+      eligibilityStatus: 'early_principal_only',
+    });
+
+    await newInvestment.save();
+
+    // 7. Store reference to new investment on source investment
+    await Investment.findByIdAndUpdate(sourceInvestment._id, {
+      reinvestedInto: newInvestment._id
+    });
+
+    // 8. Create Transaction Record
+    const sourceRef = sourceInvestment.ref || `INV-${String(sourceInvestment._id).slice(-6).toUpperCase()}`;
+    const transaction = new Transaction({
+      userId: user._id,
+      userEmail: user.email || sourceInvestment.userEmail || '',
+      type: 'investment',
+      amount: reinvestAmount,
+      status: 'approved',
+      referenceId: newInvestment._id,
+      referenceType: 'Investment',
+      description: `Internal Reinvestment from Matured ${sourceRef} into ${newPlanType} (₹${reinvestAmount.toLocaleString('en-IN')})`,
+    });
+    await transaction.save();
+
+    // 9. Update user total investment counters
+    const principalDiff = reinvestAmount - principal;
+    if (principalDiff > 0) {
+      user.totalInvestment = (user.totalInvestment || 0) + principalDiff;
+      await user.save();
+    }
+
+    // 10. Send User & Admin Notifications
+    try {
+      await sendNotification({
+        userId: user._id,
+        title: '🔄 Reinvestment Successful',
+        description: `Your ₹${reinvestAmount.toLocaleString('en-IN')} matured payout has been successfully reinvested into ${newInvestment.planType || newPlanType} plan.`,
+        type: 'investment_approved',
+        metadata: { investmentId: newInvestment._id, sourceInvestmentId: sourceInvestment._id },
+        pushData: { screen: 'Investments' },
+      });
+    } catch (notifErr) {
+      console.warn('[reinvestInvestment] Notification failed (non-fatal):', notifErr.message);
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: `Reinvestment of ₹${reinvestAmount.toLocaleString('en-IN')} successful!`,
+      investment: newInvestment,
+      sourceInvestmentId: sourceInvestment._id,
+      reinvestedAmount: reinvestAmount,
+    });
+  } catch (error) {
+    console.error('Error reinvesting investment:', error);
+    return res.status(500).json({ success: false, message: 'Error processing reinvestment', error: error.message });
+  }
+};
+

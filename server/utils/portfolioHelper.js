@@ -62,6 +62,8 @@ async function getUserPortfolioSummary(userIdInput) {
   const enrichedInvestments = investments.map(inv => {
     const principal = Number(inv.amount) || 0;
     const isWithdrawn = inv.status === 'withdrawn' || inv.withdrawalStatus === 'withdrawn';
+    const isReinvested = inv.status === 'reinvested' || inv.withdrawalStatus === 'reinvested';
+    const isClosed = isWithdrawn || isReinvested;
     const isRejected = inv.status === 'rejected';
     const isPending = inv.status === 'pending';
 
@@ -95,12 +97,12 @@ async function getUserPortfolioSummary(userIdInput) {
       : (inv.selectedWithdrawalDate ? new Date(inv.selectedWithdrawalDate) : maturityDate);
     intendedWithdrawalDate.setHours(0, 0, 0, 0);
 
-    const isMatured = !isPending && !isWithdrawn && nowDate >= maturityDate;
-    const isUnlocked = !isPending && !isWithdrawn && nowDate >= intendedWithdrawalDate;
+    const isMatured = !isPending && !isClosed && nowDate >= maturityDate;
+    const isUnlocked = !isPending && !isClosed && nowDate >= intendedWithdrawalDate;
 
     // Accrue interest from startDate to today (capped at durationDays)
     let accruedInterest = 0;
-    if (inv.startDate && !isWithdrawn && !isPending) {
+    if (inv.startDate && !isClosed && !isPending) {
       const startDay = new Date(inv.startDate);
       startDay.setHours(0, 0, 0, 0);
       const elapsedDays = Math.max(0, Math.min(durationDays, Math.floor((nowMidnight - startDay) / 86400000)));
@@ -117,6 +119,9 @@ async function getUserPortfolioSummary(userIdInput) {
 
     if (isWithdrawn) {
       withdrawalStatus = 'withdrawn';
+      availableToWithdraw = 0;
+    } else if (isReinvested) {
+      withdrawalStatus = 'reinvested';
       availableToWithdraw = 0;
     } else if (isMatured) {
       // FULL MATURITY: Principal + Interest + Benefits available
