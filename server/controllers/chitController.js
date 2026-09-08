@@ -35,51 +35,39 @@ const calcNextWeeklyDueDate = (joinedAt, weekIndex) => {
   return targetDueDate;
 };
 
-const getActionPercentage = (totalWeeks, week) => {
-  if (totalWeeks === 10) {
-    if (week >= 1 && week <= 4) return null;
-    const schedule = {
-      5: 16,
-      6: 14,
-      7: 12,
-      8: 10,
-      9: 8,
-      10: 6
-    };
-    return schedule[week] ?? 0;
-  } else if (totalWeeks === 20) {
-    if (week >= 1 && week <= 9) return null;
-    const schedule = {
-      10: 28,
-      11: 26,
-      12: 24,
-      13: 22,
-      14: 20,
-      15: 18,
-      16: 16,
-      17: 14,
-      18: 12,
-      19: 10,
-      20: 8
-    };
-    return schedule[week] ?? 0;
-  }
-  return 0;
+const getActionPercentage = (totalUnits, unit) => {
+  const total = Number(totalUnits) || 10;
+  const u = Number(unit) || 1;
+  const lockedCount = Math.floor((total - 1) / 2);
+  if (u <= lockedCount) return null;
+  const baseEndPct = total >= 20 ? 8 : 6;
+  if (u > total) return 0;
+  return baseEndPct + 2 * (total - u);
 };
 
-const generateWeeklySchedule = (weeklyAmount, totalWeeks) => {
-  const totalContribution = weeklyAmount * totalWeeks;
+const generateCycleSchedule = (installmentAmount, totalUnits) => {
+  const amount = Number(installmentAmount) || 200;
+  const units = Number(totalUnits) || 10;
+  const totalContribution = amount * units;
   const schedule = [];
   
-  let accumulatedDividend = 0;
+  let totalDividend = 0;
+  for (let u = 1; u <= units; u++) {
+    const actionPct = getActionPercentage(units, u);
+    if (actionPct !== null && actionPct > 0) {
+      totalDividend += (amount * actionPct) / 100;
+    }
+  }
   
-  for (let w = 1; w <= totalWeeks; w++) {
-    const actionPct = getActionPercentage(totalWeeks, w);
+  for (let u = 1; u <= units; u++) {
+    const actionPct = getActionPercentage(units, u);
     
     if (actionPct === null) {
       schedule.push({
-        week: w,
-        weeklyPayment: weeklyAmount,
+        unit: u,
+        week: u,
+        payment: amount,
+        weeklyPayment: amount,
         priceAmount: null,
         dividend: null,
         actionPercentage: null,
@@ -88,41 +76,46 @@ const generateWeeklySchedule = (weeklyAmount, totalWeeks) => {
       });
     } else {
       const priceAmount = totalContribution - (totalContribution * actionPct / 100);
-      const dividend = weeklyAmount * actionPct / 100;
-      accumulatedDividend += dividend;
-      const totalValue = priceAmount + accumulatedDividend;
+      const dividend = (amount * actionPct) / 100;
+      const totalValue = priceAmount + totalDividend;
+      const profitPercentage = ((totalValue / totalContribution) * 100).toFixed(1);
       
       schedule.push({
-        week: w,
-        weeklyPayment: weeklyAmount,
+        unit: u,
+        week: u,
+        payment: amount,
+        weeklyPayment: amount,
         priceAmount,
         dividend,
         actionPercentage: actionPct,
         totalValue,
+        profitPercentage,
         isLocked: false
       });
     }
   }
   
   // Add Settlement row
-  const settlementWeek = totalWeeks + 1;
-  const totalDividend = totalWeeks === 10
-    ? (weeklyAmount * (16+14+12+10+8+6) / 100)
-    : (weeklyAmount * (28+26+24+22+20+18+16+14+12+10+8) / 100);
+  const settlementUnit = units + 1;
   const settlementAmount = totalContribution + totalDividend;
   
   schedule.push({
-    week: settlementWeek,
+    unit: settlementUnit,
+    week: settlementUnit,
+    payment: 0,
     weeklyPayment: 0,
     priceAmount: null,
     dividend: totalDividend,
     actionPercentage: 0,
     totalValue: settlementAmount,
+    profitPercentage: ((settlementAmount / totalContribution) * 100).toFixed(1),
     isSettlement: true
   });
   
   return { schedule, totalDividend, settlementAmount };
 };
+
+const generateWeeklySchedule = generateCycleSchedule;
 
 // ─── GET /api/chits ──────────────────────────────────────────────────────────
 const getAllChits = async (req, res) => {
@@ -690,56 +683,50 @@ const withdrawChitPayout = async (req, res) => {
       return res.status(400).json({ message: 'Chit Amount Already Withdrawn' });
     }
 
-    const totalWeeks = member.totalWeeks || member.chitId.totalWeeks || member.chitId.duration || 10;
-    const currentWeek = member.currentWeek || 1;
-    const settlementWeek = totalWeeks + 1;
+    const isWeekly = member.chitId?.isWeekly || false;
+    const totalUnits = isWeekly
+      ? (member.totalWeeks || member.chitId?.totalWeeks || member.chitId?.duration || 10)
+      : (member.chitId?.duration || member.chitId?.totalWeeks || 12);
+    const currentUnit = isWeekly ? (member.currentWeek || 1) : (member.currentMonth || 1);
+    const settlementUnit = totalUnits + 1;
+    const paidUnits = isWeekly ? (member.paidWeeks || 0) : (member.currentMonth || 0);
 
     // Check if it is a settlement or regular withdrawal
-    const isSettlement = currentWeek >= settlementWeek || member.paidWeeks >= totalWeeks;
+    const isSettlement = currentUnit >= settlementUnit || paidUnits >= totalUnits;
 
     let actionPercentage = 0;
     let priceAmount = 0;
     let accumulatedDividend = 0;
     let finalWithdrawalAmount = 0;
 
-    const weeklyAmount = member.weeklyAmount || member.chitId.weeklyAmount || 200;
-    const totalContribution = member.totalContribution || (weeklyAmount * totalWeeks);
+    const installmentAmount = isWeekly
+      ? (member.weeklyAmount || member.chitId?.weeklyAmount || member.chitId?.monthlyAmount || 200)
+      : (member.chitId?.monthlyAmount || member.chitId?.weeklyAmount || member.monthlyAmount || 1000);
+    const totalContribution = member.totalContribution || (installmentAmount * totalUnits);
+
+    const { settlementAmount, totalDividend } = generateCycleSchedule(installmentAmount, totalUnits);
 
     if (isSettlement) {
       // Settlement payout: total contribution + total dividend
       actionPercentage = 0;
       priceAmount = totalContribution;
-      
-      // Calculate total dividend for the entire tenure
-      const { settlementAmount, totalDividend } = generateWeeklySchedule(weeklyAmount, totalWeeks);
       accumulatedDividend = totalDividend;
       finalWithdrawalAmount = settlementAmount;
     } else {
       // Normal withdrawal during the cycle
-      // Check lock periods
-      if (totalWeeks === 10) {
-        if (currentWeek < 5) {
-          return res.status(400).json({ message: 'Withdrawal locked for weeks 1–4' });
-        }
-      } else if (totalWeeks === 20) {
-        if (currentWeek < 10) {
-          return res.status(400).json({ message: 'Withdrawal locked for weeks 1–9' });
-        }
+      // Check lock periods: first Math.floor((totalUnits - 1) / 2) units are locked
+      const lockedCount = Math.floor((totalUnits - 1) / 2);
+      if (currentUnit <= lockedCount) {
+        return res.status(400).json({ message: `Withdrawal locked for ${isWeekly ? 'weeks' : 'months'} 1–${lockedCount}` });
       }
 
-      actionPercentage = getActionPercentage(totalWeeks, currentWeek);
+      actionPercentage = getActionPercentage(totalUnits, currentUnit);
       if (actionPercentage === null) {
-        return res.status(400).json({ message: 'Withdrawal not available for this week' });
+        return res.status(400).json({ message: `Withdrawal not available for this ${isWeekly ? 'week' : 'month'}` });
       }
 
       priceAmount = totalContribution - (totalContribution * actionPercentage / 100);
-      
-      // Calculate total plan dividend
-      const totalDividend = totalWeeks === 10
-        ? (weeklyAmount * 66 / 100)
-        : (weeklyAmount * 198 / 100);
       accumulatedDividend = totalDividend;
-
       finalWithdrawalAmount = priceAmount + accumulatedDividend;
     }
 

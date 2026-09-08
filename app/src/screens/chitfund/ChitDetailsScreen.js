@@ -76,27 +76,41 @@ const ChitDetailsScreen = ({ navigation, route }) => {
     { key: 'support', label: 'Support', icon: 'headset' },
   ];
 
-  const getActionPercentage = (totalWeeks, week) => {
-    if (totalWeeks === 10) {
-      if (week >= 1 && week <= 4) return null;
-      const schedule = { 5: 16, 6: 14, 7: 12, 8: 10, 9: 8, 10: 6 };
-      return schedule[week] ?? 0;
-    } else if (totalWeeks === 20) {
-      if (week >= 1 && week <= 9) return null;
-      const schedule = { 10: 28, 11: 26, 12: 24, 13: 22, 14: 20, 15: 18, 16: 16, 17: 14, 18: 12, 19: 10, 20: 8 };
-      return schedule[week] ?? 0;
+  const getActionPercentage = (totalUnits, unit) => {
+    const total = Number(totalUnits) || 10;
+    const u = Number(unit) || 1;
+    const lockedCount = Math.floor((total - 1) / 2);
+    if (u <= lockedCount) return null;
+    const baseEndPct = total >= 20 ? 8 : 6;
+    if (u > total) return 0;
+    return baseEndPct + 2 * (total - u);
+  };
+
+  const getTotalDividend = (installmentAmount, totalUnits) => {
+    const amount = Number(installmentAmount) || 0;
+    const units = Number(totalUnits) || 10;
+    let sum = 0;
+    for (let u = 1; u <= units; u++) {
+      const pct = getActionPercentage(units, u);
+      if (pct !== null && pct > 0) {
+        sum += (amount * pct) / 100;
+      }
     }
-    return 0;
+    return sum;
   };
 
   const getWeeklyRowData = (weeklyAmount, totalWeeks, w) => {
-    const totalContribution = weeklyAmount * totalWeeks;
-    const actionPct = getActionPercentage(totalWeeks, w);
+    const amount = Number(weeklyAmount) || 0;
+    const units = Number(totalWeeks) || 10;
+    const totalContribution = amount * units;
+    const actionPct = getActionPercentage(units, w);
     
     if (actionPct === null) {
       return {
+        unit: w,
         week: w,
-        weeklyPayment: weeklyAmount,
+        payment: amount,
+        weeklyPayment: amount,
         priceAmount: null,
         dividend: null,
         actionPercentage: null,
@@ -106,17 +120,16 @@ const ChitDetailsScreen = ({ navigation, route }) => {
     }
     
     const priceAmount = totalContribution - (totalContribution * actionPct / 100);
-    const dividend = weeklyAmount * actionPct / 100;
-    
-    const totalDividend = totalWeeks === 10
-      ? (weeklyAmount * 66 / 100)
-      : (weeklyAmount * 198 / 100);
+    const dividend = (amount * actionPct) / 100;
+    const totalDividend = getTotalDividend(amount, units);
     const totalValue = priceAmount + totalDividend;
     const profitPercentage = ((totalValue / totalContribution) * 100).toFixed(1);
     
     return {
+      unit: w,
       week: w,
-      weeklyPayment: weeklyAmount,
+      payment: amount,
+      weeklyPayment: amount,
       priceAmount,
       dividend,
       actionPercentage: actionPct,
@@ -127,21 +140,23 @@ const ChitDetailsScreen = ({ navigation, route }) => {
   };
 
   const generateWeeklySchedule = (weeklyAmount, totalWeeks) => {
-    const totalContribution = weeklyAmount * totalWeeks;
+    const amount = Number(weeklyAmount) || 0;
+    const units = Number(totalWeeks) || 10;
+    const totalContribution = amount * units;
     const schedule = [];
     
-    for (let w = 1; w <= totalWeeks; w++) {
-      schedule.push(getWeeklyRowData(weeklyAmount, totalWeeks, w));
+    for (let w = 1; w <= units; w++) {
+      schedule.push(getWeeklyRowData(amount, units, w));
     }
     
-    const settlementWeek = totalWeeks + 1;
-    const totalDividend = totalWeeks === 10
-      ? (weeklyAmount * 66 / 100)
-      : (weeklyAmount * 198 / 100);
+    const settlementWeek = units + 1;
+    const totalDividend = getTotalDividend(amount, units);
     const settlementAmount = totalContribution + totalDividend;
     
     schedule.push({
+      unit: settlementWeek,
       week: settlementWeek,
+      payment: 0,
       weeklyPayment: 0,
       priceAmount: null,
       dividend: totalDividend,
@@ -153,6 +168,9 @@ const ChitDetailsScreen = ({ navigation, route }) => {
     
     return { schedule, totalDividend, settlementAmount };
   };
+
+  const generateCycleSchedule = generateWeeklySchedule;
+  const getCycleRowData = getWeeklyRowData;
 
   const handleWithdrawal = async (memberId) => {
     Alert.alert(
@@ -180,22 +198,28 @@ const ChitDetailsScreen = ({ navigation, route }) => {
   };
 
   const renderWeeklyTable = () => {
-    const isWeekly = chit?.isWeekly || false;
-    if (!isWeekly) return null;
+    if (!chit) return null;
     
-    const weeklyAmount = chit.weeklyAmount || chit.monthlyAmount || 200;
-    const totalWeeks = chit.totalWeeks || chit.duration || 10;
+    const isWeekly = chit?.isWeekly !== undefined ? chit.isWeekly : (chit?.paymentFrequency !== 'monthly');
+    const unitLabel = isWeekly ? 'Week' : 'Month';
+    
+    const installmentAmount = isWeekly 
+      ? (chit.weeklyAmount || chit.monthlyAmount || 200) 
+      : (chit.monthlyAmount || chit.weeklyAmount || 1000);
+    const totalUnits = isWeekly 
+      ? (chit.totalWeeks || chit.duration || 10) 
+      : (chit.duration || chit.totalWeeks || 15);
     
     const myMembership = (memberId ? myChits.find(m => m._id === memberId) : null) || myChits.find(m => (m.chitId?._id || m.chitId) === chit._id) || chit.myMembership;
-    const currentWeek = myMembership?.currentWeek || 0;
+    const currentUnit = isWeekly ? (myMembership?.currentWeek || 0) : (myMembership?.currentMonth || 0);
     
-    const { schedule } = generateWeeklySchedule(weeklyAmount, totalWeeks);
+    const { schedule } = generateCycleSchedule(installmentAmount, totalUnits);
     
     return (
       <View style={[styles.sectionCard, { paddingHorizontal: 8 }]}>
         <Text style={styles.sectionTitle}>Chit Fund Cycle Schedule</Text>
         <View style={styles.tableHeader}>
-          <Text style={[styles.tableHeaderCell, { width: '15%' }]}>Week</Text>
+          <Text style={[styles.tableHeaderCell, { width: '15%' }]}>{unitLabel}</Text>
           <Text style={[styles.tableHeaderCell, { width: '15%' }]}>Pay</Text>
           <Text style={[styles.tableHeaderCell, { width: '18%' }]}>Price</Text>
           <Text style={[styles.tableHeaderCell, { width: '14%' }]}>Div</Text>
@@ -204,7 +228,8 @@ const ChitDetailsScreen = ({ navigation, route }) => {
         </View>
         
         {schedule.map((row) => {
-          const isCurrent = row.week === currentWeek && !row.isSettlement;
+          const rowUnit = row.unit || row.week;
+          const isCurrent = rowUnit === currentUnit && !row.isSettlement;
           const isSettledRow = row.isSettlement;
           const rowStyle = isCurrent 
             ? [styles.tableRow, styles.tableRowCurrent]
@@ -218,19 +243,21 @@ const ChitDetailsScreen = ({ navigation, route }) => {
               ? '#d97706'
               : colors.text;
               
+          const paymentVal = row.payment !== undefined ? row.payment : row.weeklyPayment;
+
           return (
-            <View key={row.week} style={rowStyle}>
+            <View key={rowUnit} style={rowStyle}>
               <Text style={[styles.tableCell, { width: '15%', fontWeight: '600', color: cellColor }]}>
-                {row.isSettlement ? `${row.week} (Settle)` : row.week}
+                {row.isSettlement ? `${rowUnit} (Settle)` : rowUnit}
               </Text>
               <Text style={[styles.tableCell, { width: '15%', color: cellColor }]}>
-                {row.weeklyPayment > 0 ? `₹${row.weeklyPayment}` : '-'}
+                {paymentVal > 0 ? `₹${paymentVal.toLocaleString('en-IN')}` : '-'}
               </Text>
               <Text style={[styles.tableCell, { width: '18%', color: cellColor }]}>
-                {row.isLocked ? 'LOCKED' : row.priceAmount ? `₹${row.priceAmount}` : '-'}
+                {row.isLocked ? 'LOCKED' : row.priceAmount ? `₹${row.priceAmount.toLocaleString('en-IN')}` : '-'}
               </Text>
               <Text style={[styles.tableCell, { width: '14%', color: cellColor }]}>
-                {row.isLocked ? 'LOCKED' : `₹${row.dividend}`}
+                {row.isLocked ? 'LOCKED' : `₹${row.dividend?.toLocaleString('en-IN') || 0}`}
               </Text>
               <Text style={[styles.tableCell, { width: '12%', color: cellColor }]}>
                 {row.isLocked ? 'LOCKED' : `${row.actionPercentage}%`}
@@ -354,8 +381,8 @@ const ChitDetailsScreen = ({ navigation, route }) => {
             const dueStatus = myMembership.pendingInstallments > 0 ? 'Pending' : 'Paid';
 
 
-            const eligibleStart = totalUnits === 10 ? 5 : 10;
-            const isEligible = isWeekly && currentUnit >= eligibleStart;
+            const eligibleStart = Math.floor((totalUnits - 1) / 2) + 1;
+            const isEligible = currentUnit >= eligibleStart;
             const isWithdrawn = myMembership.withdrawalStatus === 'completed';
 
             return (
@@ -372,70 +399,68 @@ const ChitDetailsScreen = ({ navigation, route }) => {
                 )}
 
                 {/* Payout & Withdrawal Action Card */}
-                {isWeekly && (
-                  <View style={styles.sectionCard}>
-                    <Text style={styles.sectionTitle}>Chit Fund Payout / Withdrawal</Text>
-                    {isWithdrawn ? (
-                      <View style={{ backgroundColor: themeColors.surface2, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: themeColors.border }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                          <MaterialCommunityIcons name="check-decagram" size={24} color={themeColors.success} />
-                          <Text style={{ fontSize: 15, fontWeight: '800', color: themeColors.success }}>Chit Amount Already Withdrawn</Text>
-                        </View>
-                        <View style={styles.detailRow}>
-                          <Text style={styles.detailLabel}>Withdrawn In Week</Text>
-                          <Text style={styles.detailValue}>Week {myMembership.withdrawalWeek}</Text>
-                        </View>
-                        <View style={styles.detailRow}>
-                          <Text style={styles.detailLabel}>Withdrawn Amount</Text>
-                          <Text style={{ fontSize: 16, fontWeight: '800', color: themeColors.success }}>{formatCurrency(myMembership.withdrawalAmount)}</Text>
-                        </View>
-                        <Text style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 10, lineHeight: 18 }}>
-                          Your payout has been credited to your Growvest balance. Please continue paying the remaining weekly dues ({remainingInstallments} weeks left).
-                        </Text>
+                <View style={styles.sectionCard}>
+                  <Text style={styles.sectionTitle}>Chit Fund Payout / Withdrawal</Text>
+                  {isWithdrawn ? (
+                    <View style={{ backgroundColor: themeColors.surface2, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: themeColors.border }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <MaterialCommunityIcons name="check-decagram" size={24} color={themeColors.success} />
+                        <Text style={{ fontSize: 15, fontWeight: '800', color: themeColors.success }}>Chit Amount Already Withdrawn</Text>
                       </View>
-                    ) : isEligible ? (
-                      <View>
-                        <View style={{ backgroundColor: themeColors.primaryLight, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: themeColors.primary, marginBottom: 16 }}>
-                          <Text style={{ fontWeight: 'bold', color: themeColors.primary, fontSize: 14, marginBottom: 12 }}>Current Eligible Payout Breakdown (Week {currentUnit})</Text>
-                          {(() => {
-                            const row = getWeeklyRowData(baseAmount, totalUnits, currentUnit);
-                            const totalDividend = totalUnits === 10 ? (baseAmount * 66 / 100) : (baseAmount * 198 / 100);
-                            return (
-                              <>
-                                <View style={styles.detailRow}>
-                                  <Text style={styles.detailLabel}>Price Amount</Text>
-                                  <Text style={styles.detailValue}>{formatCurrency(row.priceAmount)}</Text>
-                                </View>
-                                <View style={styles.detailRow}>
-                                  <Text style={styles.detailLabel}>Share Dividend</Text>
-                                  <Text style={styles.detailValue}>{formatCurrency(totalDividend)}</Text>
-                                </View>
-                                <View style={styles.detailRow}>
-                                  <Text style={styles.detailLabel}>Total Value (Withdrawal Amount)</Text>
-                                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: themeColors.primary }}>{formatCurrency(row.totalValue)}</Text>
-                                </View>
-                              </>
-                            );
-                          })()}
-                        </View>
-                        <TouchableOpacity
-                          style={styles.withdrawBtn}
-                          activeOpacity={0.85}
-                          onPress={() => handleWithdrawal(myMembership._id)}
-                        >
-                          <MaterialCommunityIcons name="cash-fast" size={20} color={themeColors.white} />
-                          <Text style={styles.joinNowBtnText}>Withdraw Payout</Text>
-                        </TouchableOpacity>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Withdrawn In {isWeekly ? 'Week' : 'Month'}</Text>
+                        <Text style={styles.detailValue}>{isWeekly ? 'Week' : 'Month'} {myMembership.withdrawalWeek}</Text>
                       </View>
-                    ) : (
-                      <View style={{ backgroundColor: themeColors.surface2, padding: 14, borderRadius: 12, alignItems: 'center' }}>
-                        <Text style={{ fontSize: 13, fontWeight: '600', color: themeColors.textSecondary }}>
-                          🔒 Payout locked until Week {eligibleStart}
-                        </Text>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Withdrawn Amount</Text>
+                        <Text style={{ fontSize: 16, fontWeight: '800', color: themeColors.success }}>{formatCurrency(myMembership.withdrawalAmount)}</Text>
                       </View>
-                    )}
-                  </View>
-                )}
+                      <Text style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 10, lineHeight: 18 }}>
+                        Your payout has been credited to your Growvest balance. Please continue paying the remaining dues ({remainingInstallments} {isWeekly ? 'weeks' : 'months'} left).
+                      </Text>
+                    </View>
+                  ) : isEligible ? (
+                    <View>
+                      <View style={{ backgroundColor: themeColors.primaryLight, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: themeColors.primary, marginBottom: 16 }}>
+                        <Text style={{ fontWeight: 'bold', color: themeColors.primary, fontSize: 14, marginBottom: 12 }}>Current Eligible Payout Breakdown ({isWeekly ? 'Week' : 'Month'} {currentUnit})</Text>
+                        {(() => {
+                          const row = getWeeklyRowData(baseAmount, totalUnits, currentUnit);
+                          const totalDividend = getTotalDividend(baseAmount, totalUnits);
+                          return (
+                            <>
+                              <View style={styles.detailRow}>
+                                <Text style={styles.detailLabel}>Price Amount</Text>
+                                <Text style={styles.detailValue}>{formatCurrency(row.priceAmount)}</Text>
+                              </View>
+                              <View style={styles.detailRow}>
+                                <Text style={styles.detailLabel}>Share Dividend</Text>
+                                <Text style={styles.detailValue}>{formatCurrency(totalDividend)}</Text>
+                              </View>
+                              <View style={styles.detailRow}>
+                                <Text style={styles.detailLabel}>Total Value (Withdrawal Amount)</Text>
+                                <Text style={{ fontSize: 16, fontWeight: 'bold', color: themeColors.primary }}>{formatCurrency(row.totalValue)}</Text>
+                              </View>
+                            </>
+                          );
+                        })()}
+                      </View>
+                      <TouchableOpacity
+                        style={styles.withdrawBtn}
+                        activeOpacity={0.85}
+                        onPress={() => handleWithdrawal(myMembership._id)}
+                      >
+                        <MaterialCommunityIcons name="cash-fast" size={20} color={themeColors.white} />
+                        <Text style={styles.joinNowBtnText}>Withdraw Payout</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={{ backgroundColor: themeColors.surface2, padding: 14, borderRadius: 12, alignItems: 'center' }}>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: themeColors.textSecondary }}>
+                        🔒 Payout locked until {isWeekly ? 'Week' : 'Month'} {eligibleStart}
+                      </Text>
+                    </View>
+                  )}
+                </View>
 
                 {/* Membership Details */}
                 <View style={styles.sectionCard}>
@@ -458,8 +483,8 @@ const ChitDetailsScreen = ({ navigation, route }) => {
                     <Text style={styles.detailValue}>{userJoinedDate}</Text>
                   </View>
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Current Week</Text>
-                    <Text style={styles.detailValue}>Week {currentUnit} of {totalUnits}</Text>
+                    <Text style={styles.detailLabel}>Current {isWeekly ? 'Week' : 'Month'}</Text>
+                    <Text style={styles.detailValue}>{isWeekly ? 'Week' : 'Month'} {currentUnit} of {totalUnits}</Text>
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Next Due Date</Text>
