@@ -15,6 +15,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { authService } from '../../services/authService';
 import { investmentService } from '../../services/investmentService';
+import { calculateInvestmentTier } from '../../services/investmentTierHelper';
 import { colors, typography } from '../../theme/theme';
 import TopBar from '../../components/TopBar';
 import { useTheme } from '../../context/ThemeContext';
@@ -157,6 +158,14 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
       return;
     }
 
+    const tierInfo = calculateInvestmentTier({
+      planType: investmentType,
+      principal: parseFloat(amount) || 0,
+      customDays: Math.max(1, parseInt(customDaysInput, 10) || 365),
+      intendedWithdrawalDate: selectedWithdrawalDate,
+      plansConfig: plans,
+    });
+
     navigation.navigate('InvestmentPayment', {
       isReinvestment,
       sourceInvestmentId,
@@ -165,8 +174,12 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
       amount: parseFloat(amount),
       type: investmentType,
       userData,
-      selectedWithdrawalDate,
-      intendedWithdrawalDate: selectedWithdrawalDate,
+      selectedWithdrawalDate: tierInfo.intendedWithdrawalDate,
+      intendedWithdrawalDate: tierInfo.intendedWithdrawalDate,
+      eligibleHoldingDays: tierInfo.eligibleHoldingDays,
+      applicableInterestRate: tierInfo.applicableRate,
+      calculatedInterest: tierInfo.calculatedInterest,
+      expectedPayout: tierInfo.expectedPayout,
       benefitEligibilityDate: fifthWeekDate.toISOString(),
     });
   };
@@ -175,34 +188,36 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
     return plans.find(p => p.id === investmentType) || null;
   };
 
+  const currentTierInfo = React.useMemo(() => {
+    const selectedPlan = plans.find(p => p.id === investmentType) || null;
+    const maxDays = selectedPlan?.durationDays || 365;
+    const currentDaysVal = Math.max(1, Math.min(maxDays, parseInt(customDaysInput, 10) || maxDays));
+    return calculateInvestmentTier({
+      planType: investmentType,
+      principal: parseFloat(amount) || 0,
+      customDays: currentDaysVal,
+      plansConfig: plans,
+    });
+  }, [investmentType, amount, customDaysInput, plans]);
+
   const getInterestRate = () => {
-    const plan = getSelectedPlan();
-    return plan ? `${plan.interestRate}%` : '0%';
+    return `${currentTierInfo.applicableRate}% p.a.`;
   };
 
   const getLockPeriod = () => {
-    const plan = getSelectedPlan();
-    return plan ? `${plan.durationDays} Days` : 'No lock period';
+    return `${currentTierInfo.eligibleHoldingDays} Days`;
   };
 
   const calculateInterest = () => {
-    const amt = parseFloat(amount) || 0;
-    const plan = getSelectedPlan();
-    if (!plan) return 0;
-    const daily = (amt * plan.interestRate) / 100 / 365;
-    return daily * plan.durationDays;
+    return currentTierInfo.calculatedInterest;
   };
 
   const calculateDailyInterest = () => {
-    const amt = parseFloat(amount) || 0;
-    const plan = getSelectedPlan();
-    if (!plan) return 0;
-    return (amt * plan.interestRate) / 100 / 365;
+    return currentTierInfo.dailyInterest;
   };
 
   const calculateMaturityAmount = () => {
-    const amt = parseFloat(amount) || 0;
-    return amt + calculateInterest();
+    return currentTierInfo.expectedPayout;
   };
 
   return (
@@ -314,13 +329,9 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
                 {new Date(selectedWithdrawalDate).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
               </Text>
               <Text style={styles.datePickerSub}>
-                {(() => {
-                  const selectedPlan = getSelectedPlan();
-                  const maxDays = selectedPlan?.durationDays || 365;
-                  const maturityDate = new Date(today.getTime() + maxDays * 24 * 60 * 60 * 1000);
-                  const isEarly = new Date(selectedWithdrawalDate) < new Date(maturityDate.toDateString());
-                  return isEarly ? '⚡ Early Exit • Principal Only' : '💎 Full Maturity • Principal + Interest';
-                })()}
+                {currentTierInfo.isEarlyExit
+                  ? `⚡ ${currentTierInfo.eligibleHoldingDays} Days • ${currentTierInfo.applicableRate}% p.a. Tier Rate`
+                  : `💎 ${currentTierInfo.eligibleHoldingDays} Days • ${currentTierInfo.applicableRate}% p.a. Full Plan Rate`}
               </Text>
             </View>
             <View style={styles.changeDateBtnModern}>
@@ -334,43 +345,41 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
         {(() => {
           const selectedPlan = getSelectedPlan();
           const maxDays = selectedPlan?.durationDays || 365;
-          const maturityDate = new Date(today.getTime() + maxDays * 24 * 60 * 60 * 1000);
-          const formattedMaturityDate = maturityDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
           const formattedWithdrawalDate = new Date(selectedWithdrawalDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-          const isEarlyWithdrawal = new Date(selectedWithdrawalDate) < new Date(maturityDate.toDateString());
           const hasAmount = amount && parseFloat(amount) > 0;
-          const formattedAmountText = hasAmount ? ` (₹${parseFloat(amount).toLocaleString('en-IN')})` : '';
+          const formattedInterestText = hasAmount ? `₹${currentTierInfo.calculatedInterest.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'applicable interest';
+          const formattedPayoutText = hasAmount ? `₹${currentTierInfo.expectedPayout.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'principal + interest';
 
           return (
             <View style={[
               styles.policyCardContainer,
-              { backgroundColor: isEarlyWithdrawal ? '#FFFBEB' : '#ECFDF5', borderColor: isEarlyWithdrawal ? '#FDE68A' : '#A7F3D0' }
+              { backgroundColor: currentTierInfo.isEarlyExit ? '#ECFDF5' : '#ECFDF5', borderColor: isDarkMode ? 'rgba(52, 211, 153, 0.3)' : '#A7F3D0' }
             ]}>
               <View style={styles.policyCardHeader}>
                 <MaterialCommunityIcons 
-                  name={isEarlyWithdrawal ? "alert-circle" : "check-decagram"} 
+                  name={currentTierInfo.isEarlyExit ? "clock-check-outline" : "check-decagram"} 
                   size={20} 
-                  color={isEarlyWithdrawal ? "#D97706" : "#059669"} 
+                  color="#059669" 
                   style={{ marginRight: 8 }} 
                 />
-                <Text style={[styles.policyCardTitle, { color: isEarlyWithdrawal ? '#92400E' : '#065F46' }]}>
-                  {isEarlyWithdrawal ? 'Early Exit Policy' : 'Maturity Payout Policy'}
+                <Text style={[styles.policyCardTitle, { color: '#065F46' }]}>
+                  {currentTierInfo.isEarlyExit ? 'Custom Duration Interest Tier Policy' : 'Maturity Payout Policy'}
                 </Text>
               </View>
 
               <View style={styles.policyRowItem}>
-                <MaterialCommunityIcons name="shield-lock-outline" size={16} color={isEarlyWithdrawal ? '#D97706' : '#059669'} style={{ marginRight: 8, marginTop: 2 }} />
-                <Text style={[styles.policyRowText, { color: isEarlyWithdrawal ? '#92400E' : '#065F46' }]}>
-                  <Text style={{ fontWeight: '700' }}>Lock Period:</Text> Locked until <Text style={{ fontWeight: '700' }}>{formattedWithdrawalDate}</Text>. Funds cannot be withdrawn prior.
+                <MaterialCommunityIcons name="shield-lock-outline" size={16} color="#059669" style={{ marginRight: 8, marginTop: 2 }} />
+                <Text style={[styles.policyRowText, { color: '#065F46' }]}>
+                  <Text style={{ fontWeight: '700' }}>Lock Period:</Text> Locked until <Text style={{ fontWeight: '700' }}>{formattedWithdrawalDate}</Text> ({currentTierInfo.eligibleHoldingDays} days). Funds cannot be withdrawn prior.
                 </Text>
               </View>
 
               <View style={styles.policyRowItem}>
-                <MaterialCommunityIcons name={isEarlyWithdrawal ? "cash-refund" : "cash-multiple"} size={16} color={isEarlyWithdrawal ? '#D97706' : '#059669'} style={{ marginRight: 8, marginTop: 2 }} />
-                <Text style={[styles.policyRowText, { color: isEarlyWithdrawal ? '#92400E' : '#065F46' }]}>
-                  <Text style={{ fontWeight: '700' }}>Payout Eligibility:</Text> {isEarlyWithdrawal
-                    ? `You will only receive your original principal amount${formattedAmountText}. Interest returns are not eligible on early exit.`
-                    : `You will receive your full principal${formattedAmountText} + full ${selectedPlan?.interestRate}% interest returns upon completion (${formattedMaturityDate}).`}
+                <MaterialCommunityIcons name="cash-multiple" size={16} color="#059669" style={{ marginRight: 8, marginTop: 2 }} />
+                <Text style={[styles.policyRowText, { color: '#065F46' }]}>
+                  <Text style={{ fontWeight: '700' }}>Eligible Return ({currentTierInfo.applicableRate}% p.a.):</Text> {currentTierInfo.isEarlyExit
+                    ? `Your selected ${currentTierInfo.eligibleHoldingDays}-day duration qualifies for ${currentTierInfo.applicableRate}% p.a. returns (${currentTierInfo.tierReason}). Expected return: ${formattedInterestText} (Total payout: ${formattedPayoutText}).`
+                    : `You will receive your full principal + full ${selectedPlan?.interestRate}% p.a. returns (${formattedInterestText}) upon completion.`}
                 </Text>
               </View>
             </View>
@@ -382,7 +391,6 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
           const selectedPlan = getSelectedPlan();
           const maxDays = selectedPlan?.durationDays || 365;
           const maturityDate = new Date(today.getTime() + maxDays * 24 * 60 * 60 * 1000);
-          const isEarlyWithdrawal = new Date(selectedWithdrawalDate) < new Date(maturityDate.toDateString());
 
           return (
             <View style={styles.summaryContainer}>
@@ -391,7 +399,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Selected Plan</Text>
                 <Text style={[styles.summaryValue, { color: themeColors.primary, fontWeight: '700' }]}>
-                  {selectedPlan?.name || 'Selected Plan'}
+                  {selectedPlan?.name || 'Selected Plan'} ({selectedPlan?.interestRate}% p.a.)
                 </Text>
               </View>
 
@@ -416,8 +424,8 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
               <View style={styles.summaryDivider} />
 
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Intended Withdrawal Date</Text>
-                <Text style={[styles.summaryValue, { color: isEarlyWithdrawal ? '#D97706' : '#059669', fontWeight: '700' }]}>
+                <Text style={styles.summaryLabel}>Target Withdrawal Date</Text>
+                <Text style={[styles.summaryValue, { color: '#059669', fontWeight: '700' }]}>
                   {new Date(selectedWithdrawalDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </Text>
               </View>
@@ -425,24 +433,24 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
               <View style={styles.summaryDivider} />
 
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Plan Duration</Text>
-                <Text style={styles.summaryValue}>{maxDays} Days</Text>
+                <Text style={styles.summaryLabel}>Eligible Duration</Text>
+                <Text style={styles.summaryValue}>{currentTierInfo.eligibleHoldingDays} Days</Text>
               </View>
 
               <View style={styles.summaryDivider} />
 
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Maturity Date</Text>
-                <Text style={[styles.summaryValue, { fontWeight: '700', color: themeColors.primary }]}>
-                  {maturityDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                </Text>
-              </View>
-
-              <View style={styles.summaryDivider} />
-
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Interest Rate</Text>
+                <Text style={styles.summaryLabel}>Applicable Interest Rate</Text>
                 <Text style={[styles.summaryValue, { color: themeColors.success, fontWeight: '700' }]}>{getInterestRate()}</Text>
+              </View>
+
+              <View style={styles.summaryDivider} />
+
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Tier Classification</Text>
+                <Text style={[styles.summaryValue, { color: themeColors.textSecondary, fontWeight: '600', fontSize: 12 }]}>
+                  {currentTierInfo.tierReason}
+                </Text>
               </View>
 
               <View style={styles.summaryDivider} />
@@ -450,7 +458,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Expected Interest</Text>
                 <Text style={[styles.summaryValue, { color: themeColors.success, fontWeight: '700' }]}>
-                  ₹{calculateInterest().toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                  ₹{calculateInterest().toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </Text>
               </View>
 
@@ -467,15 +475,15 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
 
               <View style={[styles.summaryRow, { alignItems: 'flex-start' }]}>
                 <Text style={styles.summaryLabel}>Withdrawal Eligibility</Text>
-                <Text style={[styles.summaryValue, { color: isEarlyWithdrawal ? '#D97706' : '#059669', fontWeight: '700' }]}>
-                  {isEarlyWithdrawal ? 'Early: Principal Only' : 'Full Return (Principal + Interest)'}
+                <Text style={[styles.summaryValue, { color: '#059669', fontWeight: '700' }]}>
+                  Full Return (Principal + {currentTierInfo.applicableRate}% Interest)
                 </Text>
               </View>
 
               <View style={styles.summaryHighlightRow}>
-                <Text style={styles.summaryHighlightLabel}>Maturity Amount</Text>
+                <Text style={styles.summaryHighlightLabel}>Expected Payout</Text>
                 <Text style={[styles.summaryHighlightValue, { color: themeColors.success }]}>
-                  ₹{calculateMaturityAmount().toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                  ₹{calculateMaturityAmount().toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </Text>
               </View>
             </View>
@@ -485,9 +493,9 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
         {/* Info Points */}
         <View style={styles.infoContainer}>
           {[
-            { icon: 'check-circle', text: 'Interest calculated daily' },
-            { icon: 'check-circle', text: 'No hidden charges' },
-            { icon: 'check-circle', text: 'Secure and regulated' },
+            { icon: 'check-circle', text: 'Interest calculated daily & prorated' },
+            { icon: 'check-circle', text: 'No hidden charges or penalties' },
+            { icon: 'check-circle', text: 'Secure, verified and regulated' },
           ].map((item, i) => (
             <View key={i} style={styles.infoItem}>
               <MaterialCommunityIcons name={item.icon} size={18} color={themeColors.success || colors.success} />
@@ -525,7 +533,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
             <View style={styles.modalSheetHeader}>
               <View>
                 <Text style={styles.modalSheetTitle}>Choose Withdrawal Date</Text>
-                <Text style={styles.modalSheetSubtitle}>Select when to unlock your funds</Text>
+                <Text style={styles.modalSheetSubtitle}>Select when to unlock your funds & interest</Text>
               </View>
               <TouchableOpacity onPress={() => setDatePickerModalVisible(false)} style={styles.modalSheetCloseBtn}>
                 <MaterialCommunityIcons name="close" size={20} color={themeColors.textSecondary} />
@@ -537,22 +545,27 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
                 const selectedPlan = getSelectedPlan();
                 const maxDays = selectedPlan?.durationDays || 365;
                 const currentDaysVal = Math.max(1, Math.min(maxDays, parseInt(customDaysInput, 10) || maxDays));
+                const modalTier = calculateInvestmentTier({
+                  planType: investmentType,
+                  principal: parseFloat(amount) || 0,
+                  customDays: currentDaysVal,
+                  plansConfig: plans,
+                });
                 const targetDateObj = new Date(today.getTime() + currentDaysVal * 24 * 60 * 60 * 1000);
                 const formattedTargetDate = targetDateObj.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
-                const isEarly = currentDaysVal < maxDays;
                 const hasAmt = amount && parseFloat(amount) > 0;
                 const numAmt = hasAmt ? parseFloat(amount) : 0;
                 const formattedAmt = hasAmt ? `₹${numAmt.toLocaleString('en-IN')}` : '₹0.00';
-                const estimatedInterest = hasAmt ? ((numAmt * (selectedPlan?.interestRate || 0)) / 100 / 365) * maxDays : 0;
-                const formattedInterest = `₹${estimatedInterest.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+                const formattedInterest = `₹${modalTier.calculatedInterest.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                const formattedPayout = `₹${modalTier.expectedPayout.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-                // Presets
+                // Presets tailored to selected plan
                 let presets = [];
                 if (maxDays <= 15) presets = [5, 10, 15];
                 else if (maxDays <= 30) presets = [7, 15, 21, 30];
                 else if (maxDays <= 90) presets = [15, 30, 60, 90];
-                else if (maxDays <= 180) presets = [30, 60, 120, 180];
-                else presets = [30, 90, 180, 270, 365];
+                else if (maxDays <= 180) presets = [30, 60, 90, 120, 180];
+                else presets = [15, 30, 90, 180, 270, 365];
 
                 return (
                   <View>
@@ -567,19 +580,19 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
                         <Text style={styles.modalHeroTag}>TARGET WITHDRAWAL DATE</Text>
                         <View style={[
                           styles.modalHeroBadge,
-                          { backgroundColor: isEarly ? '#FEF3C7' : '#DCFCE7' }
+                          { backgroundColor: modalTier.isEarlyExit ? '#FEF3C7' : '#DCFCE7' }
                         ]}>
                           <MaterialCommunityIcons 
-                            name={isEarly ? 'lightning-bolt' : 'check-decagram'} 
+                            name={modalTier.isEarlyExit ? 'lightning-bolt' : 'check-decagram'} 
                             size={12} 
-                            color={isEarly ? '#92400E' : '#065F46'} 
+                            color={modalTier.isEarlyExit ? '#92400E' : '#065F46'} 
                             style={{ marginRight: 4 }}
                           />
                           <Text style={[
                             styles.modalHeroBadgeText,
-                            { color: isEarly ? '#92400E' : '#065F46' }
+                            { color: modalTier.isEarlyExit ? '#92400E' : '#065F46' }
                           ]}>
-                            {isEarly ? `Day ${currentDaysVal} (Early Exit)` : `${maxDays} Days (Maturity)`}
+                            {currentDaysVal} Days ({modalTier.applicableRate}% p.a.)
                           </Text>
                         </View>
                       </View>
@@ -600,14 +613,34 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
                         <View style={styles.modalHeroMetricDivider} />
 
                         <View style={styles.modalHeroMetricCol}>
-                          <Text style={styles.modalHeroMetricLabel}>INTEREST RETURN</Text>
+                          <Text style={styles.modalHeroMetricLabel}>ESTIMATED INTEREST</Text>
                           <Text style={styles.modalHeroMetricValue}>
-                            {isEarly ? '₹0.00' : formattedInterest}
+                            {formattedInterest}
                           </Text>
-                          <Text style={isEarly ? styles.modalHeroMetricSubAmber : styles.modalHeroMetricSubGreen}>
-                            {isEarly ? `Locked (${maxDays}d term)` : '✓ Full Interest'}
+                          <Text style={styles.modalHeroMetricSubGreen}>
+                            ✓ {modalTier.applicableRate}% p.a. Tier
                           </Text>
                         </View>
+
+                        <View style={styles.modalHeroMetricDivider} />
+
+                        <View style={styles.modalHeroMetricCol}>
+                          <Text style={styles.modalHeroMetricLabel}>EXPECTED PAYOUT</Text>
+                          <Text style={[styles.modalHeroMetricValue, { color: '#6EE7B7' }]}>
+                            {formattedPayout}
+                          </Text>
+                          <Text style={styles.modalHeroMetricSubGreen}>
+                            Principal + Interest
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Tier Reason Callout inside Hero */}
+                      <View style={styles.modalHeroTierBadgeRow}>
+                        <MaterialCommunityIcons name="information-outline" size={13} color="#A7F3D0" style={{ marginRight: 4 }} />
+                        <Text style={styles.modalHeroTierBadgeText}>
+                          {modalTier.tierReason}
+                        </Text>
                       </View>
                     </LinearGradient>
 
@@ -620,7 +653,12 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
                     >
                       {presets.map((days) => {
                         const isSel = currentDaysVal === days;
-                        const isMaturity = days >= maxDays;
+                        const presetTier = calculateInvestmentTier({
+                          planType: investmentType,
+                          principal: parseFloat(amount) || 0,
+                          customDays: days,
+                          plansConfig: plans,
+                        });
                         return (
                           <TouchableOpacity
                             key={days}
@@ -650,7 +688,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
                               styles.modalPresetPillSub,
                               isSel ? { color: '#A7F3D0' } : { color: themeColors.textTertiary }
                             ]}>
-                              {isMaturity ? 'Full Maturity' : 'Early Exit'}
+                              {presetTier.applicableRate}% p.a.
                             </Text>
                           </TouchableOpacity>
                         );
@@ -683,7 +721,9 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
 
                         <View style={styles.modalStepperCenterInfo}>
                           <Text style={styles.modalStepperDaysBig}>{currentDaysVal} Days</Text>
-                          <Text style={styles.modalStepperHintText}>Min 1 Day • Max {maxDays} Days</Text>
+                          <Text style={styles.modalStepperHintText}>
+                            Min 1 Day • Max {maxDays} Days ({modalTier.applicableRate}% p.a.)
+                          </Text>
                         </View>
 
                         <TouchableOpacity
@@ -716,27 +756,19 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
                     {/* Section 3: Simple, Clear Policy Note */}
                     <View style={[
                       styles.modalPolicyNoticeBox,
-                      { backgroundColor: isEarly ? '#FFFBEB' : '#ECFDF5', borderColor: isEarly ? '#FDE68A' : '#A7F3D0' }
+                      { backgroundColor: '#ECFDF5', borderColor: isDarkMode ? 'rgba(52, 211, 153, 0.3)' : '#A7F3D0' }
                     ]}>
                       <MaterialCommunityIcons
-                        name={isEarly ? 'information' : 'shield-check'}
+                        name="shield-check"
                         size={18}
-                        color={isEarly ? '#D97706' : '#059669'}
+                        color="#059669"
                         style={{ marginRight: 8, marginTop: 1 }}
                       />
                       <Text style={[
                         styles.modalPolicyNoticeText,
-                        { color: isEarly ? '#92400E' : '#065F46' }
+                        { color: '#065F46' }
                       ]}>
-                        {isEarly ? (
-                          <>
-                            <Text style={{ fontWeight: '700' }}>Early Exit Rule:</Text> Withdrawing on {formattedTargetDate} unlocks your <Text style={{ fontWeight: '700' }}>full principal amount ({formattedAmt})</Text>. Interest returns require keeping the investment for full {maxDays} days.
-                          </>
-                        ) : (
-                          <>
-                            <Text style={{ fontWeight: '700' }}>Full Maturity Reward:</Text> You will receive your <Text style={{ fontWeight: '700' }}>100% principal ({formattedAmt}) + full {selectedPlan?.interestRate}% returns ({formattedInterest})</Text> on {formattedTargetDate}!
-                          </>
-                        )}
+                        <Text style={{ fontWeight: '700' }}>Withdrawal Tier Rule:</Text> Your selected withdrawal date determines the interest tier. Shorter durations receive the applicable lower tier rate (<Text style={{ fontWeight: '700' }}>{modalTier.applicableRate}% p.a.</Text>). Funds unlock on {formattedTargetDate} with <Text style={{ fontWeight: '700' }}>principal + {modalTier.applicableRate}% prorated interest ({formattedPayout})</Text>.
                       </Text>
                     </View>
                   </View>
@@ -1327,6 +1359,21 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
     height: 32,
     backgroundColor: 'rgba(255,255,255,0.15)',
     marginHorizontal: 12,
+  },
+  modalHeroTierBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    marginTop: 10,
+  },
+  modalHeroTierBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#D1FAE5',
+    flex: 1,
   },
 
   // Section Titles

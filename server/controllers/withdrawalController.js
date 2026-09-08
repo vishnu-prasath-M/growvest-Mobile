@@ -44,18 +44,20 @@ exports.createWithdrawal = async (req, res) => {
       const now = new Date();
       const principal = Number(targetInv.amount) || 0;
       
-      let rate = Number(targetInv.interestRate) || 12;
-      let durationDays = Number(targetInv.durationDays) || 365;
-      if (targetInv.type === '15_days')   { rate = 12;  durationDays = 15;  }
-      else if (targetInv.type === '1_month')  { rate = 15;  durationDays = 30;  }
-      else if (targetInv.type === '3_months') { rate = 18;  durationDays = 90;  }
-      else if (targetInv.type === '6_months') { rate = 20;  durationDays = 180; }
-      else if (targetInv.type === '1_year')   { rate = 24;  durationDays = 365; }
-      else if (targetInv.type === 'saving')   { rate = 12;  durationDays = 365; }
-      else if (targetInv.type === 'fixed')    { rate = 24;  durationDays = 365; }
+      let rate = Number(targetInv.applicableInterestRate) || Number(targetInv.interestRate);
+      let durationDays = Number(targetInv.eligibleHoldingDays) || Number(targetInv.durationDays);
+      if (!rate || !durationDays) {
+        if (targetInv.type === '15_days')   { rate = rate || 12;  durationDays = durationDays || 15;  }
+        else if (targetInv.type === '1_month')  { rate = rate || 15;  durationDays = durationDays || 30;  }
+        else if (targetInv.type === '3_months') { rate = rate || 18;  durationDays = durationDays || 90;  }
+        else if (targetInv.type === '6_months') { rate = rate || 20;  durationDays = durationDays || 180; }
+        else if (targetInv.type === '1_year')   { rate = rate || 24;  durationDays = durationDays || 365; }
+        else if (targetInv.type === 'saving')   { rate = rate || 12;  durationDays = durationDays || 365; }
+        else if (targetInv.type === 'fixed')    { rate = rate || 24;  durationDays = durationDays || 365; }
+      }
 
       const dailyInterest = (principal * rate) / 100 / 365;
-      const totalInterestForDuration = dailyInterest * durationDays;
+      const totalInterestForDuration = Number(targetInv.calculatedInterest) || (dailyInterest * durationDays);
 
       const maturityDate = targetInv.maturityDate
         ? new Date(targetInv.maturityDate)
@@ -67,9 +69,10 @@ exports.createWithdrawal = async (req, res) => {
         : (targetInv.selectedWithdrawalDate ? new Date(targetInv.selectedWithdrawalDate) : maturityDate);
       intendedDate.setHours(0, 0, 0, 0);
 
-      // Lock Guard: Cannot withdraw before chosen intended withdrawal date
-      if (now < intendedDate) {
-        const formattedDate = intendedDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+      // Lock Guard: Cannot withdraw before chosen intended withdrawal date / maturity date
+      const unlockDate = intendedDate < maturityDate ? intendedDate : maturityDate;
+      if (now < unlockDate) {
+        const formattedDate = unlockDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
         return res.status(400).json({
           message: `This investment is currently locked. Withdrawal will unlock on your chosen intended withdrawal date: ${formattedDate}.`
         });
@@ -83,7 +86,7 @@ exports.createWithdrawal = async (req, res) => {
         return res.status(400).json({ message: 'This investment has already been withdrawn.' });
       }
 
-      const isMatured = now >= maturityDate;
+      const isMatured = now >= unlockDate;
       let accruedInterest = 0;
       if (targetInv.startDate) {
         const startDay = new Date(targetInv.startDate);
@@ -95,19 +98,8 @@ exports.createWithdrawal = async (req, res) => {
 
       const benefits = Number(targetInv.benefits) || 0;
 
-      if (!isMatured) {
-        // EARLY WITHDRAWAL (on or after intended date, but before maturity): Principal ONLY allowed!
-        available = principal;
-        if (Number(amount) > principal + 1) {
-          const formattedMaturity = maturityDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-          return res.status(400).json({
-            message: `Early withdrawal before plan completion (${formattedMaturity}) is strictly restricted to your invested principal amount (₹${principal.toLocaleString('en-IN')}) only. Interest returns are only paid upon full maturity.`
-          });
-        }
-      } else {
-        // FULL MATURITY: Principal + Interest + Extra Benefits
-        available = principal + accruedInterest + benefits;
-      }
+      // UNLOCKED ON / AFTER INTENDED WITHDRAWAL DATE: Principal + Full Tier Interest + Extra Benefits
+      available = principal + (isMatured ? totalInterestForDuration : accruedInterest) + benefits;
     }
 
     if (Number(amount) > available + 1) {
