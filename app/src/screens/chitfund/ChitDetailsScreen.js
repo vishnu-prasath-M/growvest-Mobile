@@ -253,20 +253,27 @@ const ChitDetailsScreen = ({ navigation, route }) => {
               <Text style={[styles.tableCell, { width: '15%', color: cellColor }]}>
                 {paymentVal > 0 ? `₹${paymentVal.toLocaleString('en-IN')}` : '-'}
               </Text>
-              <Text style={[styles.tableCell, { width: '18%', color: cellColor }]}>
-                {row.isLocked ? 'LOCKED' : row.priceAmount ? `₹${row.priceAmount.toLocaleString('en-IN')}` : '-'}
-              </Text>
-              <Text style={[styles.tableCell, { width: '14%', color: cellColor }]}>
-                {row.isLocked ? 'LOCKED' : `₹${row.dividend?.toLocaleString('en-IN') || 0}`}
-              </Text>
-              <Text style={[styles.tableCell, { width: '12%', color: cellColor }]}>
-                {row.isLocked ? 'LOCKED' : `${row.actionPercentage}%`}
-              </Text>
-              <Text style={[styles.tableCell, { width: '26%', textAlign: 'right', fontWeight: 'bold', color: cellColor }]}>
-                {row.isLocked 
-                  ? 'LOCKED' 
-                  : `₹${row.totalValue.toLocaleString('en-IN')} (${row.profitPercentage}%)`}
-              </Text>
+              {row.isLocked ? (
+                <View style={styles.lockedPillContainer}>
+                  <MaterialCommunityIcons name="lock" size={12} color={colors.textTertiary || '#64748B'} />
+                  <Text style={styles.lockedPillText}>LOCKED</Text>
+                </View>
+              ) : (
+                <>
+                  <Text style={[styles.tableCell, { width: '18%', color: cellColor }]}>
+                    {row.priceAmount ? `₹${row.priceAmount.toLocaleString('en-IN')}` : '-'}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: '14%', color: cellColor }]}>
+                    {row.dividend !== null && row.dividend !== undefined ? `₹${row.dividend.toLocaleString('en-IN')}` : '-'}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: '12%', color: cellColor }]}>
+                    {row.actionPercentage !== null && row.actionPercentage !== undefined ? `${row.actionPercentage}%` : '-'}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: '26%', textAlign: 'right', fontWeight: 'bold', color: cellColor }]}>
+                    ₹{row.totalValue.toLocaleString('en-IN')} ({row.profitPercentage}%)
+                  </Text>
+                </>
+              )}
             </View>
           );
         })}
@@ -977,6 +984,24 @@ const getStyles = (colors) => StyleSheet.create({
   tableCell: {
     fontSize: 11,
     color: colors.text,
+  },
+  lockedPillContainer: {
+    width: '70%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(148, 163, 184, 0.08)',
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.16)',
+  },
+  lockedPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textTertiary || '#64748B',
+    letterSpacing: 0.8,
   },
   withdrawBtn: {
     flexDirection: 'row',

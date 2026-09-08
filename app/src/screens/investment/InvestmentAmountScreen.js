@@ -676,8 +676,8 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
                         >
                           <MaterialCommunityIcons 
                             name="minus" 
-                            size={20} 
-                            color={currentDaysVal <= 1 ? '#94A3B8' : '#0E3D23'} 
+                            size={22} 
+                            color={currentDaysVal <= 1 ? (isDarkMode ? '#475569' : '#94A3B8') : (isDarkMode ? '#34D399' : '#059669')} 
                           />
                         </TouchableOpacity>
 
@@ -701,8 +701,8 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
                         >
                           <MaterialCommunityIcons 
                             name="plus" 
-                            size={20} 
-                            color={currentDaysVal >= maxDays ? '#94A3B8' : '#0E3D23'} 
+                            size={22} 
+                            color={currentDaysVal >= maxDays ? (isDarkMode ? '#475569' : '#94A3B8') : (isDarkMode ? '#34D399' : '#059669')} 
                           />
                         </TouchableOpacity>
                       </View>
@@ -1378,11 +1378,11 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
 
   // Custom Stepper Container & Visual Timeline
   modalStepperContainer: {
-    backgroundColor: colors.background,
+    backgroundColor: isDarkMode ? '#131D24' : (colors.background || '#F8FAFC'),
     borderRadius: 18,
     padding: 14,
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: isDarkMode ? '#22303C' : colors.borderLight,
     marginBottom: 14,
   },
   modalStepperRow: {
@@ -1392,18 +1392,19 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
     marginBottom: 12,
   },
   modalStepperCircleBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.surface,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: colors.borderLight,
+    borderColor: isDarkMode ? '#334155' : '#CBD5E1',
     ...colors.shadow.card,
   },
   modalStepperCircleBtnDisabled: {
     opacity: 0.35,
+    borderColor: isDarkMode ? '#1E293B' : '#E2E8F0',
   },
   modalStepperCenterInfo: {
     alignItems: 'center',
