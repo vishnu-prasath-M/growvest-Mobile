@@ -9,6 +9,7 @@ const { triggerReferralRewardOnInvestment } = require('../utils/referralHelper')
 const { sendNotification } = require('../services/notificationHelper');
 const PocketMoney = require('../models/PocketMoney');
 const PocketMoneyPayout = require('../models/PocketMoneyPayout');
+const { calculateInvestmentTier } = require('../services/investmentTierService');
 
 const getRazorpayInstance = () => {
   const key_id = process.env.RAZORPAY_KEY_ID || 'rzp_test_xxxxxxxxx';
@@ -192,63 +193,35 @@ const completeInvestment = async (user, data, orderId, paymentId, signature) => 
 
   const refCode = `INV-${Date.now().toString().slice(-6)}`;
   
-  // Resolve plan parameters
-  let interestRate = 12;
-  let durationDays = 365;
-  let planType = 'saving';
+  // Authoritative tier and interest calculation
+  const tierCalc = calculateInvestmentTier({
+    planType: type,
+    amount: Number(amount),
+    startDate: new Date(),
+    intendedWithdrawalDate: data.intendedWithdrawalDate || data.selectedWithdrawalDate,
+    customDays: data.customDays || data.durationDays,
+  });
   
-  if (type === 'fixed') {
-    interestRate = 24;
-    durationDays = 365;
-    planType = 'fixed';
-  } else if (type === '15_days') {
-    interestRate = 12;
-    durationDays = 15;
-    planType = '15_days';
-  } else if (type === '1_month') {
-    interestRate = 15;
-    durationDays = 30;
-    planType = '1_month';
-  } else if (type === '3_months') {
-    interestRate = 18;
-    durationDays = 90;
-    planType = '3_months';
-  } else if (type === '6_months') {
-    interestRate = 20;
-    durationDays = 180;
-    planType = '6_months';
-  } else if (type === '1_year') {
-    interestRate = 24;
-    durationDays = 365;
-    planType = '1_year';
-  }
-  
-  const dailyInterest = (Number(amount) * interestRate) / 100 / 365;
-  const totalInterest = dailyInterest * durationDays;
-  const maturityAmount = Number(amount) + totalInterest;
-  
-  const startDate = new Date();
-  const maturityDate = new Date(startDate.getTime() + durationDays * 24 * 60 * 60 * 1000);
+  const startDate = tierCalc.startDate;
+  const maturityDate = tierCalc.maturityDate;
+  const intendedWithdrawalDate = tierCalc.intendedWithdrawalDate;
 
   // 5th week / Benefit eligibility date = 35 days (5 weeks) from startDate
   const benefitEligibilityDate = new Date(startDate.getTime() + 35 * 24 * 60 * 60 * 1000);
   benefitEligibilityDate.setHours(0, 0, 0, 0);
 
-  const selectedDateObj = data.selectedWithdrawalDate
-    ? new Date(data.selectedWithdrawalDate)
-    : new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000);
-
   // 1. Create & auto-approve investment
   const investment = new Investment({
-    amount,
+    amount: tierCalc.principal,
     ref: refCode,
     status: 'approved', // Auto-approved upon Razorpay verification
-    type,
+    type: tierCalc.planId,
     userId: user._id,
     userName: user.name || user.username,
     userEmail: user.email,
     mobileNumber: user.mobileNumber,
-    interestRate,
+    interestRate: tierCalc.applicableInterestRate,
+    planInterestRate: tierCalc.maxPlanRate,
     startDate,
     paymentProvider: 'Razorpay',
     paymentStatus: 'paid',
@@ -259,21 +232,27 @@ const completeInvestment = async (user, data, orderId, paymentId, signature) => 
     verified: true,
     
     // Duration plan fields
-    planType,
-    durationDays,
-    totalInterest,
-    dailyInterest,
-    maturityAmount,
+    planType: tierCalc.planId,
+    planDurationDays: tierCalc.maxPlanDays,
+    durationDays: tierCalc.eligibleHoldingDays,
+    eligibleHoldingDays: tierCalc.eligibleHoldingDays,
+    applicableInterestTier: tierCalc.applicableInterestTier,
+    calculatedInterest: tierCalc.calculatedInterest,
+    totalInterest: tierCalc.totalInterest,
+    dailyInterest: tierCalc.dailyInterest,
+    expectedPayout: tierCalc.expectedPayout,
+    maturityAmount: tierCalc.maturityAmount,
     maturityDate,
     withdrawalStatus: 'locked',
 
     // Date-based withdrawal & 5-week benefit eligibility
-    selectedWithdrawalDate: selectedDateObj,
-    intendedWithdrawalDate: selectedDateObj,
-    benefitEligibilityDate: benefitEligibilityDate,
+    selectedWithdrawalDate: intendedWithdrawalDate,
+    intendedWithdrawalDate,
+    benefitEligibilityDate,
     benefits: Number(data.benefits) || 0,
     fifthWeekPaymentCompleted: data.fifthWeekPaymentCompleted !== false,
-    eligibilityStatus: 'early_principal_only',
+    eligibilityStatus: 'tier_eligible',
+    interestLogicVersion: 2,
   });
 
   await investment.save();

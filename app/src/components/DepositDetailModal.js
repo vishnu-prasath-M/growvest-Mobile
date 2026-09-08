@@ -80,10 +80,10 @@ const DepositDetailModal = ({ visible, item, onClose, onWithdraw, onReinvest }) 
   }
 
   const principal = Number(item.amount || item.investedAmount) || 0;
-  const rate = Number(item.interestRate) || 12;
+  const rate = Number(item.applicableInterestRate) || Number(item.interestRate) || 12;
   const dailyInterest = (principal * rate) / 100 / 365;
-  const accrued = Number(item.accruedInterest || item.interestEarned) || 0;
-  const maturityAmount = Number(item.maturityAmount) || (principal + (item.totalInterest || 0));
+  const accrued = Number(item.calculatedInterest || item.accruedInterest || item.interestEarned) || 0;
+  const maturityAmount = Number(item.expectedPayout) || Number(item.maturityAmount) || (principal + (item.totalInterest || accrued));
 
   let iconName = 'trending-up';
   if (isSaving) iconName = 'piggy-bank-outline';

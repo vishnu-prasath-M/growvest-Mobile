@@ -54,13 +54,31 @@ const investmentSchema = new mongoose.Schema({
   planType: {
     type: String,
   },
+  planDurationDays: {
+    type: Number,
+  },
+  planInterestRate: {
+    type: Number,
+  },
   durationDays: {
+    type: Number,
+  },
+  eligibleHoldingDays: {
+    type: Number,
+  },
+  applicableInterestTier: {
+    type: String,
+  },
+  calculatedInterest: {
     type: Number,
   },
   totalInterest: {
     type: Number,
   },
   dailyInterest: {
+    type: Number,
+  },
+  expectedPayout: {
     type: Number,
   },
   maturityAmount: {
@@ -85,7 +103,7 @@ const investmentSchema = new mongoose.Schema({
   },
   interestLogicVersion: {
     type: Number,
-    default: 1, // 1 is old/wrong, 2 is correct (Feature 2)
+    default: 2, // 2 is correct authoritative tier calculation
   },
   // Date-based withdrawal & 5-week benefit eligibility fields
   selectedWithdrawalDate: {
@@ -93,6 +111,27 @@ const investmentSchema = new mongoose.Schema({
   },
   intendedWithdrawalDate: {
     type: Date,
+  },
+  eligibleHoldingDays: {
+    type: Number,
+  },
+  applicableInterestRate: {
+    type: Number,
+  },
+  applicableInterestTier: {
+    type: String,
+  },
+  calculatedInterest: {
+    type: Number,
+  },
+  expectedPayout: {
+    type: Number,
+  },
+  planDurationDays: {
+    type: Number,
+  },
+  planInterestRate: {
+    type: Number,
   },
   benefitEligibilityDate: {
     type: Date,
@@ -107,8 +146,8 @@ const investmentSchema = new mongoose.Schema({
   },
   eligibilityStatus: {
     type: String,
-    enum: ['early_principal_only', 'full_eligible', 'withdrawn'],
-    default: 'early_principal_only',
+    enum: ['early_principal_only', 'full_eligible', 'tier_eligible', 'withdrawn'],
+    default: 'tier_eligible',
   },
   // Withdrawal request tracking — investment stays 'approved' until admin marks withdrawal as paid
   withdrawalRequestId: {

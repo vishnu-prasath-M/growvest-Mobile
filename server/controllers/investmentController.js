@@ -3,57 +3,29 @@ const User = require('../models/User');
 const Transaction = require('../models/Transaction');
 const { syncInvestmentInterest } = require('./userController');
 const { sendNotification } = require('../services/notificationHelper');
+const { calculateInvestmentTier, INVESTMENT_PLANS, DURATION_TIERS } = require('../services/investmentTierService');
 
 exports.createInvestment = async (req, res) => {
   try {
     const { amount, type, userName, userEmail, mobileNumber } = req.body;
     const refCode = `INV-${Date.now().toString().slice(-6)}`;
     
-    // Resolve plan parameters
-    let interestRate = 12;
-    let durationDays = 365;
-    let planType = 'saving';
+    // Authoritative tier and interest calculation
+    const tierCalc = calculateInvestmentTier({
+      planType: type,
+      amount: Number(amount),
+      startDate: new Date(),
+      intendedWithdrawalDate: req.body.intendedWithdrawalDate || req.body.selectedWithdrawalDate,
+      customDays: req.body.customDays || req.body.durationDays,
+    });
     
-    if (type === 'fixed') {
-      interestRate = 24;
-      durationDays = 365;
-      planType = 'fixed';
-    } else if (type === '15_days') {
-      interestRate = 12;
-      durationDays = 15;
-      planType = '15_days';
-    } else if (type === '1_month') {
-      interestRate = 15;
-      durationDays = 30;
-      planType = '1_month';
-    } else if (type === '3_months') {
-      interestRate = 18;
-      durationDays = 90;
-      planType = '3_months';
-    } else if (type === '6_months') {
-      interestRate = 20;
-      durationDays = 180;
-      planType = '6_months';
-    } else if (type === '1_year') {
-      interestRate = 24;
-      durationDays = 365;
-      planType = '1_year';
-    }
-    
-    const dailyInterest = (Number(amount) * interestRate) / 100 / 365;
-    const totalInterest = dailyInterest * durationDays;
-    const maturityAmount = Number(amount) + totalInterest;
-    
-    const startDate = new Date();
-    const maturityDate = new Date(startDate.getTime() + durationDays * 24 * 60 * 60 * 1000);
+    const startDate = tierCalc.startDate;
+    const maturityDate = tierCalc.maturityDate;
+    const intendedWithdrawalDate = tierCalc.intendedWithdrawalDate;
     
     // 5th week / Benefit eligibility date = 35 days (5 weeks) from startDate
     const benefitEligibilityDate = new Date(startDate.getTime() + 35 * 24 * 60 * 60 * 1000);
     benefitEligibilityDate.setHours(0, 0, 0, 0);
-
-    const selectedDateObj = req.body.selectedWithdrawalDate
-      ? new Date(req.body.selectedWithdrawalDate)
-      : new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000);
 
     // Find user using req.user, email (case-insensitive), or mobile
     let user = null;
@@ -78,32 +50,40 @@ exports.createInvestment = async (req, res) => {
     const resolvedName = user?.name || user?.username || userName || 'Investor';
 
     const newInvestment = new Investment({
-      amount: Number(amount),
+      amount: tierCalc.principal,
       ref: refCode,
       status: 'approved',
-      type,
+      type: tierCalc.planId,
       userId: user?._id || null,
       userName: resolvedName,
       userEmail: resolvedEmail,
       mobileNumber: resolvedMobile,
-      interestRate,
+      interestRate: tierCalc.applicableInterestRate,
+      planInterestRate: tierCalc.maxPlanRate,
       startDate,
       
       // Duration plan fields
-      planType,
-      durationDays,
-      totalInterest,
-      dailyInterest,
-      maturityAmount,
+      planType: tierCalc.planId,
+      planDurationDays: tierCalc.maxPlanDays,
+      durationDays: tierCalc.eligibleHoldingDays,
+      eligibleHoldingDays: tierCalc.eligibleHoldingDays,
+      applicableInterestTier: tierCalc.applicableInterestTier,
+      calculatedInterest: tierCalc.calculatedInterest,
+      totalInterest: tierCalc.totalInterest,
+      dailyInterest: tierCalc.dailyInterest,
+      expectedPayout: tierCalc.expectedPayout,
+      maturityAmount: tierCalc.maturityAmount,
       maturityDate,
       withdrawalStatus: 'locked',
 
       // Date-based withdrawal & 5-week benefit eligibility
-      selectedWithdrawalDate: selectedDateObj,
-      benefitEligibilityDate: benefitEligibilityDate,
+      selectedWithdrawalDate: intendedWithdrawalDate,
+      intendedWithdrawalDate,
+      benefitEligibilityDate,
       benefits: Number(req.body.benefits) || 0,
       fifthWeekPaymentCompleted: req.body.fifthWeekPaymentCompleted !== false,
-      eligibilityStatus: 'early_principal_only',
+      eligibilityStatus: 'tier_eligible',
+      interestLogicVersion: 2,
     });
 
     await newInvestment.save();
@@ -135,7 +115,7 @@ exports.createInvestment = async (req, res) => {
         status: 'approved',
         referenceId: newInvestment._id,
         referenceType: 'Investment',
-        description: `Investment in ${type} deposit - ₹${amount}`
+        description: `Investment in ${tierCalc.planName} (${tierCalc.eligibleHoldingDays} Days @ ${tierCalc.applicableInterestRate}% p.a.) - ₹${amount}`
       });
       await transaction.save();
     }
@@ -144,6 +124,26 @@ exports.createInvestment = async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: 'Error creating investment', error: error.message });
   }
+};
+
+exports.calculateTier = async (req, res) => {
+  try {
+    const { planType, amount, startDate, intendedWithdrawalDate, customDays } = req.body;
+    const result = calculateInvestmentTier({
+      planType,
+      amount: Number(amount) || 1000,
+      startDate: startDate || new Date(),
+      intendedWithdrawalDate,
+      customDays,
+    });
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(500).json({ message: 'Error calculating tier', error: error.message });
+  }
+};
+
+exports.getPlans = async (req, res) => {
+  res.status(200).json(INVESTMENT_PLANS);
 };
 
 exports.getInvestments = async (req, res) => {
@@ -573,50 +573,20 @@ exports.reinvestInvestment = async (req, res) => {
       });
     }
 
-    // 6. Create the New Investment Record
+    // 6. Create the New Investment Record with Authoritative Tier Calculation
     const newPlanType = requestedPlanType || sourceInvestment.type || '1_year';
-    let newInterestRate = 12;
-    let newDurationDays = 365;
-    let resolvedPlanType = 'saving';
-
-    if (newPlanType === 'fixed') {
-      newInterestRate = 24;
-      newDurationDays = 365;
-      resolvedPlanType = 'fixed';
-    } else if (newPlanType === '15_days') {
-      newInterestRate = 12;
-      newDurationDays = 15;
-      resolvedPlanType = '15_days';
-    } else if (newPlanType === '1_month') {
-      newInterestRate = 15;
-      newDurationDays = 30;
-      resolvedPlanType = '1_month';
-    } else if (newPlanType === '3_months') {
-      newInterestRate = 18;
-      newDurationDays = 90;
-      resolvedPlanType = '3_months';
-    } else if (newPlanType === '6_months') {
-      newInterestRate = 20;
-      newDurationDays = 180;
-      resolvedPlanType = '6_months';
-    } else if (newPlanType === '1_year') {
-      newInterestRate = 24;
-      newDurationDays = 365;
-      resolvedPlanType = '1_year';
-    }
-
-    const newDailyInterest = (reinvestAmount * newInterestRate) / 100 / 365;
-    const newTotalInterest = newDailyInterest * newDurationDays;
-    const newMaturityAmount = Number((reinvestAmount + newTotalInterest).toFixed(2));
-
     const newStartDate = new Date();
-    const newMaturityDate = new Date(newStartDate.getTime() + newDurationDays * 24 * 60 * 60 * 1000);
+
+    const tierCalc = calculateInvestmentTier({
+      planType: newPlanType,
+      amount: reinvestAmount,
+      startDate: newStartDate,
+      intendedWithdrawalDate: selectedWithdrawalDate,
+    });
+
+    const newMaturityDate = tierCalc.maturityDate;
     const newBenefitEligibilityDate = new Date(newStartDate.getTime() + 35 * 24 * 60 * 60 * 1000);
     newBenefitEligibilityDate.setHours(0, 0, 0, 0);
-
-    const chosenWithdrawalDateObj = selectedWithdrawalDate
-      ? new Date(selectedWithdrawalDate)
-      : newMaturityDate;
 
     const refCode = `INV-${Date.now().toString().slice(-6)}`;
 
@@ -624,12 +594,13 @@ exports.reinvestInvestment = async (req, res) => {
       amount: reinvestAmount,
       ref: refCode,
       status: 'approved',
-      type: newPlanType,
+      type: tierCalc.planId,
       userId: user._id,
       userName: user.name || user.username || 'Investor',
       userEmail: user.email || '',
       mobileNumber: user.mobileNumber || '',
-      interestRate: newInterestRate,
+      interestRate: tierCalc.applicableInterestRate,
+      planInterestRate: tierCalc.maxPlanRate,
       startDate: newStartDate,
       paymentProvider: 'Internal_Reinvestment',
       paymentStatus: 'paid',
@@ -640,20 +611,26 @@ exports.reinvestInvestment = async (req, res) => {
       reinvestedFrom: sourceInvestment._id,
 
       // Duration plan fields
-      planType: resolvedPlanType,
-      durationDays: newDurationDays,
-      totalInterest: newTotalInterest,
-      dailyInterest: newDailyInterest,
-      maturityAmount: newMaturityAmount,
+      planType: tierCalc.planId,
+      planDurationDays: tierCalc.maxPlanDays,
+      durationDays: tierCalc.eligibleHoldingDays,
+      eligibleHoldingDays: tierCalc.eligibleHoldingDays,
+      applicableInterestTier: tierCalc.applicableInterestTier,
+      calculatedInterest: tierCalc.calculatedInterest,
+      totalInterest: tierCalc.totalInterest,
+      dailyInterest: tierCalc.dailyInterest,
+      expectedPayout: tierCalc.expectedPayout,
+      maturityAmount: tierCalc.maturityAmount,
       maturityDate: newMaturityDate,
       withdrawalStatus: 'locked',
 
-      selectedWithdrawalDate: chosenWithdrawalDateObj,
-      intendedWithdrawalDate: chosenWithdrawalDateObj,
+      selectedWithdrawalDate: tierCalc.intendedWithdrawalDate,
+      intendedWithdrawalDate: tierCalc.intendedWithdrawalDate,
       benefitEligibilityDate: newBenefitEligibilityDate,
       benefits: 0,
       fifthWeekPaymentCompleted: true,
-      eligibilityStatus: 'early_principal_only',
+      eligibilityStatus: 'tier_eligible',
+      interestLogicVersion: 2,
     });
 
     await newInvestment.save();
