@@ -605,32 +605,32 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
 
                       <View style={styles.modalHeroMetricsRow}>
                         <View style={styles.modalHeroMetricCol}>
-                          <Text style={styles.modalHeroMetricLabel}>PRINCIPAL RETURN</Text>
-                          <Text style={styles.modalHeroMetricValue}>{formattedAmt}</Text>
-                          <Text style={styles.modalHeroMetricSubGreen}>✓ 100% Eligible</Text>
+                          <Text style={styles.modalHeroMetricLabel} numberOfLines={1} adjustsFontSizeToFit>PRINCIPAL</Text>
+                          <Text style={styles.modalHeroMetricValue} numberOfLines={1} adjustsFontSizeToFit>{formattedAmt}</Text>
+                          <Text style={styles.modalHeroMetricSubGreen} numberOfLines={1}>✓ 100% Eligible</Text>
                         </View>
 
                         <View style={styles.modalHeroMetricDivider} />
 
                         <View style={styles.modalHeroMetricCol}>
-                          <Text style={styles.modalHeroMetricLabel}>ESTIMATED INTEREST</Text>
-                          <Text style={styles.modalHeroMetricValue}>
+                          <Text style={styles.modalHeroMetricLabel} numberOfLines={1} adjustsFontSizeToFit>EST. INTEREST</Text>
+                          <Text style={styles.modalHeroMetricValue} numberOfLines={1} adjustsFontSizeToFit>
                             {formattedInterest}
                           </Text>
-                          <Text style={styles.modalHeroMetricSubGreen}>
-                            ✓ {modalTier.applicableRate}% p.a. Tier
+                          <Text style={styles.modalHeroMetricSubGreen} numberOfLines={1}>
+                            ✓ {modalTier.applicableRate}% Tier
                           </Text>
                         </View>
 
                         <View style={styles.modalHeroMetricDivider} />
 
                         <View style={styles.modalHeroMetricCol}>
-                          <Text style={styles.modalHeroMetricLabel}>EXPECTED PAYOUT</Text>
-                          <Text style={[styles.modalHeroMetricValue, { color: '#6EE7B7' }]}>
+                          <Text style={styles.modalHeroMetricLabel} numberOfLines={1} adjustsFontSizeToFit>TOTAL PAYOUT</Text>
+                          <Text style={[styles.modalHeroMetricValue, { color: '#6EE7B7' }]} numberOfLines={1} adjustsFontSizeToFit>
                             {formattedPayout}
                           </Text>
-                          <Text style={styles.modalHeroMetricSubGreen}>
-                            Principal + Interest
+                          <Text style={styles.modalHeroMetricSubGreen} numberOfLines={1}>
+                            Principal + Return
                           </Text>
                         </View>
                       </View>
@@ -1330,26 +1330,26 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
     flex: 1,
   },
   modalHeroMetricLabel: {
-    fontSize: 9.5,
+    fontSize: 9,
     fontWeight: '700',
     color: '#A7F3D0',
-    letterSpacing: 0.4,
+    letterSpacing: 0.3,
     marginBottom: 2,
   },
   modalHeroMetricValue: {
-    fontSize: 15,
+    fontSize: 14.5,
     fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: -0.2,
   },
   modalHeroMetricSubGreen: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '600',
     color: '#6EE7B7',
     marginTop: 1,
   },
   modalHeroMetricSubAmber: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '600',
     color: '#FDE68A',
     marginTop: 1,
@@ -1358,7 +1358,7 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
     width: 1,
     height: 32,
     backgroundColor: 'rgba(255,255,255,0.15)',
-    marginHorizontal: 12,
+    marginHorizontal: 8,
   },
   modalHeroTierBadgeRow: {
     flexDirection: 'row',
