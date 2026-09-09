@@ -58,10 +58,12 @@ exports.submitKYC = async (req, res) => {
       return res.status(400).json({ message: 'Missing required fields: fullName, aadhaarNumber, panNumber' });
     }
 
-    if (req.body.upiId && req.body.upiId.trim()) {
-      if (!/^[a-zA-Z0-9.\-_]{2,100}@[a-zA-Z0-9.\-_]{2,64}$/.test(req.body.upiId.trim())) {
-        return res.status(400).json({ message: 'Invalid UPI ID format (e.g. username@okhdfcbank or 9876543210@paytm)' });
-      }
+    if (!req.body.upiId || !req.body.upiId.trim()) {
+      return res.status(400).json({ message: 'UPI ID is required' });
+    }
+
+    if (!/^[a-zA-Z0-9.\-_]{2,100}@[a-zA-Z0-9.\-_]{2,64}$/.test(req.body.upiId.trim())) {
+      return res.status(400).json({ message: 'Invalid UPI ID format (e.g. username@okhdfcbank or 9876543210@paytm)' });
     }
     
     const kycData = {
@@ -396,14 +398,12 @@ exports.updateBankDetails = async (req, res) => {
     } = req.body;
 
     // Basic validation
-    if (!accountHolderName || !bankName || !accountNumber || !ifscCode || !branchName) {
-      return res.status(400).json({ message: 'Required bank fields are missing' });
+    if (!accountHolderName || !bankName || !accountNumber || !ifscCode || !branchName || !upiId || !upiId.trim()) {
+      return res.status(400).json({ message: 'Required bank fields (including UPI ID) are missing' });
     }
 
-    if (upiId && upiId.trim()) {
-      if (!/^[a-zA-Z0-9.\-_]{2,100}@[a-zA-Z0-9.\-_]{2,64}$/.test(upiId.trim())) {
-        return res.status(400).json({ message: 'Invalid UPI ID format (e.g. username@okhdfcbank or 9876543210@paytm)' });
-      }
+    if (!/^[a-zA-Z0-9.\-_]{2,100}@[a-zA-Z0-9.\-_]{2,64}$/.test(upiId.trim())) {
+      return res.status(400).json({ message: 'Invalid UPI ID format (e.g. username@okhdfcbank or 9876543210@paytm)' });
     }
 
     // Find existing KYC record for this user

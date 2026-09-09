@@ -220,10 +220,10 @@ const KYCScreen = ({ navigation }) => {
       else if (form.accountNumber.trim() !== form.confirmAccountNumber.trim()) newErrors.confirmAccountNumber = 'Account numbers do not match';
       if (!form.ifscCode.trim()) newErrors.ifscCode = 'IFSC is required';
       if (!form.branchName.trim()) newErrors.branchName = 'Branch is required';
-      if (form.upiId && form.upiId.trim()) {
-        if (!/^[a-zA-Z0-9.\-_]{2,100}@[a-zA-Z0-9.\-_]{2,64}$/.test(form.upiId.trim())) {
-          newErrors.upiId = 'Invalid UPI ID format (e.g. username@okhdfcbank or 9876543210@paytm)';
-        }
+      if (!form.upiId || !form.upiId.trim()) {
+        newErrors.upiId = 'UPI ID is required';
+      } else if (!/^[a-zA-Z0-9.\-_]{2,100}@[a-zA-Z0-9.\-_]{2,64}$/.test(form.upiId.trim())) {
+        newErrors.upiId = 'Invalid UPI ID format (e.g. username@okhdfcbank or 9876543210@paytm)';
       }
     } else if (step === 3) {
       if (!form.aadhaarFrontImage) newErrors.aadhaarFrontImage = 'Aadhaar front image is required';
@@ -369,14 +369,14 @@ const KYCScreen = ({ navigation }) => {
             {renderField('fullName', 'Full Name')}
             {renderField('fatherOrHusbandName', 'Father / Husband Name')}
             {renderDobField()}
-            {renderField('gender', 'Gender', { type: 'select', required: true })}
-            {renderField('occupation', 'Occupation')}
+            {renderField('gender', 'Gender', { type: 'select' })}
+            {renderField('occupation', 'Occupation', { placeholder: 'e.g. Salaried, Business, Self Employed' })}
           </View>
         );
       case 1:
         return (
           <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Address & Identity</Text>
+            <Text style={styles.stepTitle}>Address & Identity Details</Text>
             {renderField('address', 'Address', { placeholder: 'Full address' })}
             {renderField('city', 'City')}
             {renderField('district', 'District')}
@@ -402,7 +402,7 @@ const KYCScreen = ({ navigation }) => {
             {renderField('confirmAccountNumber', 'Confirm Account Number', { keyboard: 'numeric' })}
             {renderField('ifscCode', 'IFSC Code', { autoCapitalize: 'characters', placeholder: 'e.g. SBIN0001234' })}
             {renderField('branchName', 'Branch Name')}
-            {renderField('upiId', 'UPI ID (Optional)', { required: false, autoCapitalize: 'none', keyboard: 'email-address', placeholder: 'e.g. username@okhdfcbank' })}
+            {renderField('upiId', 'UPI ID', { autoCapitalize: 'none', keyboard: 'email-address', placeholder: 'e.g. username@okhdfcbank' })}
           </View>
         );
       case 3:
