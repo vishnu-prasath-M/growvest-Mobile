@@ -14,6 +14,7 @@ const buildMessage = (token, { title, body, data = {} }) => ({
   data,
   priority: 'high',
   channelId: 'default',
+  color: '#085428',
   badge: 1,
   _displayInForeground: true,
   _contentAvailable: true,
