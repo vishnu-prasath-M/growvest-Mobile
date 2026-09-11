@@ -15,6 +15,7 @@ import { executeRazorpayPayment } from '../../services/razorpayHandler';
 import { investmentService } from '../../services/investmentService';
 import { useTheme } from '../../context/ThemeContext';
 import KycRequiredModal from '../../components/KycRequiredModal';
+import ModernAlertModal from '../../components/ModernAlertModal';
 import { kycService } from '../../services/kycService';
 
 const InvestmentPaymentScreen = ({ navigation, route }) => {
@@ -34,6 +35,30 @@ const InvestmentPaymentScreen = ({ navigation, route }) => {
 
   const [loading, setLoading] = useState(false);
   const [kycModalVisible, setKycModalVisible] = useState(false);
+
+  // Modern Alert Modal state
+  const [alertConfig, setAlertConfig] = useState({
+    visible: false,
+    type: 'success',
+    title: '',
+    message: '',
+    primaryText: 'OK',
+    onPrimary: null,
+  });
+
+  const showAlert = (alertType, title, message, primaryText = 'OK', onPrimary = null) => {
+    setAlertConfig({
+      visible: true,
+      type: alertType,
+      title,
+      message,
+      primaryText,
+      onPrimary: () => {
+        setAlertConfig((prev) => ({ ...prev, visible: false }));
+        if (onPrimary) onPrimary();
+      },
+    });
+  };
 
   const formatCurrency = (value) => {
     return `₹${value?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`;
@@ -62,27 +87,24 @@ const InvestmentPaymentScreen = ({ navigation, route }) => {
         intendedWithdrawalDate: selectedWithdrawalDate,
       });
 
-      Alert.alert(
+      showAlert(
+        'success',
         'Reinvestment Successful! 🎉',
         `Your ₹${Number(amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} has been successfully reinvested into ${getPlanDisplayName(type)}. No external payment was required.`,
-        [
-          {
-            text: 'View My Investments',
-            onPress: () => {
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'MainTabs', state: { routes: [{ name: 'Investments' }] } }]
-              });
-            },
-          },
-        ]
+        'View My Investments',
+        () => {
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'MainTabs', state: { routes: [{ name: 'Investments' }] } }],
+          });
+        }
       );
     } catch (error) {
       console.error('[InvestmentPayment] Reinvestment failed:', error);
-      Alert.alert(
+      showAlert(
+        'error',
         'Reinvestment Failed',
-        error?.message || error || 'Could not complete reinvestment. Please try again.',
-        [{ text: 'OK' }]
+        error?.message || error || 'Could not complete reinvestment. Please try again.'
       );
     } finally {
       setLoading(false);
@@ -105,27 +127,26 @@ const InvestmentPaymentScreen = ({ navigation, route }) => {
       user: userData,
       setLoading,
       onSuccess: (response) => {
-        Alert.alert(
+        showAlert(
+          'success',
           'Payment Successful! 🎉',
           type === 'pocket_money'
             ? `Your ₹${amount} Pocket Money Plan has been verified and activated.`
             : `Your ₹${amount} ${getPlanDisplayName(type)} has been verified and automatically approved.`,
-          [
-            {
-              text: 'View Dashboard',
-              onPress: () => {
-                navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
-              },
-            },
-          ]
+          'View Dashboard',
+          () => {
+            navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+          }
         );
       },
       onFailure: (error) => {
         console.error('[InvestmentPayment] Payment failed or cancelled:', error);
-        Alert.alert(
-          'Payment Not Completed',
-          'Payment was cancelled or failed. Your investment has not been created.',
-          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        showAlert(
+          'warning',
+          'Payment Cancelled',
+          'Payment was not completed. Your investment has not been created.',
+          'OK',
+          () => navigation.goBack()
         );
       },
     });
@@ -256,6 +277,17 @@ const InvestmentPaymentScreen = ({ navigation, route }) => {
         visible={kycModalVisible}
         onClose={() => setKycModalVisible(false)}
         onNavigateToKYC={() => navigation.navigate('KYC')}
+      />
+
+      {/* Modern Alert Modal */}
+      <ModernAlertModal
+        visible={alertConfig.visible}
+        type={alertConfig.type}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        primaryButtonText={alertConfig.primaryText}
+        onPrimaryPress={alertConfig.onPrimary}
+        onClose={() => setAlertConfig((prev) => ({ ...prev, visible: false }))}
       />
     </View>
   );

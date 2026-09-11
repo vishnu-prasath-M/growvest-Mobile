@@ -17,13 +17,14 @@ import { useFocusEffect } from '@react-navigation/native';
 import { colors, typography } from '../../theme/theme';
 import TopBar from '../../components/TopBar';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
+import ModernAlertModal from '../../components/ModernAlertModal';
 import { useTheme } from '../../context/ThemeContext';
 import api from '../../services/apiService';
 import { API_ENDPOINTS } from '../../config/api';
 
 const BankDetailsScreen = ({ navigation }) => {
-  const { colors: themeColors } = useTheme();
-  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
+  const { colors: themeColors, isDarkMode } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
   
   const [form, setForm] = useState({
     accountHolderName: '',
@@ -38,6 +39,30 @@ const BankDetailsScreen = ({ navigation }) => {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [kycData, setKycData] = useState(null);
+
+  // Modern Alert state
+  const [alertConfig, setAlertConfig] = useState({
+    visible: false,
+    type: 'bank',
+    title: '',
+    message: '',
+    primaryText: 'OK',
+    onPrimary: null,
+  });
+
+  const showAlert = (type, title, message, primaryText = 'OK', onPrimary = null) => {
+    setAlertConfig({
+      visible: true,
+      type,
+      title,
+      message,
+      primaryText,
+      onPrimary: () => {
+        setAlertConfig((prev) => ({ ...prev, visible: false }));
+        if (onPrimary) onPrimary();
+      },
+    });
+  };
 
   // Fetch KYC bank details from MongoDB on screen focus
   const fetchBankDetails = async () => {
@@ -61,7 +86,7 @@ const BankDetailsScreen = ({ navigation }) => {
       }
     } catch (error) {
       console.error('Error fetching KYC bank details:', error);
-      Alert.alert('Error', 'Failed to load bank details. Please try again.');
+      showAlert('error', 'Error', 'Failed to load bank details. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -113,14 +138,15 @@ const BankDetailsScreen = ({ navigation }) => {
       });
       // Update confirmAccountNumber to match after save
       setForm((prev) => ({ ...prev, confirmAccountNumber: form.accountNumber.trim() }));
-      Alert.alert(
-        'Saved',
-        'Bank details updated successfully.',
-        [{ text: 'OK' }]
+      showAlert(
+        'bank',
+        'Bank Details Saved 🎉',
+        'Your bank account and UPI details have been updated successfully.',
+        'Done'
       );
     } catch (error) {
       const msg = error.response?.data?.message || 'Failed to update bank details. Please try again.';
-      Alert.alert('Error', msg);
+      showAlert('error', 'Error', msg);
     } finally {
       setSaving(false);
     }
@@ -286,6 +312,17 @@ const BankDetailsScreen = ({ navigation }) => {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Modern Alert Modal */}
+      <ModernAlertModal
+        visible={alertConfig.visible}
+        type={alertConfig.type}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        primaryButtonText={alertConfig.primaryText}
+        onPrimaryPress={alertConfig.onPrimary}
+        onClose={() => setAlertConfig((prev) => ({ ...prev, visible: false }))}
+      />
     </KeyboardAvoidingView>
   );
 };
