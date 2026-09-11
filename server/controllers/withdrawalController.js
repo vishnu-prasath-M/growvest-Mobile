@@ -345,19 +345,32 @@ exports.updateWithdrawalStatus = async (req, res) => {
         { new: true }
       );
 
-      // If this withdrawal is linked to an investment, mark that investment as withdrawn
+      // If this withdrawal is linked to an investment, check if it's a full or partial withdrawal
       const targetInvId = updatedWithdrawal.investmentId || (mongoose.Types.ObjectId.isValid(withdrawal.withdrawType) ? withdrawal.withdrawType : null);
       if (targetInvId) {
         try {
           const Investment = require('../models/Investment');
-          await Investment.findByIdAndUpdate(targetInvId, {
-            status: 'withdrawn',
-            withdrawalStatus: 'withdrawn',
-            eligibilityStatus: 'withdrawn',
-          });
-          console.log(`[withdrawalController] Investment ${targetInvId} marked as withdrawn.`);
+          const targetInv = await Investment.findById(targetInvId);
+          if (targetInv) {
+            const fullAmt = targetInv.expectedPayout || targetInv.maturityAmount || targetInv.amount || 0;
+            if (updatedWithdrawal.amount >= fullAmt - 1) {
+              await Investment.findByIdAndUpdate(targetInvId, {
+                status: 'withdrawn',
+                withdrawalStatus: 'withdrawn',
+                eligibilityStatus: 'withdrawn',
+              });
+              console.log(`[withdrawalController] Investment ${targetInvId} marked as fully withdrawn.`);
+            } else {
+              // Partial withdrawal - unlock / keep approved so remaining amount is available
+              await Investment.findByIdAndUpdate(targetInvId, {
+                withdrawalStatus: 'available',
+                withdrawalRequestId: null,
+              });
+              console.log(`[withdrawalController] Investment ${targetInvId} partial withdrawal processed; remaining balance stays available.`);
+            }
+          }
         } catch (invErr) {
-          console.warn('[withdrawalController] Could not mark investment as withdrawn (non-fatal):', invErr.message);
+          console.warn('[withdrawalController] Could not update investment status (non-fatal):', invErr.message);
         }
       }
 
@@ -387,6 +400,18 @@ exports.updateWithdrawalStatus = async (req, res) => {
     // For rejected status
     const updateData = { status };
     const updatedWithdrawal = await Withdrawal.findByIdAndUpdate(id, updateData, { new: true });
+
+    // If linked to an investment, unlock it so user can request again
+    const rejectedTargetInvId = withdrawal.investmentId || (mongoose.Types.ObjectId.isValid(withdrawal.withdrawType) ? withdrawal.withdrawType : null);
+    if (rejectedTargetInvId) {
+      try {
+        const Investment = require('../models/Investment');
+        await Investment.findByIdAndUpdate(rejectedTargetInvId, {
+          withdrawalStatus: 'available',
+          withdrawalRequestId: null,
+        });
+      } catch (e) {}
+    }
 
     // Update transaction record for rejected status
     await Transaction.findOneAndUpdate(
