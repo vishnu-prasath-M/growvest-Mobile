@@ -108,7 +108,12 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.innerWidth < 1024;
+    }
+    return false;
+  });
   const [pendingList, setPendingList] = useState<PendingInv[]>([]);
   const [payModalData, setPayModalData] = useState<WithdrawReq | null>(null);
   const [withdrawList, setWithdrawList] = useState<WithdrawReq[]>([]);

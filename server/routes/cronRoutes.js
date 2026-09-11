@@ -31,6 +31,12 @@ const handleDailyNotifications = async (req, res) => {
       results.chit_due = 'dispatched';
     }
 
+    if (type === 'sip_due' || type === 'sip' || type === 'all') {
+      console.log('[CronRoute] → Running Daily SIP Reminders...');
+      await cronService.sendDailySIPNotifications();
+      results.sip_due = 'dispatched';
+    }
+
     if (type === 'morning_tip' || type === 'all') {
       console.log('[CronRoute] → Running Morning Financial Tip Broadcast...');
       await cronService.sendMorningFinancialTip();
@@ -57,5 +63,15 @@ const handleDailyNotifications = async (req, res) => {
 
 router.get('/daily-notifications', handleDailyNotifications);
 router.post('/daily-notifications', handleDailyNotifications);
+
+// Dedicated direct cron-job.org endpoints
+router.get('/sip-notifications', (req, res) => {
+  req.query.type = 'sip_due';
+  return handleDailyNotifications(req, res);
+});
+router.post('/sip-notifications', (req, res) => {
+  req.query.type = 'sip_due';
+  return handleDailyNotifications(req, res);
+});
 
 module.exports = router;

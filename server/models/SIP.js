@@ -27,7 +27,7 @@ const sipSchema = new mongoose.Schema({
   amount: {
     type: Number,
     required: true,
-    min: 100,
+    min: 10,
   },
   frequency: {
     type: String,

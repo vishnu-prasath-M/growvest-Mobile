@@ -28,8 +28,8 @@ const FREQUENCIES = [
 ];
 
 const PRESETS_BY_FREQ = {
-  daily: [100, 200, 500, 1000],
-  weekly: [250, 500, 1000, 2000],
+  daily: [10, 50, 100, 500],
+  weekly: [100, 250, 500, 1000],
   monthly: [500, 1000, 2000, 5000],
 };
 
@@ -73,13 +73,13 @@ const CreateSIPScreen = ({ navigation }) => {
   const styles = React.useMemo(() => getStyles(themeColors, isDark), [themeColors, isDark]);
 
   // Form State
-  const [selectedFrequency, setSelectedFrequency] = useState('monthly');
-  const [selectedAmount, setSelectedAmount] = useState(1000);
+  const [selectedFrequency, setSelectedFrequency] = useState('daily');
+  const [selectedAmount, setSelectedAmount] = useState(10);
   const [customAmount, setCustomAmount] = useState('');
   const [isCustom, setIsCustom] = useState(false);
   const [selectedDayName, setSelectedDayName] = useState('Monday');
   const [selectedMonthDate, setSelectedMonthDate] = useState(10);
-  const [selectedDurationCount, setSelectedDurationCount] = useState(12);
+  const [selectedDurationCount, setSelectedDurationCount] = useState(30);
 
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -91,19 +91,59 @@ const CreateSIPScreen = ({ navigation }) => {
     setCustomAmount('');
 
     if (freq === 'daily') {
-      setSelectedAmount(100);
+      setSelectedAmount(10);
       setSelectedDurationCount(30);
     } else if (freq === 'weekly') {
-      setSelectedAmount(500);
+      setSelectedAmount(100);
       setSelectedDurationCount(12);
     } else {
-      setSelectedAmount(1000);
+      setSelectedAmount(500);
       setSelectedDurationCount(12);
     }
   };
 
   const currentAmount = isCustom ? Number(customAmount) || 0 : selectedAmount;
   const totalPlanned = currentAmount * selectedDurationCount;
+
+  // 26% p.a. Dynamic SIP Returns Calculation Engine
+  const ANNUAL_RATE = 0.26; // 26% p.a.
+  const calculateSIPReturns = () => {
+    const P = currentAmount;
+    const N = selectedDurationCount;
+    if (P <= 0 || N <= 0) return { expectedInterest: 0, expectedMaturity: 0, periodicRatePct: 0, rateLabel: '26% p.a.' };
+
+    let periodicRate = 0;
+    let rateLabel = '';
+
+    if (selectedFrequency === 'daily') {
+      // Daily return = 26% / 365 = ~0.000712328767
+      periodicRate = ANNUAL_RATE / 365;
+      rateLabel = `${(periodicRate * 100).toFixed(4)}% / day (26% p.a.)`;
+    } else if (selectedFrequency === 'weekly') {
+      // Weekly return = 26% * 7 / 365 = ~0.0049863
+      periodicRate = (ANNUAL_RATE * 7) / 365;
+      rateLabel = `${(periodicRate * 100).toFixed(3)}% / week (26% p.a.)`;
+    } else {
+      // Monthly return = 26% / 12 = ~0.0216667
+      periodicRate = ANNUAL_RATE / 12;
+      rateLabel = `${(periodicRate * 100).toFixed(2)}% / month (26% p.a.)`;
+    }
+
+    // Installment on period k accrues interest for remaining duration: Interest = P * r * (N * (N + 1) / 2)
+    const expectedInterest = Math.round(P * periodicRate * ((N * (N + 1)) / 2));
+    const totalDeposited = P * N;
+    const expectedMaturity = totalDeposited + expectedInterest;
+
+    return {
+      expectedInterest,
+      expectedMaturity,
+      periodicRate,
+      rateLabel,
+      totalDeposited,
+    };
+  };
+
+  const sipReturns = calculateSIPReturns();
 
   const calculateEndDate = () => {
     const d = new Date();
@@ -130,8 +170,8 @@ const CreateSIPScreen = ({ navigation }) => {
   };
 
   const handleStartSIP = () => {
-    if (currentAmount < 100) {
-      Alert.alert('Invalid Amount', 'Minimum SIP contribution amount is ₹100.');
+    if (currentAmount < 10) {
+      Alert.alert('Invalid Amount', 'Minimum SIP contribution amount is ₹10.');
       return;
     }
     setShowConfirmModal(true);
@@ -507,6 +547,14 @@ const CreateSIPScreen = ({ navigation }) => {
             <Text style={styles.summaryValue}>{selectedDurationCount} Contributions</Text>
           </View>
           <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Annual Return Yield</Text>
+            <Text style={[styles.summaryValue, { color: '#085428', fontWeight: '700' }]}>26% p.a.</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Rate per Contribution</Text>
+            <Text style={styles.summaryValue}>{sipReturns.rateLabel}</Text>
+          </View>
+          <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Target Completion</Text>
             <Text style={styles.summaryValue}>{calculateEndDate()}</Text>
           </View>
@@ -514,11 +562,23 @@ const CreateSIPScreen = ({ navigation }) => {
           <View style={styles.summaryDivider} />
 
           <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Total Principal Saved</Text>
+            <Text style={styles.summaryValue}>₹{totalPlanned.toLocaleString('en-IN')}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={[styles.summaryLabel, { color: '#085428', fontWeight: '600' }]}>
+              Expected Returns (+26% p.a.)
+            </Text>
+            <Text style={[styles.summaryValue, { color: '#085428', fontWeight: '700' }]}>
+              +₹{sipReturns.expectedInterest.toLocaleString('en-IN')}
+            </Text>
+          </View>
+          <View style={styles.summaryRow}>
             <Text style={[styles.summaryLabel, { fontWeight: '700', color: themeColors.text }]}>
-              Total Planned Savings
+              Estimated Maturity Value
             </Text>
             <Text style={[styles.summaryValue, { color: '#085428', fontSize: 18, fontWeight: '800' }]}>
-              ₹{totalPlanned.toLocaleString('en-IN')}
+              ₹{sipReturns.expectedMaturity.toLocaleString('en-IN')}
             </Text>
           </View>
         </View>
@@ -560,7 +620,7 @@ const CreateSIPScreen = ({ navigation }) => {
 
             <Text style={styles.modalTitle}>Confirm {selectedFrequency.toUpperCase()} SIP Plan</Text>
             <Text style={styles.modalSubtitle}>
-              You will contribute ₹{currentAmount.toLocaleString('en-IN')} {selectedFrequency === 'daily' ? 'every day' : selectedFrequency === 'weekly' ? `every ${selectedDayName}` : `every month on the ${selectedMonthDate}th`} for {selectedDurationCount} contributions.
+              You will contribute ₹{currentAmount.toLocaleString('en-IN')} {selectedFrequency === 'daily' ? 'every day' : selectedFrequency === 'weekly' ? `every ${selectedDayName}` : `every month on the ${selectedMonthDate}th`} for {selectedDurationCount} contributions earning 26% p.a.
             </Text>
 
             <View style={styles.modalBreakdown}>
@@ -581,6 +641,18 @@ const CreateSIPScreen = ({ navigation }) => {
               <View style={styles.modalBreakdownRow}>
                 <Text style={styles.modalBreakdownLabel}>Total Planned</Text>
                 <Text style={styles.modalBreakdownValue}>₹{totalPlanned.toLocaleString('en-IN')}</Text>
+              </View>
+              <View style={styles.modalBreakdownRow}>
+                <Text style={styles.modalBreakdownLabel}>Expected Returns (26% p.a.)</Text>
+                <Text style={[styles.modalBreakdownValue, { color: '#085428', fontWeight: '700' }]}>
+                  +₹{sipReturns.expectedInterest.toLocaleString('en-IN')}
+                </Text>
+              </View>
+              <View style={styles.modalBreakdownRow}>
+                <Text style={styles.modalBreakdownLabel}>Estimated Maturity Payout</Text>
+                <Text style={[styles.modalBreakdownValue, { color: '#085428', fontWeight: '800' }]}>
+                  ₹{sipReturns.expectedMaturity.toLocaleString('en-IN')}
+                </Text>
               </View>
             </View>
 
