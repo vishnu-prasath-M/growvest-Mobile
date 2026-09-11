@@ -257,8 +257,25 @@ const SIPDetailsScreen = ({ route, navigation }) => {
               <Text style={styles.heroIdLabel}>SIP ID</Text>
               <Text style={styles.heroIdValue}>{sip.sipId}</Text>
             </View>
-            <View style={styles.heroStatusBadge}>
-              <Text style={styles.heroStatusText}>{(sip.status || 'Active').toUpperCase()}</Text>
+            <View style={[
+              styles.heroStatusBadge,
+              (sip.isFullyWithdrawn || (sip.status === 'cancelled' && (sip.withdrawnAmount || 0) >= (sip.totalPaidAmount || 0) && (sip.totalPaidAmount || 0) > 0))
+                ? { backgroundColor: 'rgba(52, 211, 153, 0.35)' }
+                : sip.hasPendingWithdrawal
+                ? { backgroundColor: 'rgba(251, 191, 36, 0.35)' }
+                : sip.status === 'cancelled'
+                ? { backgroundColor: 'rgba(239, 68, 68, 0.35)' }
+                : sip.status === 'completed'
+                ? { backgroundColor: 'rgba(251, 191, 36, 0.35)' }
+                : { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
+            ]}>
+              <Text style={styles.heroStatusText}>
+                {(sip.isFullyWithdrawn || (sip.status === 'cancelled' && (sip.withdrawnAmount || 0) >= (sip.totalPaidAmount || 0) && (sip.totalPaidAmount || 0) > 0))
+                  ? 'WITHDRAWN'
+                  : sip.hasPendingWithdrawal
+                  ? 'WITHDRAWAL PENDING'
+                  : (sip.status || 'Active').toUpperCase()}
+              </Text>
             </View>
           </View>
 
@@ -279,7 +296,9 @@ const SIPDetailsScreen = ({ route, navigation }) => {
           <View style={styles.heroProgressWrap}>
             <View style={styles.heroProgressHeader}>
               <Text style={styles.heroProgressText}>
-                {sip.contributionsCompleted} of {sip.totalContributions} Contributions Completed
+                {sip.status === 'cancelled'
+                  ? `SIP Cancelled • ${sip.contributionsCompleted} of ${sip.totalContributions} Paid`
+                  : `${sip.contributionsCompleted} of ${sip.totalContributions} Contributions Completed`}
               </Text>
               <Text style={styles.heroProgressPercent}>{progress}%</Text>
             </View>
@@ -365,29 +384,58 @@ const SIPDetailsScreen = ({ route, navigation }) => {
           </View>
         </View>
 
-        {/* Action Buttons: Withdraw & Cancel */}
-        <View style={styles.actionButtonsRow}>
-          <TouchableOpacity
-            style={[styles.withdrawBtn, (sip.availablePrincipal || 0) <= 0 && { opacity: 0.5 }]}
-            activeOpacity={0.8}
-            disabled={(sip.availablePrincipal || 0) <= 0}
-            onPress={() => setShowWithdrawModal(true)}
-          >
-            <MaterialCommunityIcons name="bank-transfer-out" size={18} color="#FFFFFF" />
-            <Text style={styles.withdrawBtnText}>Withdraw from SIP</Text>
-          </TouchableOpacity>
+        {/* Action Buttons: Withdraw & Cancel or Status Cards */}
+        {sip.isFullyWithdrawn || (sip.status === 'cancelled' && (sip.withdrawnAmount || 0) >= (sip.totalPaidAmount || 0) && (sip.totalPaidAmount || 0) > 0) ? (
+          <View style={styles.withdrawnCard}>
+            <View style={styles.withdrawnIconWrap}>
+              <MaterialCommunityIcons name="check-decagram" size={24} color="#059669" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.withdrawnCardTitle}>Withdrawn from SIP</Text>
+              <Text style={styles.withdrawnCardSubtitle}>
+                Total {formatCurrency(sip.withdrawnAmount || sip.totalPaidAmount)} has been withdrawn. This SIP is closed.
+              </Text>
+            </View>
+          </View>
+        ) : sip.hasPendingWithdrawal ? (
+          <View style={styles.pendingCard}>
+            <View style={styles.pendingIconWrap}>
+              <MaterialCommunityIcons name="clock-outline" size={24} color="#D97706" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.pendingCardTitle}>Withdrawal Processing</Text>
+              <Text style={styles.pendingCardSubtitle}>
+                Your request to withdraw {formatCurrency(sip.pendingWithdrawalAmount || sip.totalPaidAmount)} is being processed by admin.
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.actionButtonsRow}>
+            {(sip.availablePrincipal || 0) > 0 && (
+              <TouchableOpacity
+                style={styles.withdrawBtn}
+                activeOpacity={0.8}
+                onPress={() => setShowWithdrawModal(true)}
+              >
+                <MaterialCommunityIcons name="bank-transfer-out" size={18} color="#FFFFFF" />
+                <Text style={styles.withdrawBtnText}>
+                  Withdraw {formatCurrency(sip.availablePrincipal)}
+                </Text>
+              </TouchableOpacity>
+            )}
 
-          {sip.status === 'active' && (
-            <TouchableOpacity
-              style={styles.cancelBtn}
-              activeOpacity={0.8}
-              onPress={() => setShowCancelModal(true)}
-            >
-              <MaterialCommunityIcons name="close-circle-outline" size={18} color="#B91C1C" />
-              <Text style={styles.cancelBtnText}>Cancel SIP</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+            {sip.status === 'active' && (
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                activeOpacity={0.8}
+                onPress={() => setShowCancelModal(true)}
+              >
+                <MaterialCommunityIcons name="close-circle-outline" size={18} color="#B91C1C" />
+                <Text style={styles.cancelBtnText}>Cancel SIP</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         {/* Contribution History Ledger */}
         <View style={styles.ledgerHeaderRow}>
@@ -400,23 +448,24 @@ const SIPDetailsScreen = ({ route, navigation }) => {
         {contributions.map((c) => {
           const isPaid = c.paymentStatus === 'paid';
           const isFailed = c.paymentStatus === 'failed';
-          const isPending = c.paymentStatus === 'pending';
+          const isCancelled = c.paymentStatus === 'cancelled' || (sip.status === 'cancelled' && !isPaid);
+          const isPending = !isPaid && !isFailed && !isCancelled;
           const isPayingThis = payingContributionId === c._id;
 
           return (
-            <View key={c._id} style={styles.contribCard}>
+            <View key={c._id} style={[styles.contribCard, isCancelled && { opacity: 0.7 }]}>
               <View style={styles.contribHeader}>
                 <View style={styles.contribIconWrap}>
                   <MaterialCommunityIcons
-                    name={isPaid ? 'check-circle' : isFailed ? 'alert-circle' : 'clock-outline'}
+                    name={isPaid ? 'check-circle' : isFailed ? 'alert-circle' : isCancelled ? 'close-circle-outline' : 'clock-outline'}
                     size={20}
-                    color={isPaid ? '#15803D' : isFailed ? '#B91C1C' : '#D97706'}
+                    color={isPaid ? '#15803D' : isFailed ? '#B91C1C' : isCancelled ? '#64748B' : '#D97706'}
                   />
                 </View>
                 <View style={{ flex: 1, marginLeft: 10 }}>
                   <Text style={styles.contribTitle}>Contribution #{c.installmentNumber}</Text>
                   <Text style={styles.contribSubtitle}>
-                    Due: {formatDate(c.dueDate)} {isPaid ? `• Paid: ${formatDate(c.paidAt)}` : ''}
+                    {isPaid ? `Paid on ${formatDate(c.paidAt)}` : isCancelled ? 'Scheduled installment cancelled' : `Due: ${formatDate(c.dueDate)}`}
                   </Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
@@ -429,6 +478,8 @@ const SIPDetailsScreen = ({ route, navigation }) => {
                           ? (isDark ? 'rgba(16, 185, 129, 0.2)' : '#DCFCE7')
                           : isFailed
                           ? (isDark ? 'rgba(239, 68, 68, 0.2)' : '#FEE2E2')
+                          : isCancelled
+                          ? (isDark ? 'rgba(148, 163, 184, 0.15)' : '#F1F5F9')
                           : (isDark ? 'rgba(245, 158, 11, 0.2)' : '#FEF3C7'),
                       },
                     ]}
@@ -441,11 +492,13 @@ const SIPDetailsScreen = ({ route, navigation }) => {
                             ? (isDark ? '#34D399' : '#15803D')
                             : isFailed
                             ? (isDark ? '#F87171' : '#B91C1C')
+                            : isCancelled
+                            ? (isDark ? '#94A3B8' : '#64748B')
                             : (isDark ? '#FBBF24' : '#B45309'),
                         },
                       ]}
                     >
-                      {isPaid ? 'Paid' : isFailed ? 'Failed' : 'Pending'}
+                      {isPaid ? 'Paid' : isFailed ? 'Failed' : isCancelled ? 'Cancelled' : 'Pending'}
                     </Text>
                   </View>
                 </View>
@@ -764,6 +817,66 @@ const getStyles = (themeColors, isDark) =>
       flexDirection: 'row',
       gap: 10,
       marginBottom: 20,
+    },
+    withdrawnCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : '#ECFDF5',
+      borderWidth: 1.5,
+      borderColor: isDark ? 'rgba(52, 211, 153, 0.3)' : '#A7F3D0',
+      borderRadius: 14,
+      padding: 14,
+      marginBottom: 20,
+    },
+    withdrawnIconWrap: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : '#DCFCE7',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    withdrawnCardTitle: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: isDark ? '#34D399' : '#065F46',
+      marginBottom: 2,
+    },
+    withdrawnCardSubtitle: {
+      fontSize: 12,
+      color: isDark ? 'rgba(209, 213, 219, 0.9)' : '#047857',
+      lineHeight: 16,
+    },
+    pendingCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: isDark ? 'rgba(245, 158, 11, 0.12)' : '#FFFBEB',
+      borderWidth: 1.5,
+      borderColor: isDark ? 'rgba(251, 191, 36, 0.35)' : '#FDE68A',
+      borderRadius: 14,
+      padding: 14,
+      marginBottom: 20,
+    },
+    pendingIconWrap: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#FEF3C7',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    pendingCardTitle: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: isDark ? '#FBBF24' : '#92400E',
+      marginBottom: 2,
+    },
+    pendingCardSubtitle: {
+      fontSize: 12,
+      color: isDark ? 'rgba(209, 213, 219, 0.9)' : '#B45309',
+      lineHeight: 16,
     },
     withdrawBtn: {
       flex: 1,
