@@ -144,123 +144,92 @@ exports.getUserDetailByEmail = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    const userOrConditions = [{ userId: user._id }];
-    if (user._id) userOrConditions.push({ userId: user._id.toString() });
-    if (user.email && typeof user.email === 'string' && user.email.trim() !== '' && !user.email.includes('no-email@') && user.email !== 'undefined') {
-      userOrConditions.push({ userEmail: new RegExp(`^${user.email.trim()}$`, 'i') });
-    }
-    if (user.mobileNumber && typeof user.mobileNumber === 'string' && user.mobileNumber.trim() !== '' && user.mobileNumber.trim() !== '0000000000' && user.mobileNumber.trim() !== '1234567890' && user.mobileNumber !== 'undefined') {
-      userOrConditions.push({ mobileNumber: user.mobileNumber.trim() });
-    }
 
-    const investments = await Investment.find({ $or: userOrConditions });
-    
-    // Sync each before detail view
-    for (const inv of investments) {
-      await syncInvestmentInterest(inv);
-    }
-
-    const withdrawals = await Withdrawal.find({ $or: userOrConditions, status: { $in: ['paid', 'approved'] } });
+    const summary = await getUserPortfolioSummary(user._id);
 
     const KYC = require('../models/KYC');
     const kyc = await KYC.findOne({ userId: user._id });
     const upiId = kyc ? kyc.upiId : '';
 
-    const PocketMoney = require('../models/PocketMoney');
-    const pocketMonies = await PocketMoney.find({ userId: user._id });
-    const pocketInvested = pocketMonies.reduce((acc, pm) => acc + pm.investedAmount, 0);
-    const pocketReleased = pocketMonies.reduce((acc, pm) => acc + pm.totalPaidOut, 0);
-    const pocketRemaining = pocketMonies.reduce((acc, pm) => acc + pm.remainingAmount, 0);
+    const SIP = require('../models/SIP');
+    const userOrConditions = [{ userId: user._id }];
+    if (user.email) userOrConditions.push({ userEmail: new RegExp(`^${user.email.trim()}$`, 'i') });
+    if (user.mobileNumber) userOrConditions.push({ mobileNumber: user.mobileNumber.trim() });
 
-    const savingInvestments = investments.filter(inv => inv.type === 'saving');
-    const fixedInvestments = investments.filter(inv => inv.type === 'fixed');
-    
-    // Dynamic duration-based investment categories
-    const durationPlanTypes = ['15_days', '1_month', '3_months', '6_months', '1_year'];
-    const durationInvestments = investments.filter(inv => durationPlanTypes.includes(inv.type));
-    
-    // Separate into Matured vs Locked
-    const maturedInvestments = durationInvestments.filter(inv => {
-      return new Date() >= new Date(inv.maturityDate);
-    });
-    const lockedInvestments = durationInvestments.filter(inv => {
-      return new Date() < new Date(inv.maturityDate);
-    });
+    const sips = await SIP.find({ $or: userOrConditions });
+    const activeSips = sips.filter(s => s.status === 'active');
+    const totalSipInvested = sips.reduce((sum, s) => sum + (Number(s.totalInvested) || Number(s.currentValue) || Number(s.amount) || 0), 0);
+    const totalSipMonthlyRate = activeSips.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
 
-    const savingWithdrawals = withdrawals.filter(wd => wd.withdrawType === 'saving');
-    const fixedWithdrawals = withdrawals.filter(wd => wd.withdrawType === 'fixed');
-
-    const savingInvested = savingInvestments.reduce((acc, inv) => acc + inv.amount, 0);
-    const savingInterest = savingInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
-    
-    // Matured principal + interest added directly to withdrawable savings pool
-    const maturedPrincipal = maturedInvestments.reduce((acc, inv) => acc + inv.amount, 0);
-    const maturedInterest = maturedInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
-    const maturedTotal = maturedPrincipal + maturedInterest;
-
-    const savingWithdrawn = savingWithdrawals.reduce((acc, wd) => acc + wd.amount, 0);
-    const savingBalance = Math.max(0, savingInvested + savingInterest + pocketReleased + maturedTotal - savingWithdrawn);
-
-    const fixedInvested = fixedInvestments.reduce((acc, inv) => acc + inv.amount, 0);
-    const fixedInterest = fixedInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
-    const fixedWithdrawn = fixedWithdrawals.reduce((acc, wd) => acc + wd.amount, 0);
-    const fixedBalance = Math.max(0, fixedInvested + fixedInterest - fixedWithdrawn);
-
-    // Locked duration plans
-    const lockedDurationPrincipal = lockedInvestments.reduce((acc, inv) => acc + inv.amount, 0);
-    const lockedDurationInterest = lockedInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
-    const lockedDurationTotal = lockedDurationPrincipal + lockedDurationInterest;
-
-    const durationInvested = durationInvestments.reduce((acc, inv) => acc + inv.amount, 0);
-    const durationInterest = durationInvestments.reduce((acc, inv) => acc + (inv.interestEarned || 0), 0);
-
-    const totalInvested = savingInvested + fixedInvested + pocketInvested + durationInvested;
-    const totalInterest = savingInterest + fixedInterest + durationInterest;
-    const totalBalance = savingBalance + fixedBalance + lockedDurationTotal;
-
-    const withdrawableFixed = fixedInvestments.filter(inv => {
-      const diffDays = (new Date() - new Date(inv.startDate)) / (1000 * 60 * 60 * 24);
-      return diffDays >= 365;
-    }).reduce((acc, inv) => acc + inv.amount + (inv.interestEarned || 0), 0);
-    
-    const availableToWithdrawDetail = savingBalance + withdrawableFixed;
+    const durationInvestments = summary.investments || [];
+    const validDurationInvs = durationInvestments.filter(i => i.status !== 'rejected');
+    const durationInvested = validDurationInvs.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
+    const durationInterest = validDurationInvs.reduce((sum, i) => sum + (Number(i.totalInterest) || Number(i.calculatedInterest) || Number(i.interestEarned) || 0), 0);
+    const durationLocked = summary.balances.totalLocked || 0;
+    const durationMaturedAvailable = summary.balances.maturedAvailableOnly || 0;
 
     res.status(200).json({
       user,
       upiId,
-      totalInvested,
-      totalEarnings: totalInterest,
-      currentBalance: totalBalance,
-      availableToWithdraw: availableToWithdrawDetail,
-      saving: {
-        invested: savingInvested + maturedPrincipal,
-        interest: savingInterest + maturedInterest,
-        withdrawn: savingWithdrawn,
-        balance: savingBalance,
-        count: savingInvestments.length + maturedInvestments.length
-      },
-      fixed: {
-        invested: fixedInvested,
-        interest: fixedInterest,
-        withdrawn: fixedWithdrawn,
-        balance: fixedBalance,
-        count: fixedInvestments.length
-      },
-      pocketMoney: {
-        invested: pocketInvested,
-        released: pocketReleased,
-        remaining: pocketRemaining,
-        count: pocketMonies.length
-      },
+      totalInvested: summary.balances.totalInvested,
+      totalEarnings: summary.balances.totalInterestEarned,
+      currentBalance: summary.balances.totalBalance,
+      availableToWithdraw: summary.balances.availableToWithdraw,
+      coins: summary.balances.coins,
+      coinBalance: summary.balances.coinBalance,
+      unlockedRewardCoinsRupees: summary.balances.unlockedRewardCoinsRupees,
+
+      // 1. Duration / Savings Plans
       durationInvestments: {
         invested: durationInvested,
         interest: durationInterest,
-        lockedAmount: lockedDurationTotal,
-        maturedAmount: maturedTotal,
-        count: durationInvestments.length
+        lockedAmount: durationLocked,
+        maturedAmount: durationMaturedAvailable,
+        count: validDurationInvs.length,
+      },
+
+      // 2. Chit Funds
+      chitFund: {
+        invested: summary.balances.totalChitInvested || 0,
+        winnings: summary.balances.totalChitWinningAmount || 0,
+        withdrawable: summary.balances.chitWithdrawalAvailable || 0,
+        count: summary.balances.activeChitsCount || 0,
+      },
+
+      // 3. SIP Investments
+      sip: {
+        invested: totalSipInvested,
+        monthlyCommitment: totalSipMonthlyRate,
+        activeCount: activeSips.length,
+        totalCount: sips.length,
+      },
+
+      // 4. Pocket Money
+      pocketMoney: {
+        invested: summary.balances.pocketMoneyInvested || 0,
+        released: summary.balances.pocketMoneyReleased || 0,
+        remaining: summary.balances.pocketMoneyRemaining || 0,
+        count: summary.pocketMonies?.filter(pm => pm.status === 'active').length || 0,
+      },
+
+      // Legacy compatibility
+      saving: {
+        invested: durationInvested,
+        interest: durationInterest,
+        withdrawn: 0,
+        balance: summary.balances.availableToWithdraw,
+        count: validDurationInvs.length,
+      },
+      fixed: {
+        invested: 0,
+        interest: 0,
+        withdrawn: 0,
+        balance: 0,
+        count: 0,
       }
     });
   } catch (error) {
+    console.error('Error fetching user detail:', error);
     res.status(500).json({ message: 'Error fetching user detail', error: error.message });
   }
 };
