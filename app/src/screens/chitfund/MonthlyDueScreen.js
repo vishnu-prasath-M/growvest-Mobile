@@ -555,11 +555,6 @@ const MonthlyDueScreen = ({ navigation }) => {
             </Text>
             
             <View style={styles.reminderOptions}>
-              <TouchableOpacity style={styles.reminderOptionBtn} activeOpacity={0.7} onPress={() => handleSetReminder('10_seconds')}>
-                <MaterialCommunityIcons name="alarm" size={20} color={colors.primary} />
-                <Text style={styles.reminderOptionText}>In 10 seconds (Test Demo)</Text>
-              </TouchableOpacity>
-
               <TouchableOpacity style={styles.reminderOptionBtn} activeOpacity={0.7} onPress={() => handleSetReminder('tomorrow_morning')}>
                 <MaterialCommunityIcons name="weather-sunny" size={20} color={colors.primary} />
                 <Text style={styles.reminderOptionText}>Tomorrow morning (9:00 AM)</Text>
