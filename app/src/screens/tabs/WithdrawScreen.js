@@ -235,23 +235,24 @@ const WithdrawScreen = ({ navigation }) => {
     // Pre-populate UPI / Bank ID
     setUpiId(bankInfo?.upiId || userData?.upiId || `${bankInfo?.accountNumber || 'bank'}@upi`);
 
-    // Match matured investment if available or general
-    const maturedInv = investments.find(inv => {
-      const isMatured = inv.maturityDate && new Date() >= new Date(inv.maturityDate);
-      const isWithdrawn = inv.status === 'withdrawn' || inv.withdrawalStatus === 'withdrawn';
-      return isMatured && !isWithdrawn && inv.status === 'approved';
-    });
-
-    if (maturedInv) {
-      setWithdrawType(maturedInv._id);
-    } else {
-      setWithdrawType('saving');
-    }
+    // Main withdrawal box is a flexible balance withdrawal from total available balance
+    setWithdrawType('saving');
 
     setWithdrawModalVisible(true);
   };
 
   const handleWithdraw = async () => {
+    const numAmt = parseFloat(amount);
+    if (!amount || isNaN(numAmt) || numAmt <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid amount to withdraw.');
+      return;
+    }
+
+    if (numAmt > totalAvailableToWithdraw) {
+      Alert.alert('Exceeds Balance', `The entered amount exceeds your available to withdraw balance of ${formatCurrency(totalAvailableToWithdraw)}.`);
+      return;
+    }
+
     if (!upiId || !upiId.trim()) {
       Alert.alert('Invalid UPI ID', 'Please enter your UPI ID (e.g. username@okhdfcbank)');
       return;
@@ -265,21 +266,21 @@ const WithdrawScreen = ({ navigation }) => {
     setWithdrawing(true);
     try {
       if (withdrawType && withdrawType !== 'saving' && withdrawType !== 'fixed') {
-        const res = await investmentService.withdrawInvestment(withdrawType, upiId.trim());
+        const res = await investmentService.withdrawInvestment(withdrawType, upiId.trim(), numAmt);
         Alert.alert(
           'Withdrawal Requested ⏳',
-          res?.message || 'Your withdrawal request has been submitted and is pending admin approval.',
+          res?.message || `Your withdrawal request of ₹${numAmt.toLocaleString('en-IN')} has been submitted and is pending admin approval.`,
           [{ text: 'OK' }]
         );
       } else {
         const res = await withdrawalService.createWithdrawal({
-          amount: parseFloat(amount),
+          amount: numAmt,
           upiId: upiId.trim(),
           userName: userData?.name || userData?.username || 'User',
           userEmail: userData?.email || userData?.mobileNumber || '',
-          withdrawType,
+          withdrawType: 'saving',
         });
-        Alert.alert('Success', res?.message || 'Withdrawal request submitted successfully');
+        Alert.alert('Success', res?.message || `Your withdrawal request of ₹${numAmt.toLocaleString('en-IN')} has been submitted successfully.`);
       }
       setWithdrawModalVisible(false);
       setAmount('');
