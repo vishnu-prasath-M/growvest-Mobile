@@ -42,9 +42,9 @@ export const investmentService = {
     }
   },
   // Withdraw investment
-  withdrawInvestment: async (id, upiId) => {
+  withdrawInvestment: async (id, upiId, amount) => {
     try {
-      const response = await api.post(`/investments/${id}/withdraw`, { upiId });
+      const response = await api.post(`/investments/${id}/withdraw`, { upiId, amount });
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;

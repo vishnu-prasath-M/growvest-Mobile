@@ -333,6 +333,9 @@ exports.withdrawInvestment = async (req, res) => {
 
     const benefits = Number(investment.benefits) || 0;
     const payoutAmount = isFullEligible ? (principal + accruedInterest + benefits) : principal;
+    const requestedAmount = (req.body.amount && Number(req.body.amount) > 0)
+      ? Math.min(Number(req.body.amount), payoutAmount)
+      : payoutAmount;
 
     // Map investment type to allowed Withdrawal.withdrawType enum values
     const supportedTypes = ['saving', 'fixed', '15_days', '1_month', '3_months', '6_months', '1_year', '2_years'];
@@ -360,7 +363,7 @@ exports.withdrawInvestment = async (req, res) => {
     const Withdrawal = require('../models/Withdrawal');
     const withdrawal = new Withdrawal({
       userId: user?._id || req.user?._id || investment.userId,
-      amount: payoutAmount,
+      amount: requestedAmount,
       upiId: upiId || investment.upiId || 'Registered UPI',
       userName: resolvedName,
       userEmail: resolvedEmail,
@@ -377,13 +380,13 @@ exports.withdrawInvestment = async (req, res) => {
       userId: user?._id || req.user?._id || investment.userId,
       userEmail: resolvedEmail,
       type: 'withdrawal',
-      amount: payoutAmount,
+      amount: requestedAmount,
       status: 'requested',
       referenceId: withdrawal._id,
       referenceType: 'Withdrawal',
       description: isFullEligible
-        ? `Full benefit withdrawal requested for ${investment.type} plan - ₹${payoutAmount}`
-        : `Early principal withdrawal requested for ${investment.type} plan - ₹${payoutAmount}`,
+        ? `Full benefit withdrawal requested for ${investment.type} plan - ₹${requestedAmount}`
+        : `Early principal withdrawal requested for ${investment.type} plan - ₹${requestedAmount}`,
     });
     await transaction.save();
 
@@ -400,7 +403,7 @@ exports.withdrawInvestment = async (req, res) => {
       const { notifyAdmins } = require('../services/notificationHelper');
       await notifyAdmins({
         title: '💸 New Investment Withdrawal Request',
-        description: `${resolvedName} requested a ${isFullEligible ? 'full benefit' : 'early principal'} withdrawal of ₹${payoutAmount.toLocaleString('en-IN')} from ${investment.type} plan.`,
+        description: `${resolvedName} requested a ${isFullEligible ? 'full benefit' : 'early principal'} withdrawal of ₹${requestedAmount.toLocaleString('en-IN')} from ${investment.type} plan.`,
         type: 'general',
         metadata: { withdrawalId: withdrawal._id, investmentId: investment._id },
       });
@@ -411,10 +414,10 @@ exports.withdrawInvestment = async (req, res) => {
     res.status(200).json({
       success: true,
       message: isFullEligible
-        ? `Full benefit payout of ₹${payoutAmount.toLocaleString('en-IN')} requested. Pending admin approval.`
-        : `Early principal payout of ₹${payoutAmount.toLocaleString('en-IN')} requested. Pending admin approval. Interest & benefits remain locked.`,
+        ? `Withdrawal of ₹${requestedAmount.toLocaleString('en-IN')} requested. Pending admin approval.`
+        : `Withdrawal of ₹${requestedAmount.toLocaleString('en-IN')} requested. Pending admin approval. Interest & benefits remain locked.`,
       withdrawal,
-      payoutAmount,
+      payoutAmount: requestedAmount,
       isEarlyWithdrawal: !isFullEligible,
     });
   } catch (error) {
