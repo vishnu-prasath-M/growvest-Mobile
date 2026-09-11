@@ -1,10 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   TouchableOpacity,
   TextInput,
   KeyboardAvoidingView,
@@ -15,8 +14,11 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import { useFocusEffect } from '@react-navigation/native';
 import { colors, typography } from '../../theme/theme';
 import TopBar from '../../components/TopBar';
+import { SkeletonLoader } from '../../components/SkeletonLoader';
+import ModernAlertModal from '../../components/ModernAlertModal';
 import { useTheme } from '../../context/ThemeContext';
 import api from '../../services/apiService';
 import { API_ENDPOINTS } from '../../config/api';
@@ -26,27 +28,39 @@ const STEPS = ['Personal', 'Address & ID', 'Nominee', 'Documents'];
 // Maximum allowed image size (in MB) — validates before upload starts
 const MAX_IMAGE_SIZE_MB = 5;
 
-const checkImageSize = (base64String, field) => {
-  // base64 encodes 3 bytes as 4 chars; approximate original size
-  const estimatedBytes = (base64String.length * 3) / 4;
-  const estimatedMB = estimatedBytes / (1024 * 1024);
-  if (estimatedMB > MAX_IMAGE_SIZE_MB) {
-    Alert.alert(
-      'Image Too Large',
-      `Please upload an image smaller than ${MAX_IMAGE_SIZE_MB} MB.\n\nThe selected image is approximately ${estimatedMB.toFixed(1)} MB.`,
-      [{ text: 'OK', style: 'default' }]
-    );
-    return false;
-  }
-  return true;
-};
-
 const KYCScreen = ({ navigation }) => {
-  const { colors: themeColors } = useTheme();
-  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
+  const { colors: themeColors, isDarkMode } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
   const [currentStep, setCurrentStep] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(true);
+  const [kycStatusData, setKycStatusData] = useState(null);
+  const [isReSubmitting, setIsReSubmitting] = useState(false);
   const scrollRef = useRef(null);
+
+  // Modern alert state
+  const [alertConfig, setAlertConfig] = useState({
+    visible: false,
+    type: 'success',
+    title: '',
+    message: '',
+    primaryText: 'OK',
+    onPrimary: null,
+  });
+
+  const showAlert = (type, title, message, primaryText = 'OK', onPrimary = null) => {
+    setAlertConfig({
+      visible: true,
+      type,
+      title,
+      message,
+      primaryText,
+      onPrimary: () => {
+        setAlertConfig((prev) => ({ ...prev, visible: false }));
+        if (onPrimary) onPrimary();
+      },
+    });
+  };
 
   // Date Picker Modal state
   const [dobModalVisible, setDobModalVisible] = useState(false);
@@ -84,10 +98,72 @@ const KYCScreen = ({ navigation }) => {
   });
   const [errors, setErrors] = useState({});
 
+  const checkImageSize = (base64String, field) => {
+    const estimatedBytes = (base64String.length * 3) / 4;
+    const estimatedMB = estimatedBytes / (1024 * 1024);
+    if (estimatedMB > MAX_IMAGE_SIZE_MB) {
+      showAlert(
+        'warning',
+        'Image Too Large',
+        `Please upload an image smaller than ${MAX_IMAGE_SIZE_MB} MB.\nThe selected image is approximately ${estimatedMB.toFixed(1)} MB.`
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const fetchKYCStatus = async () => {
+    try {
+      setStatusLoading(true);
+      const res = await api.get(API_ENDPOINTS.KYC_STATUS);
+      if (res && res.data) {
+        setKycStatusData(res.data);
+        if (res.data.data) {
+          const d = res.data.data;
+          setForm((prev) => ({
+            ...prev,
+            fullName: d.fullName || prev.fullName,
+            fatherOrHusbandName: d.fatherOrHusbandName || prev.fatherOrHusbandName,
+            dob: d.dob ? new Date(d.dob).toLocaleDateString('en-IN') : prev.dob,
+            gender: d.gender || prev.gender,
+            address: d.address || prev.address,
+            city: d.city || prev.city,
+            district: d.district || prev.district,
+            state: d.state || prev.state,
+            pincode: d.pincode || prev.pincode,
+            aadhaarNumber: d.aadhaarNumber || prev.aadhaarNumber,
+            panNumber: d.panNumber || prev.panNumber,
+            occupation: d.occupation || prev.occupation,
+            nomineeName: d.nomineeName || prev.nomineeName,
+            nomineeRelationship: d.nomineeRelationship || prev.nomineeRelationship,
+            nomineeMobileNumber: d.nomineeMobileNumber || prev.nomineeMobileNumber,
+            accountHolderName: d.accountHolderName || prev.accountHolderName,
+            bankName: d.bankName || prev.bankName,
+            accountNumber: d.accountNumber || prev.accountNumber,
+            confirmAccountNumber: d.accountNumber || prev.confirmAccountNumber,
+            ifscCode: d.ifscCode || prev.ifscCode,
+            branchName: d.branchName || prev.branchName,
+            upiId: d.upiId || prev.upiId,
+          }));
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching KYC status:', err);
+    } finally {
+      setStatusLoading(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchKYCStatus();
+    }, [])
+  );
+
   const handleImagePick = async (field) => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Please grant camera roll permissions');
+      showAlert('warning', 'Permission Needed', 'Please grant photo gallery permissions to upload documents.');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -99,7 +175,7 @@ const KYCScreen = ({ navigation }) => {
     });
     if (!result.canceled && result.assets[0]) {
       const base64 = result.assets[0].base64;
-      if (!checkImageSize(base64, field)) return;  // size guard
+      if (!checkImageSize(base64, field)) return;
       setForm((prev) => ({ ...prev, [field]: base64 }));
     }
   };
@@ -107,7 +183,7 @@ const KYCScreen = ({ navigation }) => {
   const handleCameraPick = async (field) => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Please grant camera permissions');
+      showAlert('warning', 'Permission Needed', 'Please grant camera permissions to capture photo.');
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -118,17 +194,15 @@ const KYCScreen = ({ navigation }) => {
     });
     if (!result.canceled && result.assets[0]) {
       const base64 = result.assets[0].base64;
-      if (!checkImageSize(base64, field)) return;  // size guard
+      if (!checkImageSize(base64, field)) return;
       setForm((prev) => ({ ...prev, [field]: base64 }));
     }
   };
 
+  const [pickerModalField, setPickerModalField] = useState(null);
+
   const showImagePicker = (field) => {
-    Alert.alert('Upload Image', 'Choose an option', [
-      { text: 'Camera', onPress: () => handleCameraPick(field) },
-      { text: 'Gallery', onPress: () => handleImagePick(field) },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    setPickerModalField(field);
   };
 
   const updateField = (field, value) => {
@@ -136,7 +210,6 @@ const KYCScreen = ({ navigation }) => {
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }));
   };
 
-  // Masked numeric input formatting for DOB (DD/MM/YYYY)
   const handleDobChange = (text) => {
     const cleaned = text.replace(/\D/g, '');
     let formatted = cleaned;
@@ -162,7 +235,6 @@ const KYCScreen = ({ navigation }) => {
       if (!form.fullName.trim()) newErrors.fullName = 'Full name is required';
       if (!form.fatherOrHusbandName.trim()) newErrors.fatherOrHusbandName = 'Father/Husband name is required';
       
-      // DOB Validation
       if (!form.dob.trim()) {
         newErrors.dob = 'Date of birth is required';
       } else {
@@ -270,15 +342,198 @@ const KYCScreen = ({ navigation }) => {
         ifscCode: form.ifscCode.toUpperCase(),
       };
       await api.post(API_ENDPOINTS.KYC_SUBMIT, payload);
-      Alert.alert('Success', 'KYC submitted successfully. We will review your documents.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      showAlert(
+        'success',
+        'KYC Submitted Successfully! 🎉',
+        'We have received your verification documents. Our team will review and approve your submission.',
+        'Done',
+        () => {
+          setIsReSubmitting(false);
+          fetchKYCStatus();
+        }
+      );
     } catch (error) {
-      const msg = error.response?.data?.message || 'Error submitting KYC';
-      Alert.alert('Submission Failed', msg);
+      const msg = error.response?.data?.message || 'Error submitting KYC. Please try again.';
+      showAlert('error', 'Submission Failed', msg);
     } finally {
       setSaving(false);
     }
+  };
+
+  const maskString = (str, visibleStart = 0, visibleEnd = 4) => {
+    if (!str) return '••••';
+    const s = String(str);
+    if (s.length <= visibleEnd) return s;
+    const start = visibleStart > 0 ? s.slice(0, visibleStart) : '';
+    const end = s.slice(-visibleEnd);
+    return `${start}•••• •••• ${end}`;
+  };
+
+  const renderVerifiedView = () => {
+    const kyc = kycStatusData?.data || {};
+    return (
+      <ScrollView contentContainerStyle={styles.verifiedScrollContent} showsVerticalScrollIndicator={false}>
+        {/* Verified Status Banner */}
+        <View style={styles.verifiedHeroOuter}>
+          <LinearGradient
+            colors={isDarkMode ? ['#0B2E1B', '#164E2E'] : ['#0E3D23', '#1B6A3E']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.verifiedHeroGradient}
+          >
+            <View style={styles.verifiedBadgeRow}>
+              <View style={styles.verifiedIconWrap}>
+                <MaterialCommunityIcons name="shield-check" size={32} color="#34D399" />
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <View style={styles.verifiedStatusPill}>
+                  <Text style={styles.verifiedStatusPillText}>VERIFIED & ACTIVE</Text>
+                </View>
+                <Text style={styles.verifiedHeroTitle}>KYC Verification Complete</Text>
+              </View>
+            </View>
+
+            <Text style={styles.verifiedHeroDesc}>
+              Your identity, address, and bank account have been verified. Your account has full access to deposits, withdrawals, and chit funds.
+            </Text>
+          </LinearGradient>
+        </View>
+
+        {/* Verified Profile Card */}
+        <View style={styles.verifiedCard}>
+          <View style={styles.verifiedCardHeader}>
+            <MaterialCommunityIcons name="account-check-outline" size={22} color={colors.primary} />
+            <Text style={styles.verifiedCardTitle}>Personal Information</Text>
+          </View>
+          <View style={styles.vRow}>
+            <Text style={styles.vLabel}>Full Name</Text>
+            <Text style={styles.vVal}>{kyc.fullName || form.fullName || 'Verified User'}</Text>
+          </View>
+          <View style={styles.vRow}>
+            <Text style={styles.vLabel}>Father / Husband</Text>
+            <Text style={styles.vVal}>{kyc.fatherOrHusbandName || form.fatherOrHusbandName || '—'}</Text>
+          </View>
+          <View style={styles.vRow}>
+            <Text style={styles.vLabel}>Date of Birth</Text>
+            <Text style={styles.vVal}>{kyc.dob ? new Date(kyc.dob).toLocaleDateString('en-IN') : form.dob || '—'}</Text>
+          </View>
+          <View style={styles.vRow}>
+            <Text style={styles.vLabel}>Gender</Text>
+            <Text style={styles.vVal}>{(kyc.gender || form.gender || '—').toUpperCase()}</Text>
+          </View>
+          <View style={[styles.vRow, { borderBottomWidth: 0 }]}>
+            <Text style={styles.vLabel}>Occupation</Text>
+            <Text style={styles.vVal}>{kyc.occupation || form.occupation || '—'}</Text>
+          </View>
+        </View>
+
+        {/* Identity & Address Card */}
+        <View style={styles.verifiedCard}>
+          <View style={styles.verifiedCardHeader}>
+            <MaterialCommunityIcons name="card-account-details-outline" size={22} color={colors.primary} />
+            <Text style={styles.verifiedCardTitle}>Identity & Address</Text>
+          </View>
+          <View style={styles.vRow}>
+            <Text style={styles.vLabel}>Aadhaar Number</Text>
+            <Text style={styles.vVal}>{maskString(kyc.aadhaarNumber || form.aadhaarNumber, 0, 4)}</Text>
+          </View>
+          <View style={styles.vRow}>
+            <Text style={styles.vLabel}>PAN Number</Text>
+            <Text style={styles.vVal}>{kyc.panNumber ? `${kyc.panNumber.slice(0, 2)}•••••${kyc.panNumber.slice(-1)}` : '••••'}</Text>
+          </View>
+          <View style={[styles.vRow, { borderBottomWidth: 0 }]}>
+            <Text style={styles.vLabel}>Registered Address</Text>
+            <Text style={[styles.vVal, { flex: 1, textAlign: 'right' }]}>
+              {[kyc.city, kyc.state, kyc.pincode].filter(Boolean).join(', ') || 'Verified Address'}
+            </Text>
+          </View>
+        </View>
+
+        {/* Bank & Payout Card */}
+        <View style={styles.verifiedCard}>
+          <View style={styles.verifiedCardHeader}>
+            <MaterialCommunityIcons name="bank-check" size={22} color={colors.primary} />
+            <Text style={styles.verifiedCardTitle}>Verified Bank & Payout Details</Text>
+          </View>
+          <View style={styles.vRow}>
+            <Text style={styles.vLabel}>Bank Name</Text>
+            <Text style={styles.vVal}>{kyc.bankName || form.bankName || 'Linked Bank'}</Text>
+          </View>
+          <View style={styles.vRow}>
+            <Text style={styles.vLabel}>Account Holder</Text>
+            <Text style={styles.vVal}>{kyc.accountHolderName || form.accountHolderName || '—'}</Text>
+          </View>
+          <View style={styles.vRow}>
+            <Text style={styles.vLabel}>Account Number</Text>
+            <Text style={styles.vVal}>•••• •••• {String(kyc.accountNumber || form.accountNumber || '0000').slice(-4)}</Text>
+          </View>
+          <View style={styles.vRow}>
+            <Text style={styles.vLabel}>IFSC Code</Text>
+            <Text style={styles.vVal}>{kyc.ifscCode || form.ifscCode || '—'}</Text>
+          </View>
+          <View style={[styles.vRow, { borderBottomWidth: 0 }]}>
+            <Text style={styles.vLabel}>UPI ID</Text>
+            <Text style={[styles.vVal, { color: isDarkMode ? '#34D399' : '#047857' }]}>
+              {kyc.upiId || form.upiId || '—'}
+            </Text>
+          </View>
+        </View>
+
+        {/* Action: Update Bank Details */}
+        <TouchableOpacity
+          style={styles.updateBankBtn}
+          activeOpacity={0.85}
+          onPress={() => navigation.navigate('BankDetails')}
+        >
+          <MaterialCommunityIcons name="bank-transfer" size={20} color={colors.primary} />
+          <Text style={styles.updateBankBtnText}>Update Bank / UPI Details</Text>
+        </TouchableOpacity>
+
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    );
+  };
+
+  const renderUnderReviewView = () => {
+    return (
+      <ScrollView contentContainerStyle={styles.verifiedScrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.pendingHeroOuter}>
+          <View style={styles.pendingIconWrap}>
+            <MaterialCommunityIcons name="clock-time-four-outline" size={44} color="#F59E0B" />
+          </View>
+          <Text style={styles.pendingHeroTitle}>KYC Verification Under Review</Text>
+          <Text style={styles.pendingHeroDesc}>
+            We have received your KYC documents and details. Our verification team is reviewing them. You will be notified once verified (typically within 24–48 hours).
+          </Text>
+        </View>
+
+        <View style={styles.verifiedCard}>
+          <Text style={styles.verifiedCardTitle}>Submitted Details</Text>
+          <View style={styles.vRow}>
+            <Text style={styles.vLabel}>Applicant Name</Text>
+            <Text style={styles.vVal}>{form.fullName || 'User'}</Text>
+          </View>
+          <View style={styles.vRow}>
+            <Text style={styles.vLabel}>Submission Status</Text>
+            <Text style={[styles.vVal, { color: '#D97706', fontWeight: '800' }]}>Under Review</Text>
+          </View>
+          <View style={[styles.vRow, { borderBottomWidth: 0 }]}>
+            <Text style={styles.vLabel}>Submitted Date</Text>
+            <Text style={styles.vVal}>
+              {kycStatusData?.submittedAt ? new Date(kycStatusData.submittedAt).toLocaleDateString('en-IN') : 'Recent'}
+            </Text>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={styles.backHomeBtn}
+          activeOpacity={0.85}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.backHomeBtnText}>Back to Dashboard</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    );
   };
 
   const renderDobField = () => (
@@ -465,6 +720,19 @@ const KYCScreen = ({ navigation }) => {
   ];
   const days = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0'));
 
+  if (statusLoading) {
+    return (
+      <View style={styles.container}>
+        <TopBar title="KYC Verification" navigation={navigation} showBack />
+        <SkeletonLoader variant="form" />
+      </View>
+    );
+  }
+
+  const isApproved = kycStatusData?.status === 'approved' || kycStatusData?.status === 'verified';
+  const isPending = kycStatusData?.status === 'pending';
+  const isRejected = kycStatusData?.status === 'rejected';
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -472,77 +740,99 @@ const KYCScreen = ({ navigation }) => {
     >
       <TopBar title="KYC Verification" navigation={navigation} showBack />
 
-      {/* Steps Indicator */}
-      <View style={styles.stepsBar}>
-        {STEPS.map((step, idx) => (
-          <View key={step} style={styles.stepItem}>
-            <View
-              style={[
-                styles.stepBadge,
-                idx === currentStep && styles.stepBadgeActive,
-                idx < currentStep && styles.stepBadgeDone,
-              ]}
-            >
-              {idx < currentStep ? (
-                <MaterialCommunityIcons name="check" size={14} color={colors.white} />
-              ) : (
-                <Text style={[styles.stepBadgeText, idx === currentStep && styles.stepBadgeTextActive]}>
-                  {idx + 1}
+      {/* When KYC is already verified and not actively re-submitting */}
+      {isApproved && !isReSubmitting ? (
+        renderVerifiedView()
+      ) : isPending && !isReSubmitting ? (
+        renderUnderReviewView()
+      ) : (
+        <>
+          {/* Rejection notice banner if previously rejected */}
+          {isRejected && (
+            <View style={styles.rejectionBanner}>
+              <MaterialCommunityIcons name="alert-circle" size={24} color="#DC2626" />
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={styles.rejectionTitle}>KYC Verification Rejected</Text>
+                <Text style={styles.rejectionDesc}>
+                  Reason: {kycStatusData?.rejectionReason || 'Uploaded documents were unclear or mismatched.'} Please re-submit with correct details.
                 </Text>
-              )}
+              </View>
             </View>
-            <Text style={[styles.stepLabel, idx === currentStep && styles.stepLabelActive]}>{step}</Text>
-          </View>
-        ))}
-      </View>
+          )}
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
-      >
-        <ScrollView
-          ref={scrollRef}
-          contentContainerStyle={[styles.content, { paddingBottom: 180 }]}
-          keyboardShouldPersistTaps="handled"
-          automaticallyAdjustKeyboardInsets={true}
-          showsVerticalScrollIndicator={false}
-        >
-          {renderStep()}
-
-          {/* Navigation Buttons */}
-          <View style={styles.navButtons}>
-            {currentStep > 0 && (
-              <TouchableOpacity style={styles.prevBtn} onPress={handlePrev} activeOpacity={0.8}>
-                <MaterialCommunityIcons name="chevron-left" size={20} color={colors.textSecondary} />
-                <Text style={styles.prevBtnText}>Previous</Text>
-              </TouchableOpacity>
-            )}
-
-            {currentStep < 3 ? (
-              <TouchableOpacity style={styles.nextBtn} onPress={handleNext} activeOpacity={0.85}>
-                <LinearGradient colors={['#0E3D23', '#1C6B3F']} style={styles.nextBtnGradient}>
-                  <Text style={styles.nextBtnText}>Next Step</Text>
-                  <MaterialCommunityIcons name="chevron-right" size={20} color={colors.white} />
-                </LinearGradient>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={[styles.nextBtn, saving && styles.nextBtnDisabled]}
-                onPress={handleSubmit}
-                disabled={saving}
-                activeOpacity={0.85}
-              >
-                <LinearGradient colors={['#0E3D23', '#1C6B3F']} style={styles.nextBtnGradient}>
-                  <Text style={styles.nextBtnText}>{saving ? 'Submitting...' : 'Submit KYC'}</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            )}
+          {/* Steps Indicator */}
+          <View style={styles.stepsBar}>
+            {STEPS.map((step, idx) => (
+              <View key={step} style={styles.stepItem}>
+                <View
+                  style={[
+                    styles.stepBadge,
+                    idx === currentStep && styles.stepBadgeActive,
+                    idx < currentStep && styles.stepBadgeDone,
+                  ]}
+                >
+                  {idx < currentStep ? (
+                    <MaterialCommunityIcons name="check" size={14} color={colors.white} />
+                  ) : (
+                    <Text style={[styles.stepBadgeText, idx === currentStep && styles.stepBadgeTextActive]}>
+                      {idx + 1}
+                    </Text>
+                  )}
+                </View>
+                <Text style={[styles.stepLabel, idx === currentStep && styles.stepLabelActive]}>{step}</Text>
+              </View>
+            ))}
           </View>
 
-          <View style={{ height: 60 }} />
-        </ScrollView>
-      </KeyboardAvoidingView>
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+          >
+            <ScrollView
+              ref={scrollRef}
+              contentContainerStyle={[styles.content, { paddingBottom: 180 }]}
+              keyboardShouldPersistTaps="handled"
+              automaticallyAdjustKeyboardInsets={true}
+              showsVerticalScrollIndicator={false}
+            >
+              {renderStep()}
+
+              {/* Navigation Buttons */}
+              <View style={styles.navButtons}>
+                {currentStep > 0 && (
+                  <TouchableOpacity style={styles.prevBtn} onPress={handlePrev} activeOpacity={0.8}>
+                    <MaterialCommunityIcons name="chevron-left" size={20} color={colors.textSecondary} />
+                    <Text style={styles.prevBtnText}>Previous</Text>
+                  </TouchableOpacity>
+                )}
+
+                {currentStep < 3 ? (
+                  <TouchableOpacity style={styles.nextBtn} onPress={handleNext} activeOpacity={0.85}>
+                    <LinearGradient colors={['#0E3D23', '#1C6B3F']} style={styles.nextBtnGradient}>
+                      <Text style={styles.nextBtnText}>Next Step</Text>
+                      <MaterialCommunityIcons name="chevron-right" size={20} color={colors.white} />
+                    </LinearGradient>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.nextBtn, saving && styles.nextBtnDisabled]}
+                    onPress={handleSubmit}
+                    disabled={saving}
+                    activeOpacity={0.85}
+                  >
+                    <LinearGradient colors={['#0E3D23', '#1C6B3F']} style={styles.nextBtnGradient}>
+                      <Text style={styles.nextBtnText}>{saving ? 'Submitting...' : 'Submit KYC'}</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <View style={{ height: 60 }} />
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </>
+      )}
 
       {/* Date Picker Modal */}
       <Modal visible={dobModalVisible} transparent animationType="slide" onRequestClose={() => setDobModalVisible(false)}>
@@ -611,11 +901,58 @@ const KYCScreen = ({ navigation }) => {
           </View>
         </View>
       </Modal>
+
+      {/* Image Picker Choice Modal */}
+      <Modal visible={!!pickerModalField} transparent animationType="fade" onRequestClose={() => setPickerModalField(null)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setPickerModalField(null)}>
+          <View style={[styles.modalCard, { borderRadius: 24, padding: 24, marginHorizontal: 20 }]}>
+            <Text style={[styles.modalTitle, { textAlign: 'center', marginBottom: 18 }]}>Upload Document</Text>
+            <View style={{ gap: 12 }}>
+              <TouchableOpacity
+                style={styles.pickerChoiceBtn}
+                onPress={() => {
+                  const field = pickerModalField;
+                  setPickerModalField(null);
+                  handleCameraPick(field);
+                }}
+              >
+                <MaterialCommunityIcons name="camera" size={22} color={colors.primary} />
+                <Text style={styles.pickerChoiceText}>Take Photo with Camera</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.pickerChoiceBtn}
+                onPress={() => {
+                  const field = pickerModalField;
+                  setPickerModalField(null);
+                  handleImagePick(field);
+                }}
+              >
+                <MaterialCommunityIcons name="image-multiple" size={22} color={colors.primary} />
+                <Text style={styles.pickerChoiceText}>Choose from Gallery</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity style={[styles.prevBtn, { marginTop: 16 }]} onPress={() => setPickerModalField(null)}>
+              <Text style={styles.prevBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Modern Alert Modal */}
+      <ModernAlertModal
+        visible={alertConfig.visible}
+        type={alertConfig.type}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        primaryButtonText={alertConfig.primaryText}
+        onPrimaryPress={alertConfig.onPrimary}
+        onClose={() => setAlertConfig((prev) => ({ ...prev, visible: false }))}
+      />
     </KeyboardAvoidingView>
   );
 };
 
-const getStyles = (colors) =>
+const getStyles = (colors, isDarkMode) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
     content: { paddingBottom: 20 },
@@ -753,15 +1090,16 @@ const getStyles = (colors) =>
     // Modal styles
     modalOverlay: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      justifyContent: 'flex-end',
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     modalCard: {
+      width: '90%',
       backgroundColor: colors.surface,
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
+      borderRadius: 24,
       padding: 20,
-      maxHeight: '60%',
+      maxHeight: '75%',
     },
     modalHeader: {
       flexDirection: 'row',
@@ -786,6 +1124,201 @@ const getStyles = (colors) =>
       alignItems: 'center',
     },
     applyBtnText: { color: colors.white, fontSize: 15, fontWeight: '700' },
+    pickerChoiceBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 16,
+      borderRadius: 14,
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.borderLight,
+      gap: 12,
+    },
+    pickerChoiceText: { fontSize: 15, fontWeight: '700', color: colors.text },
+
+    // ── Verified Screen Styles ──
+    verifiedScrollContent: {
+      padding: 20,
+      paddingBottom: 40,
+    },
+    verifiedHeroOuter: {
+      borderRadius: 24,
+      overflow: 'hidden',
+      marginBottom: 20,
+      elevation: 6,
+      shadowColor: '#0E3D23',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.25,
+      shadowRadius: 10,
+    },
+    verifiedHeroGradient: {
+      padding: 22,
+    },
+    verifiedBadgeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 14,
+    },
+    verifiedIconWrap: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: 'rgba(255, 255, 255, 0.15)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    verifiedStatusPill: {
+      alignSelf: 'flex-start',
+      backgroundColor: '#10B981',
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 6,
+      marginBottom: 4,
+    },
+    verifiedStatusPillText: {
+      color: '#FFFFFF',
+      fontSize: 10,
+      fontWeight: '800',
+      letterSpacing: 0.5,
+    },
+    verifiedHeroTitle: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: '#FFFFFF',
+    },
+    verifiedHeroDesc: {
+      fontSize: 13,
+      lineHeight: 19,
+      color: 'rgba(255, 255, 255, 0.85)',
+    },
+    verifiedCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 20,
+      padding: 20,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: colors.borderLight,
+      ...colors.shadow.card,
+    },
+    verifiedCardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      marginBottom: 16,
+    },
+    verifiedCardTitle: {
+      fontSize: 15,
+      fontWeight: '800',
+      color: colors.text,
+    },
+    vRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderLight,
+    },
+    vLabel: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      fontWeight: '500',
+    },
+    vVal: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    updateBankBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      backgroundColor: colors.surface,
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+      borderRadius: 16,
+      paddingVertical: 15,
+      marginTop: 6,
+    },
+    updateBankBtnText: {
+      color: colors.primary,
+      fontSize: 15,
+      fontWeight: '700',
+    },
+
+    // ── Pending / Under Review Styles ──
+    pendingHeroOuter: {
+      backgroundColor: colors.surface,
+      borderRadius: 24,
+      padding: 26,
+      alignItems: 'center',
+      marginBottom: 20,
+      borderWidth: 1.5,
+      borderColor: isDarkMode ? 'rgba(245, 158, 11, 0.3)' : '#FDE68A',
+      ...colors.shadow.card,
+    },
+    pendingIconWrap: {
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+      backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.15)' : '#FEF3C7',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 16,
+    },
+    pendingHeroTitle: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: colors.text,
+      marginBottom: 8,
+      textAlign: 'center',
+    },
+    pendingHeroDesc: {
+      fontSize: 13,
+      lineHeight: 20,
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+    backHomeBtn: {
+      backgroundColor: colors.primary,
+      borderRadius: 16,
+      paddingVertical: 15,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 10,
+      ...colors.shadow.button,
+    },
+    backHomeBtnText: {
+      color: '#FFFFFF',
+      fontSize: 15,
+      fontWeight: '700',
+    },
+
+    // ── Rejection Banner ──
+    rejectionBanner: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#FEE2E2',
+      borderWidth: 1.5,
+      borderColor: isDarkMode ? 'rgba(239, 68, 68, 0.35)' : '#FCA5A5',
+      borderRadius: 16,
+      padding: 16,
+      marginHorizontal: 20,
+      marginTop: 12,
+      marginBottom: 14,
+    },
+    rejectionTitle: {
+      fontSize: 14,
+      fontWeight: '800',
+      color: isDarkMode ? '#F87171' : '#B91C1C',
+      marginBottom: 2,
+    },
+    rejectionDesc: {
+      fontSize: 12,
+      color: isDarkMode ? 'rgba(254, 202, 202, 0.9)' : '#7F1D1D',
+      lineHeight: 17,
+    },
   });
 
 export default KYCScreen;

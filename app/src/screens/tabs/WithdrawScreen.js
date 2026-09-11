@@ -28,6 +28,7 @@ import { mapProfileToWithdrawUser } from '../../utils/userBalances';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
 import DepositDetailModal from '../../components/DepositDetailModal';
+import ModernAlertModal from '../../components/ModernAlertModal';
 import { useTheme } from '../../context/ThemeContext';
 
 const WithdrawScreen = ({ navigation }) => {
@@ -47,6 +48,30 @@ const WithdrawScreen = ({ navigation }) => {
   const [withdrawing, setWithdrawing] = useState(false);
   const [emailRequiredModalVisible, setEmailRequiredModalVisible] = useState(false);
   const [investments, setInvestments] = useState([]);
+
+  // Modern Alert state
+  const [alertConfig, setAlertConfig] = useState({
+    visible: false,
+    type: 'payout',
+    title: '',
+    message: '',
+    primaryText: 'OK',
+    onPrimary: null,
+  });
+
+  const showAlert = (type, title, message, primaryText = 'OK', onPrimary = null) => {
+    setAlertConfig({
+      visible: true,
+      type,
+      title,
+      message,
+      primaryText,
+      onPrimary: () => {
+        setAlertConfig((prev) => ({ ...prev, visible: false }));
+        if (onPrimary) onPrimary();
+      },
+    });
+  };
 
   const fetchUserData = async () => {
     try {
@@ -209,25 +234,24 @@ const WithdrawScreen = ({ navigation }) => {
   const handleMainWithdrawRequest = () => {
     const numAmt = parseFloat(amount);
     if (!amount || isNaN(numAmt) || numAmt <= 0) {
-      Alert.alert('Enter Amount', 'Please enter a valid amount to withdraw.');
+      showAlert('warning', 'Enter Amount', 'Please enter a valid amount to withdraw.');
       return;
     }
     if (totalAvailableToWithdraw <= 0) {
-      Alert.alert('No Available Balance', 'You currently do not have any matured investments ready to withdraw.');
+      showAlert('warning', 'No Available Balance', 'You currently do not have any matured investments ready to withdraw.');
       return;
     }
     if (numAmt > totalAvailableToWithdraw) {
-      Alert.alert('Exceeds Balance', `The entered amount exceeds your available to withdraw balance of ${formatCurrency(totalAvailableToWithdraw)}.`);
+      showAlert('warning', 'Exceeds Balance', `The entered amount exceeds your available to withdraw balance of ${formatCurrency(totalAvailableToWithdraw)}.`);
       return;
     }
     if (!bankInfo?.accountNumber && !bankInfo?.upiId && !userData?.upiId) {
-      Alert.alert(
+      showAlert(
+        'warning',
         'Bank Account Required',
         'Please link your Bank Account or UPI ID before requesting a withdrawal.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Add Bank Details', onPress: () => navigation.navigate('BankDetails') },
-        ]
+        'Add Bank Details',
+        () => navigation.navigate('BankDetails')
       );
       return;
     }
@@ -244,22 +268,22 @@ const WithdrawScreen = ({ navigation }) => {
   const handleWithdraw = async () => {
     const numAmt = parseFloat(amount);
     if (!amount || isNaN(numAmt) || numAmt <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid amount to withdraw.');
+      showAlert('warning', 'Invalid Amount', 'Please enter a valid amount to withdraw.');
       return;
     }
 
     if (numAmt > totalAvailableToWithdraw) {
-      Alert.alert('Exceeds Balance', `The entered amount exceeds your available to withdraw balance of ${formatCurrency(totalAvailableToWithdraw)}.`);
+      showAlert('warning', 'Exceeds Balance', `The entered amount exceeds your available to withdraw balance of ${formatCurrency(totalAvailableToWithdraw)}.`);
       return;
     }
 
     if (!upiId || !upiId.trim()) {
-      Alert.alert('Invalid UPI ID', 'Please enter your UPI ID (e.g. username@okhdfcbank)');
+      showAlert('warning', 'Invalid UPI ID', 'Please enter your UPI ID (e.g. username@okhdfcbank)');
       return;
     }
     
     if (!/^[a-zA-Z0-9.\-_]{2,100}@[a-zA-Z0-9.\-_]{2,64}$/.test(upiId.trim())) {
-      Alert.alert('Invalid UPI ID', 'Please enter a valid UPI ID format (e.g. username@okhdfcbank or 9876543210@paytm).');
+      showAlert('warning', 'Invalid UPI ID', 'Please enter a valid UPI ID format (e.g. username@okhdfcbank or 9876543210@paytm).');
       return;
     }
     
@@ -267,10 +291,12 @@ const WithdrawScreen = ({ navigation }) => {
     try {
       if (withdrawType && withdrawType !== 'saving' && withdrawType !== 'fixed') {
         const res = await investmentService.withdrawInvestment(withdrawType, upiId.trim(), numAmt);
-        Alert.alert(
-          'Withdrawal Requested ⏳',
-          res?.message || `Your withdrawal request of ₹${numAmt.toLocaleString('en-IN')} has been submitted and is pending admin approval.`,
-          [{ text: 'OK' }]
+        const formattedAmt = `₹${numAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        showAlert(
+          'payout',
+          'Withdrawal Requested ⌛',
+          `Your withdrawal request of ${formattedAmt} has been submitted successfully and is pending admin approval.`,
+          'Got It'
         );
       } else {
         const res = await withdrawalService.createWithdrawal({
@@ -280,14 +306,20 @@ const WithdrawScreen = ({ navigation }) => {
           userEmail: userData?.email || userData?.mobileNumber || '',
           withdrawType: 'saving',
         });
-        Alert.alert('Success', res?.message || `Your withdrawal request of ₹${numAmt.toLocaleString('en-IN')} has been submitted successfully.`);
+        const formattedAmt = `₹${numAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        showAlert(
+          'payout',
+          'Withdrawal Requested ⌛',
+          `Your withdrawal request of ${formattedAmt} has been submitted successfully and is pending admin approval.`,
+          'Got It'
+        );
       }
       setWithdrawModalVisible(false);
       setAmount('');
       fetchUserData();
     } catch (error) {
       const errMsg = error?.response?.data?.message || error?.message || error?.error || (typeof error === 'string' ? error : 'Failed to process withdrawal request');
-      Alert.alert('Withdrawal Failed', errMsg);
+      showAlert('error', 'Withdrawal Failed', errMsg);
     } finally {
       setWithdrawing(false);
     }
@@ -623,6 +655,17 @@ const WithdrawScreen = ({ navigation }) => {
           setSelectedDeposit(null);
           openWithdrawModal(inv._id);
         }}
+      />
+
+      {/* Modern Alert Modal */}
+      <ModernAlertModal
+        visible={alertConfig.visible}
+        type={alertConfig.type}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        primaryButtonText={alertConfig.primaryText}
+        onPrimaryPress={alertConfig.onPrimary}
+        onClose={() => setAlertConfig((prev) => ({ ...prev, visible: false }))}
       />
     </View>
   );
