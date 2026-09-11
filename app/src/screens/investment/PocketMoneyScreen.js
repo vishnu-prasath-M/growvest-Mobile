@@ -221,25 +221,35 @@ const PocketMoneyScreen = ({ navigation }) => {
             );
           })
         ) : (
-          /* Empty State */
+          /* Empty / Completed State (Single Action Button) */
           <View style={styles.emptyCard}>
-            <MaterialCommunityIcons name="wallet-giftcard" size={64} color={themeColors.primary} />
-            <Text style={styles.emptyTitle}>No Active Pocket Money Plan</Text>
+            <MaterialCommunityIcons
+              name={completedPlans.length > 0 ? "check-decagram" : "wallet-giftcard"}
+              size={60}
+              color={completedPlans.length > 0 ? themeColors.success : themeColors.primary}
+            />
+            <Text style={styles.emptyTitle}>
+              {completedPlans.length > 0 ? 'Pocket Money Plan Completed' : 'No Active Pocket Money Plan'}
+            </Text>
             <Text style={styles.emptyDesc}>
-              Setup a Pocket Money plan to automatically release funds into your wallet balance daily, every 2 days, or weekly.
+              {completedPlans.length > 0
+                ? 'Your previous Pocket Money plan has completed all 10 payouts! Start a new plan anytime to continue earning regular payouts.'
+                : 'Setup a Pocket Money plan to automatically release funds into your wallet balance daily, every 2 days, or weekly.'}
             </Text>
             <TouchableOpacity
               style={styles.startBtn}
               activeOpacity={0.8}
               onPress={handleInvestMore}
             >
-              <Text style={styles.startBtnText}>Start Pocket Money Plan</Text>
+              <Text style={styles.startBtnText}>
+                {completedPlans.length > 0 ? 'Start New Pocket Money Plan' : 'Start Pocket Money Plan'}
+              </Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* More Investment Button (Shown whenever user has plans) */}
-        {pocketPlans.length > 0 && (
+        {/* More Investment Button (Shown only when user currently has active plans) */}
+        {activePlans.length > 0 && (
           <TouchableOpacity
             style={styles.investMoreBtn}
             activeOpacity={0.85}
@@ -348,6 +358,26 @@ const PocketMoneyScreen = ({ navigation }) => {
           </View>
         )}
 
+        {/* Completed Plans Section */}
+        {completedPlans.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Completed Plans</Text>
+            <View style={styles.completedList}>
+              {completedPlans.map((plan) => (
+                <View key={plan._id} style={styles.completedItem}>
+                  <View style={styles.completedHeader}>
+                    <Text style={styles.completedName}>₹{(plan.investedAmount || 0).toLocaleString('en-IN')} Plan</Text>
+                    <Text style={styles.completedStatus}>COMPLETED</Text>
+                  </View>
+                  <Text style={styles.completedMeta}>
+                    Frequency: {plan.frequency === 'daily' ? 'Daily' : plan.frequency === 'every_2_days' ? 'Every 2 Days' : 'Weekly'} • Completed: {formatDate(plan.completedAt || plan.updatedAt)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
         {/* History / Transactions Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Payout Release History</Text>
@@ -362,16 +392,16 @@ const PocketMoneyScreen = ({ navigation }) => {
                         backgroundColor:
                           tx.type === 'pocket_money_payout'
                             ? isDarkMode
-                              ? 'rgba(74,222,128,0.1)'
-                              : 'rgba(21,128,61,0.1)'
+                              ? 'rgba(74,222,128,0.15)'
+                              : '#DCFCE7'
                             : isDarkMode
-                            ? 'rgba(239,68,68,0.1)'
-                            : 'rgba(220,38,38,0.1)',
+                            ? 'rgba(239,68,68,0.15)'
+                            : '#FEE2E2',
                       },
                     ]}
                   >
                     <MaterialCommunityIcons
-                      name={tx.type === 'pocket_money_payout' ? 'cash-receive' : 'cash-send'}
+                      name={tx.type === 'pocket_money_payout' ? 'cash-plus' : 'cash-minus'}
                       size={22}
                       color={tx.type === 'pocket_money_payout' ? themeColors.success : themeColors.error}
                     />
@@ -401,26 +431,6 @@ const PocketMoneyScreen = ({ navigation }) => {
             </View>
           )}
         </View>
-
-        {/* Completed Plans Section */}
-        {completedPlans.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Completed Plans</Text>
-            <View style={styles.completedList}>
-              {completedPlans.map((plan) => (
-                <View key={plan._id} style={styles.completedItem}>
-                  <View style={styles.completedHeader}>
-                    <Text style={styles.completedName}>₹{(plan.investedAmount || 0).toLocaleString('en-IN')} Plan</Text>
-                    <Text style={styles.completedStatus}>COMPLETED</Text>
-                  </View>
-                  <Text style={styles.completedMeta}>
-                    Frequency: {plan.frequency} • Completed: {formatDate(plan.completedAt || plan.updatedAt)}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
 
         <View style={{ height: 40 }} />
       </ScrollView>

@@ -383,18 +383,39 @@ exports.getSIPById = async (req, res) => {
       return res.status(404).json({ message: 'SIP plan not found' });
     }
 
+    // If SIP is cancelled, ensure any pending contribution is synced to cancelled
+    if (sip.status === 'cancelled') {
+      await SIPContribution.updateMany(
+        { sipId: sip._id, paymentStatus: 'pending' },
+        { $set: { paymentStatus: 'cancelled' } }
+      );
+    }
+
     const contributions = await SIPContribution.find({ sipId: sip._id, userId })
       .sort({ installmentNumber: 1 })
       .lean();
 
-    // Calculate with-drawable principal for this SIP only
-    const availablePrincipal = Math.max(0, (sip.totalPaidAmount || 0) - (sip.withdrawnAmount || 0));
+    // Check pending withdrawal
+    const pendingWithdrawal = await Withdrawal.findOne({
+      investmentId: sip._id,
+      status: 'pending',
+    }).lean();
+
+    const pendingWithdrawalAmount = pendingWithdrawal ? Number(pendingWithdrawal.amount || 0) : 0;
+    const hasPendingWithdrawal = Boolean(pendingWithdrawal);
+
+    // Calculate withdrawable principal for this SIP only
+    const availablePrincipal = Math.max(0, (sip.totalPaidAmount || 0) - (sip.withdrawnAmount || 0) - pendingWithdrawalAmount);
+    const isFullyWithdrawn = (sip.totalPaidAmount || 0) > 0 && availablePrincipal <= 0 && (sip.withdrawnAmount || 0) >= (sip.totalPaidAmount || 0);
 
     res.status(200).json({
       success: true,
       data: {
         ...sip,
         availablePrincipal,
+        pendingWithdrawalAmount,
+        hasPendingWithdrawal,
+        isFullyWithdrawn,
         contributions,
       },
     });
