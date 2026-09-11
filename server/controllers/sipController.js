@@ -65,8 +65,8 @@ exports.createSIP = async (req, res) => {
     }
 
     const numAmount = Number(amount);
-    if (!numAmount || numAmount < 100) {
-      return res.status(400).json({ message: 'Minimum SIP contribution amount is ₹100' });
+    if (!numAmount || numAmount < 10) {
+      return res.status(400).json({ message: 'Minimum SIP contribution amount is ₹10' });
     }
 
     let totalInstallments = 12;

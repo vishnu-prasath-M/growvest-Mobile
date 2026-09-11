@@ -540,10 +540,10 @@ exports.reinvestInvestment = async (req, res) => {
           message: `Reinvestment amount (₹${parsedClientAmt}) cannot exceed available matured amount (₹${authoritativeMaturityAmount}).`
         });
       }
-      if (parsedClientAmt < 100) {
+      if (parsedClientAmt < 10) {
         return res.status(400).json({
           success: false,
-          message: 'Minimum reinvestment amount is ₹100.'
+          message: 'Minimum reinvestment amount is ₹10.'
         });
       }
       reinvestAmount = parsedClientAmt;

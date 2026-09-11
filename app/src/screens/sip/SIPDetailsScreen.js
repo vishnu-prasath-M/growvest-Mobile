@@ -338,6 +338,22 @@ const SIPDetailsScreen = ({ route, navigation }) => {
             </Text>
           </View>
           <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>Annual Return Yield</Text>
+            <Text style={[styles.breakdownValue, { color: '#085428', fontWeight: '700' }]}>26% p.a.</Text>
+          </View>
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>Expected Returns (26% p.a.)</Text>
+            <Text style={[styles.breakdownValue, { color: '#085428', fontWeight: '700' }]}>
+              +₹{Math.round((Number(sip.amount) || 0) * (sip.frequency === 'daily' ? (0.26 / 365) : sip.frequency === 'weekly' ? (0.26 * 7 / 365) : (0.26 / 12)) * (((Number(sip.totalContributions || sip.durationCount) || 12) * ((Number(sip.totalContributions || sip.durationCount) || 12) + 1)) / 2)).toLocaleString('en-IN')}
+            </Text>
+          </View>
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>Estimated Maturity Value</Text>
+            <Text style={[styles.breakdownValue, { color: '#085428', fontWeight: '800' }]}>
+              ₹{((Number(sip.totalPlannedAmount) || 0) + Math.round((Number(sip.amount) || 0) * (sip.frequency === 'daily' ? (0.26 / 365) : sip.frequency === 'weekly' ? (0.26 * 7 / 365) : (0.26 / 12)) * (((Number(sip.totalContributions || sip.durationCount) || 12) * ((Number(sip.totalContributions || sip.durationCount) || 12) + 1)) / 2))).toLocaleString('en-IN')}
+            </Text>
+          </View>
+          <View style={styles.breakdownRow}>
             <Text style={styles.breakdownLabel}>Withdrawn Principal</Text>
             <Text style={styles.breakdownValue}>{formatCurrency(sip.withdrawnAmount)}</Text>
           </View>

@@ -123,8 +123,8 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
       return;
     }
 
-    if (parseFloat(amount) < 100) {
-      Alert.alert('Error', 'Minimum investment amount is ₹100');
+    if (parseFloat(amount) < 10) {
+      Alert.alert('Error', 'Minimum investment amount is ₹10');
       return;
     }
 
@@ -309,7 +309,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
               textColor={themeColors.text}
             />
           </View>
-          <Text style={styles.minAmount}>Minimum: ₹100</Text>
+          <Text style={styles.minAmount}>Minimum: ₹10</Text>
         </View>
 
         {/* Intended Withdrawal Date Selection */}

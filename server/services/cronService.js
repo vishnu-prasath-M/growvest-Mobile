@@ -300,6 +300,65 @@ const sendChitDueReminders = async () => {
   }
 };
 
+// ─── 5. SIP Due Reminders (Daily SIP & Due Weekly/Monthly SIPs) ──────────────
+const sendDailySIPNotifications = async () => {
+  console.log('[CronService] Running Daily SIP Installment Notification check...');
+  try {
+    const SIP = require('../models/SIP');
+    const SIPContribution = require('../models/SIPContribution');
+
+    const now = new Date();
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    // Find all active SIPs
+    const activeSIPs = await SIP.find({
+      status: 'active',
+    }).populate('userId');
+
+    let count = 0;
+    for (const sip of activeSIPs) {
+      if (!sip.userId?._id) continue;
+
+      // Find pending contributions due up to today
+      const pendingContribution = await SIPContribution.findOne({
+        sipId: sip._id,
+        paymentStatus: 'pending',
+        dueDate: { $lte: todayEnd },
+      }).sort({ installmentNumber: 1 });
+
+      if (pendingContribution) {
+        const userName = sip.userId.name || sip.userId.username || 'Investor';
+        const amount = pendingContribution.amount || sip.amount || 10;
+        const isDaily = sip.frequency === 'daily';
+
+        const title = isDaily
+          ? '💰 Time to Pay Your Daily SIP!'
+          : `🔔 ${sip.frequency?.toUpperCase() || 'SIP'} Installment Due!`;
+
+        const body = isDaily
+          ? `Hi ${userName}, your daily SIP of ₹${amount.toLocaleString('en-IN')} for ${sip.sipId} is due today. Keep investing daily to earn up to 26% p.a. compound returns!`
+          : `Hi ${userName}, your installment #${pendingContribution.installmentNumber} of ₹${amount.toLocaleString('en-IN')} for ${sip.sipId} is due today. Complete your payment now!`;
+
+        await sendUserNotification(
+          sip.userId._id,
+          title,
+          body,
+          'sip_due_reminder',
+          { screen: 'SIPDetails', sipId: sip._id.toString() }
+        );
+        count++;
+      }
+    }
+
+    console.log(`[CronService] SIP due notifications dispatched to ${count} active SIP holders.`);
+    return { sent: count };
+  } catch (error) {
+    console.error('[CronService] Error sending SIP notifications:', error);
+    throw error;
+  }
+};
+
 // ─── Legacy alias (for backward-compat with admin manual trigger endpoint) ────
 const sendDailyEngagingNotifications = sendEveningEngagementNotification;
 
@@ -308,6 +367,7 @@ module.exports = {
   sendMorningFinancialTip,
   sendEveningEngagementNotification,
   sendChitDueReminders,
+  sendDailySIPNotifications,
   // Legacy alias
   sendDailyEngagingNotifications,
 };
