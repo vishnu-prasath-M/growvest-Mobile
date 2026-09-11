@@ -19,12 +19,12 @@ import TopBar from '../../components/TopBar';
 import api from '../../services/apiService';
 import { API_ENDPOINTS } from '../../config/api';
 
-// ─── Notification Type Configuration ─────────────────────────────────────────
+// ─── Complete Notification Type Configuration ────────────────────────────────
 const TYPE_CONFIG = {
   investment_approved: {
     icon: 'trending-up',
-    color: '#0E3D23',
-    bg: '#E3F6EC',
+    color: '#059669',
+    bg: '#ECFDF5',
     darkColor: '#34D399',
     darkBg: 'rgba(16, 185, 129, 0.16)',
     label: 'Investment',
@@ -32,122 +32,218 @@ const TYPE_CONFIG = {
   investment_rejected: {
     icon: 'trending-down',
     color: '#DC2626',
-    bg: '#FEE2E2',
+    bg: '#FEF2F2',
     darkColor: '#F87171',
-    darkBg: 'rgba(239, 68, 68, 0.15)',
+    darkBg: 'rgba(239, 68, 68, 0.16)',
     label: 'Investment',
   },
   withdrawal_approved: {
-    icon: 'arrow-up-circle-outline',
-    color: '#0E3D23',
-    bg: '#E3F6EC',
-    darkColor: '#34D399',
-    darkBg: 'rgba(16, 185, 129, 0.16)',
+    icon: 'cash-fast',
+    color: '#0D9488',
+    bg: '#F0FDFA',
+    darkColor: '#2DD4BF',
+    darkBg: 'rgba(45, 212, 191, 0.16)',
     label: 'Withdrawal',
   },
   withdrawal_rejected: {
     icon: 'arrow-down-circle-outline',
     color: '#DC2626',
-    bg: '#FEE2E2',
+    bg: '#FEF2F2',
     darkColor: '#F87171',
-    darkBg: 'rgba(239, 68, 68, 0.15)',
+    darkBg: 'rgba(239, 68, 68, 0.16)',
     label: 'Withdrawal',
   },
   chit_joined: {
     icon: 'account-group-outline',
-    color: '#0E3D23',
-    bg: '#E3F6EC',
-    darkColor: '#34D399',
-    darkBg: 'rgba(16, 185, 129, 0.16)',
+    color: '#7C3AED',
+    bg: '#F5F3FF',
+    darkColor: '#A78BFA',
+    darkBg: 'rgba(124, 58, 237, 0.16)',
     label: 'Chit Fund',
   },
   chit_join_approved: {
     icon: 'check-decagram-outline',
-    color: '#0E3D23',
-    bg: '#E3F6EC',
+    color: '#059669',
+    bg: '#ECFDF5',
     darkColor: '#34D399',
     darkBg: 'rgba(16, 185, 129, 0.16)',
-    label: 'Approved',
+    label: 'Chit Enrolled',
   },
   chit_join_rejected: {
     icon: 'close-circle-outline',
     color: '#DC2626',
-    bg: '#FEE2E2',
+    bg: '#FEF2F2',
     darkColor: '#F87171',
-    darkBg: 'rgba(239, 68, 68, 0.15)',
-    label: 'Rejected',
+    darkBg: 'rgba(239, 68, 68, 0.16)',
+    label: 'Chit Rejected',
   },
   chit_payment_approved: {
     icon: 'cash-check',
-    color: '#0E3D23',
-    bg: '#E3F6EC',
+    color: '#059669',
+    bg: '#ECFDF5',
     darkColor: '#34D399',
     darkBg: 'rgba(16, 185, 129, 0.16)',
-    label: 'Payment',
+    label: 'Chit Payment',
   },
   chit_payment_rejected: {
     icon: 'cash-remove',
     color: '#DC2626',
-    bg: '#FEE2E2',
+    bg: '#FEF2F2',
     darkColor: '#F87171',
-    darkBg: 'rgba(239, 68, 68, 0.15)',
-    label: 'Payment',
+    darkBg: 'rgba(239, 68, 68, 0.16)',
+    label: 'Chit Payment',
+  },
+  chit_due_reminder: {
+    icon: 'clock-alert-outline',
+    color: '#D97706',
+    bg: '#FFFBEB',
+    darkColor: '#FBBF24',
+    darkBg: 'rgba(245, 158, 11, 0.16)',
+    label: 'Chit Due',
+  },
+  due_reminder: {
+    icon: 'bell-ring-outline',
+    color: '#D97706',
+    bg: '#FFFBEB',
+    darkColor: '#FBBF24',
+    darkBg: 'rgba(245, 158, 11, 0.16)',
+    label: 'Due Reminder',
   },
   new_chit_available: {
     icon: 'sparkles',
     color: '#0284C7',
-    bg: '#E0F2FE',
+    bg: '#F0F9FF',
     darkColor: '#38BDF8',
-    darkBg: 'rgba(14, 165, 233, 0.15)',
+    darkBg: 'rgba(14, 165, 233, 0.16)',
     label: 'New Chit',
   },
   chit_closed: {
     icon: 'lock-check-outline',
     color: '#64748B',
-    bg: '#F1F5F9',
+    bg: '#F8FAFC',
     darkColor: '#94A3B8',
     darkBg: 'rgba(255, 255, 255, 0.08)',
-    label: 'Closed',
-  },
-  due_reminder: {
-    icon: 'bell-ring-outline',
-    color: '#D97706',
-    bg: '#FEF3C7',
-    darkColor: '#FBBF24',
-    darkBg: 'rgba(245, 158, 11, 0.15)',
-    label: 'Reminder',
-  },
-  kyc_approved: {
-    icon: 'shield-check-outline',
-    color: '#0E3D23',
-    bg: '#E3F6EC',
-    darkColor: '#34D399',
-    darkBg: 'rgba(16, 185, 129, 0.16)',
-    label: 'KYC',
-  },
-  kyc_rejected: {
-    icon: 'shield-alert-outline',
-    color: '#DC2626',
-    bg: '#FEE2E2',
-    darkColor: '#F87171',
-    darkBg: 'rgba(239, 68, 68, 0.15)',
-    label: 'KYC',
+    label: 'Chit Matured',
   },
   auction_winner: {
     icon: 'trophy-outline',
-    color: '#7C3AED',
-    bg: '#F5F3FF',
-    darkColor: '#A78BFA',
-    darkBg: 'rgba(124, 58, 237, 0.15)',
-    label: 'Auction',
+    color: '#B45309',
+    bg: '#FFFBEB',
+    darkColor: '#FCD34D',
+    darkBg: 'rgba(251, 191, 36, 0.18)',
+    label: 'Auction Winner',
   },
   auction: {
     icon: 'gavel',
     color: '#7C3AED',
     bg: '#F5F3FF',
     darkColor: '#A78BFA',
-    darkBg: 'rgba(124, 58, 237, 0.15)',
+    darkBg: 'rgba(124, 58, 237, 0.16)',
     label: 'Auction',
+  },
+  sip_due_reminder: {
+    icon: 'calendar-clock-outline',
+    color: '#2563EB',
+    bg: '#EFF6FF',
+    darkColor: '#60A5FA',
+    darkBg: 'rgba(37, 99, 235, 0.16)',
+    label: 'SIP Due',
+  },
+  pocket_money_approved: {
+    icon: 'wallet-plus-outline',
+    color: '#059669',
+    bg: '#ECFDF5',
+    darkColor: '#34D399',
+    darkBg: 'rgba(16, 185, 129, 0.16)',
+    label: 'Pocket Money',
+  },
+  pocket_money_payout: {
+    icon: 'cash-multiple',
+    color: '#059669',
+    bg: '#ECFDF5',
+    darkColor: '#34D399',
+    darkBg: 'rgba(16, 185, 129, 0.16)',
+    label: 'Daily Payout',
+  },
+  pocket_money_reminder: {
+    icon: 'clock-outline',
+    color: '#D97706',
+    bg: '#FFFBEB',
+    darkColor: '#FBBF24',
+    darkBg: 'rgba(245, 158, 11, 0.16)',
+    label: 'Payout Reminder',
+  },
+  pocket_money_completed: {
+    icon: 'check-all',
+    color: '#7C3AED',
+    bg: '#F5F3FF',
+    darkColor: '#A78BFA',
+    darkBg: 'rgba(124, 58, 237, 0.16)',
+    label: 'Plan Completed',
+  },
+  referral_reward: {
+    icon: 'gift-outline',
+    color: '#DB2777',
+    bg: '#FDF2F8',
+    darkColor: '#F472B6',
+    darkBg: 'rgba(236, 72, 153, 0.16)',
+    label: 'Referral Bonus',
+  },
+  referral_lead: {
+    icon: 'account-plus-outline',
+    color: '#8B5CF6',
+    bg: '#F5F3FF',
+    darkColor: '#A78BFA',
+    darkBg: 'rgba(139, 92, 246, 0.16)',
+    label: 'Referral Lead',
+  },
+  reward: {
+    icon: 'star-circle-outline',
+    color: '#D97706',
+    bg: '#FFFBEB',
+    darkColor: '#FBBF24',
+    darkBg: 'rgba(245, 158, 11, 0.16)',
+    label: 'Reward',
+  },
+  coin_reward: {
+    icon: 'circle-multiple-outline',
+    color: '#D97706',
+    bg: '#FFFBEB',
+    darkColor: '#FBBF24',
+    darkBg: 'rgba(245, 158, 11, 0.16)',
+    label: 'Coins Credited',
+  },
+  financial_tip: {
+    icon: 'lightbulb-outline',
+    color: '#2563EB',
+    bg: '#EFF6FF',
+    darkColor: '#60A5FA',
+    darkBg: 'rgba(37, 99, 235, 0.16)',
+    label: 'Financial Tip',
+  },
+  evening_engagement: {
+    icon: 'moon-waning-crescent',
+    color: '#6366F1',
+    bg: '#EEF2FF',
+    darkColor: '#818CF8',
+    darkBg: 'rgba(99, 102, 241, 0.16)',
+    label: 'Daily Digest',
+  },
+  kyc_approved: {
+    icon: 'shield-check-outline',
+    color: '#059669',
+    bg: '#ECFDF5',
+    darkColor: '#34D399',
+    darkBg: 'rgba(16, 185, 129, 0.16)',
+    label: 'KYC Verified',
+  },
+  kyc_rejected: {
+    icon: 'shield-alert-outline',
+    color: '#DC2626',
+    bg: '#FEF2F2',
+    darkColor: '#F87171',
+    darkBg: 'rgba(239, 68, 68, 0.16)',
+    label: 'KYC Action',
   },
   welcome: {
     icon: 'hand-wave-outline',
@@ -163,7 +259,7 @@ const TYPE_CONFIG = {
     bg: '#E3F6EC',
     darkColor: '#34D399',
     darkBg: 'rgba(16, 185, 129, 0.16)',
-    label: 'Update',
+    label: 'Notification',
   },
 };
 
@@ -171,6 +267,7 @@ const getTypeConfig = (type) => TYPE_CONFIG[type] || TYPE_CONFIG.general;
 
 // ─── Time formatter ───────────────────────────────────────────────────────────
 const formatTime = (dateString) => {
+  if (!dateString) return 'Recent';
   const date = new Date(dateString);
   const now = new Date();
   const diffMs = now - date;
@@ -243,12 +340,13 @@ const SkeletonCard = () => {
   );
 };
 
-// ─── Notification Row ─────────────────────────────────────────────────────────
-const NotificationRow = React.memo(({ notification: n, onMarkRead, isLast }) => {
+// ─── Notification Row Component ──────────────────────────────────────────────
+const NotificationRow = React.memo(({ notification: n, onMarkRead, navigation, isLast }) => {
   const { colors: themeColors, isDarkMode } = useTheme();
   const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
   const cfg = getTypeConfig(n.type);
   const scale = useRef(new Animated.Value(1)).current;
+  const isUnread = !n.read;
 
   const onPressIn = () =>
     Animated.spring(scale, { toValue: 0.98, useNativeDriver: true, speed: 60, bounciness: 2 }).start();
@@ -257,7 +355,27 @@ const NotificationRow = React.memo(({ notification: n, onMarkRead, isLast }) => 
     Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 50, bounciness: 5 }).start();
 
   const onPress = () => {
-    if (!n.read) onMarkRead(n._id);
+    if (isUnread) onMarkRead(n._id);
+
+    // Deep navigation if notification has target screen metadata
+    const meta = n.metadata || {};
+    if (navigation) {
+      if (meta.screen === 'ChitDetails' && meta.chitId) {
+        navigation.navigate('ChitDetails', { chitId: meta.chitId });
+      } else if (meta.screen === 'MonthlyDueScreen') {
+        navigation.navigate('MonthlyDueScreen', { chitId: meta.chitId });
+      } else if (meta.screen === 'SIPDetails' && meta.sipId) {
+        navigation.navigate('SIPDetails', { sipId: meta.sipId });
+      } else if (meta.screen === 'SIPDashboard' || n.type === 'sip_due_reminder') {
+        navigation.navigate('SIPDashboard');
+      } else if (meta.screen === 'Withdrawals' || n.type?.startsWith('withdrawal')) {
+        navigation.navigate('Withdraw');
+      } else if (meta.screen === 'ExploreChits' || n.type === 'new_chit_available') {
+        navigation.navigate('ExploreChits');
+      } else if (n.type?.startsWith('pocket_money')) {
+        navigation.navigate('PocketMoney');
+      }
+    }
   };
 
   const iconBg = isDarkMode ? cfg.darkBg : cfg.bg;
@@ -265,39 +383,62 @@ const NotificationRow = React.memo(({ notification: n, onMarkRead, isLast }) => 
 
   return (
     <Pressable onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut}>
-      <Animated.View style={[styles.row, { transform: [{ scale }] }]}>
-        {/* Left Mint Avatar Box */}
-        <View style={[styles.mintIconBox, { backgroundColor: iconBg }]}>
+      <Animated.View
+        style={[
+          styles.row,
+          isUnread ? styles.unreadRow : styles.readRow,
+          { transform: [{ scale }] },
+        ]}
+      >
+        {/* Left Vertical Accent Bar for New Notifications */}
+        {isUnread && <View style={styles.unreadAccentBar} />}
+
+        {/* Category Icon Badge */}
+        <View style={[styles.iconBox, { backgroundColor: iconBg }]}>
           <MaterialCommunityIcons name={cfg.icon} size={20} color={iconColor} />
         </View>
 
-        {/* Content */}
+        {/* Content Body */}
         <View style={styles.rowContent}>
-          {/* Title + Time */}
+          {/* Header Row: Title & Time */}
           <View style={styles.rowTopRow}>
             <Text
-              style={[styles.rowTitle, !n.read && styles.rowTitleBold]}
+              style={[
+                styles.rowTitle,
+                isUnread ? styles.unreadTitle : styles.readTitle,
+              ]}
               numberOfLines={1}
             >
               {n.title}
             </Text>
-            <Text style={styles.rowTime}>{formatTime(n.createdAt)}</Text>
+            <Text style={[styles.rowTime, isUnread && styles.unreadTime]}>
+              {formatTime(n.createdAt)}
+            </Text>
           </View>
 
-          {/* Description */}
-          <Text style={styles.rowDesc} numberOfLines={2}>
+          {/* Notification Description */}
+          <Text
+            style={[
+              styles.rowDesc,
+              isUnread ? styles.unreadDesc : styles.readDesc,
+            ]}
+            numberOfLines={2}
+          >
             {n.description}
           </Text>
 
-          {/* Tag and Unread Indicator */}
+          {/* Footer Tags & New Pill Badge */}
           <View style={styles.tagRow}>
-            <View style={[styles.tag, { backgroundColor: iconBg }]}>
-              <Text style={[styles.tagText, { color: iconColor }]}>{cfg.label}</Text>
+            <View style={[styles.typeBadge, { backgroundColor: iconBg }]}>
+              <Text style={[styles.typeBadgeText, { color: iconColor }]}>
+                {cfg.label}
+              </Text>
             </View>
-            {!n.read && (
-              <View style={styles.unreadBadge}>
-                <View style={styles.unreadDot} />
-                <Text style={styles.unreadBadgeText}>New</Text>
+
+            {isUnread && (
+              <View style={styles.newPill}>
+                <View style={styles.pulsingDot} />
+                <Text style={styles.newPillText}>NEW</Text>
               </View>
             )}
           </View>
@@ -313,6 +454,7 @@ const EmptyState = () => {
   const { colors: themeColors, isDarkMode } = useTheme();
   const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
   const float = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     const a = Animated.loop(
       Animated.sequence([
@@ -340,13 +482,13 @@ const EmptyState = () => {
       </Animated.View>
       <Text style={styles.emptyTitle}>All Caught Up</Text>
       <Text style={styles.emptyBody}>
-        You have no new notifications right now.{'\n'}We'll keep you updated on your investments & chits.
+        You have no new notifications right now.{'\n'}We'll keep you posted on your investments, chits, and payouts.
       </Text>
     </View>
   );
 };
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
+// ─── Main Notifications Screen ────────────────────────────────────────────────
 const NotificationsScreen = ({ navigation }) => {
   const { colors: themeColors, isDarkMode } = useTheme();
   const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
@@ -422,7 +564,7 @@ const NotificationsScreen = ({ navigation }) => {
           unreadCount > 0 ? (
             <TouchableOpacity
               onPress={handleMarkAllAsRead}
-              activeOpacity={0.7}
+              activeOpacity={0.75}
               style={styles.markAllPill}
             >
               <MaterialCommunityIcons
@@ -430,7 +572,7 @@ const NotificationsScreen = ({ navigation }) => {
                 size={16}
                 color={isDarkMode ? '#34D399' : '#0E3D23'}
               />
-              <Text style={styles.markAllText}>Read All</Text>
+              <Text style={styles.markAllText}>Mark Read</Text>
             </TouchableOpacity>
           ) : null
         }
@@ -450,34 +592,49 @@ const NotificationsScreen = ({ navigation }) => {
         }
       >
         {/* ── Unread Summary Banner ────────────────────────── */}
-        {unreadCount > 0 ? (
+        {unreadCount > 0 && (
           <View style={styles.unreadBanner}>
             <View style={styles.unreadBannerIconBox}>
-              <MaterialCommunityIcons name="bell-badge-outline" size={18} color="#0E3D23" />
+              <MaterialCommunityIcons
+                name="bell-ring"
+                size={18}
+                color={isDarkMode ? '#0E3D23' : '#0E3D23'}
+              />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.unreadBannerTitle}>
-                {unreadCount} Unread {unreadCount === 1 ? 'Notification' : 'Notifications'}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={styles.unreadBannerTitle}>
+                  {unreadCount} Unread {unreadCount === 1 ? 'Update' : 'Updates'}
+                </Text>
+                <View style={styles.activeDot} />
+              </View>
+              <Text style={styles.unreadBannerSubtitle}>
+                Tap any notification to view details
               </Text>
-              <Text style={styles.unreadBannerSubtitle}>Stay up to date with your activity</Text>
             </View>
           </View>
-        ) : null}
+        )}
 
-        {/* ── Groups ─────────────────────────────────────── */}
+        {/* ── Notification Groups ─────────────────────────── */}
         {groups.length > 0 ? (
           groups.map((group) => (
             <View key={group.label} style={styles.menuGroup}>
-              {/* Section header */}
-              <Text style={styles.menuGroupLabel}>{group.label}</Text>
+              {/* Group Section Header */}
+              <View style={styles.groupHeaderRow}>
+                <Text style={styles.menuGroupLabel}>{group.label}</Text>
+                <Text style={styles.groupCountLabel}>
+                  {group.items.length} {group.items.length === 1 ? 'item' : 'items'}
+                </Text>
+              </View>
 
-              {/* 24px Rounded Card Container */}
+              {/* Card Container */}
               <View style={styles.menuCard}>
                 {group.items.map((n, idx) => (
                   <NotificationRow
                     key={n._id}
                     notification={n}
                     onMarkRead={handleMarkAsRead}
+                    navigation={navigation}
                     isLast={idx === group.items.length - 1}
                   />
                 ))}
@@ -504,15 +661,17 @@ const getStyles = (themeColors, isDarkMode) => StyleSheet.create({
     paddingHorizontal: 16,
   },
 
-  // ── Mark All Button in TopBar ───────────────────────────────────────────────
+  // ── TopBar Mark All Button ───────────────────────────────────────────────────
   markAllPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.16)' : '#E3F6EC',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    gap: 5,
+    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.18)' : '#E3F6EC',
+    paddingHorizontal: 11,
+    paddingVertical: 6,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: isDarkMode ? 'rgba(52, 211, 153, 0.3)' : '#C6F0DC',
   },
   markAllText: {
     fontSize: 12,
@@ -520,41 +679,59 @@ const getStyles = (themeColors, isDarkMode) => StyleSheet.create({
     color: isDarkMode ? '#34D399' : '#0E3D23',
   },
 
-  // ── Unread Banner ───────────────────────────────────────────────────────────
+  // ── Unread Summary Banner ───────────────────────────────────────────────────
   unreadBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.14)' : '#E3F6EC',
-    borderWidth: 1,
-    borderColor: isDarkMode ? 'rgba(16, 185, 129, 0.25)' : '#D1FAE5',
+    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.14)' : '#EDFAF2',
+    borderWidth: 1.5,
+    borderColor: isDarkMode ? 'rgba(52, 211, 153, 0.35)' : '#C2ECD7',
     borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     marginBottom: 18,
+    shadowColor: '#0E3D23',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDarkMode ? 0 : 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   unreadBannerIconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#A7F3D0',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#86EFAC',
     justifyContent: 'center',
     alignItems: 'center',
   },
   unreadBannerTitle: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
     color: isDarkMode ? '#A7F3D0' : '#0E3D23',
   },
+  activeDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#10B981',
+  },
   unreadBannerSubtitle: {
-    fontSize: 11,
-    color: isDarkMode ? 'rgba(167, 243, 208, 0.8)' : '#065F46',
-    marginTop: 1,
+    fontSize: 12,
+    color: isDarkMode ? 'rgba(167, 243, 208, 0.85)' : '#065F46',
+    marginTop: 2,
   },
 
-  // ── Section Groups ──────────────────────────────────────────────────────────
+  // ── Section Group Header ────────────────────────────────────────────────────
   menuGroup: {
     marginBottom: 20,
+  },
+  groupHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+    marginBottom: 8,
   },
   menuGroupLabel: {
     fontSize: 12,
@@ -562,14 +739,17 @@ const getStyles = (themeColors, isDarkMode) => StyleSheet.create({
     color: isDarkMode ? '#9CA3AF' : '#686D62',
     textTransform: 'uppercase',
     letterSpacing: 1.2,
-    marginBottom: 10,
-    paddingHorizontal: 4,
+  },
+  groupCountLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: themeColors.textMuted,
   },
 
-  // ── Card Shell (24px rounded card matching profile & app lock) ──────────────
+  // ── Card Shell ──────────────────────────────────────────────────────────────
   menuCard: {
     backgroundColor: themeColors.surface,
-    borderRadius: 24,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#ECEFE6',
     overflow: 'hidden',
@@ -580,32 +760,51 @@ const getStyles = (themeColors, isDarkMode) => StyleSheet.create({
     elevation: 2,
   },
 
-  // ── Row ─────────────────────────────────────────────────────────────────────
+  // ── Row Styling ─────────────────────────────────────────────────────────────
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     paddingVertical: 14,
     paddingHorizontal: 16,
-    gap: 14,
+    gap: 13,
+    position: 'relative',
+  },
+  unreadRow: {
+    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.08)' : '#F5FCF8',
+  },
+  readRow: {
     backgroundColor: themeColors.surface,
   },
+
+  // Vertical Accent Indicator Bar on left for Unread
+  unreadAccentBar: {
+    position: 'absolute',
+    left: 0,
+    top: 10,
+    bottom: 10,
+    width: 4,
+    borderTopRightRadius: 3,
+    borderBottomRightRadius: 3,
+    backgroundColor: isDarkMode ? '#34D399' : '#0E3D23',
+  },
+
   rowDivider: {
     height: 1,
     backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.06)' : '#EFF1E9',
-    marginHorizontal: 16,
+    marginHorizontal: 14,
   },
 
-  // Icon avatar box (38x38 mint pill circle)
-  mintIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+  // Category Icon Avatar (40x40 circle)
+  iconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 2,
   },
 
-  // Row Content
+  // Content Area
   rowContent: {
     flex: 1,
     minWidth: 0,
@@ -619,13 +818,15 @@ const getStyles = (themeColors, isDarkMode) => StyleSheet.create({
   },
   rowTitle: {
     flex: 1,
-    fontSize: 15,
-    fontWeight: '600',
-    color: themeColors.text,
+    fontSize: 14.5,
     letterSpacing: -0.2,
   },
-  rowTitleBold: {
+  unreadTitle: {
     fontWeight: '700',
+    color: themeColors.text,
+  },
+  readTitle: {
+    fontWeight: '500',
     color: themeColors.text,
   },
   rowTime: {
@@ -634,50 +835,64 @@ const getStyles = (themeColors, isDarkMode) => StyleSheet.create({
     color: themeColors.textMuted,
     flexShrink: 0,
   },
+  unreadTime: {
+    fontWeight: '600',
+    color: isDarkMode ? '#34D399' : '#0E3D23',
+  },
   rowDesc: {
-    fontSize: 13,
-    color: themeColors.textMuted,
+    fontSize: 12.5,
     lineHeight: 18,
     marginBottom: 8,
   },
+  unreadDesc: {
+    color: isDarkMode ? '#D1D5DB' : '#374151',
+  },
+  readDesc: {
+    color: themeColors.textMuted,
+  },
+
+  // Tag Row & New Badge
   tagRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  tag: {
+  typeBadge: {
     alignSelf: 'flex-start',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
   },
-  tagText: {
+  typeBadgeText: {
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.3,
   },
-  unreadBadge: {
+  newPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.2)' : '#DCFCE7',
-    paddingHorizontal: 6,
+    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.22)' : '#DCFCE7',
+    borderWidth: 1,
+    borderColor: isDarkMode ? 'rgba(52, 211, 153, 0.4)' : '#BBF7D0',
+    paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: 6,
+    borderRadius: 7,
   },
-  unreadDot: {
+  pulsingDot: {
     width: 5,
     height: 5,
     borderRadius: 2.5,
     backgroundColor: isDarkMode ? '#34D399' : '#0E3D23',
   },
-  unreadBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
+  newPillText: {
+    fontSize: 9.5,
+    fontWeight: '800',
     color: isDarkMode ? '#34D399' : '#0E3D23',
+    letterSpacing: 0.4,
   },
 
-  // ── Skeleton ─────────────────────────────────────────────────────────────────
+  // ── Skeleton Loader ─────────────────────────────────────────────────────────
   skeletonWrap: {
     marginHorizontal: 16,
     marginTop: 16,
@@ -697,9 +912,9 @@ const getStyles = (themeColors, isDarkMode) => StyleSheet.create({
     borderBottomColor: isDarkMode ? 'rgba(255, 255, 255, 0.06)' : '#EFF1E9',
   },
   skeletonIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#E5E7EB',
   },
   skeletonBody: { flex: 1, gap: 8 },
@@ -749,4 +964,4 @@ const getStyles = (themeColors, isDarkMode) => StyleSheet.create({
   },
 });
 
-export default NotificationsScreen;
+export default NotificationsScreen;
