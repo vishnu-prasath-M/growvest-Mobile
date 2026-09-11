@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Investment = require('../models/Investment');
 const ChitMember = require('../models/ChitMember');
+const Chit = require('../models/Chit');
 const PocketMoney = require('../models/PocketMoney');
 
 /**
@@ -211,24 +212,51 @@ async function getUserPortfolioSummary(userIdInput) {
     }
   });
 
-  // ─── 4. PENDING WITHDRAWALS ────────────────────────────────────────────────
+  // ─── 4. WITHDRAWALS DEDUCTION ─────────────────────────────────────────────
   const Withdrawal = require('../models/Withdrawal');
-  const pendingWithdrawals = await Withdrawal.find({
+  const userWithdrawals = await Withdrawal.find({
     $or: userOrConditions,
-    status: 'pending',
+    status: { $in: ['pending', 'approved', 'paid'] },
   });
-  const pendingWithdrawalAmount = pendingWithdrawals.reduce((sum, w) => sum + (Number(w.amount) || 0), 0);
+
+  const closedInvestmentIds = new Set(
+    investments
+      .filter(inv => inv.status === 'withdrawn' || inv.withdrawalStatus === 'withdrawn' || inv.status === 'reinvested' || inv.withdrawalStatus === 'reinvested')
+      .map(inv => inv._id.toString())
+  );
+
+  let pendingWithdrawalAmount = 0;
+  let unlinkedPaidSavingsWithdrawals = 0;
+
+  userWithdrawals.forEach(w => {
+    const amt = Number(w.amount) || 0;
+    if (w.status === 'pending') {
+      pendingWithdrawalAmount += amt;
+    } else if (w.status === 'paid' || w.status === 'approved') {
+      const isChit = w.withdrawType === 'chit';
+      const isSip = w.withdrawType === 'sip';
+      if (!isChit && !isSip) {
+        const linkedInvId = w.investmentId ? w.investmentId.toString() : null;
+        if (linkedInvId && closedInvestmentIds.has(linkedInvId)) {
+          // Already accounted for by completely closing the investment
+        } else {
+          // Paid/approved withdrawal against general matured savings / duration investments
+          unlinkedPaidSavingsWithdrawals += amt;
+        }
+      }
+    }
+  });
 
   // ─── 5. AGGREGATION ─────────────────────────────────────────────────────────
   // Current active pocket money holding is pocketMoneyRemaining (active principal remaining to be released)
   const totalInvested = totalDurationInvested + totalChitInvested + pocketMoneyRemaining;
   const totalLocked = totalDurationLocked + totalChitLocked + pocketMoneyRemaining;
 
-  // totalBalance = what the user currently has invested + accrued interest
-  const totalBalance = totalInvested + totalAccruedInterest;
+  // availableToWithdraw = truly liquid right now in app (matured/eligible active deposits + chit winnings - pending requests - generic/unlinked paid withdrawals)
+  const availableToWithdraw = Math.max(0, maturedWithdrawalAvailable + chitWithdrawalAvailable - pendingWithdrawalAmount - unlinkedPaidSavingsWithdrawals);
 
-  // availableToWithdraw = truly liquid right now in app (matured/eligible active deposits + chit winnings - pending withdrawal requests)
-  const availableToWithdraw = Math.max(0, maturedWithdrawalAvailable + chitWithdrawalAvailable - pendingWithdrawalAmount);
+  // totalBalance = what the user currently has invested + accrued interest - generic/unlinked paid withdrawals
+  const totalBalance = Math.max(0, totalInvested + totalAccruedInterest - unlinkedPaidSavingsWithdrawals);
 
   // Next unlock date — earliest maturity date among locked investments
   const lockedInvestments = enrichedInvestments.filter(i => i.isLocked && i.maturityDate);
