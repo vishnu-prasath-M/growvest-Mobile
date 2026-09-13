@@ -252,7 +252,7 @@ const HomeScreen = ({ navigation }) => {
     {
       label: 'Investment',
       image: require('../../../assets/add.png'),
-      onPress: () => navigation.navigate('InvestmentAmount'),
+      onPress: () => navigation.navigate('InvestmentDashboard'),
     },
     {
       label: 'SIP',
@@ -388,7 +388,7 @@ const HomeScreen = ({ navigation }) => {
                       value: hideBalance
                         ? '••••'
                         : formatCurrency(balances?.availableToWithdraw || 0),
-                      onPress: () => navigation.navigate('Withdrawal'),
+                      onPress: () => navigation.navigate('Withdraw'),
                     },
                     {
                       icon: 'trending-up',
@@ -449,7 +449,7 @@ const HomeScreen = ({ navigation }) => {
               <TouchableOpacity
                 style={styles.pendingBanner}
                 activeOpacity={0.8}
-                onPress={() => navigation.navigate('Withdrawal')}
+                onPress={() => navigation.navigate('Withdraw')}
               >
                 <View style={styles.pendingIconBox}>
                   <MaterialCommunityIcons name="clock-outline" size={18} color={colors.warning} />

@@ -255,56 +255,12 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
       >
         {/* Title Section */}
         <View style={styles.titleSection}>
-          <Text style={styles.mainTitle}>Investment Plans</Text>
+          <Text style={styles.mainTitle}>{isReinvestment ? 'Reinvest Funds' : 'Select Plan & Amount'}</Text>
           <Text style={styles.mainSubtitle}>
-            Grow your money with high-yield fixed return plans and guaranteed daily interest payouts.
+            {isReinvestment
+              ? 'Choose a plan to reinvest your matured payout.'
+              : 'Choose your desired fixed return plan and enter your investment amount.'}
           </Text>
-        </View>
-
-        {/* Investment Portfolio Summary Card */}
-        <View style={styles.heroCardOuter}>
-          <LinearGradient
-            colors={isDarkMode ? ['#085428', '#0A6C35', '#043417'] : ['#0E3D23', '#1A5C39', '#2E8B5A']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.heroCard}
-          >
-            <View style={styles.heroRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.heroLabel}>TOTAL INVESTED</Text>
-                <Text style={styles.heroAmount}>
-                  ₹{(investmentSummary.totalInvested || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                </Text>
-              </View>
-              <View style={styles.heroBadge}>
-                <MaterialCommunityIcons name="chart-line" size={18} color="#E8D083" />
-                <Text style={styles.heroBadgeText}>{investmentSummary.activeCount || 0} Active</Text>
-              </View>
-            </View>
-
-            <View style={styles.heroDivider} />
-
-            <View style={styles.heroStatsRow}>
-              <View style={styles.heroStatItem}>
-                <Text style={styles.heroStatLabel}>Active Plans</Text>
-                <Text style={styles.heroStatValue}>{investmentSummary.activeCount || 0}</Text>
-              </View>
-              <View style={styles.heroStatItem}>
-                <Text style={styles.heroStatLabel}>Earned Interest</Text>
-                <Text style={[styles.heroStatValue, { color: '#FCD34D' }]}>
-                  ₹{(investmentSummary.totalEarned || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                </Text>
-              </View>
-              <View style={styles.heroStatItem}>
-                <Text style={styles.heroStatLabel}>Daily Returns</Text>
-                <Text style={styles.heroStatValue}>
-                  {investmentSummary.dailyInterest > 0
-                    ? `₹${investmentSummary.dailyInterest.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/d`
-                    : '—'}
-                </Text>
-              </View>
-            </View>
-          </LinearGradient>
         </View>
 
         {/* Reinvest Banner */}
