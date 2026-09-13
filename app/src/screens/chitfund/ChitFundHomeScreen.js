@@ -269,24 +269,31 @@ const ChitFundHomeScreen = ({ navigation }) => {
                   </View>
                   <View style={styles.heroStatusPill}>
                     <View style={styles.heroStatusDot} />
-                    <Text style={styles.heroStatusText}>Active</Text>
+                    <Text style={styles.heroStatusText}>{dashboard.activeChits || 0} Active</Text>
                   </View>
                 </View>
 
-                <Text style={styles.heroTitle}>Active Chits</Text>
-                {/* Animated counter */}
-                <Text style={styles.heroCount}>{animatedChitCount}</Text>
+                <Text style={styles.heroTitle}>Total Chit Invested</Text>
+                {/* Invested amount from database */}
+                <Text style={styles.heroCount}>{formatCurrency(dashboard.totalPaid)}</Text>
 
                 <View style={styles.heroStatsRow}>
                   <View style={styles.heroStatItem}>
-                    <Text style={styles.heroStatLabel}>Total Paid</Text>
-                    <Text style={styles.heroStatValue}>{formatCurrency(dashboard.totalPaid)}</Text>
+                    <Text style={styles.heroStatLabel}>Active Chits</Text>
+                    <Text style={styles.heroStatValue}>{dashboard.activeChits || 0}</Text>
                   </View>
                   <View style={styles.heroDividerV} />
                   <View style={styles.heroStatItem}>
                     <Text style={styles.heroStatLabel}>Dividend Earned</Text>
                     <Text style={[styles.heroStatValue, { color: colors.gold }]}>
                       {formatCurrency(dashboard.totalDividend)}
+                    </Text>
+                  </View>
+                  <View style={styles.heroDividerV} />
+                  <View style={styles.heroStatItem}>
+                    <Text style={styles.heroStatLabel}>Next Due</Text>
+                    <Text style={styles.heroStatValue}>
+                      {formatCurrency(dashboard.upcomingDue || 0)}
                     </Text>
                   </View>
                 </View>
@@ -441,11 +448,11 @@ const getStyles = (colors) => StyleSheet.create({
     marginBottom: 4,
   },
   heroCount: {
-    fontSize: 48,
+    fontSize: 32,
     fontWeight: '800',
     color: colors.white,
-    letterSpacing: -1.5,
-    marginBottom: 24,
+    letterSpacing: -0.5,
+    marginBottom: 20,
   },
   heroStatsRow: {
     flexDirection: 'row',
@@ -456,18 +463,18 @@ const getStyles = (colors) => StyleSheet.create({
   },
   heroStatItem: { flex: 1 },
   heroStatLabel: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.6)',
+    fontSize: 10.5,
+    color: 'rgba(255,255,255,0.7)',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 4,
+    marginBottom: 3,
   },
-  heroStatValue: { fontSize: 18, fontWeight: '700', color: colors.white },
+  heroStatValue: { fontSize: 15, fontWeight: '700', color: colors.white },
   heroDividerV: {
     width: 1,
-    height: 32,
+    height: 30,
     backgroundColor: 'rgba(255,255,255,0.15)',
-    marginHorizontal: 20,
+    marginHorizontal: 10,
   },
 
   // Available Banner

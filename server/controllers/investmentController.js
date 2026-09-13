@@ -691,3 +691,24 @@ exports.reinvestInvestment = async (req, res) => {
   }
 };
 
+exports.getInvestmentSummary = async (req, res) => {
+  try {
+    const { getUserPortfolioSummary } = require('../utils/portfolioHelper');
+    const summary = await getUserPortfolioSummary(req.user.id || req.user._id);
+    if (!summary) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.status(200).json({
+      totalInvested: summary.balances.totalDurationInvested || 0,
+      activeCount: summary.balances.activeDurationInvestmentsCount || 0,
+      totalEarned: summary.balances.durationAccruedInterest || summary.balances.totalInterestEarned || 0,
+      dailyInterest: summary.balances.durationDailyInterest || summary.balances.dailyInterest || 0,
+    });
+  } catch (error) {
+    console.error('Error fetching investment summary:', error);
+    res.status(500).json({ message: 'Error fetching investment summary', error: error.message });
+  }
+};
+
+

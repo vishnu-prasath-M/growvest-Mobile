@@ -297,6 +297,11 @@ async function getUserPortfolioSummary(userIdInput) {
     balances: {
       totalBalance,
       totalInvested,
+      totalDurationInvested,
+      totalGeneralInvested: totalDurationInvested,
+      activeDurationInvestmentsCount: enrichedInvestments.filter(i => !['rejected', 'withdrawn', 'reinvested', 'pending'].includes(i.status)).length,
+      durationDailyInterest: totalDailyInterest,
+      durationAccruedInterest: totalAccruedInterest,
       totalLocked,
       dailyInterest: totalDailyInterest,
       totalInterestEarned: totalAccruedInterest,

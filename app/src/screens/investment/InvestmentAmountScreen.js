@@ -50,11 +50,36 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
   const [selectedWithdrawalDate, setSelectedWithdrawalDate] = useState(defaultWithdrawalDate.toISOString().split('T')[0]);
   const [customDaysInput, setCustomDaysInput] = useState('365');
   const [datePickerModalVisible, setDatePickerModalVisible] = useState(false);
+  const [investmentSummary, setInvestmentSummary] = useState({
+    totalInvested: 0,
+    activeCount: 0,
+    totalEarned: 0,
+    dailyInterest: 0,
+  });
+
+  const loadInvestmentSummary = async () => {
+    try {
+      const summary = await investmentService.getInvestmentSummary();
+      if (summary) {
+        setInvestmentSummary(summary);
+      }
+    } catch (error) {
+      console.error('Error loading investment summary:', error);
+    }
+  };
 
   useEffect(() => {
     loadUserData();
     loadPlans();
+    loadInvestmentSummary();
   }, []);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadInvestmentSummary();
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   useEffect(() => {
     if (route.params?.initialPlan) {
@@ -228,6 +253,60 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Title Section */}
+        <View style={styles.titleSection}>
+          <Text style={styles.mainTitle}>Investment Plans</Text>
+          <Text style={styles.mainSubtitle}>
+            Grow your money with high-yield fixed return plans and guaranteed daily interest payouts.
+          </Text>
+        </View>
+
+        {/* Investment Portfolio Summary Card */}
+        <View style={styles.heroCardOuter}>
+          <LinearGradient
+            colors={isDarkMode ? ['#085428', '#0A6C35', '#043417'] : ['#0E3D23', '#1A5C39', '#2E8B5A']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.heroCard}
+          >
+            <View style={styles.heroRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.heroLabel}>TOTAL INVESTED</Text>
+                <Text style={styles.heroAmount}>
+                  ₹{(investmentSummary.totalInvested || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                </Text>
+              </View>
+              <View style={styles.heroBadge}>
+                <MaterialCommunityIcons name="chart-line" size={18} color="#E8D083" />
+                <Text style={styles.heroBadgeText}>{investmentSummary.activeCount || 0} Active</Text>
+              </View>
+            </View>
+
+            <View style={styles.heroDivider} />
+
+            <View style={styles.heroStatsRow}>
+              <View style={styles.heroStatItem}>
+                <Text style={styles.heroStatLabel}>Active Plans</Text>
+                <Text style={styles.heroStatValue}>{investmentSummary.activeCount || 0}</Text>
+              </View>
+              <View style={styles.heroStatItem}>
+                <Text style={styles.heroStatLabel}>Earned Interest</Text>
+                <Text style={[styles.heroStatValue, { color: '#FCD34D' }]}>
+                  ₹{(investmentSummary.totalEarned || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                </Text>
+              </View>
+              <View style={styles.heroStatItem}>
+                <Text style={styles.heroStatLabel}>Daily Returns</Text>
+                <Text style={styles.heroStatValue}>
+                  {investmentSummary.dailyInterest > 0
+                    ? `₹${investmentSummary.dailyInterest.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/d`
+                    : '—'}
+                </Text>
+              </View>
+            </View>
+          </LinearGradient>
+        </View>
+
         {/* Reinvest Banner */}
         {isReinvestment && (
           <View style={styles.reinvestBanner}>
@@ -862,6 +941,88 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 20,
+  },
+  titleSection: {
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 14,
+  },
+  mainTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: colors.text || (isDarkMode ? '#FFFFFF' : '#0F172A'),
+    marginBottom: 4,
+  },
+  mainSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.textSecondary || (isDarkMode ? '#9CA3AF' : '#64748B'),
+  },
+  heroCardOuter: {
+    paddingHorizontal: 20,
+    marginBottom: 6,
+  },
+  heroCard: {
+    borderRadius: 20,
+    padding: 18,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+  },
+  heroRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  heroLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#A7F3D0',
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+  heroAmount: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  heroBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
+  },
+  heroBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  heroDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    marginVertical: 14,
+  },
+  heroStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  heroStatItem: {
+    flex: 1,
+  },
+  heroStatLabel: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.75)',
+    marginBottom: 2,
+  },
+  heroStatValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   reinvestBanner: {
     margin: 20,
