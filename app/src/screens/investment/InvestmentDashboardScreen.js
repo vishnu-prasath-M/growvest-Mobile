@@ -107,15 +107,6 @@ const InvestmentDashboardScreen = ({ navigation }) => {
       maximumFractionDigits: 2,
     })}`;
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '—';
-    return new Date(dateStr).toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
-  };
-
   const getStatusLabel = (item) => {
     if (item.status === 'reinvested' || item.withdrawalStatus === 'reinvested') return 'REINVESTED';
     if (item.status === 'pending') return 'PENDING';
@@ -137,31 +128,26 @@ const InvestmentDashboardScreen = ({ navigation }) => {
         return {
           bg: isDark ? 'rgba(59, 130, 246, 0.18)' : '#DBEAFE',
           text: isDark ? '#60A5FA' : '#2563EB',
-          icon: 'refresh',
         };
       case 'MATURED':
         return {
           bg: isDark ? 'rgba(16, 185, 129, 0.2)' : '#DCFCE7',
           text: isDark ? '#34D399' : '#059669',
-          icon: 'check-circle-outline',
         };
       case 'ACTIVE':
         return {
           bg: isDark ? 'rgba(245, 158, 11, 0.18)' : '#FEF3C7',
           text: isDark ? '#FBBF24' : '#D97706',
-          icon: 'clock-outline',
         };
       case 'WITHDRAWN':
         return {
           bg: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
           text: isDark ? '#9CA3AF' : '#64748B',
-          icon: 'check-all',
         };
       default:
         return {
           bg: isDark ? 'rgba(148, 163, 184, 0.2)' : '#F1F5F9',
           text: isDark ? '#CBD5E1' : '#475569',
-          icon: 'information-outline',
         };
     }
   };
@@ -265,8 +251,8 @@ const InvestmentDashboardScreen = ({ navigation }) => {
 
         {/* Section Header & Filters */}
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>My Investments</Text>
-          <Text style={styles.sectionCount}>{investments.length} Plans</Text>
+          <Text style={styles.sectionHeaderTitle}>MY INVESTMENTS</Text>
+          <Text style={styles.sectionHeaderCount}>{filteredInvestments.length} Total</Text>
         </View>
 
         {/* Filter Pills */}
@@ -285,18 +271,16 @@ const InvestmentDashboardScreen = ({ navigation }) => {
           ))}
         </View>
 
-        {/* Investments List */}
+        {/* Investments List - Exact "My Investments" Grouped Card UI */}
         {loading ? (
           <SkeletonLoader variant="list" count={3} />
         ) : filteredInvestments.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <View style={styles.emptyIconCircle}>
-              <MaterialCommunityIcons name="finance" size={48} color="#94A3B8" />
-            </View>
+          <View style={styles.emptyCard}>
+            <MaterialCommunityIcons name="chart-box-outline" size={44} color={themeColors.textTertiary || '#94A3B8'} />
             <Text style={styles.emptyTitle}>
               {activeFilter !== 'All' ? `No ${activeFilter} Investments` : 'No Investments Found'}
             </Text>
-            <Text style={styles.emptySubtitle}>
+            <Text style={styles.emptyBody}>
               {activeFilter !== 'All'
                 ? `You currently do not have any ${activeFilter.toLowerCase()} investment plans.`
                 : 'Start a high-yield fixed return plan to earn daily interest and grow your capital.'}
@@ -310,57 +294,46 @@ const InvestmentDashboardScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         ) : (
-          filteredInvestments.map((item) => {
-            const status = getStatusLabel(item);
-            const badge = getStatusBadgeStyle(status);
-            const planTitle = getPlanDisplayName(item.type);
-            const refId = item.ref || item.refId || (item._id ? `INV-${String(item._id).slice(-6).toUpperCase()}` : '');
+          <View style={styles.investmentsGroupCard}>
+            {filteredInvestments.map((item, idx) => {
+              const statusLabel = getStatusLabel(item);
+              const badge = getStatusBadgeStyle(statusLabel);
+              const planTitle = getPlanDisplayName(item.type);
+              const planSubtitle = `Invested: ${formatCurrency(item.amount)} • ${item.interestRate || 12}% p.a.`;
 
-            return (
-              <TouchableOpacity
-                key={String(item._id)}
-                style={styles.invCard}
-                activeOpacity={0.85}
-                onPress={() => setSelectedDeposit(item)}
-              >
-                <View style={styles.cardHeader}>
-                  <View style={styles.cardIconBox}>
-                    <MaterialCommunityIcons name="trending-up" size={20} color={isDark ? '#34D399' : '#0E3D23'} />
-                  </View>
-                  <View style={styles.cardHeaderText}>
-                    <Text style={styles.cardTitle} numberOfLines={1}>{planTitle}</Text>
-                    <Text style={styles.cardSubText}>Ref: {refId}</Text>
-                  </View>
-                  <View style={[styles.statusBadge, { backgroundColor: badge.bg }]}>
-                    <MaterialCommunityIcons name={badge.icon} size={12} color={badge.text} style={{ marginRight: 4 }} />
-                    <Text style={[styles.statusBadgeText, { color: badge.text }]}>{status}</Text>
-                  </View>
+              return (
+                <View key={String(item._id || idx)}>
+                  {idx > 0 && <View style={styles.cardDivider} />}
+                  <TouchableOpacity
+                    style={styles.investmentRow}
+                    activeOpacity={0.7}
+                    onPress={() => setSelectedDeposit(item)}
+                  >
+                    <View style={styles.mintIconBox}>
+                      <MaterialCommunityIcons name="trending-up" size={20} color={isDark ? '#34D399' : '#0E3D23'} />
+                    </View>
+
+                    <View style={styles.textContent}>
+                      <Text style={styles.titleText} numberOfLines={1}>
+                        {planTitle}
+                      </Text>
+                      <Text style={styles.subText} numberOfLines={1}>
+                        {planSubtitle}
+                      </Text>
+                    </View>
+
+                    <View style={[styles.badgePill, { backgroundColor: badge.bg }]}>
+                      <Text style={[styles.badgePillText, { color: badge.text }]}>
+                        {statusLabel}
+                      </Text>
+                    </View>
+
+                    <MaterialCommunityIcons name="chevron-right" size={20} color={isDark ? '#6B7280' : '#8E9486'} />
+                  </TouchableOpacity>
                 </View>
-
-                <View style={styles.cardDivider} />
-
-                <View style={styles.cardDetailsRow}>
-                  <View style={styles.cardDetailItem}>
-                    <Text style={styles.cardDetailLabel}>INVESTED</Text>
-                    <Text style={styles.cardDetailValue}>{formatCurrency(item.amount)}</Text>
-                  </View>
-                  <View style={styles.cardDetailItem}>
-                    <Text style={styles.cardDetailLabel}>INTEREST RATE</Text>
-                    <Text style={styles.cardDetailValue}>{item.interestRate || 12}% p.a.</Text>
-                  </View>
-                  <View style={styles.cardDetailItem}>
-                    <Text style={styles.cardDetailLabel}>MATURITY</Text>
-                    <Text style={styles.cardDetailValue}>{formatDate(item.maturityDate)}</Text>
-                  </View>
-                </View>
-
-                <View style={styles.cardFooter}>
-                  <Text style={styles.viewDetailsText}>View Details & Breakdown</Text>
-                  <MaterialCommunityIcons name="chevron-right" size={18} color="#085428" />
-                </View>
-              </TouchableOpacity>
-            );
-          })
+              );
+            })}
+          </View>
         )}
 
         <View style={{ height: 60 }} />
@@ -536,15 +509,18 @@ const getStyles = (themeColors, isDark) =>
       justifyContent: 'space-between',
       alignItems: 'center',
       marginBottom: 10,
+      paddingHorizontal: 4,
     },
-    sectionTitle: {
-      fontSize: 18,
+    sectionHeaderTitle: {
+      fontSize: 12,
       fontWeight: '800',
-      color: themeColors.text || (isDark ? '#FFFFFF' : '#0F172A'),
+      color: isDark ? '#9CA3AF' : '#686D62',
+      letterSpacing: 1.2,
+      textTransform: 'uppercase',
     },
-    sectionCount: {
-      fontSize: 13,
-      fontWeight: '700',
+    sectionHeaderCount: {
+      fontSize: 11,
+      fontWeight: '600',
       color: themeColors.textMuted || (isDark ? '#9CA3AF' : '#64748B'),
     },
     filterRow: {
@@ -570,132 +546,64 @@ const getStyles = (themeColors, isDark) =>
       color: '#FFFFFF',
       fontWeight: '700',
     },
-    invCard: {
-      backgroundColor: isDark ? '#0E1E15' : (themeColors.surface || '#FFFFFF'),
-      borderRadius: 16,
-      padding: 16,
-      marginBottom: 12,
+    investmentsGroupCard: {
+      backgroundColor: themeColors.surface || (isDark ? '#0E1E15' : '#FFFFFF'),
+      borderRadius: 24,
       borderWidth: 1,
-      borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
-      shadowColor: '#000',
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#ECEFE6',
+      overflow: 'hidden',
+      shadowColor: '#0E3D23',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.04,
-      shadowRadius: 6,
+      shadowOpacity: isDark ? 0 : 0.04,
+      shadowRadius: 8,
       elevation: 2,
-    },
-    cardHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    cardIconBox: {
-      width: 38,
-      height: 38,
-      borderRadius: 10,
-      backgroundColor: isDark ? 'rgba(52, 211, 153, 0.12)' : '#DCFCE7',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: 12,
-    },
-    cardHeaderText: {
-      flex: 1,
-    },
-    cardTitle: {
-      fontSize: 15,
-      fontWeight: '700',
-      color: themeColors.text || (isDark ? '#FFFFFF' : '#0F172A'),
-      marginBottom: 2,
-    },
-    cardSubText: {
-      fontSize: 12,
-      color: themeColors.textMuted || (isDark ? '#9CA3AF' : '#64748B'),
-    },
-    statusBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 12,
-    },
-    statusBadgeText: {
-      fontSize: 11,
-      fontWeight: '700',
-      letterSpacing: 0.3,
     },
     cardDivider: {
       height: 1,
-      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : '#F1F5F9',
-      marginVertical: 12,
+      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : '#EFF1E9',
+      marginHorizontal: 16,
     },
-    cardDetailsRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-    },
-    cardDetailItem: {
-      flex: 1,
-    },
-    cardDetailLabel: {
-      fontSize: 10,
-      fontWeight: '600',
-      color: themeColors.textMuted || (isDark ? '#9CA3AF' : '#64748B'),
-      letterSpacing: 0.5,
-      marginBottom: 3,
-    },
-    cardDetailValue: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: themeColors.text || (isDark ? '#FFFFFF' : '#0F172A'),
-    },
-    cardFooter: {
+    investmentRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
-      marginTop: 12,
-      paddingTop: 10,
-      borderTopWidth: 1,
-      borderTopColor: isDark ? 'rgba(255, 255, 255, 0.04)' : '#F8FAFC',
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      gap: 12,
     },
-    viewDetailsText: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: '#085428',
-    },
-    emptyContainer: {
-      alignItems: 'center',
+    mintIconBox: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: isDark ? 'rgba(16, 185, 129, 0.16)' : '#E3F6EC',
       justifyContent: 'center',
+      alignItems: 'center',
+    },
+    textContent: { flex: 1, minWidth: 0 },
+    titleText: { fontSize: 15, fontWeight: '700', color: themeColors.text || (isDark ? '#FFFFFF' : '#0F172A') },
+    subText: { fontSize: 12, fontWeight: '500', color: themeColors.textMuted || (isDark ? '#9CA3AF' : '#64748B'), marginTop: 2 },
+    badgePill: {
+      borderRadius: 999,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      marginRight: 2,
+    },
+    badgePillText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.3 },
+    emptyCard: {
+      backgroundColor: themeColors.surface || (isDark ? '#0E1E15' : '#FFFFFF'),
+      borderRadius: 24,
       padding: 32,
-      backgroundColor: isDark ? '#0E1E15' : (themeColors.surface || '#FFFFFF'),
-      borderRadius: 18,
-      borderWidth: 1,
-      borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
-      marginTop: 8,
-    },
-    emptyIconCircle: {
-      width: 72,
-      height: 72,
-      borderRadius: 36,
-      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : '#F1F5F9',
       alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#ECEFE6',
     },
-    emptyTitle: {
-      fontSize: 17,
-      fontWeight: '700',
-      color: themeColors.text || (isDark ? '#FFFFFF' : '#0F172A'),
-      marginBottom: 6,
-    },
-    emptySubtitle: {
-      fontSize: 13,
-      color: themeColors.textMuted || (isDark ? '#9CA3AF' : '#64748B'),
-      textAlign: 'center',
-      lineHeight: 18,
-      marginBottom: 18,
-    },
+    emptyTitle: { fontSize: 16, fontWeight: '700', color: themeColors.text || (isDark ? '#FFFFFF' : '#0F172A'), marginTop: 10 },
+    emptyBody: { fontSize: 13, color: themeColors.textMuted || (isDark ? '#9CA3AF' : '#64748B'), textAlign: 'center', marginTop: 4, lineHeight: 18 },
     emptyActionBtn: {
       backgroundColor: '#085428',
       paddingHorizontal: 20,
       paddingVertical: 10,
       borderRadius: 20,
+      marginTop: 16,
     },
     emptyActionBtnText: {
       color: '#FFFFFF',
