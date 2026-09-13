@@ -31,6 +31,7 @@ import WithdrawScreen from '../screens/tabs/WithdrawScreen';
 import ProfileScreen from '../screens/tabs/ProfileScreen';
 
 // Investment Flow Screens
+import InvestmentDashboardScreen from '../screens/investment/InvestmentDashboardScreen';
 import InvestmentAmountScreen from '../screens/investment/InvestmentAmountScreen';
 import InvestmentPaymentScreen from '../screens/investment/InvestmentPaymentScreen';
 import InvestmentStatusScreen from '../screens/investment/InvestmentStatusScreen';
@@ -516,6 +517,7 @@ const AppNavigator = () => {
           <Stack.Screen name="MainTabs" component={TabNavigator} />
           <Stack.Screen name="Transactions" component={TransactionsScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="InvestmentDashboard" component={InvestmentDashboardScreen} options={{ headerShown: false }} />
           <Stack.Screen name="InvestmentAmount" component={InvestmentAmountScreen} options={{ headerShown: false }} />
           <Stack.Screen name="InvestmentPayment" component={InvestmentPaymentScreen} options={{ headerShown: false }} />
           <Stack.Screen name="InvestmentStatus" component={InvestmentStatusScreen} options={{ headerShown: false }} />
