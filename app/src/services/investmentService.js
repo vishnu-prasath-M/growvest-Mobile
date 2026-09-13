@@ -41,6 +41,16 @@ export const investmentService = {
       throw error.response?.data || error.message;
     }
   },
+
+  // Get user investment summary (total invested, active plans, earned)
+  getInvestmentSummary: async () => {
+    try {
+      const response = await api.get('/investments/summary');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
   // Withdraw investment
   withdrawInvestment: async (id, upiId, amount) => {
     try {

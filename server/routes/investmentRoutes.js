@@ -4,6 +4,7 @@ const investmentController = require('../controllers/investmentController');
 const { protect, admin } = require('../middleware/authMiddleware');
 
 router.get('/plans', protect, investmentController.getPlans);
+router.get('/summary', protect, investmentController.getInvestmentSummary);
 router.post('/calculate-tier', protect, investmentController.calculateTier);
 router.post('/reinvest', protect, investmentController.reinvestInvestment);
 router.post('/:id/reinvest', protect, investmentController.reinvestInvestment);
