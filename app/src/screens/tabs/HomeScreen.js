@@ -349,7 +349,14 @@ const HomeScreen = ({ navigation }) => {
 
               <View style={styles.balanceCardInner}>
                 <View style={styles.balanceTopRow}>
-                  <Text style={styles.balanceLabelText}>Total Balance</Text>
+                  <TouchableOpacity
+                    style={styles.balanceHeaderRow}
+                    activeOpacity={0.7}
+                    onPress={() => navigation.navigate('Investments')}
+                  >
+                    <Text style={styles.balanceLabelText}>Investment Summary</Text>
+                    <MaterialCommunityIcons name="chevron-right" size={16} color="rgba(255,255,255,0.8)" />
+                  </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.eyeBtn}
                     activeOpacity={0.7}
@@ -364,8 +371,8 @@ const HomeScreen = ({ navigation }) => {
                   </TouchableOpacity>
                 </View>
 
-                <Text style={styles.balanceAmount}>
-                  {hideBalance ? '₹ ••••••' : formatCurrency(balances?.totalBalance)}
+                <Text style={styles.balanceAmount} numberOfLines={1} adjustsFontSizeToFit>
+                  {hideBalance ? '₹ ••••••' : formatCurrency(balances?.totalInvested || 0)}
                 </Text>
                 <View style={styles.balanceTrend}>
                   <MaterialCommunityIcons name="trending-up" size={14} color={colors.gold} />
@@ -376,8 +383,16 @@ const HomeScreen = ({ navigation }) => {
                 <View style={styles.statsRow}>
                   {[
                     {
+                      icon: 'wallet-outline',
+                      label: 'AVAILABLE',
+                      value: hideBalance
+                        ? '••••'
+                        : formatCurrency(balances?.availableToWithdraw || 0),
+                      onPress: () => navigation.navigate('Withdrawal'),
+                    },
+                    {
                       icon: 'trending-up',
-                      label: 'EARNED',
+                      label: 'EARNED/DAY',
                       value: hideBalance
                         ? '••••'
                         : balances?.dailyInterest
@@ -385,16 +400,24 @@ const HomeScreen = ({ navigation }) => {
                         : formatCurrency(0),
                     },
                     {
-                      icon: 'piggy-bank-outline',
-                      label: 'POCKET MONEY',
-                      value: hideBalance ? '••••' : formatCurrency(balances?.pocketMoneyRemaining ?? 0),
+                      icon: 'cash-check',
+                      label: 'TOTAL EARNED',
+                      value: hideBalance
+                        ? '••••'
+                        : formatCurrency(balances?.totalInterestEarned ?? balances?.totalEarned ?? balances?.totalInterest ?? 0),
                     },
                   ].map((s) => (
-                    <View key={s.label} style={styles.statPill}>
-                      <MaterialCommunityIcons name={s.icon} size={16} color={colors.gold} />
-                      <Text style={styles.statLabel}>{s.label}</Text>
-                      <Text style={styles.statValue}>{s.value}</Text>
-                    </View>
+                    <TouchableOpacity
+                      key={s.label}
+                      style={styles.statPill}
+                      activeOpacity={s.onPress ? 0.7 : 1}
+                      onPress={s.onPress}
+                      disabled={!s.onPress}
+                    >
+                      <MaterialCommunityIcons name={s.icon} size={15} color={colors.gold} />
+                      <Text style={styles.statLabel} numberOfLines={1}>{s.label}</Text>
+                      <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{s.value}</Text>
+                    </TouchableOpacity>
                   ))}
                 </View>
               </View>
@@ -420,38 +443,14 @@ const HomeScreen = ({ navigation }) => {
             </View>
           </View>
 
-          {/* ── Investment Summary ── */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Investment Summary</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Investments')} style={styles.viewAllBtn}>
-                <Text style={styles.viewAllText}>View all</Text>
-                <MaterialCommunityIcons name="chevron-right" size={15} color={colors.primary} />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.summaryGrid}>
-              <LinearGradient
-                colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[styles.summaryCard, styles.summaryCardAccent]}
+          {/* ── Pending Requests (if any) ── */}
+          {pendingRequests > 0 && (
+            <View style={styles.section}>
+              <TouchableOpacity
+                style={styles.pendingBanner}
+                activeOpacity={0.8}
+                onPress={() => navigation.navigate('Withdrawal')}
               >
-                <Text style={styles.summaryCardLabelLight}>Available</Text>
-                <Text style={styles.summaryCardValueLight}>
-                  {formatCurrency(balances?.availableToWithdraw || 0)}
-                </Text>
-                <Text style={styles.summaryCardTrendGold}>
-                  {isAvailable ? 'Ready to withdraw' : `🔒 Locked ${nextUnlockDate ? `(Unlocks ${nextUnlockDate})` : ''}`}
-                </Text>
-              </LinearGradient>
-              <View style={[styles.summaryCard, styles.summaryCardSurface]}>
-                <Text style={styles.summaryCardLabel}>Total Earned</Text>
-                <Text style={styles.summaryCardValue}>{formatCurrency(balances?.totalInterestEarned ?? balances?.totalEarned ?? balances?.totalInterest)}</Text>
-                <Text style={styles.summaryCardTrend}>Interest & returns</Text>
-              </View>
-            </View>
-            {pendingRequests > 0 && (
-              <View style={styles.pendingBanner}>
                 <View style={styles.pendingIconBox}>
                   <MaterialCommunityIcons name="clock-outline" size={18} color={colors.warning} />
                 </View>
@@ -460,9 +459,9 @@ const HomeScreen = ({ navigation }) => {
                   <Text style={styles.pendingCount}>{pendingRequests} awaiting</Text>
                 </View>
                 <MaterialCommunityIcons name="chevron-right" size={18} color={colors.textMuted} />
-              </View>
-            )}
-          </View>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* ── Tip Card ── */}
           <View style={[styles.section, { marginBottom: 4 }]}>
@@ -629,24 +628,25 @@ const getStyles = (colors) => StyleSheet.create({
     width: 120, height: 120, borderRadius: 60,
     backgroundColor: 'rgba(212,168,67,0.18)',
   },
-  balanceCardInner: { padding: 24 },
+  balanceCardInner: { padding: 22 },
   balanceTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  balanceHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   balanceLabelText: { fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
   eyeBtn: {
     width: 32, height: 32, borderRadius: 16,
     backgroundColor: 'rgba(255,255,255,0.15)',
     justifyContent: 'center', alignItems: 'center',
   },
-  balanceAmount: { fontSize: 38, fontWeight: '800', color: '#F8FAF9', letterSpacing: -1.5, marginTop: 12 },
+  balanceAmount: { fontSize: 34, fontWeight: '800', color: '#F8FAF9', letterSpacing: -1.2, marginTop: 12 },
   balanceTrend: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   balanceTrendText: { fontSize: 12, color: colors.gold, fontWeight: '600' },
-  statsRow: { flexDirection: 'row', gap: 8, marginTop: 20 },
+  statsRow: { flexDirection: 'row', gap: 6, marginTop: 18 },
   statPill: {
     flex: 1, backgroundColor: 'rgba(255,255,255,0.10)',
-    borderRadius: 16, padding: 12, gap: 4,
+    borderRadius: 14, paddingVertical: 10, paddingHorizontal: 8, gap: 4,
   },
-  statLabel: { fontSize: 10, color: 'rgba(255,255,255,0.65)', textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: '600' },
-  statValue: { fontSize: 13, fontWeight: '700', color: '#F8FAF9', letterSpacing: -0.3 },
+  statLabel: { fontSize: 9, color: 'rgba(255,255,255,0.65)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600' },
+  statValue: { fontSize: 12, fontWeight: '700', color: '#F8FAF9', letterSpacing: -0.3 },
 
   // Section
   section: { paddingHorizontal: 20, marginTop: 24 },
