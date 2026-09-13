@@ -28,6 +28,13 @@ const PocketMoneyScreen = ({ navigation }) => {
   const [selectedPlanId, setSelectedPlanId] = useState(null);
   const [kycModalVisible, setKycModalVisible] = useState(false);
 
+  const [summary, setSummary] = useState({
+    totalInvested: 0,
+    activeCount: 0,
+    totalPaidOut: 0,
+    totalRemaining: 0,
+  });
+
   const handleRequestPayout = async (planId, payoutAmt) => {
     try {
       if (!planId) return;
@@ -46,29 +53,50 @@ const PocketMoneyScreen = ({ navigation }) => {
   const loadData = async () => {
     try {
       setLoading(true);
-      // Fetch pocket money plans (enriched per plan with todayPayoutStatus)
-      const plansRes = await api.get('/pocket-money/my');
-      if (plansRes && plansRes.data && Array.isArray(plansRes.data)) {
-        setPocketPlans(plansRes.data);
+      // Fetch pocket money plans and summary concurrently from MongoDB
+      const [plansRes, summaryRes, txRes] = await Promise.allSettled([
+        api.get('/pocket-money/my'),
+        api.get('/pocket-money/summary'),
+        api.get('/transactions/my'),
+      ]);
+
+      let plans = [];
+      if (plansRes.status === 'fulfilled' && plansRes.value?.data && Array.isArray(plansRes.value.data)) {
+        plans = plansRes.value.data;
+        setPocketPlans(plans);
 
         const statusMap = {};
-        plansRes.data.forEach((p) => {
+        plans.forEach((p) => {
           if (p && p._id) {
             statusMap[p._id] = p.todayPayoutStatus || 'available';
           }
         });
         setPayoutStatuses(statusMap);
 
-        const active = plansRes.data.filter((p) => p && p.status === 'active');
+        const active = plans.filter((p) => p && p.status === 'active');
         if (active.length > 0) {
           setSelectedPlanId((prev) => (prev && active.some(p => p._id === prev) ? prev : active[0]._id));
         }
       }
 
+      if (summaryRes.status === 'fulfilled' && summaryRes.value?.data) {
+        setSummary(summaryRes.value.data);
+      } else {
+        // Fallback: Compute strictly over unique active plans (no duplicate count)
+        const uniqueMap = new Map();
+        plans.forEach(p => uniqueMap.set(p._id, p));
+        const uniqueActive = Array.from(uniqueMap.values()).filter(p => p.status === 'active');
+        setSummary({
+          totalInvested: uniqueActive.reduce((sum, p) => sum + (Number(p.investedAmount) || 0), 0),
+          activeCount: uniqueActive.length,
+          totalPaidOut: uniqueActive.reduce((sum, p) => sum + (Number(p.totalPaidOut) || 0), 0),
+          totalRemaining: uniqueActive.reduce((sum, p) => sum + (Number(p.remainingAmount) || 0), 0),
+        });
+      }
+
       // Fetch transaction list
-      const txRes = await api.get('/transactions/my');
-      if (txRes && txRes.data && Array.isArray(txRes.data)) {
-        const pocketTxs = txRes.data.filter(
+      if (txRes.status === 'fulfilled' && txRes.value?.data && Array.isArray(txRes.value.data)) {
+        const pocketTxs = txRes.value.data.filter(
           (tx) => tx && (tx.type === 'pocket_money_payout' || tx.type === 'pocket_money_invest')
         );
         setTransactions(pocketTxs);
@@ -130,6 +158,83 @@ const PocketMoneyScreen = ({ navigation }) => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[themeColors.primary]} />
         }
       >
+        {/* Title Section */}
+        <View style={styles.titleSection}>
+          <Text style={styles.mainTitle}>Pocket Money Plans</Text>
+          <Text style={styles.mainSubtitle}>
+            Enjoy regular automated payouts directly into your balance daily, every 2 days, or weekly.
+          </Text>
+        </View>
+
+        {/* ONE Main Card with Total Invested Amount */}
+        <View style={styles.heroCardOuter}>
+          <LinearGradient
+            colors={isDarkMode ? ['#085428', '#0A6C35', '#043417'] : ['#0E3D23', '#1A5C39', '#2E8B5A']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.heroCard}
+          >
+            <View style={styles.heroRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.heroLabel}>TOTAL POCKET INVESTED</Text>
+                <Text style={styles.heroAmount}>{formatCurrency(summary.totalInvested)}</Text>
+              </View>
+              <View style={styles.heroBadge}>
+                <MaterialCommunityIcons name="chart-line" size={18} color="#E8D083" />
+                <Text style={styles.heroBadgeText}>{summary.activeCount || 0} Active</Text>
+              </View>
+            </View>
+
+            <View style={styles.heroDivider} />
+
+            <View style={styles.heroStatsRow}>
+              <View style={styles.heroStatItem}>
+                <Text style={styles.heroStatLabel}>Active Plans</Text>
+                <Text style={styles.heroStatValue}>{summary.activeCount || 0}</Text>
+              </View>
+              <View style={styles.heroStatItem}>
+                <Text style={styles.heroStatLabel}>Released</Text>
+                <Text style={[styles.heroStatValue, { color: '#FCD34D' }]}>
+                  {formatCurrency(summary.totalPaidOut || 0)}
+                </Text>
+              </View>
+              <View style={styles.heroStatItem}>
+                <Text style={styles.heroStatLabel}>Remaining</Text>
+                <Text style={styles.heroStatValue}>
+                  {formatCurrency(summary.totalRemaining || 0)}
+                </Text>
+              </View>
+            </View>
+          </LinearGradient>
+        </View>
+
+        {/* Start New Pocket Money Plan Button (when user has active plans) */}
+        {activePlans.length > 0 && (
+          <TouchableOpacity
+            style={styles.startPlanBtn}
+            activeOpacity={0.85}
+            onPress={handleInvestMore}
+          >
+            <LinearGradient
+              colors={['#085428', '#0A6C35']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.startPlanGradient}
+            >
+              <MaterialCommunityIcons name="plus-circle-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.startPlanBtnText}>Start New Pocket Money Plan</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
+
+        {/* Section Header for Active Plans */}
+        {activePlans.length > 0 && (
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>My Pocket Plans</Text>
+            <Text style={styles.sectionCount}>{activePlans.length} {activePlans.length === 1 ? 'Plan' : 'Plans'}</Text>
+          </View>
+        )}
+
         {/* Active Plans Card List */}
         {activePlans.length > 0 ? (
           activePlans.map((plan, planIdx) => {
@@ -246,25 +351,6 @@ const PocketMoneyScreen = ({ navigation }) => {
               </Text>
             </TouchableOpacity>
           </View>
-        )}
-
-        {/* More Investment Button (Shown only when user currently has active plans) */}
-        {activePlans.length > 0 && (
-          <TouchableOpacity
-            style={styles.investMoreBtn}
-            activeOpacity={0.85}
-            onPress={handleInvestMore}
-          >
-            <LinearGradient
-              colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.investMoreGradient}
-            >
-              <MaterialCommunityIcons name="plus-circle-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-              <Text style={styles.investMoreText}>More Investment</Text>
-            </LinearGradient>
-          </TouchableOpacity>
         )}
 
         {/* Active Plan Detail Specs */}
@@ -460,8 +546,126 @@ const getStyles = (colors, isDarkMode) =>
     scrollContent: {
       paddingBottom: 20,
     },
+    titleSection: {
+      paddingHorizontal: 20,
+      paddingTop: 14,
+      paddingBottom: 14,
+    },
+    mainTitle: {
+      fontSize: 22,
+      fontWeight: '800',
+      color: colors.text || (isDarkMode ? '#FFFFFF' : '#0F172A'),
+      marginBottom: 4,
+    },
+    mainSubtitle: {
+      fontSize: 13,
+      lineHeight: 18,
+      color: colors.textSecondary || (isDarkMode ? '#9CA3AF' : '#64748B'),
+    },
+    heroCardOuter: {
+      paddingHorizontal: 20,
+      marginBottom: 16,
+    },
+    heroCard: {
+      borderRadius: 20,
+      padding: 18,
+      elevation: 4,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+    },
+    heroRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    heroLabel: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: '#A7F3D0',
+      letterSpacing: 0.8,
+      marginBottom: 4,
+    },
+    heroAmount: {
+      fontSize: 28,
+      fontWeight: '800',
+      color: '#FFFFFF',
+    },
+    heroBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255, 255, 255, 0.15)',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
+      gap: 6,
+    },
+    heroBadgeText: {
+      color: '#FFFFFF',
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    heroDivider: {
+      height: 1,
+      backgroundColor: 'rgba(255, 255, 255, 0.15)',
+      marginVertical: 14,
+    },
+    heroStatsRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    heroStatItem: {
+      flex: 1,
+    },
+    heroStatLabel: {
+      fontSize: 11,
+      color: 'rgba(255, 255, 255, 0.75)',
+      marginBottom: 2,
+    },
+    heroStatValue: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: '#FFFFFF',
+    },
+    startPlanBtn: {
+      marginHorizontal: 20,
+      borderRadius: 14,
+      overflow: 'hidden',
+      marginBottom: 20,
+    },
+    startPlanGradient: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 14,
+      gap: 8,
+    },
+    startPlanBtnText: {
+      color: '#FFFFFF',
+      fontSize: 15,
+      fontWeight: '700',
+    },
+    sectionHeaderRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      marginBottom: 12,
+    },
+    sectionTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: colors.text || (isDarkMode ? '#FFFFFF' : '#0F172A'),
+    },
+    sectionCount: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.textSecondary || (isDarkMode ? '#9CA3AF' : '#64748B'),
+    },
     activeCardOuter: {
-      margin: 20,
+      marginHorizontal: 20,
+      marginBottom: 16,
       borderRadius: 24,
       overflow: 'hidden',
       elevation: 8,

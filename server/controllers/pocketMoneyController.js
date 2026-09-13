@@ -699,4 +699,54 @@ exports.confirmReleasePayout = async (req, res) => {
   }
 };
 
+// GET /api/pocket-money/summary
+exports.getPocketMoneySummary = async (req, res) => {
+  try {
+    const pocketMonies = await PocketMoney.find({ userId: req.user._id });
+    
+    // Deduplicate by _id to prevent any duplicate counts
+    const uniquePlansMap = new Map();
+    pocketMonies.forEach(pm => {
+      uniquePlansMap.set(pm._id.toString(), pm);
+    });
+    const uniquePlans = Array.from(uniquePlansMap.values());
+
+    const activePlans = uniquePlans.filter(p => p.status === 'active');
+    const completedPlans = uniquePlans.filter(p => p.status === 'completed');
+
+    const totalActiveInvested = activePlans.reduce((sum, p) => sum + (Number(p.investedAmount) || 0), 0);
+    const totalActivePaidOut = activePlans.reduce((sum, p) => sum + (Number(p.totalPaidOut) || 0), 0);
+    const totalActiveRemaining = activePlans.reduce((sum, p) => sum + (Number(p.remainingAmount) || 0), 0);
+
+    const allTimeInvested = uniquePlans.reduce((sum, p) => sum + (Number(p.investedAmount) || 0), 0);
+    const allTimePaidOut = uniquePlans.reduce((sum, p) => sum + (Number(p.totalPaidOut) || 0), 0);
+
+    let nextPayoutDate = null;
+    activePlans.forEach(p => {
+      if (p.nextPayoutDate) {
+        const d = new Date(p.nextPayoutDate);
+        if (!nextPayoutDate || d < nextPayoutDate) {
+          nextPayoutDate = d;
+        }
+      }
+    });
+
+    res.json({
+      totalInvested: totalActiveInvested,
+      activeCount: activePlans.length,
+      completedCount: completedPlans.length,
+      totalPlansCount: uniquePlans.length,
+      totalPaidOut: totalActivePaidOut,
+      totalRemaining: totalActiveRemaining,
+      allTimeInvested,
+      allTimePaidOut,
+      nextPayoutDate: nextPayoutDate ? nextPayoutDate.toISOString() : null,
+    });
+  } catch (error) {
+    console.error('Error fetching pocket money summary:', error);
+    res.status(500).json({ message: 'Error fetching pocket money summary', error: error.message });
+  }
+};
+
 module.exports.runPocketMoneyPayouts = runPocketMoneyPayouts;
+
