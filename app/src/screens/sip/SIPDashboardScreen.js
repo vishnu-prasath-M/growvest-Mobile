@@ -126,14 +126,7 @@ const SIPDashboardScreen = ({ navigation }) => {
           <MaterialCommunityIcons name="arrow-left" size={24} color={themeColors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>SIP</Text>
-        <TouchableOpacity
-          style={styles.newSipHeaderBtn}
-          activeOpacity={0.8}
-          onPress={() => navigation.navigate('CreateSIP')}
-        >
-          <MaterialCommunityIcons name="plus" size={18} color="#FFFFFF" />
-          <Text style={styles.newSipHeaderBtnText}>New</Text>
-        </TouchableOpacity>
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView

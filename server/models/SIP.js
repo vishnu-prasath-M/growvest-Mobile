@@ -83,10 +83,22 @@ const sipSchema = new mongoose.Schema({
   nextContributionDate: {
     type: Date,
   },
+  interestRate: {
+    type: Number,
+    default: 26, // 26% p.a.
+  },
+  expectedInterest: {
+    type: Number,
+    default: 0,
+  },
+  expectedMaturityAmount: {
+    type: Number,
+    default: 0,
+  },
   status: {
     type: String,
-    enum: ['active', 'paused', 'completed', 'cancelled'],
-    default: 'active',
+    enum: ['active', 'paused', 'completed', 'cancelled', 'pending_payment'],
+    default: 'pending_payment',
     index: true,
   },
   autoPayEnabled: {
