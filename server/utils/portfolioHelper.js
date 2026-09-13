@@ -51,7 +51,31 @@ async function getUserPortfolioSummary(userIdInput) {
     userOrConditions.push({ mobileNumber: user.mobileNumber.trim() });
   }
 
-  // ─── 1. SAVINGS / FIXED DURATION INVESTMENTS ────────────────────────────────
+  // ─── 1. WITHDRAWALS LOOKUP ────────────────────────────────────────────────
+  const Withdrawal = require('../models/Withdrawal');
+  const userWithdrawals = await Withdrawal.find({
+    $or: userOrConditions,
+    status: { $in: ['pending', 'approved', 'paid'] },
+  });
+
+  const paidOrApprovedInvIds = new Set();
+  const pendingInvIds = new Set();
+  let generalPendingAmount = 0;
+
+  userWithdrawals.forEach(w => {
+    const invId = w.investmentId ? w.investmentId.toString() : null;
+    if (w.status === 'paid' || w.status === 'approved') {
+      if (invId) paidOrApprovedInvIds.add(invId);
+    } else if (w.status === 'pending') {
+      if (invId) {
+        pendingInvIds.add(invId);
+      } else {
+        generalPendingAmount += Number(w.amount) || 0;
+      }
+    }
+  });
+
+  // ─── 2. SAVINGS / FIXED DURATION INVESTMENTS ────────────────────────────────
   const investments = await Investment.find({ $or: userOrConditions });
 
   let totalDurationInvested = 0;
@@ -62,7 +86,10 @@ async function getUserPortfolioSummary(userIdInput) {
 
   const enrichedInvestments = investments.map(inv => {
     const principal = Number(inv.amount) || 0;
-    const isWithdrawn = inv.status === 'withdrawn' || inv.withdrawalStatus === 'withdrawn';
+    const invIdStr = inv._id ? inv._id.toString() : '';
+    const isPaidOut = paidOrApprovedInvIds.has(invIdStr);
+    const hasPendingWithdrawal = pendingInvIds.has(invIdStr) || inv.withdrawalStatus === 'pending';
+    const isWithdrawn = inv.status === 'withdrawn' || inv.withdrawalStatus === 'withdrawn' || isPaidOut;
     const isReinvested = inv.status === 'reinvested' || inv.withdrawalStatus === 'reinvested';
     const isClosed = isWithdrawn || isReinvested;
     const isRejected = inv.status === 'rejected';
@@ -130,6 +157,11 @@ async function getUserPortfolioSummary(userIdInput) {
     } else if (isReinvested) {
       withdrawalStatus = 'reinvested';
       availableToWithdraw = 0;
+    } else if (hasPendingWithdrawal) {
+      withdrawalStatus = 'pending';
+      availableToWithdraw = 0;
+      totalDurationInvested += principal;
+      totalAccruedInterest += totalInterestForDuration;
     } else if (isMatured) {
       // MATURITY REACHED: Principal + Interest + Benefits available
       withdrawalStatus = 'available_full';
@@ -212,54 +244,26 @@ async function getUserPortfolioSummary(userIdInput) {
     }
   });
 
-  // ─── 4. WITHDRAWALS DEDUCTION ─────────────────────────────────────────────
-  const Withdrawal = require('../models/Withdrawal');
-  const userWithdrawals = await Withdrawal.find({
-    $or: userOrConditions,
-    status: { $in: ['pending', 'approved', 'paid'] },
-  });
-
-  const closedInvestmentIds = new Set(
-    investments
-      .filter(inv => inv.status === 'withdrawn' || inv.withdrawalStatus === 'withdrawn' || inv.status === 'reinvested' || inv.withdrawalStatus === 'reinvested')
-      .map(inv => inv._id.toString())
-  );
-
-  let pendingWithdrawalAmount = 0;
-  let unlinkedPaidSavingsWithdrawals = 0;
-
-  userWithdrawals.forEach(w => {
-    const amt = Number(w.amount) || 0;
-    if (w.status === 'pending') {
-      pendingWithdrawalAmount += amt;
-    } else if (w.status === 'paid' || w.status === 'approved') {
-      const isChit = w.withdrawType === 'chit';
-      const isSip = w.withdrawType === 'sip';
-      if (!isChit && !isSip) {
-        const linkedInvId = w.investmentId ? w.investmentId.toString() : null;
-        if (linkedInvId && closedInvestmentIds.has(linkedInvId)) {
-          // Already accounted for by completely closing the investment
-        } else {
-          // Paid/approved withdrawal against general matured savings / duration investments
-          unlinkedPaidSavingsWithdrawals += amt;
-        }
-      }
-    }
-  });
+  // ─── 4. PENDING WITHDRAWALS DEDUCTION ─────────────────────────────────────
+  // Pending requests tied to specific investments already set availableToWithdraw = 0 on those investments.
+  // Any general pending withdrawal without investmentId deducts from general liquid balance.
+  const totalPendingWithdrawals = userWithdrawals
+    .filter(w => w.status === 'pending')
+    .reduce((sum, w) => sum + (Number(w.amount) || 0), 0);
 
   // ─── 5. AGGREGATION ─────────────────────────────────────────────────────────
   // Current active pocket money holding is pocketMoneyRemaining (active principal remaining to be released)
   const totalInvested = totalDurationInvested + totalChitInvested + pocketMoneyRemaining;
   const totalLocked = totalDurationLocked + totalChitLocked + pocketMoneyRemaining;
 
-  // availableToWithdraw = truly liquid right now in app (matured/eligible active deposits + chit winnings - pending requests - generic/unlinked paid withdrawals)
-  const availableToWithdraw = Math.max(0, maturedWithdrawalAvailable + chitWithdrawalAvailable - pendingWithdrawalAmount - unlinkedPaidSavingsWithdrawals);
+  // availableToWithdraw = truly liquid right now in app (matured/eligible active deposits + chit winnings - general pending withdrawal requests)
+  const availableToWithdraw = Math.max(0, maturedWithdrawalAvailable + chitWithdrawalAvailable - generalPendingAmount);
 
-  // totalBalance = what the user currently has invested + accrued interest - generic/unlinked paid withdrawals
-  const totalBalance = Math.max(0, totalInvested + totalAccruedInterest - unlinkedPaidSavingsWithdrawals);
+  // totalBalance = what the user currently has invested + accrued interest
+  const totalBalance = Math.max(0, totalInvested + totalAccruedInterest);
 
-  // Next unlock date — earliest maturity date among locked investments
-  const lockedInvestments = enrichedInvestments.filter(i => i.isLocked && i.maturityDate);
+  // Next unlock date — earliest maturity date among locked investments that have not matured yet
+  const lockedInvestments = enrichedInvestments.filter(i => i.isLocked && i.maturityDate && new Date(i.maturityDate) > nowDate);
   let nextUnlockDate = null;
   if (lockedInvestments.length > 0) {
     const sorted = lockedInvestments.slice().sort((a, b) => new Date(a.maturityDate) - new Date(b.maturityDate));

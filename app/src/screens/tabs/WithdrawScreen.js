@@ -496,6 +496,7 @@ const WithdrawScreen = ({ navigation }) => {
             <View style={styles.investmentsGroupCard}>
               {investments.map((inv, idx) => {
                 const isWithdrawn = inv.status === 'withdrawn' || inv.withdrawalStatus === 'withdrawn';
+                const isReinvested = inv.status === 'reinvested' || inv.withdrawalStatus === 'reinvested';
                 const isPocketMoney = inv.isPocketMoney === true;
                 const isChit = inv.isChit === true;
                 const isMatured = inv.maturityDate && new Date() >= new Date(inv.maturityDate);
@@ -505,9 +506,9 @@ const WithdrawScreen = ({ navigation }) => {
                 let planTitle = getPlanDisplayName(inv.type);
                 let planSubtitle = `Invested: ${formatCurrency(inv.amount)} • ${inv.interestRate || 12}% p.a.`;
                 let iconName = 'trending-up';
-                let badgeLabel = isWithdrawn ? 'WITHDRAWN' : isFullEligible ? 'MATURED' : 'ACTIVE';
-                let badgeBg = isWithdrawn ? (isDarkMode ? 'rgba(255,255,255,0.06)' : '#F1F5F9') : isFullEligible ? '#DCFCE7' : '#FEF3C7';
-                let badgeColor = isWithdrawn ? (isDarkMode ? '#9CA3AF' : '#64748B') : isFullEligible ? '#059669' : '#D97706';
+                let badgeLabel = isWithdrawn ? 'WITHDRAWN' : isReinvested ? 'REINVESTED' : isFullEligible ? 'MATURED' : 'ACTIVE';
+                let badgeBg = isWithdrawn ? (isDarkMode ? 'rgba(255,255,255,0.06)' : '#F1F5F9') : isReinvested ? (isDarkMode ? 'rgba(59, 130, 246, 0.18)' : '#DBEAFE') : isFullEligible ? '#DCFCE7' : '#FEF3C7';
+                let badgeColor = isWithdrawn ? (isDarkMode ? '#9CA3AF' : '#64748B') : isReinvested ? (isDarkMode ? '#60A5FA' : '#2563EB') : isFullEligible ? '#059669' : '#D97706';
 
                 if (isPocketMoney) {
                   planTitle = 'Pocket Money Plan';
