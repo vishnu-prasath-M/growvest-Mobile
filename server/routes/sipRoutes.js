@@ -11,6 +11,7 @@ router.get('/:id', protect, sipController.getSIPById);
 router.post('/pay-installment', protect, sipController.payInstallment);
 router.post('/:id/withdraw', protect, sipController.withdrawSIP);
 router.post('/:id/cancel', protect, sipController.cancelSIP);
+router.delete('/:id/pending', protect, sipController.cancelPendingSIP);
 
 // Admin routes
 router.get('/admin/all', protect, admin, sipController.getAdminSIPs);

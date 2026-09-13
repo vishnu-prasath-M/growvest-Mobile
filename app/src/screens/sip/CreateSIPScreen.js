@@ -247,10 +247,16 @@ const CreateSIPScreen = ({ navigation }) => {
             setSubmitting(false);
           }
         },
-        onError: (err) => {
+        onError: async (err) => {
           setSubmitting(false);
-          Alert.alert('Payment Cancelled', 'You can complete your first contribution anytime from your SIP dashboard.');
-          navigation.replace('SIPDashboard');
+          try {
+            if (sip?._id) {
+              await sipService.cancelPendingSIP(sip._id);
+            }
+          } catch (cancelErr) {
+            console.warn('[CreateSIP] Discard pending SIP failed (non-fatal):', cancelErr?.message);
+          }
+          Alert.alert('Payment Cancelled', 'SIP setup was cancelled and no plan was created. You will only join after a successful payment.');
         },
       });
     } catch (error) {

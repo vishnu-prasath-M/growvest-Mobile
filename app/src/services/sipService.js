@@ -78,4 +78,12 @@ export const sipService = {
     const response = await api.post(`/sip/${sipId}/cancel`);
     return response.data;
   },
+
+  /**
+   * Cancel / Discard unpaid pending SIP when checkout is cancelled
+   */
+  cancelPendingSIP: async (sipId) => {
+    const response = await api.delete(`/sip/${sipId}/pending`);
+    return response.data;
+  },
 };

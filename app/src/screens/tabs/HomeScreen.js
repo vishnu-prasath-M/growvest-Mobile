@@ -376,11 +376,6 @@ const HomeScreen = ({ navigation }) => {
                 <View style={styles.statsRow}>
                   {[
                     {
-                      icon: 'shield-lock-outline',
-                      label: 'INVESTED',
-                      value: hideBalance ? '••••' : formatCurrency(balances?.totalInvested),
-                    },
-                    {
                       icon: 'trending-up',
                       label: 'EARNED',
                       value: hideBalance

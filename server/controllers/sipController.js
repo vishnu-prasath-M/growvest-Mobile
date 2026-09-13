@@ -110,7 +110,17 @@ exports.createSIP = async (req, res) => {
     const totalPlannedAmount = numAmount * totalInstallments;
     const sipIdStr = generateSIPId();
 
-    // 1. Create Parent SIP record
+    // 26% p.a. Dynamic SIP Returns Calculation
+    const interestRate = 26; // 26% p.a.
+    const periodicRate = frequency === 'daily'
+      ? (0.26 / 365)
+      : frequency === 'weekly'
+      ? ((0.26 * 7) / 365)
+      : (0.26 / 12);
+    const expectedInterest = Math.round(numAmount * periodicRate * ((totalInstallments * (totalInstallments + 1)) / 2));
+    const expectedMaturityAmount = totalPlannedAmount + expectedInterest;
+
+    // 1. Create Parent SIP record in pending_payment status until first contribution succeeds
     const sip = new SIP({
       sipId: sipIdStr,
       userId: user._id,
@@ -131,7 +141,10 @@ exports.createSIP = async (req, res) => {
       contributionsCompleted: 0,
       remainingContributions: totalInstallments,
       nextContributionDate: calculateDueDate(startDate, 1, frequency, numSipDate, sipDayName),
-      status: 'active',
+      interestRate,
+      expectedInterest,
+      expectedMaturityAmount,
+      status: 'pending_payment',
       notes,
     });
     await sip.save();
@@ -266,6 +279,9 @@ exports.verifyPayment = async (req, res) => {
     sip.totalPaidAmount = (sip.totalPaidAmount || 0) + contribution.amount;
     sip.contributionsCompleted = (sip.contributionsCompleted || 0) + 1;
     sip.remainingContributions = Math.max(0, sip.totalContributions - sip.contributionsCompleted);
+    if (sip.status === 'pending_payment') {
+      sip.status = 'active';
+    }
 
     // Compute next due date
     const nextPending = await SIPContribution.findOne({ sipId: sip._id, paymentStatus: 'pending' }).sort({ installmentNumber: 1 });
@@ -333,12 +349,55 @@ exports.verifyPayment = async (req, res) => {
   }
 };
 
-// ─── 3. Get All SIPs for Authenticated User ─────────────────────────────────
+// ─── 3. Cancel / Discard Unpaid Pending SIP (When User Cancels Payment) ──────
+exports.cancelPendingSIP = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    const sip = await SIP.findOne({ _id: id, userId });
+    if (!sip) {
+      return res.status(404).json({ success: false, message: 'SIP plan not found' });
+    }
+
+    // Only allow purging if no money was ever paid
+    if ((sip.totalPaidAmount || 0) === 0 && (sip.contributionsCompleted || 0) === 0) {
+      await SIPContribution.deleteMany({ sipId: sip._id });
+      await SIP.findByIdAndDelete(sip._id);
+      return res.status(200).json({ success: true, message: 'Unpaid draft SIP discarded successfully' });
+    }
+
+    return res.status(400).json({ success: false, message: 'Cannot discard an active SIP with paid contributions' });
+  } catch (error) {
+    console.error('[SIPController] Cancel pending SIP error:', error);
+    res.status(500).json({ message: 'Failed to cancel pending SIP', error: error.message });
+  }
+};
+
+// ─── 4. Get All SIPs for Authenticated User ─────────────────────────────────
 exports.getMySIPs = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    const sips = await SIP.find({ userId }).sort({ createdAt: -1 }).lean();
+    // Clean up any abandoned draft SIPs with 0 contributions / payments
+    const abandonedSIPs = await SIP.find({
+      userId,
+      contributionsCompleted: 0,
+      totalPaidAmount: 0,
+      status: { $in: ['pending_payment', 'active'] },
+    }).select('_id');
+
+    if (abandonedSIPs.length > 0) {
+      const abandonedIds = abandonedSIPs.map((s) => s._id);
+      await SIPContribution.deleteMany({ sipId: { $in: abandonedIds } });
+      await SIP.deleteMany({ _id: { $in: abandonedIds } });
+    }
+
+    const sips = await SIP.find({
+      userId,
+      status: { $ne: 'pending_payment' },
+      contributionsCompleted: { $gt: 0 },
+    }).sort({ createdAt: -1 }).lean();
 
     const totalSIPInvested = sips.reduce((sum, s) => sum + (s.totalPaidAmount || 0), 0);
     const activeSIPCount = sips.filter((s) => s.status === 'active').length;
