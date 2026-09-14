@@ -156,9 +156,10 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
     const chosenDate = new Date(selectedWithdrawalDate);
     const todayMidnight = new Date();
     todayMidnight.setHours(0, 0, 0, 0);
+    const minAllowedDate = new Date(todayMidnight.getTime() + 2 * 24 * 60 * 60 * 1000);
 
-    if (isNaN(chosenDate.getTime()) || chosenDate < todayMidnight) {
-      Alert.alert('Invalid Date', 'Please choose a valid intended withdrawal date.');
+    if (isNaN(chosenDate.getTime()) || chosenDate < minAllowedDate) {
+      Alert.alert('Invalid Duration', 'Minimum investment duration is 2 days. Same-day or 1-day investments are not permitted.');
       return;
     }
 
@@ -186,7 +187,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
     const tierInfo = calculateInvestmentTier({
       planType: investmentType,
       principal: parseFloat(amount) || 0,
-      customDays: Math.max(1, parseInt(customDaysInput, 10) || 365),
+      customDays: Math.max(2, parseInt(customDaysInput, 10) || 365),
       intendedWithdrawalDate: selectedWithdrawalDate,
       plansConfig: plans,
     });
@@ -216,7 +217,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
   const currentTierInfo = React.useMemo(() => {
     const selectedPlan = plans.find(p => p.id === investmentType) || null;
     const maxDays = selectedPlan?.durationDays || 365;
-    const currentDaysVal = Math.max(1, Math.min(maxDays, parseInt(customDaysInput, 10) || maxDays));
+    const currentDaysVal = Math.max(2, Math.min(maxDays, parseInt(customDaysInput, 10) || maxDays));
     return calculateInvestmentTier({
       planType: investmentType,
       principal: parseFloat(amount) || 0,
@@ -579,7 +580,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
               {(() => {
                 const selectedPlan = getSelectedPlan();
                 const maxDays = selectedPlan?.durationDays || 365;
-                const currentDaysVal = Math.max(1, Math.min(maxDays, parseInt(customDaysInput, 10) || maxDays));
+                const currentDaysVal = Math.max(2, Math.min(maxDays, parseInt(customDaysInput, 10) || maxDays));
                 const modalTier = calculateInvestmentTier({
                   planType: investmentType,
                   principal: parseFloat(amount) || 0,
@@ -594,9 +595,9 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
                 const formattedInterest = `₹${modalTier.calculatedInterest.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                 const formattedPayout = `₹${modalTier.expectedPayout.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-                // Presets tailored to selected plan
+                // Presets tailored to selected plan (minimum 2 days)
                 let presets = [];
-                if (maxDays <= 15) presets = [5, 10, 15];
+                if (maxDays <= 15) presets = [2, 5, 10, 15];
                 else if (maxDays <= 30) presets = [7, 15, 21, 30];
                 else if (maxDays <= 90) presets = [15, 30, 60, 90];
                 else if (maxDays <= 180) presets = [30, 60, 90, 120, 180];
@@ -737,11 +738,11 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
                         <TouchableOpacity
                           style={[
                             styles.modalStepperCircleBtn,
-                            currentDaysVal <= 1 && styles.modalStepperCircleBtnDisabled
+                            currentDaysVal <= 2 && styles.modalStepperCircleBtnDisabled
                           ]}
-                          disabled={currentDaysVal <= 1}
+                          disabled={currentDaysVal <= 2}
                           onPress={() => {
-                            const nextVal = Math.max(1, currentDaysVal - 1);
+                            const nextVal = Math.max(2, currentDaysVal - 1);
                             setCustomDaysInput(String(nextVal));
                             const d = new Date(today.getTime() + nextVal * 24 * 60 * 60 * 1000);
                             setSelectedWithdrawalDate(d.toISOString().split('T')[0]);
@@ -750,14 +751,14 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
                           <MaterialCommunityIcons 
                             name="minus" 
                             size={22} 
-                            color={currentDaysVal <= 1 ? (isDarkMode ? '#475569' : '#94A3B8') : (isDarkMode ? '#34D399' : '#059669')} 
+                            color={currentDaysVal <= 2 ? (isDarkMode ? '#475569' : '#94A3B8') : (isDarkMode ? '#34D399' : '#059669')} 
                           />
                         </TouchableOpacity>
 
                         <View style={styles.modalStepperCenterInfo}>
                           <Text style={styles.modalStepperDaysBig}>{currentDaysVal} Days</Text>
                           <Text style={styles.modalStepperHintText}>
-                            Min 1 Day • Max {maxDays} Days ({modalTier.applicableRate}% p.a.)
+                            Min 2 Days • Max {maxDays} Days ({modalTier.applicableRate}% p.a.)
                           </Text>
                         </View>
 

@@ -10,13 +10,16 @@ exports.createInvestment = async (req, res) => {
     const { amount, type, userName, userEmail, mobileNumber } = req.body;
     const refCode = `INV-${Date.now().toString().slice(-6)}`;
     
-    // Authoritative tier and interest calculation
+    const rawCustomDays = req.body.customDays || req.body.durationDays;
+    const cleanCustomDays = rawCustomDays ? Math.max(2, Number(rawCustomDays)) : undefined;
+
+    // Authoritative tier and interest calculation (minimum 2 days guaranteed)
     const tierCalc = calculateInvestmentTier({
       planType: type,
       amount: Number(amount),
       startDate: new Date(),
       intendedWithdrawalDate: req.body.intendedWithdrawalDate || req.body.selectedWithdrawalDate,
-      customDays: req.body.customDays || req.body.durationDays,
+      customDays: cleanCustomDays,
     });
     
     const startDate = tierCalc.startDate;
@@ -476,9 +479,22 @@ exports.reinvestInvestment = async (req, res) => {
       return res.status(400).json({ success: false, message: 'A withdrawal request for this investment is currently pending admin approval.' });
     }
 
-    // 3. Verify Server-Side Maturity
+    // 3. Verify Server-Side Maturity (Minimum 2 days holding required; cannot reinvest on same day)
     const now = new Date();
     const startDateObj = sourceInvestment.startDate ? new Date(sourceInvestment.startDate) : new Date();
+    const startMidnight = new Date(startDateObj);
+    startMidnight.setHours(0, 0, 0, 0);
+
+    const nowMidnight = new Date(now);
+    nowMidnight.setHours(0, 0, 0, 0);
+
+    // Rule: Cannot reinvest on the same calendar day the investment was created
+    if (nowMidnight.getTime() <= startMidnight.getTime()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Investments cannot be reinvested on the same day they were created. Minimum holding period is 2 days.'
+      });
+    }
 
     const durationDaysMap = {
       '15_days': 15,
@@ -488,15 +504,29 @@ exports.reinvestInvestment = async (req, res) => {
       '1_year': 365,
       '2_years': 730,
     };
-    const planDurationDays = sourceInvestment.durationDays || durationDaysMap[sourceInvestment.type] || 365;
+    const planDurationDays = Math.max(2, sourceInvestment.durationDays || durationDaysMap[sourceInvestment.type] || 15);
 
-    const maturityDate = sourceInvestment.maturityDate
+    const minUnlockTime = startMidnight.getTime() + 2 * 24 * 60 * 60 * 1000;
+    let maturityDate = sourceInvestment.maturityDate
       ? new Date(sourceInvestment.maturityDate)
       : new Date(startDateObj.getTime() + planDurationDays * 24 * 60 * 60 * 1000);
     maturityDate.setHours(0, 0, 0, 0);
+    if (maturityDate.getTime() < minUnlockTime) {
+      maturityDate = new Date(minUnlockTime);
+    }
 
-    if (now < maturityDate) {
-      const formattedDate = maturityDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    let intendedDate = sourceInvestment.intendedWithdrawalDate
+      ? new Date(sourceInvestment.intendedWithdrawalDate)
+      : (sourceInvestment.selectedWithdrawalDate ? new Date(sourceInvestment.selectedWithdrawalDate) : maturityDate);
+    intendedDate.setHours(0, 0, 0, 0);
+    if (intendedDate.getTime() < minUnlockTime) {
+      intendedDate = new Date(minUnlockTime);
+    }
+
+    const unlockDate = intendedDate < maturityDate ? intendedDate : maturityDate;
+
+    if (now < unlockDate) {
+      const formattedDate = unlockDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
       return res.status(400).json({
         success: false,
         message: `This investment has not reached maturity yet. Maturity date is ${formattedDate}.`
@@ -580,11 +610,20 @@ exports.reinvestInvestment = async (req, res) => {
     const newPlanType = requestedPlanType || sourceInvestment.type || '1_year';
     const newStartDate = new Date();
 
+    // Sanitize withdrawal date to ensure it is at least 2 days after newStartDate
+    let cleanWithdrawalDate = selectedWithdrawalDate;
+    if (cleanWithdrawalDate) {
+      const cwDate = new Date(cleanWithdrawalDate);
+      if (isNaN(cwDate.getTime()) || cwDate.getTime() < newStartDate.getTime() + 2 * 24 * 60 * 60 * 1000) {
+        cleanWithdrawalDate = undefined; // Fall back to full plan duration
+      }
+    }
+
     const tierCalc = calculateInvestmentTier({
       planType: newPlanType,
       amount: reinvestAmount,
       startDate: newStartDate,
-      intendedWithdrawalDate: selectedWithdrawalDate,
+      intendedWithdrawalDate: cleanWithdrawalDate,
     });
 
     const newMaturityDate = tierCalc.maturityDate;
@@ -626,6 +665,8 @@ exports.reinvestInvestment = async (req, res) => {
       maturityAmount: tierCalc.maturityAmount,
       maturityDate: newMaturityDate,
       withdrawalStatus: 'locked',
+      interestEarned: 0,
+      lastInterestCalculatedAt: newStartDate,
 
       selectedWithdrawalDate: tierCalc.intendedWithdrawalDate,
       intendedWithdrawalDate: tierCalc.intendedWithdrawalDate,
