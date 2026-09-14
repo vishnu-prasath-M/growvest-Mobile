@@ -1,11 +1,35 @@
-import { Alert } from 'react-native';
+import { Alert, NativeModules } from 'react-native';
 import { paymentService } from './paymentService';
+
+/**
+ * Dynamically resolves Razorpay native checkout if native module is available
+ * (present in standalone APK, local Android run, or custom EAS dev client).
+ * Prevents Expo Go crashes by only importing when RNRazorpayCheckout is linked.
+ */
+const getRazorpayCheckout = () => {
+  try {
+    const isNativeModuleAvailable = !!(
+      NativeModules.RNRazorpayCheckout ||
+      (typeof global !== 'undefined' && global.__turboModuleProxy?.('RNRazorpayCheckout'))
+    );
+
+    if (!isNativeModuleAvailable) {
+      return null;
+    }
+
+    const RazorpayCheckout = require('react-native-razorpay');
+    return RazorpayCheckout.default || RazorpayCheckout;
+  } catch (err) {
+    console.warn('[Razorpay] Native module resolution failed:', err?.message);
+    return null;
+  }
+};
 
 /**
  * Reusable Razorpay Payment Handler
  * 
  * 1. Calls backend createOrder()
- * 2. Opens Razorpay Checkout on native/Expo dev client or web fallback
+ * 2. Opens official native Razorpay Checkout with UPI / Cards / Netbanking (on APK/dev client)
  * 3. Sends payment credentials to backend verifyPayment()
  * 4. Backend automatically auto-approves investment, updates balance, creates transaction, sends push notification
  */
@@ -43,15 +67,7 @@ export const executeRazorpayPayment = async ({
     };
 
     // Safe native check
-    let RazorpayCheckout = null;
-    try {
-      // Use eval/Function require to bypass Metro bundler static analysis when running in Expo Go without native build
-      const safeRequire = eval('require');
-      const RZ = safeRequire('react-native-razorpay');
-      RazorpayCheckout = RZ.default || RZ;
-    } catch (err) {
-      RazorpayCheckout = null;
-    }
+    const RazorpayCheckout = getRazorpayCheckout();
 
     if (RazorpayCheckout && typeof RazorpayCheckout.open === 'function') {
       try {
@@ -74,7 +90,7 @@ export const executeRazorpayPayment = async ({
           onFailure(error);
         } else {
           Alert.alert(
-            'Payment Failed',
+            'Payment Incomplete',
             error.description || error.message || 'Payment was cancelled or could not be processed.'
           );
         }
@@ -82,8 +98,8 @@ export const executeRazorpayPayment = async ({
     } else {
       // Test Mode Simulation fallback when running in Expo Go without native build
       Alert.alert(
-        'Razorpay Test Mode',
-        `Initiate Payment of ₹${amount} for Order ${orderId}?`,
+        'Razorpay Native Mode',
+        `Official Razorpay checkout with UPI & Cards opens natively in the Standalone APK / Dev Client build.\n\nRunning in Expo Go currently. Simulate test payment of ₹${amount} for Order ${orderId}?`,
         [
           {
             text: 'Cancel Payment',
@@ -94,7 +110,7 @@ export const executeRazorpayPayment = async ({
             },
           },
           {
-            text: 'Pay Now',
+            text: 'Simulate Pay',
             onPress: async () => {
               try {
                 const mockPaymentId = `pay_${Date.now()}`;
@@ -161,14 +177,7 @@ export const openRazorpayCheckout = async ({
     theme: { color: '#085428' },
   };
 
-  let RazorpayCheckout = null;
-  try {
-    const safeRequire = eval('require');
-    const RZ = safeRequire('react-native-razorpay');
-    RazorpayCheckout = RZ.default || RZ;
-  } catch (err) {
-    RazorpayCheckout = null;
-  }
+  const RazorpayCheckout = getRazorpayCheckout();
 
   if (!isSimulated && RazorpayCheckout && typeof RazorpayCheckout.open === 'function') {
     try {
@@ -185,11 +194,11 @@ export const openRazorpayCheckout = async ({
       if (onError) onError(error);
     }
   } else {
-    // Simulator fallback
+    // Simulator fallback for Expo Go
     const displayAmount = Math.round(amount / 100);
     Alert.alert(
-      'Razorpay Test Mode',
-      `Complete payment of ₹${displayAmount.toLocaleString('en-IN')} for ${description}?`,
+      'Razorpay Native Mode',
+      `Official Razorpay checkout with UPI & Cards opens natively in the Standalone APK / Dev Client build.\n\nSimulate test payment of ₹${displayAmount.toLocaleString('en-IN')} for ${description}?`,
       [
         {
           text: 'Cancel',
@@ -199,7 +208,7 @@ export const openRazorpayCheckout = async ({
           },
         },
         {
-          text: 'Pay Now (Test)',
+          text: 'Simulate Pay',
           onPress: () => {
             const mockPaymentId = `pay_${Date.now()}`;
             const signature = `simulated_signature_${orderId}_${mockPaymentId}`;
@@ -216,4 +225,3 @@ export const openRazorpayCheckout = async ({
     );
   }
 };
-
