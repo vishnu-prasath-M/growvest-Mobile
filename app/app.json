@@ -90,7 +90,8 @@
           }
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "./plugins/withAndroidQueries"
     ],
     "owner": "prasath_apr",
     "extra": {
