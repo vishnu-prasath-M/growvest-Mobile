@@ -12,7 +12,7 @@ export const INVESTMENT_PLANS = [
 ];
 
 export const DURATION_TIERS = [
-  { minDays: 1, maxDays: 14, rate: 6, tierId: 'early_6', name: 'Early Duration (<15 Days)', desc: 'Below 15-day tier: qualifies for 6% p.a. early-duration rate' },
+  { minDays: 2, maxDays: 14, rate: 6, tierId: 'early_6', name: 'Early Duration (2–14 Days)', desc: 'Below 15-day tier (minimum 2 days): qualifies for 6% p.a. early-duration rate' },
   { minDays: 15, maxDays: 29, rate: 12, tierId: '15_days', name: '15 Days Tier', desc: 'Eligible for the 15-day tier (12% p.a.)' },
   { minDays: 30, maxDays: 89, rate: 15, tierId: '1_month', name: '1 Month Tier', desc: 'Eligible for the 1-month tier (15% p.a.)' },
   { minDays: 90, maxDays: 179, rate: 18, tierId: '3_months', name: '3 Months Tier', desc: 'Eligible for the 3-month tier (18% p.a.)' },
@@ -48,16 +48,23 @@ export function calculateInvestmentTier({
   let targetDate = new Date(start.getTime() + maxPlanDays * 24 * 60 * 60 * 1000);
 
   if (customDays !== undefined && customDays !== null && !isNaN(Number(customDays))) {
-    eligibleDays = Math.max(1, Number(customDays));
+    eligibleDays = Math.max(2, Number(customDays));
     targetDate = new Date(start.getTime() + eligibleDays * 24 * 60 * 60 * 1000);
   } else if (intendedWithdrawalDate) {
     const d = new Date(intendedWithdrawalDate);
     if (!isNaN(d.getTime())) {
       d.setHours(0, 0, 0, 0);
       const diffTime = d.getTime() - start.getTime();
-      eligibleDays = Math.max(1, Math.round(diffTime / (1000 * 60 * 60 * 24)));
-      targetDate = d;
+      eligibleDays = Math.max(2, Math.round(diffTime / (1000 * 60 * 60 * 24)));
+      targetDate = new Date(start.getTime() + eligibleDays * 24 * 60 * 60 * 1000);
     }
+  }
+
+  // Strict minimum guarantee: duration cannot be less than 2 days
+  eligibleDays = Math.max(2, eligibleDays);
+  const minTargetTime = start.getTime() + 2 * 24 * 60 * 60 * 1000;
+  if (targetDate.getTime() < minTargetTime) {
+    targetDate = new Date(minTargetTime);
   }
 
   // Find matching tier

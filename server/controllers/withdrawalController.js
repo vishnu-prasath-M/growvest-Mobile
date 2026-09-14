@@ -59,15 +59,36 @@ exports.createWithdrawal = async (req, res) => {
       const dailyInterest = (principal * rate) / 100 / 365;
       const totalInterestForDuration = Number(targetInv.calculatedInterest) || (dailyInterest * durationDays);
 
-      const maturityDate = targetInv.maturityDate
-        ? new Date(targetInv.maturityDate)
-        : new Date((targetInv.startDate ? new Date(targetInv.startDate) : new Date()).getTime() + durationDays * 86400000);
-      maturityDate.setHours(0, 0, 0, 0);
+      const startDay = targetInv.startDate ? new Date(targetInv.startDate) : new Date();
+      startDay.setHours(0, 0, 0, 0);
+      const nowMidnight = new Date(now);
+      nowMidnight.setHours(0, 0, 0, 0);
 
-      const intendedDate = targetInv.intendedWithdrawalDate
+      // Lock Guard: Cannot withdraw on the same calendar day of investment (minimum 2 days required)
+      if (nowMidnight.getTime() <= startDay.getTime()) {
+        return res.status(400).json({
+          message: 'Investments cannot be withdrawn on the same day they were created. Minimum holding period is 2 days.'
+        });
+      }
+
+      durationDays = Math.max(2, durationDays);
+      const minUnlockTime = startDay.getTime() + 2 * 86400000;
+
+      let maturityDate = targetInv.maturityDate
+        ? new Date(targetInv.maturityDate)
+        : new Date(startDay.getTime() + durationDays * 86400000);
+      maturityDate.setHours(0, 0, 0, 0);
+      if (maturityDate.getTime() < minUnlockTime) {
+        maturityDate = new Date(minUnlockTime);
+      }
+
+      let intendedDate = targetInv.intendedWithdrawalDate
         ? new Date(targetInv.intendedWithdrawalDate)
         : (targetInv.selectedWithdrawalDate ? new Date(targetInv.selectedWithdrawalDate) : maturityDate);
       intendedDate.setHours(0, 0, 0, 0);
+      if (intendedDate.getTime() < minUnlockTime) {
+        intendedDate = new Date(minUnlockTime);
+      }
 
       // Lock Guard: Cannot withdraw before chosen intended withdrawal date / maturity date
       const unlockDate = intendedDate < maturityDate ? intendedDate : maturityDate;

@@ -30,6 +30,8 @@ import KycRequiredModal from '../../components/KycRequiredModal';
 import { notificationService } from '../../services/notificationService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const INSIGHT_CARD_WIDTH = Math.min(SCREEN_WIDTH * 0.78, 300);
+const INSIGHT_CARD_GAP = 12;
 
 const TIPS = [
   { title: 'Invest consistently', body: 'Regular investments in small amounts can build significant wealth over time.' },
@@ -47,10 +49,70 @@ const TIPS = [
 ];
 
 const MARKET_INSIGHTS = [
-  { icon: 'trending-up', label: 'FD Rates', value: '7.5% p.a.', trend: 'up', color: '#2D9A5A' },
-  { icon: 'bank', label: 'SIP Avg Return', value: '12% p.a.', trend: 'up', color: '#1A5C39' },
-  { icon: 'chart-line', label: 'Inflation', value: '5.1%', trend: 'down', color: '#D94F2B' },
-  { icon: 'currency-inr', label: 'USD/INR', value: '₹84.2', trend: 'neutral', color: '#C68E0A' },
+  {
+    id: 'sip',
+    title: 'SIP Compounder',
+    category: 'WEALTH ACCELERATOR',
+    value: '12.0%',
+    unit: 'p.a.',
+    trend: '+1.8%',
+    trendType: 'up',
+    badgeText: 'OUTPERFORM',
+    subtext: '5Y Historical Equity Avg',
+    highlight: 'Beats Inflation by +6.9%',
+    icon: 'lightning-bolt',
+    gradient: ['#042013', '#0A3820', '#125432'],
+    accentColor: '#10B981',
+    bars: [35, 48, 42, 65, 58, 82, 100],
+  },
+  {
+    id: 'fd',
+    title: 'Fixed Deposit',
+    category: 'CAPITAL GUARANTEE',
+    value: '7.5%',
+    unit: 'p.a.',
+    trend: '+0.25%',
+    trendType: 'up',
+    badgeText: 'STABLE YIELD',
+    subtext: 'Top Scheduled Banks Avg',
+    highlight: 'Zero Volatility Risk',
+    icon: 'shield-check',
+    gradient: ['#081D29', '#0E3347', '#174E6B'],
+    accentColor: '#06B6D4',
+    bars: [60, 60, 65, 65, 70, 75, 80],
+  },
+  {
+    id: 'cpi',
+    title: 'Inflation (CPI)',
+    category: 'MACRO MONITOR',
+    value: '5.1%',
+    unit: 'CPI',
+    trend: '-0.3%',
+    trendType: 'down',
+    badgeText: 'COOLING',
+    subtext: 'Within RBI Target 4±2%',
+    highlight: 'Purchasing Power Intact',
+    icon: 'chart-bell-curve-cumulative',
+    gradient: ['#240F1B', '#3D172B', '#5A1E3C'],
+    accentColor: '#F43F5E',
+    bars: [95, 88, 82, 75, 70, 62, 52],
+  },
+  {
+    id: 'forex',
+    title: 'USD / INR',
+    category: 'GLOBAL SPOT',
+    value: '₹84.20',
+    unit: 'INR',
+    trend: '+0.05',
+    trendType: 'neutral',
+    badgeText: 'BENCHMARK',
+    subtext: 'RBI Reference Benchmark',
+    highlight: 'Low Weekly Volatility',
+    icon: 'currency-usd',
+    gradient: ['#251B06', '#422D0A', '#61400D'],
+    accentColor: '#F59E0B',
+    bars: [62, 68, 65, 72, 70, 75, 78],
+  },
 ];
 
 const getTipOfTheDay = () => {
@@ -96,8 +158,31 @@ const HomeScreen = ({ navigation }) => {
   const [kycModalVisible, setKycModalVisible] = useState(false);
   const [kycStatusInfo, setKycStatusInfo] = useState({ status: 'not_submitted', rejectionReason: null });
 
+  const [activeInsightIndex, setActiveInsightIndex] = useState(0);
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
+  const radarAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const radarLoop = Animated.loop(
+      Animated.timing(radarAnim, {
+        toValue: 1,
+        duration: 2200,
+        useNativeDriver: true,
+      })
+    );
+    radarLoop.start();
+    return () => radarLoop.stop();
+  }, [radarAnim]);
+
+  const onInsightScroll = useCallback((event) => {
+    const offsetX = event.nativeEvent.contentOffset.x;
+    const index = Math.round(offsetX / (INSIGHT_CARD_WIDTH + INSIGHT_CARD_GAP));
+    if (index >= 0 && index < MARKET_INSIGHTS.length) {
+      setActiveInsightIndex(index);
+    }
+  }, []);
 
   useEffect(() => {
     const hydrateCached = async () => {
@@ -449,63 +534,6 @@ const HomeScreen = ({ navigation }) => {
             </View>
           )}
 
-          {/* ── Portfolio Overview ── */}
-          <View style={[styles.section, { marginTop: 24 }]}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Portfolio Overview</Text>
-              <TouchableOpacity style={styles.viewAllBtn} onPress={() => navigation.navigate('Investments')}>
-                <Text style={styles.viewAllText}>See All</Text>
-                <MaterialCommunityIcons name="chevron-right" size={14} color={themeColors.primary} />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.portfolioGrid}>
-              {/* Total Invested */}
-              <LinearGradient
-                colors={['#0E3D23', '#1A5C39']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                style={[styles.portfolioCard, styles.portfolioCardLarge]}
-              >
-                <MaterialCommunityIcons name="briefcase-outline" size={22} color="rgba(255,255,255,0.8)" />
-                <Text style={styles.portfolioCardLabel}>Total Invested</Text>
-                <Text style={styles.portfolioCardValue}>
-                  {hideBalance ? '₹ ••••' : formatCurrencyCompact(totalInvested)}
-                </Text>
-                <View style={styles.portfolioCardBadge}>
-                  <Text style={styles.portfolioCardBadgeText}>
-                    {stats.activeInvestmentsCount || 0} Active Plans
-                  </Text>
-                </View>
-              </LinearGradient>
-
-              <View style={styles.portfolioRightCol}>
-                {/* Total Returns */}
-                <TouchableOpacity
-                  style={[styles.portfolioCard, styles.portfolioCardSmall, { backgroundColor: themeColors.surface, borderWidth: 1, borderColor: themeColors.borderLight }]}
-                  activeOpacity={0.8}
-                  onPress={() => navigation.navigate('Investments')}
-                >
-                  <MaterialCommunityIcons name="chart-areaspline" size={18} color="#2D9A5A" />
-                  <Text style={[styles.portfolioCardLabel, { color: themeColors.textMuted }]}>Returns</Text>
-                  <Text style={[styles.portfolioCardValue, { color: '#2D9A5A', fontSize: 18 }]}>
-                    {hideBalance ? '••' : `+${returnPct}%`}
-                  </Text>
-                </TouchableOpacity>
-
-                {/* Pocket Money */}
-                <TouchableOpacity
-                  style={[styles.portfolioCard, styles.portfolioCardSmall, { backgroundColor: '#FEF3C2', borderWidth: 1, borderColor: '#F5E5A0' }]}
-                  activeOpacity={0.8}
-                  onPress={() => navigation.navigate('PocketMoney')}
-                >
-                  <MaterialCommunityIcons name="wallet-outline" size={18} color="#C68E0A" />
-                  <Text style={[styles.portfolioCardLabel, { color: '#92400E' }]}>Pocket Money</Text>
-                  <Text style={[styles.portfolioCardValue, { color: '#92400E', fontSize: 18 }]}>
-                    {hideBalance ? '••' : formatCurrencyCompact(stats.totalPocketRemaining || 0)}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
 
           {/* ── Active Investments ── */}
           {activeInvestments.length > 0 && (
@@ -562,9 +590,201 @@ const HomeScreen = ({ navigation }) => {
             </View>
           )}
 
-          {/* ── Recent Transactions ── */}
-          {recentTransactions.length > 0 && (
+          {/* ── Empty state if no investments yet ── */}
+          {activeInvestments.length === 0 && recentTransactions.length === 0 && (
             <View style={[styles.section, { marginTop: 24 }]}>
+              <TouchableOpacity
+                style={styles.emptyStartCard}
+                activeOpacity={0.85}
+                onPress={() => navigation.navigate('InvestmentDashboard')}
+              >
+                <LinearGradient
+                  colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                  style={styles.emptyStartGradient}
+                >
+                  <MaterialCommunityIcons name="sprout-outline" size={42} color="rgba(255,255,255,0.9)" />
+                  <Text style={styles.emptyStartTitle}>Start Your Investment Journey</Text>
+                  <Text style={styles.emptyStartBody}>
+                    Invest as little as ₹500 and watch your money grow every day.
+                  </Text>
+                  <View style={styles.emptyStartBtn}>
+                    <Text style={styles.emptyStartBtnText}>Invest Now →</Text>
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* ── Market Radar (Modern Snapping Reel with Sparklines & Radar Pulse) ── */}
+          <View style={{ marginTop: 24 }}>
+            <View style={styles.radarHeaderContainer}>
+              <View>
+                <View style={styles.radarHeaderRow}>
+                  <Text style={styles.sectionTitle}>Market Radar</Text>
+                  <View style={styles.liveRadarContainer}>
+                    <Animated.View
+                      style={[
+                        styles.liveRadarPulse,
+                        {
+                          transform: [
+                            {
+                              scale: radarAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [1, 2.8],
+                              }),
+                            },
+                          ],
+                          opacity: radarAnim.interpolate({
+                            inputRange: [0, 0.6, 1],
+                            outputRange: [0.8, 0.3, 0],
+                          }),
+                        },
+                      ]}
+                    />
+                    <View style={styles.liveRadarDot} />
+                  </View>
+                </View>
+                <Text style={styles.sectionSubtitle}>Live macroeconomic benchmarks</Text>
+              </View>
+              <View style={styles.swipeBadge}>
+                <MaterialCommunityIcons name="gesture-swipe-horizontal" size={13} color={themeColors.textMuted} />
+                <Text style={styles.swipeBadgeText}>Live Reel</Text>
+              </View>
+            </View>
+
+            {/* Horizontal Snapping Reel */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              decelerationRate="fast"
+              snapToInterval={INSIGHT_CARD_WIDTH + INSIGHT_CARD_GAP}
+              snapToAlignment="start"
+              onScroll={onInsightScroll}
+              scrollEventThrottle={16}
+              contentContainerStyle={styles.insightScrollContent}
+            >
+              {MARKET_INSIGHTS.map((item, idx) => (
+                <View key={item.id || idx} style={styles.insightCardContainer}>
+                  <LinearGradient
+                    colors={item.gradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={[styles.insightCardGradient, { borderColor: item.accentColor + '40' }]}
+                  >
+                    {/* Top Row: Pill Tag + Trend Pill */}
+                    <View style={styles.insightCardHeader}>
+                      <View style={[styles.insightCategoryPill, { backgroundColor: item.accentColor + '20', borderColor: item.accentColor + '45' }]}>
+                        <MaterialCommunityIcons name={item.icon} size={11} color={item.accentColor} style={{ marginRight: 4 }} />
+                        <Text style={[styles.insightCategoryText, { color: item.accentColor }]}>{item.category}</Text>
+                      </View>
+
+                      <View style={[styles.insightTrendPill, { backgroundColor: item.accentColor + '22', borderColor: item.accentColor + '45' }]}>
+                        <MaterialCommunityIcons
+                          name={item.trendType === 'up' ? 'arrow-top-right' : item.trendType === 'down' ? 'arrow-bottom-right' : 'swap-horizontal'}
+                          size={12}
+                          color={item.accentColor}
+                        />
+                        <Text style={[styles.insightTrendPillText, { color: item.accentColor }]}>{item.trend}</Text>
+                      </View>
+                    </View>
+
+                    {/* Middle: Title, Hero Value & Candlestick Sparklines */}
+                    <View style={styles.insightCardMiddle}>
+                      <View style={styles.insightCardDataCol}>
+                        <Text style={styles.insightCardTitle}>{item.title}</Text>
+                        <View style={styles.insightCardValueRow}>
+                          <Text style={styles.insightCardHeroValue}>{item.value}</Text>
+                          <Text style={[styles.insightCardUnit, { color: item.accentColor }]}> {item.unit}</Text>
+                        </View>
+                        <Text style={styles.insightCardSubtext} numberOfLines={1}>{item.subtext}</Text>
+                      </View>
+
+                      {/* Momentum Sparklines */}
+                      <View style={styles.sparklineContainer}>
+                        {item.bars.map((barH, bIdx) => (
+                          <View key={bIdx} style={styles.sparklineCol}>
+                            <View
+                              style={[
+                                styles.sparklineBar,
+                                {
+                                  height: `${barH}%`,
+                                  backgroundColor: bIdx === item.bars.length - 1 ? item.accentColor : item.accentColor + '45',
+                                },
+                              ]}
+                            />
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+
+                    {/* Divider */}
+                    <View style={[styles.insightCardDivider, { backgroundColor: item.accentColor + '25' }]} />
+
+                    {/* Footer Row */}
+                    <View style={styles.insightCardFooter}>
+                      <View style={styles.insightFooterLeft}>
+                        <View style={[styles.insightFooterDot, { backgroundColor: item.accentColor }]} />
+                        <Text style={styles.insightFooterText} numberOfLines={1}>{item.highlight}</Text>
+                      </View>
+                      <View style={[styles.insightBadgeTag, { backgroundColor: item.accentColor + '20' }]}>
+                        <Text style={[styles.insightBadgeTagText, { color: item.accentColor }]}>{item.badgeText}</Text>
+                      </View>
+                    </View>
+                  </LinearGradient>
+                </View>
+              ))}
+            </ScrollView>
+
+            {/* Pagination Indicators */}
+            <View style={styles.paginationRow}>
+              {MARKET_INSIGHTS.map((item, idx) => (
+                <View
+                  key={idx}
+                  style={[
+                    styles.paginationDot,
+                    activeInsightIndex === idx
+                      ? [styles.paginationDotActive, { backgroundColor: item.accentColor }]
+                      : { backgroundColor: themeColors.border || 'rgba(0,0,0,0.1)' },
+                  ]}
+                />
+              ))}
+            </View>
+          </View>
+
+          {/* ── Tip Card ── */}
+          <View style={[styles.section, { marginTop: 24 }]}>
+            <View style={styles.tipCard}>
+              <ImageBackground
+                source={require('../../../assets/tip-of-the-day-banner.jpg')}
+                style={styles.tipCardBg}
+                imageStyle={styles.tipCardImage}
+                resizeMode="cover"
+              >
+                <LinearGradient
+                  colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.45)', 'rgba(255,255,255,0.85)']}
+                  start={{ x: 0.15, y: 0 }}
+                  end={{ x: 0.85, y: 0 }}
+                  style={StyleSheet.absoluteFillObject}
+                />
+                <View style={styles.tipInner}>
+                  <View style={styles.tipArtSpacer} />
+                  <View style={styles.tipText}>
+                    <View style={styles.tipCategoryBadge}>
+                      <MaterialCommunityIcons name="lightbulb-on" size={12} color="#92400E" style={{ marginRight: 4 }} />
+                      <Text style={styles.tipCategory}>TIP OF THE DAY</Text>
+                    </View>
+                    <Text style={styles.tipTitle} numberOfLines={1}>{tipOfTheDay.title}</Text>
+                    <Text style={styles.tipBody} numberOfLines={3}>{tipOfTheDay.body}</Text>
+                  </View>
+                </View>
+              </ImageBackground>
+            </View>
+          </View>
+
+          {/* ── Recent Activity (at the bottom below Tip Card) ── */}
+          {recentTransactions.length > 0 && (
+            <View style={[styles.section, { marginTop: 24, marginBottom: 4 }]}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Recent Activity</Text>
                 <TouchableOpacity style={styles.viewAllBtn} onPress={() => navigation.navigate('Transactions')}>
@@ -600,110 +820,6 @@ const HomeScreen = ({ navigation }) => {
             </View>
           )}
 
-          {/* ── Empty state if no investments yet ── */}
-          {activeInvestments.length === 0 && recentTransactions.length === 0 && (
-            <View style={[styles.section, { marginTop: 24 }]}>
-              <TouchableOpacity
-                style={styles.emptyStartCard}
-                activeOpacity={0.85}
-                onPress={() => navigation.navigate('InvestmentDashboard')}
-              >
-                <LinearGradient
-                  colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                  style={styles.emptyStartGradient}
-                >
-                  <MaterialCommunityIcons name="sprout-outline" size={42} color="rgba(255,255,255,0.9)" />
-                  <Text style={styles.emptyStartTitle}>Start Your Investment Journey</Text>
-                  <Text style={styles.emptyStartBody}>
-                    Invest as little as ₹500 and watch your money grow every day.
-                  </Text>
-                  <View style={styles.emptyStartBtn}>
-                    <Text style={styles.emptyStartBtnText}>Invest Now →</Text>
-                  </View>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* ── Market Insights ── */}
-          <View style={[styles.section, { marginTop: 24 }]}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Market Insights</Text>
-            </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 12, paddingRight: 4 }}
-            >
-              {MARKET_INSIGHTS.map((item, idx) => (
-                <View key={idx} style={styles.insightChip}>
-                  <View style={[styles.insightIconBox, { backgroundColor: item.color + '18' }]}>
-                    <MaterialCommunityIcons name={item.icon} size={18} color={item.color} />
-                  </View>
-                  <Text style={styles.insightLabel}>{item.label}</Text>
-                  <Text style={[styles.insightValue, { color: item.color }]}>{item.value}</Text>
-                  {item.trend !== 'neutral' && (
-                    <MaterialCommunityIcons
-                      name={item.trend === 'up' ? 'arrow-up-thin' : 'arrow-down-thin'}
-                      size={14}
-                      color={item.trend === 'up' ? '#2D9A5A' : '#D94F2B'}
-                    />
-                  )}
-                </View>
-              ))}
-            </ScrollView>
-          </View>
-
-          {/* ── Tip Card ── */}
-          <View style={[styles.section, { marginTop: 24, marginBottom: 4 }]}>
-            <View style={styles.tipCard}>
-              <ImageBackground
-                source={require('../../../assets/tip-of-the-day-banner.jpg')}
-                style={styles.tipCardBg}
-                imageStyle={styles.tipCardImage}
-                resizeMode="cover"
-              >
-                <LinearGradient
-                  colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.45)', 'rgba(255,255,255,0.85)']}
-                  start={{ x: 0.15, y: 0 }}
-                  end={{ x: 0.85, y: 0 }}
-                  style={StyleSheet.absoluteFillObject}
-                />
-                <View style={styles.tipInner}>
-                  <View style={styles.tipArtSpacer} />
-                  <View style={styles.tipText}>
-                    <View style={styles.tipCategoryBadge}>
-                      <MaterialCommunityIcons name="lightbulb-on" size={12} color="#92400E" style={{ marginRight: 4 }} />
-                      <Text style={styles.tipCategory}>TIP OF THE DAY</Text>
-                    </View>
-                    <Text style={styles.tipTitle} numberOfLines={1}>{tipOfTheDay.title}</Text>
-                    <Text style={styles.tipBody} numberOfLines={3}>{tipOfTheDay.body}</Text>
-                  </View>
-                </View>
-              </ImageBackground>
-            </View>
-          </View>
-
-          {/* ── Refer & Earn Banner ── */}
-          <View style={[styles.section, { marginTop: 16 }]}>
-            <TouchableOpacity
-              style={styles.referralCard}
-              activeOpacity={0.88}
-              onPress={() => navigation.navigate('Referral')}
-            >
-              <View style={styles.referralLeft}>
-                <Text style={styles.referralEmoji}>🎁</Text>
-                <View>
-                  <Text style={styles.referralTitle}>Refer & Earn</Text>
-                  <Text style={styles.referralBody}>Invite friends and earn Growvest coins together</Text>
-                </View>
-              </View>
-              <View style={styles.referralArrow}>
-                <MaterialCommunityIcons name="chevron-right" size={20} color="#1A5C39" />
-              </View>
-            </TouchableOpacity>
-          </View>
 
           <View style={{ height: 120 }} />
         </Animated.View>
@@ -721,8 +837,6 @@ const HomeScreen = ({ navigation }) => {
 };
 
 // ─── Styles ─────────────────────────────────────────────────────────────────
-const { StyleSheet } = require('react-native');
-
 const getStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
@@ -964,21 +1078,215 @@ const getStyles = (colors) => StyleSheet.create({
   },
   emptyStartBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
 
-  // Market Insights
-  insightChip: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    paddingHorizontal: 14, paddingVertical: 12,
+
+  // Section subtitle
+  sectionSubtitle: { fontSize: 11, color: colors.textMuted, fontWeight: '500', marginTop: 2 },
+
+  // Market Radar (Modern Snapping Reel + Radar Pulse)
+  radarHeaderContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 14,
+  },
+  radarHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  liveRadarContainer: {
+    width: 14,
+    height: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  liveRadarDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#10B981',
+  },
+  liveRadarPulse: {
+    position: 'absolute',
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#10B981',
+  },
+  swipeBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    minWidth: 90,
-    borderWidth: 1, borderColor: colors.borderLight,
-    shadowColor: '#0E3D23', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
+    backgroundColor: colors.surface2 || '#F1F5F9',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.borderLight || 'rgba(0,0,0,0.06)',
   },
-  insightIconBox: { width: 36, height: 36, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  insightLabel: { fontSize: 10, color: colors.textMuted, fontWeight: '600', textAlign: 'center' },
-  insightValue: { fontSize: 13, fontWeight: '800', letterSpacing: -0.3 },
+  swipeBadgeText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: colors.textMuted,
+  },
+  insightScrollContent: {
+    paddingLeft: 20,
+    paddingRight: 8,
+    paddingVertical: 4,
+  },
+  insightCardContainer: {
+    width: INSIGHT_CARD_WIDTH,
+    marginRight: INSIGHT_CARD_GAP,
+  },
+  insightCardGradient: {
+    borderRadius: 22,
+    padding: 16,
+    borderWidth: 1.2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 6,
+    overflow: 'hidden',
+  },
+  insightCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  insightCategoryPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  insightCategoryText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
+  insightTrendPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  insightTrendPillText: {
+    fontSize: 10.5,
+    fontWeight: '800',
+  },
+  insightCardMiddle: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  insightCardDataCol: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  insightCardTitle: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.7)',
+    fontWeight: '600',
+    marginBottom: 3,
+  },
+  insightCardValueRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  insightCardHeroValue: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: -0.8,
+  },
+  insightCardUnit: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  insightCardSubtext: {
+    fontSize: 10.5,
+    color: 'rgba(255,255,255,0.6)',
+    fontWeight: '500',
+    marginTop: 3,
+  },
+  sparklineContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    height: 42,
+    gap: 4,
+    paddingBottom: 2,
+  },
+  sparklineCol: {
+    width: 5,
+    height: '100%',
+    justifyContent: 'flex-end',
+  },
+  sparklineBar: {
+    width: 5,
+    borderRadius: 3,
+  },
+  insightCardDivider: {
+    height: 1,
+    width: '100%',
+    marginBottom: 10,
+  },
+  insightCardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  insightFooterLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flex: 1,
+    marginRight: 6,
+  },
+  insightFooterDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+  },
+  insightFooterText: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.85)',
+    fontWeight: '600',
+  },
+  insightBadgeTag: {
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+  },
+  insightBadgeTagText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+  },
+  paginationRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+  },
+  paginationDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  paginationDotActive: {
+    width: 20,
+    borderRadius: 4,
+  },
 
   // Tip Card
   tipCard: {
@@ -1006,27 +1314,6 @@ const getStyles = (colors) => StyleSheet.create({
   tipCategory: { fontSize: 9.5, color: '#92400E', fontWeight: '800', letterSpacing: 0.8 },
   tipTitle: { fontSize: 14, fontWeight: '800', color: '#1A2E22', letterSpacing: -0.2, marginBottom: 2 },
   tipBody: { fontSize: 11.5, color: '#374151', lineHeight: 16, fontWeight: '500' },
-
-  // Referral Card
-  referralCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#E8F5EE',
-    borderRadius: 18,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#C4E0D2',
-  },
-  referralLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  referralEmoji: { fontSize: 28 },
-  referralTitle: { fontSize: 14, fontWeight: '700', color: '#0E3D23' },
-  referralBody: { fontSize: 12, color: '#1A5C39', marginTop: 2 },
-  referralArrow: {
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: 'rgba(26, 92, 57, 0.12)',
-    justifyContent: 'center', alignItems: 'center',
-  },
 });
 
 export default HomeScreen;

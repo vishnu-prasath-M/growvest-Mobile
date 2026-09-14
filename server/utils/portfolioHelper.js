@@ -101,45 +101,59 @@ async function getUserPortfolioSummary(userIdInput) {
 
     // ── Interest rate & duration by plan type (all p.a.) ──
     let rate = Number(inv.applicableInterestRate) || Number(inv.interestRate);
-    let durationDays = Number(inv.eligibleHoldingDays) || Number(inv.durationDays);
-    if (!rate || !durationDays) {
-      if (inv.type === '15_days')   { rate = rate || 12;  durationDays = durationDays || 15;  }
-      else if (inv.type === '1_month')  { rate = rate || 15;  durationDays = durationDays || 30;  }
-      else if (inv.type === '3_months') { rate = rate || 18;  durationDays = durationDays || 90;  }
-      else if (inv.type === '6_months') { rate = rate || 20;  durationDays = durationDays || 180; }
-      else if (inv.type === '1_year')   { rate = rate || 24;  durationDays = durationDays || 365; }
-      else if (inv.type === 'saving')   { rate = rate || 12;  durationDays = durationDays || 365; }
-      else if (inv.type === 'fixed')    { rate = rate || 24;  durationDays = durationDays || 365; }
+    let durationDays = Math.max(2, Number(inv.eligibleHoldingDays) || Number(inv.durationDays) || 15);
+    if (!rate) {
+      if (inv.type === '15_days')   { rate = 12;  durationDays = Math.max(durationDays, 15);  }
+      else if (inv.type === '1_month')  { rate = 15;  durationDays = Math.max(durationDays, 30);  }
+      else if (inv.type === '3_months') { rate = 18;  durationDays = Math.max(durationDays, 90);  }
+      else if (inv.type === '6_months') { rate = 20;  durationDays = Math.max(durationDays, 180); }
+      else if (inv.type === '1_year')   { rate = 24;  durationDays = Math.max(durationDays, 365); }
+      else if (inv.type === 'saving')   { rate = 12;  durationDays = Math.max(durationDays, 15); }
+      else if (inv.type === 'fixed')    { rate = 24;  durationDays = Math.max(durationDays, 365); }
+      else { rate = 12; }
     }
 
     const dailyInterest = (principal * rate) / 100 / 365;
     const totalInterestForDuration = Number(inv.calculatedInterest) || (dailyInterest * durationDays);
     const maturityAmount = inv.expectedPayout || inv.maturityAmount || (principal + totalInterestForDuration);
 
-    // Maturity date (full plan completion or chosen intended date)
-    const maturityDate = inv.maturityDate
-      ? new Date(inv.maturityDate)
-      : new Date((inv.startDate ? new Date(inv.startDate) : new Date()).getTime() + durationDays * 86400000);
+    const startDay = inv.startDate ? new Date(inv.startDate) : new Date();
+    startDay.setHours(0, 0, 0, 0);
 
-    // Intended withdrawal date (user-picked custom date)
-    const intendedWithdrawalDate = inv.intendedWithdrawalDate
+    // Rule: Same calendar day of investment/reinvestment has 0 interest & cannot mature
+    const isSameDay = nowMidnight.getTime() <= startDay.getTime();
+    const minUnlockTime = startDay.getTime() + 2 * 86400000; // Minimum 2 full days
+
+    // Maturity date (full plan completion)
+    let maturityDate = inv.maturityDate
+      ? new Date(inv.maturityDate)
+      : new Date(startDay.getTime() + durationDays * 86400000);
+    maturityDate.setHours(0, 0, 0, 0);
+    if (maturityDate.getTime() < minUnlockTime) {
+      maturityDate = new Date(minUnlockTime);
+    }
+
+    // Intended withdrawal date (user-picked custom date, minimum 2 days)
+    let intendedWithdrawalDate = inv.intendedWithdrawalDate
       ? new Date(inv.intendedWithdrawalDate)
       : (inv.selectedWithdrawalDate ? new Date(inv.selectedWithdrawalDate) : maturityDate);
     intendedWithdrawalDate.setHours(0, 0, 0, 0);
+    if (intendedWithdrawalDate.getTime() < minUnlockTime) {
+      intendedWithdrawalDate = new Date(minUnlockTime);
+    }
 
-    // If reaching intended date or maturity date
-    const isMatured = !isPending && !isClosed && (nowDate >= maturityDate || nowDate >= intendedWithdrawalDate);
+    // Maturity Lock Guard: CANNOT mature on the same day as startDate or before minimum 2 days
+    const unlockDate = intendedWithdrawalDate < maturityDate ? intendedWithdrawalDate : maturityDate;
+    const isMatured = !isPending && !isClosed && !isSameDay && (nowDate >= unlockDate);
     const isUnlocked = isMatured;
 
-    // Accrue interest from startDate to today (capped at durationDays)
+    // Accrue interest from startDate to today (strictly starts after first midnight / next day; 0 on same day)
     let accruedInterest = 0;
-    if (inv.startDate && !isClosed && !isPending) {
-      const startDay = new Date(inv.startDate);
-      startDay.setHours(0, 0, 0, 0);
+    if (inv.startDate && !isClosed && !isPending && !isSameDay) {
       const elapsedDays = Math.max(0, Math.min(durationDays, Math.floor((nowMidnight - startDay) / 86400000)));
       accruedInterest = elapsedDays * dailyInterest;
+      accruedInterest = Math.max(accruedInterest, Number(inv.interestEarned) || 0);
     }
-    accruedInterest = Math.max(accruedInterest, Number(inv.interestEarned) || 0);
     if (isMatured) {
       accruedInterest = Math.max(accruedInterest, totalInterestForDuration);
     }
