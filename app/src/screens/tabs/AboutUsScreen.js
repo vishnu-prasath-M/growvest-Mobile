@@ -98,6 +98,19 @@ const AboutUsScreen = ({ navigation }) => {
 
           <View style={styles.subDivider} />
 
+          {/* SIP (Systematic Investment Plan) */}
+          <View style={styles.subOptionItem}>
+            <View style={styles.subOptionHeader}>
+              <MaterialCommunityIcons name="chart-bell-curve-cumulative" size={18} color="#059669" />
+              <Text style={styles.subOptionTitle}>Systematic Investment Plan (SIP)</Text>
+            </View>
+            <Text style={styles.subOptionText}>
+              SIP allows users to build disciplined wealth through recurring automated micro-investments with daily, weekly, or monthly frequencies. Benefit from compounding returns (up to 26% p.a.), track upcoming installments, maintain streak rewards, and withdraw smoothly on maturity.
+            </Text>
+          </View>
+
+          <View style={styles.subDivider} />
+
           {/* New Investments */}
           <View style={styles.subOptionItem}>
             <View style={styles.subOptionHeader}>

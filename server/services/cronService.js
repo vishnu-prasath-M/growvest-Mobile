@@ -126,8 +126,18 @@ const sendDailyPocketMoneyNotifications = async () => {
       const freqLabel = plan.frequency === 'daily' ? 'daily'
         : plan.frequency === 'every_2_days' ? 'every 2 days' : 'weekly';
 
+      // Determine greeting based on current Indian Standard Time (IST = UTC+5:30)
+      const now = new Date();
+      const istMinutesTotal = now.getUTCHours() * 60 + now.getUTCMinutes() + 330;
+      const istHour = Math.floor((istMinutesTotal / 60) % 24);
+      const greeting = (istHour >= 4 && istHour < 12)
+        ? 'Good morning!'
+        : (istHour >= 12 && istHour < 17)
+        ? 'Good afternoon!'
+        : 'Good day!';
+
       const title = '☀️ Daily Pocket Money Ready to Claim!';
-      const body = `Good morning! Your ${freqLabel} pocket money payout of ₹${payoutAmount.toLocaleString('en-IN')} is ready. Log in to claim it in the Pocket Money section.`;
+      const body = `${greeting} Your ${freqLabel} pocket money payout of ₹${payoutAmount.toLocaleString('en-IN')} is ready. Log in to claim it in the Pocket Money section.`;
 
       await sendUserNotification(
         plan.userId._id,

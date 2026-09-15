@@ -546,44 +546,100 @@ const HomeScreen = ({ navigation }) => {
                 </TouchableOpacity>
               </View>
               {activeInvestments.slice(0, 3).map((inv, idx) => {
-                const progress = inv.duration > 0
-                  ? Math.min(((Date.now() - new Date(inv.startDate)) / (inv.duration * 30 * 24 * 60 * 60 * 1000)) * 100, 100)
-                  : 0;
+                const durationDays = inv.duration ? Number(inv.duration) : 30;
+                const startMs = inv.startDate ? new Date(inv.startDate).getTime() : Date.now();
+                const isDays = inv.durationDays || durationDays > 12;
+                const totalDays = isDays ? durationDays : durationDays * 30;
+                const elapsedDays = Math.max(0, (Date.now() - startMs) / (24 * 60 * 60 * 1000));
+                const progress = totalDays > 0 ? Math.min((elapsedDays / totalDays) * 100, 100) : 0;
+                const isFixed = inv.type === 'fixed';
+                const planTitle = inv.planName || (isFixed ? 'Fixed Yield Deposit' : 'Smart Savings Growth');
+                const categoryLabel = isFixed ? 'CAPITAL GUARANTEE' : 'FLEXIBLE SAVINGS';
+                const iconName = isFixed ? 'shield-lock-outline' : 'sprout';
+                const rate = inv.interestRate || inv.returnRate || (isFixed ? 24 : 12);
+
                 return (
                   <TouchableOpacity
                     key={inv._id || idx}
-                    style={styles.investmentItem}
-                    activeOpacity={0.85}
+                    style={styles.premiumPlanCard}
+                    activeOpacity={0.88}
                     onPress={() => navigation.navigate('Investments')}
                   >
-                    <View style={[styles.investmentIconBox, { backgroundColor: '#E8F5EE' }]}>
-                      <MaterialCommunityIcons name="trending-up" size={20} color="#1A5C39" />
-                    </View>
-                    <View style={styles.investmentContent}>
-                      <View style={styles.investmentTopRow}>
-                        <Text style={styles.investmentTitle} numberOfLines={1}>
-                          {inv.planName || inv.type || 'Investment Plan'}
-                        </Text>
-                        <View style={[styles.statusBadge, { backgroundColor: '#E8F5EE' }]}>
-                          <View style={[styles.statusDot, { backgroundColor: '#2D9A5A' }]} />
-                          <Text style={[styles.statusText, { color: '#1A5C39' }]}>Active</Text>
+                    <LinearGradient
+                      colors={['#FFFFFF', '#F8FCF9']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.premiumPlanGradient}
+                    >
+                      {/* Left vertical accent stripe */}
+                      <View style={[styles.premiumPlanAccentStripe, { backgroundColor: isFixed ? '#0284C7' : '#10B981' }]} />
+
+                      <View style={styles.premiumPlanInner}>
+                        {/* Top Header Row: Icon Badge + Plan Category & Title + Live Status Pill */}
+                        <View style={styles.premiumPlanHeaderRow}>
+                          <View style={styles.premiumPlanTitleGroup}>
+                            <View style={[styles.premiumPlanIconBadge, { backgroundColor: isFixed ? 'rgba(2, 132, 199, 0.12)' : 'rgba(16, 185, 129, 0.12)' }]}>
+                              <MaterialCommunityIcons
+                                name={iconName}
+                                size={20}
+                                color={isFixed ? '#0284C7' : '#059669'}
+                              />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={[styles.premiumPlanCategory, { color: isFixed ? '#0284C7' : '#059669' }]}>
+                                {categoryLabel}
+                              </Text>
+                              <Text style={styles.premiumPlanName} numberOfLines={1}>
+                                {planTitle}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View style={styles.premiumLivePill}>
+                            <View style={styles.premiumLiveDot} />
+                            <Text style={styles.premiumLiveText}>ACTIVE</Text>
+                          </View>
+                        </View>
+
+                        {/* Middle Metric Row: Principal Amount + Returns Rate Pill */}
+                        <View style={styles.premiumPlanMetricRow}>
+                          <View>
+                            <Text style={styles.premiumPlanAmountLabel}>INVESTED PRINCIPAL</Text>
+                            <Text style={styles.premiumPlanAmount}>
+                              {hideBalance ? '₹ ••••••' : formatCurrency(inv.amount || 0)}
+                            </Text>
+                          </View>
+
+                          <View style={[styles.premiumRatePill, { borderColor: isFixed ? 'rgba(2, 132, 199, 0.25)' : 'rgba(16, 185, 129, 0.25)', backgroundColor: isFixed ? 'rgba(2, 132, 199, 0.08)' : 'rgba(16, 185, 129, 0.08)' }]}>
+                            <MaterialCommunityIcons name="trending-up" size={15} color={isFixed ? '#0284C7' : '#059669'} />
+                            <Text style={[styles.premiumRateText, { color: isFixed ? '#0284C7' : '#047857' }]}>
+                              {rate}% p.a.
+                            </Text>
+                          </View>
+                        </View>
+
+                        {/* Bottom Progress Section with Sleek Gradient Bar */}
+                        <View style={styles.premiumProgressSection}>
+                          <View style={styles.premiumProgressBarBg}>
+                            <LinearGradient
+                              colors={isFixed ? ['#38BDF8', '#0284C7'] : ['#34D399', '#059669']}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 0 }}
+                              style={[styles.premiumProgressBarFill, { width: `${Math.max(5, Math.min(progress, 100))}%` }]}
+                            />
+                          </View>
+
+                          <View style={styles.premiumProgressFooter}>
+                            <Text style={styles.premiumProgressLabel}>
+                              {totalDays > 0 ? `${totalDays} Days Term` : 'Flexi Plan'}
+                            </Text>
+                            <Text style={[styles.premiumProgressPercent, { color: isFixed ? '#0284C7' : '#047857' }]}>
+                              {progress.toFixed(0)}% Completed
+                            </Text>
+                          </View>
                         </View>
                       </View>
-                      <View style={styles.investmentMeta}>
-                        <Text style={styles.investmentAmount}>
-                          {hideBalance ? '₹ ••••' : formatCurrency(inv.amount || 0)}
-                        </Text>
-                        <Text style={styles.investmentRate}>
-                          {inv.interestRate || inv.returnRate || 0}% p.a.
-                        </Text>
-                      </View>
-                      <View style={styles.progressBarContainer}>
-                        <View style={styles.progressBarBg}>
-                          <View style={[styles.progressBarFill, { width: `${progress.toFixed(0)}%` }]} />
-                        </View>
-                        <Text style={styles.progressText}>{progress.toFixed(0)}%</Text>
-                      </View>
-                    </View>
+                    </LinearGradient>
                   </TouchableOpacity>
                 );
               })}
@@ -999,7 +1055,150 @@ const getStyles = (colors) => StyleSheet.create({
   },
   portfolioCardBadgeText: { fontSize: 10, color: 'rgba(255,255,255,0.9)', fontWeight: '700' },
 
-  // Active Investments
+  // Active Investments - Premium Modern Redesign
+  premiumPlanCard: {
+    borderRadius: 20,
+    marginBottom: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.16)',
+    shadowColor: '#0E3D23',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.07,
+    shadowRadius: 14,
+    elevation: 4,
+    overflow: 'hidden',
+  },
+  premiumPlanGradient: {
+    flexDirection: 'row',
+  },
+  premiumPlanAccentStripe: {
+    width: 4.5,
+  },
+  premiumPlanInner: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  premiumPlanHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  premiumPlanTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+    marginRight: 10,
+  },
+  premiumPlanIconBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  premiumPlanCategory: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 1,
+  },
+  premiumPlanName: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.text,
+    letterSpacing: -0.2,
+  },
+  premiumLivePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.25)',
+  },
+  premiumLiveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
+  premiumLiveText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#047857',
+    letterSpacing: 0.5,
+  },
+  premiumPlanMetricRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginBottom: 12,
+  },
+  premiumPlanAmountLabel: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: colors.textMuted,
+    letterSpacing: 0.6,
+    marginBottom: 2,
+    textTransform: 'uppercase',
+  },
+  premiumPlanAmount: {
+    fontSize: 21,
+    fontWeight: '900',
+    color: colors.text,
+    letterSpacing: -0.5,
+  },
+  premiumRatePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  premiumRateText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  premiumProgressSection: {
+    gap: 6,
+    marginTop: 2,
+  },
+  premiumProgressBarBg: {
+    height: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  premiumProgressBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  premiumProgressFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  premiumProgressLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textMuted,
+  },
+  premiumProgressPercent: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+
+  // Legacy fallback
   investmentItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
