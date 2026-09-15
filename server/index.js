@@ -37,12 +37,18 @@ cron.schedule("0 0 * * *", async () => {
 
 // Due Reminder & Penalty Cron Job (runs daily at 8:45 AM IST)
 const calcNextWeeklyDueDate = (joinedAt, weekIndex) => {
-  const base = new Date(joinedAt);
-  const day = base.getDay();
-  const daysToSunday = day === 0 ? 0 : 7 - day;
-  const firstSunday = new Date(base.getTime() + daysToSunday * 24 * 60 * 60 * 1000);
-  firstSunday.setHours(12, 0, 0, 0);
-  const targetDueDate = new Date(firstSunday.getTime() + (weekIndex) * 7 * 24 * 60 * 60 * 1000);
+  const base = new Date(joinedAt || Date.now());
+  const day = base.getDay(); // 0 is Sunday
+  let firstDueSunday = new Date(base);
+  if (day === 0) {
+    firstDueSunday.setDate(base.getDate() + 7);
+  } else {
+    firstDueSunday.setDate(base.getDate() + (7 - day));
+  }
+  firstDueSunday.setHours(23, 59, 59, 999);
+  const offsetWeeks = Math.max(0, (weekIndex || 1) - 1);
+  const targetDueDate = new Date(firstDueSunday.getTime() + offsetWeeks * 7 * 24 * 60 * 60 * 1000);
+  targetDueDate.setHours(23, 59, 59, 999);
   return targetDueDate;
 };
 
@@ -75,10 +81,11 @@ cron.schedule("45 8 * * *", async () => {
         ? calcNextWeeklyDueDate(member.joinedAt, currentUnit)
         : calcNextDueDate(member.joinedAt, member.currentMonth);
         
-      const diffTime = nextDue.getTime() - today.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const dueMidnight = new Date(nextDue);
+      dueMidnight.setHours(0, 0, 0, 0);
+      const diffDays = Math.round((dueMidnight.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       
-      // 1. Check for overdue and apply penalty
+      // 1. Check for overdue and apply penalty (Rs 5/day late fee after Sunday)
       if (diffDays < 0) {
         const ChitPayment = require('./models/ChitPayment');
         const Transaction = require('./models/Transaction');
@@ -96,7 +103,8 @@ cron.schedule("45 8 * * *", async () => {
           });
           
           const baseAmount = isWeekly ? (member.chitId.weeklyAmount || 200) : (member.chitId.monthlyAmount || 1000);
-          const penaltyAmount = isWeekly ? (baseAmount * 0.05) : 0; 
+          const daysLate = Math.abs(diffDays);
+          const penaltyAmount = isWeekly ? Math.max(5, daysLate * 5) : 0; 
           
           if (penaltyAmount > 0) {
             if (!paymentRecord) {

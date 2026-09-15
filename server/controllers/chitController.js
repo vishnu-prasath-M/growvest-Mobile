@@ -28,9 +28,22 @@ const calcNextDueDate = (joinedAt, currentMonth) => {
 };
 
 const calcNextWeeklyDueDate = (joinedAt, weekIndex) => {
-  const startSunday = getChitStartSunday(joinedAt);
-  // weekIndex = 0 is Week 1 (Start Sunday), weekIndex = 1 is Week 2 (Next Sunday), etc.
-  const targetDueDate = new Date(startSunday.getTime() + (weekIndex) * 7 * 24 * 60 * 60 * 1000);
+  const base = new Date(joinedAt || Date.now());
+  const day = base.getDay(); // 0 is Sunday
+  let firstDueSunday = new Date(base);
+  if (day === 0) {
+    // If joined on Sunday, Week 1 is that Sunday; Week 2 is next Sunday (+7 days)
+    firstDueSunday.setDate(base.getDate() + 7);
+  } else {
+    // If joined Mon-Sat, Week 1 is join date; Week 2 is the very first upcoming Sunday
+    firstDueSunday.setDate(base.getDate() + (7 - day));
+  }
+  firstDueSunday.setHours(23, 59, 59, 999);
+
+  // weekIndex is paid units count: when weekIndex is 1 (Week 1 paid), due is Week 2 (firstDueSunday + 0)
+  // when weekIndex is 2 (Week 2 paid), due is Week 3 (firstDueSunday + 7 days)
+  const offsetWeeks = Math.max(0, (weekIndex || 1) - 1);
+  const targetDueDate = new Date(firstDueSunday.getTime() + offsetWeeks * 7 * 24 * 60 * 60 * 1000);
   targetDueDate.setHours(23, 59, 59, 999);
   return targetDueDate;
 };

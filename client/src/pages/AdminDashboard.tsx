@@ -21,6 +21,10 @@ import {
   Trash2,
   Eye,
   Wallet,
+  Smartphone,
+  Copy,
+  Check,
+  ExternalLink,
 } from "lucide-react";
 import ZenvestLogo from "@/components/ZenvestLogo";
 import { Button } from "@/components/ui/button";
@@ -101,12 +105,65 @@ const getPlanDisplayName = (type: string) => {
   return type + ' Plan';
 };
 
+const isMobileDevice = () => {
+  if (typeof window === "undefined") return false;
+  return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+};
+
+const getUPIDeepLink = (
+  upiId?: string,
+  amount?: number | string,
+  transactionNote: string = "Growvest Payout",
+  payeeName: string = "User",
+  app?: "generic" | "gpay" | "phonepe" | "paytm"
+) => {
+  if (!upiId) return "";
+  const cleanUpi = upiId.trim();
+  const numAmt = typeof amount === "string" ? parseFloat(amount.replace(/[^0-9.]/g, "")) : (amount || 0);
+  const cleanAmt = isNaN(numAmt) ? "0.00" : numAmt.toFixed(2);
+  const encodedName = encodeURIComponent(payeeName || "User");
+  const encodedNote = encodeURIComponent(transactionNote || "Payout");
+
+  const query = `pa=${cleanUpi}&pn=${encodedName}&am=${cleanAmt}&cu=INR&tn=${encodedNote}`;
+
+  if (app === "gpay") {
+    return `tez://upi/pay?${query}`;
+  }
+  if (app === "phonepe") {
+    return `phonepe://pay?${query}`;
+  }
+  if (app === "paytm") {
+    return `paytmmp://pay?${query}`;
+  }
+  return `upi://pay?${query}`;
+};
+
 type AdminTab = "overview" | "pending" | "users" | "withdrawals" | "kyc" | "chits" | "sip" | "settings" | "pocket" | "referral" | "push_test";
 
 const AdminDashboard = () => {
   const { user: authUser, token, logout } = useAuth();
   const navigate = useNavigate();
   const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+  const [copiedUPI, setCopiedUPI] = useState(false);
+
+  const handleOpenUPI = (
+    upiId?: string,
+    amount?: number | string,
+    note: string = "Growvest Payout",
+    payeeName: string = "User",
+    app?: "generic" | "gpay" | "phonepe" | "paytm"
+  ) => {
+    if (!upiId) {
+      toast.error("User does not have a UPI ID provided");
+      return;
+    }
+    const link = getUPIDeepLink(upiId, amount, note, payeeName, app);
+    if (!link) {
+      toast.error("Could not construct UPI link");
+      return;
+    }
+    window.location.href = link;
+  };
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     if (typeof window !== "undefined") {
@@ -1645,10 +1702,15 @@ const AdminDashboard = () => {
                           </Button>
                           <Button
                             size="sm"
-                            className="rounded-xl font-body h-10 px-5 bg-green-600 hover:bg-green-700 text-white"
-                            onClick={() => setPayModalData(w)}
+                            className="rounded-xl font-body h-10 px-5 bg-green-600 hover:bg-green-700 text-white shadow-sm flex items-center gap-1.5"
+                            onClick={() => {
+                              if ((isMobile || isMobileDevice()) && w.upi) {
+                                handleOpenUPI(w.upi, w.rawAmount, `WD-${w.id}`, w.user);
+                              }
+                              setPayModalData(w);
+                            }}
                           >
-                            <DollarSign className="mr-1.5 h-3.5 w-3.5 text-white" />
+                            <DollarSign className="h-3.5 w-3.5 text-white" />
                             Pay
                           </Button>
                         </div>
@@ -1900,11 +1962,78 @@ const AdminDashboard = () => {
             >
               <X size={20} />
             </button>
-            <div className="mb-6">
+            <div className="mb-5">
               <h2 className="text-xl font-heading font-bold text-foreground">Complete Payment</h2>
-              <p className="text-sm font-body text-muted-foreground mt-2">
-                Send the requested amount to the user's UPI below.
+              <p className="text-sm font-body text-muted-foreground mt-1">
+                Send the requested amount to the user's UPI address.
               </p>
+            </div>
+
+            {/* Direct 1-Click Mobile UPI App Launchers */}
+            {payModalData.upi && payModalData.rawAmount && payModalData.rawAmount > 0 && (
+              <div className="mb-5 p-4 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50/50 border border-emerald-200/80 shadow-sm">
+                <div className="flex items-center justify-between mb-2.5">
+                  <span className="text-xs font-heading font-bold text-emerald-950 flex items-center gap-1.5">
+                    <Smartphone className="h-4 w-4 text-emerald-600" />
+                    Pay via UPI Mobile App
+                  </span>
+                  <span className="text-[10px] font-body font-semibold px-2 py-0.5 rounded-full bg-emerald-200/70 text-emerald-800">
+                    Instant Deeplink
+                  </span>
+                </div>
+
+                {/* Primary UPI Chooser Button */}
+                <button
+                  type="button"
+                  onClick={() => handleOpenUPI(payModalData.upi, payModalData.rawAmount, `WD-${payModalData.id}`, payModalData.user)}
+                  className="w-full h-11 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-[0.99] text-white font-body font-bold text-sm flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 hover:shadow-lg transition-all mb-2.5"
+                >
+                  <DollarSign className="h-4 w-4 text-white" />
+                  Open UPI App (GPay / PhonePe / Paytm)
+                </button>
+
+                {/* Dedicated App Buttons */}
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenUPI(payModalData.upi, payModalData.rawAmount, `WD-${payModalData.id}`, payModalData.user, 'gpay')}
+                    className="h-9 px-1.5 rounded-xl bg-white hover:bg-blue-50 border border-blue-200 text-blue-700 font-body text-xs font-bold flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-all"
+                    title="Pay with Google Pay"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                    Google Pay
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenUPI(payModalData.upi, payModalData.rawAmount, `WD-${payModalData.id}`, payModalData.user, 'phonepe')}
+                    className="h-9 px-1.5 rounded-xl bg-white hover:bg-purple-50 border border-purple-200 text-purple-700 font-body text-xs font-bold flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-all"
+                    title="Pay with PhonePe"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-purple-500" />
+                    PhonePe
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenUPI(payModalData.upi, payModalData.rawAmount, `WD-${payModalData.id}`, payModalData.user, 'paytm')}
+                    className="h-9 px-1.5 rounded-xl bg-white hover:bg-sky-50 border border-sky-200 text-sky-700 font-body text-xs font-bold flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-all"
+                    title="Pay with Paytm"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-sky-500" />
+                    Paytm
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-[10px] uppercase">
+                <span className="bg-card px-2 text-muted-foreground font-semibold tracking-wider">
+                  Or Scan QR Code
+                </span>
+              </div>
             </div>
 
             <div className="flex flex-col items-center justify-center mb-6 gap-4">
@@ -2000,7 +2129,33 @@ const AdminDashboard = () => {
               <div>
                 <label className="text-xs font-body font-semibold text-muted-foreground">UPI ID</label>
                 <div className="p-3 bg-muted rounded-xl text-sm font-body text-foreground font-medium flex items-center justify-between">
-                  {payModalData.upi || "None provided"}
+                  <span className="break-all">{payModalData.upi || "None provided"}</span>
+                  {payModalData.upi && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground font-body flex items-center gap-1 ml-2 shrink-0"
+                      onClick={() => {
+                        navigator.clipboard.writeText(payModalData.upi || "");
+                        setCopiedUPI(true);
+                        toast.success("UPI ID copied!");
+                        setTimeout(() => setCopiedUPI(false), 2000);
+                      }}
+                    >
+                      {copiedUPI ? (
+                        <>
+                          <Check className="h-3.5 w-3.5 text-emerald-600" />
+                          <span className="text-emerald-600 font-semibold">Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3.5 w-3.5" />
+                          <span>Copy</span>
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </div>
               </div>
               <div>

@@ -231,10 +231,17 @@ const sendChitDueReminders = async () => {
     const calcNextWeeklyDueDate = (joinedAt, weekIndex) => {
       const base = new Date(joinedAt || Date.now());
       const day = base.getDay();
-      const daysToSunday = day === 0 ? 0 : 7 - day;
-      const firstSunday = new Date(base.getTime() + daysToSunday * 24 * 60 * 60 * 1000);
-      firstSunday.setHours(12, 0, 0, 0);
-      return new Date(firstSunday.getTime() + (weekIndex || 0) * 7 * 24 * 60 * 60 * 1000);
+      let firstDueSunday = new Date(base);
+      if (day === 0) {
+        firstDueSunday.setDate(base.getDate() + 7);
+      } else {
+        firstDueSunday.setDate(base.getDate() + (7 - day));
+      }
+      firstDueSunday.setHours(23, 59, 59, 999);
+      const offsetWeeks = Math.max(0, (weekIndex || 1) - 1);
+      const targetDueDate = new Date(firstDueSunday.getTime() + offsetWeeks * 7 * 24 * 60 * 60 * 1000);
+      targetDueDate.setHours(23, 59, 59, 999);
+      return targetDueDate;
     };
 
     const calcNextMonthlyDueDate = (joinedAt, monthIndex) => {
@@ -268,17 +275,33 @@ const sendChitDueReminders = async () => {
       if (dueDate && dueDate.getTime() <= fourDaysLater.getTime()) {
         const dueAmount = member.weeklyAmount || member.chitId?.monthlyAmount || 200;
         const chitTitle = member.chitId?.name || 'Chit Plan';
-        const diffDays = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+
+        const todayMidnight = new Date();
+        todayMidnight.setHours(0, 0, 0, 0);
+
+        const dueMidnight = new Date(dueDate);
+        dueMidnight.setHours(0, 0, 0, 0);
+
+        const diffDays = Math.round((dueMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24));
 
         let title = '';
         let body = '';
 
-        if (diffDays <= 0) {
+        if (diffDays === 0) {
           title = '🚨 Chit Due Today!';
           body = `Your contribution of ₹${dueAmount.toLocaleString('en-IN')} for "${chitTitle}" is due today. Pay now to stay eligible for upcoming chit draws!`;
-        } else {
-          title = `⏳ Chit Due in ${diffDays} Day${diffDays > 1 ? 's' : ''}!`;
+        } else if (diffDays === 1) {
+          title = '⏳ Chit Due Tomorrow!';
+          body = `Your contribution of ₹${dueAmount.toLocaleString('en-IN')} for "${chitTitle}" is due tomorrow (Sunday). Pay early to maintain your clean chit record.`;
+        } else if (diffDays > 1) {
+          title = `⏳ Chit Due in ${diffDays} Days!`;
           body = `Your contribution of ₹${dueAmount.toLocaleString('en-IN')} for "${chitTitle}" is due in ${diffDays} days. Pay early to maintain your clean chit record.`;
+        } else {
+          // Overdue
+          const daysLate = Math.abs(diffDays);
+          const lateFee = Math.max(5, daysLate * 5);
+          title = '⚠️ Chit Due Overdue!';
+          body = `Your contribution for "${chitTitle}" was due on Sunday and is overdue by ${daysLate} day${daysLate > 1 ? 's' : ''}. Late fee of ₹${lateFee} applies. Pay now to clear your dues!`;
         }
 
         await sendUserNotification(

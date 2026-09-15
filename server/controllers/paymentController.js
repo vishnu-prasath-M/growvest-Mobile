@@ -341,15 +341,20 @@ const completeChitJoin = async (user, data, orderId, paymentId, signature) => {
   const isWeekly = chit.isWeekly !== false && chit.paymentFrequency !== 'monthly';
   const now = new Date();
   let startSunday = new Date(now);
+  let nextDueDate;
   if (isWeekly) {
     const day = now.getDay();
-    const daysUntilSunday = (7 - day) % 7;
-    startSunday.setDate(now.getDate() + daysUntilSunday);
-    startSunday.setHours(0, 0, 0, 0);
+    if (day === 0) {
+      // Joined on Sunday: Week 1 is paid today, Week 2 is due next Sunday (+7 days)
+      startSunday.setHours(0, 0, 0, 0);
+      nextDueDate = new Date(startSunday.getTime() + 7 * 24 * 60 * 60 * 1000);
+    } else {
+      // Joined Mon-Sat: Week 1 is paid upon joining, Week 2 is due on the very first upcoming Sunday
+      nextDueDate = new Date(now.getTime() + (7 - day) * 24 * 60 * 60 * 1000);
+    }
+  } else {
+    nextDueDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   }
-  const nextDueDate = isWeekly
-    ? new Date(startSunday.getTime() + 7 * 24 * 60 * 60 * 1000)
-    : new Date(now.getFullYear(), now.getMonth() + 1, 1);
   nextDueDate.setHours(23, 59, 59, 999);
 
   // 2. Create a NEW individual ChitMember subscription

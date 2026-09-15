@@ -204,14 +204,21 @@ const MonthlyDueScreen = ({ navigation }) => {
         const joinedDate = new Date(c.joinedAt || c.createdAt || Date.now());
         let nextDue = new Date(joinedDate);
         if (isWeekly) {
-          // All weekly chits start on Sunday; dues fall on subsequent Sundays
+          // All weekly chit dues fall on Sundays
           const day = joinedDate.getDay();
-          const daysToSunday = (7 - day) % 7;
-          const startSunday = new Date(joinedDate);
-          startSunday.setDate(joinedDate.getDate() + daysToSunday);
-          startSunday.setHours(0, 0, 0, 0);
-          
-          nextDue = new Date(startSunday.getTime() + (nextUnpaidMonth - 1) * 7 * 24 * 60 * 60 * 1000);
+          let firstDueSunday = new Date(joinedDate);
+          if (day === 0) {
+            // Joined on Sunday: Week 1 is paid on joining, Week 2 is due next Sunday (+7 days)
+            firstDueSunday.setDate(joinedDate.getDate() + 7);
+          } else {
+            // Joined Mon-Sat: Week 1 is paid on joining, Week 2 is due on the very first upcoming Sunday
+            firstDueSunday.setDate(joinedDate.getDate() + (7 - day));
+          }
+          firstDueSunday.setHours(23, 59, 59, 999);
+
+          // For Week 2 (nextUnpaidMonth = 2), offset is 0 (firstDueSunday). For Week 3, offset is 1 (+7 days), etc.
+          const offsetWeeks = Math.max(0, nextUnpaidMonth - 2);
+          nextDue = new Date(firstDueSunday.getTime() + offsetWeeks * 7 * 24 * 60 * 60 * 1000);
         } else {
           // Monthly chits: due on 1st of month
           nextDue.setMonth(joinedDate.getMonth() + (nextUnpaidMonth - 1));
@@ -220,13 +227,19 @@ const MonthlyDueScreen = ({ navigation }) => {
         nextDue.setHours(23, 59, 59, 999);
         
         const today = new Date();
-        const diffTime = nextDue.getTime() - today.getTime();
-        const remainingDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-        const isOverdue = diffTime < 0;
+        const todayMidnight = new Date();
+        todayMidnight.setHours(0, 0, 0, 0);
+
+        const dueMidnight = new Date(nextDue);
+        dueMidnight.setHours(0, 0, 0, 0);
+
+        const diffDays = Math.round((dueMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24));
+        const isOverdue = diffDays < 0;
+        const remainingDays = Math.max(0, diffDays);
         
-        // Calculate late days and Rs 5/day late fee
-        const daysLate = isOverdue ? Math.max(1, Math.floor((today.getTime() - nextDue.getTime()) / (1000 * 60 * 60 * 24))) : 0;
-        const lateFee = isOverdue ? daysLate * 5 : 0;
+        // Calculate late days and Rs 5/day late fee (minimum Rs 5 when overdue after Sunday)
+        const daysLate = isOverdue ? Math.max(1, Math.abs(diffDays)) : 0;
+        const lateFee = isOverdue ? Math.max(5, daysLate * 5) : 0;
         const baseDueAmount = c.nextDueAmount || (isWeekly ? (c.weeklyAmount || c.monthlyAmount) : c.monthlyAmount) || 0;
         const totalDueAmount = baseDueAmount + lateFee;
 
@@ -308,9 +321,8 @@ const MonthlyDueScreen = ({ navigation }) => {
     const unitTitle = getUnitLabel(isWeekly, 1);
     const isFullyPaid = chit.isFullyPaid;
     
-    // Payment window: Allowed when within 5 days of due date or overdue
-    const isWithin5DaysWindow = chit.daysUntilDue <= 5;
-    const canPay = !isClosed && !isFullyPaid && isWithin5DaysWindow;
+    // Payment window: active dues (upcoming or overdue) can always be paid
+    const canPay = !isClosed && !isFullyPaid;
 
     return (
       <View key={chit._id} style={styles.dueCard}>
