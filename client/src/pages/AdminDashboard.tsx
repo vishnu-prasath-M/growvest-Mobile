@@ -113,7 +113,7 @@ const isMobileDevice = () => {
 const getUPIDeepLink = (
   upiId?: string,
   amount?: number | string,
-  transactionNote: string = "Growvest Payout",
+  transactionNote: string = "Payout",
   payeeName: string = "User",
   app?: "generic" | "gpay" | "phonepe" | "paytm"
 ) => {
@@ -122,9 +122,9 @@ const getUPIDeepLink = (
   const numAmt = typeof amount === "string" ? parseFloat(amount.replace(/[^0-9.]/g, "")) : (amount || 0);
   const cleanAmt = isNaN(numAmt) ? "0.00" : numAmt.toFixed(2);
   const encodedName = encodeURIComponent(payeeName || "User");
-  const encodedNote = encodeURIComponent(transactionNote || "Payout");
 
-  const query = `pa=${cleanUpi}&pn=${encodedName}&am=${cleanAmt}&cu=INR&tn=${encodedNote}`;
+  // Keep parameters minimal without long hex references to minimize NPCI bot flags
+  const query = `pa=${cleanUpi}&pn=${encodedName}&am=${cleanAmt}&cu=INR`;
 
   if (app === "gpay") {
     return `tez://upi/pay?${query}`;
@@ -2021,6 +2021,9 @@ const AdminDashboard = () => {
                     <span className="w-2 h-2 rounded-full bg-sky-500" />
                     Paytm
                   </button>
+                </div>
+                <div className="mt-2.5 p-2 rounded-lg bg-emerald-100/60 border border-emerald-200/60 text-[11px] font-body text-emerald-900 leading-tight">
+                  💡 <strong>Tip:</strong> If your UPI app shows a security or limit alert, simply tap <strong>Copy</strong> on the UPI ID below, open your UPI app and paste it directly.
                 </div>
               </div>
             )}
