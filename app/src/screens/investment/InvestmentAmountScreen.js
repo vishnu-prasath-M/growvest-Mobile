@@ -554,7 +554,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
       </ScrollView>
 
       {/* Intended Withdrawal Date Selection Bottom Sheet Modal */}
-      <Modal visible={datePickerModalVisible} transparent animationType="slide" onRequestClose={() => setDatePickerModalVisible(false)}>
+      <Modal visible={datePickerModalVisible} transparent statusBarTranslucent animationType="slide" onRequestClose={() => setDatePickerModalVisible(false)}>
         <View style={styles.modalBottomSheetOverlay}>
           <TouchableOpacity 
             style={StyleSheet.absoluteFillObject} 
@@ -1348,14 +1348,19 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'flex-end',
+    margin: 0,
+    padding: 0,
   },
   modalBottomSheetCard: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     paddingHorizontal: 20,
     paddingTop: 10,
-    paddingBottom: Platform.OS === 'ios' ? 36 : 20,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    marginBottom: 0,
     maxHeight: '92%',
     ...colors.shadow.card,
   },

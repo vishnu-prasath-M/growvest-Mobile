@@ -479,22 +479,27 @@ exports.reinvestInvestment = async (req, res) => {
       return res.status(400).json({ success: false, message: 'A withdrawal request for this investment is currently pending admin approval.' });
     }
 
-    // 3. Verify Server-Side Maturity (Minimum 2 days holding required; cannot reinvest on same day)
+    // 3. Verify Server-Side Maturity & Duration Rule
     const now = new Date();
-    const startDateObj = sourceInvestment.startDate ? new Date(sourceInvestment.startDate) : new Date();
-    const startMidnight = new Date(startDateObj);
-    startMidnight.setHours(0, 0, 0, 0);
-
     const nowMidnight = new Date(now);
     nowMidnight.setHours(0, 0, 0, 0);
 
-    // Rule: Cannot reinvest on the same calendar day the investment was created
-    if (nowMidnight.getTime() <= startMidnight.getTime()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Investments cannot be reinvested on the same day they were created. Minimum holding period is 2 days.'
-      });
+    // Rule: The NEW reinvestment must have a duration of at least 2 days (no same-day or 1-day investments)
+    if (selectedWithdrawalDate) {
+      const chosenWithdrawalDate = new Date(selectedWithdrawalDate);
+      chosenWithdrawalDate.setHours(0, 0, 0, 0);
+      const minNewUnlockDate = new Date(nowMidnight.getTime() + 2 * 24 * 60 * 60 * 1000);
+      if (chosenWithdrawalDate.getTime() < minNewUnlockDate.getTime()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Minimum reinvestment duration is 2 days. Same-day or 1-day investments are not permitted.'
+        });
+      }
     }
+
+    const startDateObj = sourceInvestment.startDate ? new Date(sourceInvestment.startDate) : new Date();
+    const startMidnight = new Date(startDateObj);
+    startMidnight.setHours(0, 0, 0, 0);
 
     const durationDaysMap = {
       '15_days': 15,
@@ -506,22 +511,15 @@ exports.reinvestInvestment = async (req, res) => {
     };
     const planDurationDays = Math.max(2, sourceInvestment.durationDays || durationDaysMap[sourceInvestment.type] || 15);
 
-    const minUnlockTime = startMidnight.getTime() + 2 * 24 * 60 * 60 * 1000;
     let maturityDate = sourceInvestment.maturityDate
       ? new Date(sourceInvestment.maturityDate)
       : new Date(startDateObj.getTime() + planDurationDays * 24 * 60 * 60 * 1000);
     maturityDate.setHours(0, 0, 0, 0);
-    if (maturityDate.getTime() < minUnlockTime) {
-      maturityDate = new Date(minUnlockTime);
-    }
 
     let intendedDate = sourceInvestment.intendedWithdrawalDate
       ? new Date(sourceInvestment.intendedWithdrawalDate)
       : (sourceInvestment.selectedWithdrawalDate ? new Date(sourceInvestment.selectedWithdrawalDate) : maturityDate);
     intendedDate.setHours(0, 0, 0, 0);
-    if (intendedDate.getTime() < minUnlockTime) {
-      intendedDate = new Date(minUnlockTime);
-    }
 
     const unlockDate = intendedDate < maturityDate ? intendedDate : maturityDate;
 
