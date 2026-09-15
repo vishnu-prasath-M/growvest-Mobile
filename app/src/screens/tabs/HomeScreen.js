@@ -561,83 +561,175 @@ const HomeScreen = ({ navigation }) => {
                 return (
                   <TouchableOpacity
                     key={inv._id || idx}
-                    style={styles.premiumPlanCard}
-                    activeOpacity={0.88}
+                    style={styles.uniqueOrbitalCard}
+                    activeOpacity={0.9}
                     onPress={() => navigation.navigate('Investments')}
                   >
                     <LinearGradient
-                      colors={['#FFFFFF', '#F8FCF9']}
+                      colors={isFixed ? ['#FFFFFF', '#F2F8FC', '#E5F3F9'] : ['#FFFFFF', '#F2FAF5', '#E6F7EE']}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
-                      style={styles.premiumPlanGradient}
+                      style={styles.uniqueOrbitalGradient}
                     >
-                      {/* Left vertical accent stripe */}
-                      <View style={[styles.premiumPlanAccentStripe, { backgroundColor: isFixed ? '#0284C7' : '#10B981' }]} />
+                      {/* Ambient background glowing orbs */}
+                      <View
+                        style={[
+                          styles.orbitalAmbientCircleLarge,
+                          { backgroundColor: isFixed ? 'rgba(2, 132, 199, 0.09)' : 'rgba(16, 185, 129, 0.1)' },
+                        ]}
+                      />
+                      <View
+                        style={[
+                          styles.orbitalAmbientCircleSmall,
+                          { backgroundColor: isFixed ? 'rgba(2, 132, 199, 0.05)' : 'rgba(16, 185, 129, 0.06)' },
+                        ]}
+                      />
 
-                      <View style={styles.premiumPlanInner}>
-                        {/* Top Header Row: Icon Badge + Plan Category & Title + Live Status Pill */}
-                        <View style={styles.premiumPlanHeaderRow}>
-                          <View style={styles.premiumPlanTitleGroup}>
-                            <View style={[styles.premiumPlanIconBadge, { backgroundColor: isFixed ? 'rgba(2, 132, 199, 0.12)' : 'rgba(16, 185, 129, 0.12)' }]}>
+                      {/* Main Card Content */}
+                      <View style={styles.uniqueOrbitalInner}>
+                        <View style={styles.uniqueOrbitalRow}>
+                          {/* 1. Left: Modern Circular Gauge Orb */}
+                          <View style={styles.circleGaugeContainer}>
+                            <View
+                              style={[
+                                styles.circleGaugeOuterRing,
+                                {
+                                  borderColor: isFixed ? 'rgba(2, 132, 199, 0.35)' : 'rgba(16, 185, 129, 0.35)',
+                                  backgroundColor: isFixed ? 'rgba(2, 132, 199, 0.06)' : 'rgba(16, 185, 129, 0.06)',
+                                },
+                              ]}
+                            >
+                              <View
+                                style={[
+                                  styles.circleGaugeInnerCore,
+                                  {
+                                    borderColor: isFixed ? '#0284C7' : '#10B981',
+                                    backgroundColor: isFixed ? 'rgba(2, 132, 199, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+                                  },
+                                ]}
+                              >
+                                <MaterialCommunityIcons
+                                  name={iconName}
+                                  size={16}
+                                  color={isFixed ? '#0284C7' : '#059669'}
+                                  style={{ marginBottom: 1 }}
+                                />
+                                <Text
+                                  style={[
+                                    styles.circleGaugePercentText,
+                                    { color: isFixed ? '#0284C7' : '#047857' },
+                                  ]}
+                                >
+                                  {progress.toFixed(0)}%
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+
+                          {/* 2. Center: Plan Details & Financials */}
+                          <View style={styles.uniqueOrbitalCenter}>
+                            {/* Category + Live Status */}
+                            <View style={styles.uniqueOrbitalTagRow}>
+                              <View
+                                style={[
+                                  styles.uniqueOrbitalCategoryPill,
+                                  { backgroundColor: isFixed ? 'rgba(2, 132, 199, 0.12)' : 'rgba(16, 185, 129, 0.12)' },
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.uniqueOrbitalCategoryText,
+                                    { color: isFixed ? '#0284C7' : '#059669' },
+                                  ]}
+                                >
+                                  {categoryLabel}
+                                </Text>
+                              </View>
+                              <View style={styles.uniqueLiveDotWrapper}>
+                                <View style={[styles.uniqueLivePulseDot, { backgroundColor: isFixed ? '#0284C7' : '#10B981' }]} />
+                                <Text style={[styles.uniqueLiveLabel, { color: isFixed ? '#0284C7' : '#047857' }]}>
+                                  Active
+                                </Text>
+                              </View>
+                            </View>
+
+                            {/* Plan Name */}
+                            <Text style={styles.uniqueOrbitalTitle} numberOfLines={1}>
+                              {planTitle}
+                            </Text>
+
+                            {/* Invested Amount */}
+                            <Text style={styles.uniqueOrbitalAmount}>
+                              {hideBalance ? '₹ ••••••' : formatCurrency(inv.amount || 0)}
+                            </Text>
+
+                            {/* Bottom Metric Badges */}
+                            <View style={styles.uniqueOrbitalBadgeRow}>
+                              <View
+                                style={[
+                                  styles.uniqueReturnPill,
+                                  {
+                                    backgroundColor: isFixed ? 'rgba(2, 132, 199, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                                    borderColor: isFixed ? 'rgba(2, 132, 199, 0.25)' : 'rgba(16, 185, 129, 0.25)',
+                                  },
+                                ]}
+                              >
+                                <MaterialCommunityIcons
+                                  name="trending-up"
+                                  size={13}
+                                  color={isFixed ? '#0284C7' : '#059669'}
+                                />
+                                <Text
+                                  style={[
+                                    styles.uniqueReturnText,
+                                    { color: isFixed ? '#0284C7' : '#047857' },
+                                  ]}
+                                >
+                                  {rate}% p.a.
+                                </Text>
+                              </View>
+
+                              <View style={styles.uniqueTermPill}>
+                                <MaterialCommunityIcons name="clock-outline" size={12} color={colors.textMuted} />
+                                <Text style={styles.uniqueTermText}>
+                                  {totalDays > 0 ? `${totalDays}d term` : 'Flexi'}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+
+                          {/* 3. Right: Circular Action Cue */}
+                          <View style={styles.uniqueOrbitalRight}>
+                            <View
+                              style={[
+                                styles.uniqueActionCircle,
+                                {
+                                  backgroundColor: isFixed ? 'rgba(2, 132, 199, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+                                  borderColor: isFixed ? 'rgba(2, 132, 199, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                                },
+                              ]}
+                            >
                               <MaterialCommunityIcons
-                                name={iconName}
-                                size={20}
+                                name="arrow-top-right"
+                                size={16}
                                 color={isFixed ? '#0284C7' : '#059669'}
                               />
                             </View>
-                            <View style={{ flex: 1 }}>
-                              <Text style={[styles.premiumPlanCategory, { color: isFixed ? '#0284C7' : '#059669' }]}>
-                                {categoryLabel}
-                              </Text>
-                              <Text style={styles.premiumPlanName} numberOfLines={1}>
-                                {planTitle}
-                              </Text>
-                            </View>
-                          </View>
-
-                          <View style={styles.premiumLivePill}>
-                            <View style={styles.premiumLiveDot} />
-                            <Text style={styles.premiumLiveText}>ACTIVE</Text>
                           </View>
                         </View>
+                      </View>
 
-                        {/* Middle Metric Row: Principal Amount + Returns Rate Pill */}
-                        <View style={styles.premiumPlanMetricRow}>
-                          <View>
-                            <Text style={styles.premiumPlanAmountLabel}>INVESTED PRINCIPAL</Text>
-                            <Text style={styles.premiumPlanAmount}>
-                              {hideBalance ? '₹ ••••••' : formatCurrency(inv.amount || 0)}
-                            </Text>
-                          </View>
-
-                          <View style={[styles.premiumRatePill, { borderColor: isFixed ? 'rgba(2, 132, 199, 0.25)' : 'rgba(16, 185, 129, 0.25)', backgroundColor: isFixed ? 'rgba(2, 132, 199, 0.08)' : 'rgba(16, 185, 129, 0.08)' }]}>
-                            <MaterialCommunityIcons name="trending-up" size={15} color={isFixed ? '#0284C7' : '#059669'} />
-                            <Text style={[styles.premiumRateText, { color: isFixed ? '#0284C7' : '#047857' }]}>
-                              {rate}% p.a.
-                            </Text>
-                          </View>
-                        </View>
-
-                        {/* Bottom Progress Section with Sleek Gradient Bar */}
-                        <View style={styles.premiumProgressSection}>
-                          <View style={styles.premiumProgressBarBg}>
-                            <LinearGradient
-                              colors={isFixed ? ['#38BDF8', '#0284C7'] : ['#34D399', '#059669']}
-                              start={{ x: 0, y: 0 }}
-                              end={{ x: 1, y: 0 }}
-                              style={[styles.premiumProgressBarFill, { width: `${Math.max(5, Math.min(progress, 100))}%` }]}
-                            />
-                          </View>
-
-                          <View style={styles.premiumProgressFooter}>
-                            <Text style={styles.premiumProgressLabel}>
-                              {totalDays > 0 ? `${totalDays} Days Term` : 'Flexi Plan'}
-                            </Text>
-                            <Text style={[styles.premiumProgressPercent, { color: isFixed ? '#0284C7' : '#047857' }]}>
-                              {progress.toFixed(0)}% Completed
-                            </Text>
-                          </View>
-                        </View>
+                      {/* Bottom Edge Micro Progress Bar */}
+                      <View style={styles.uniqueBottomEdgeTrack}>
+                        <LinearGradient
+                          colors={isFixed ? ['#38BDF8', '#0284C7'] : ['#34D399', '#059669']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                          style={[
+                            styles.uniqueBottomEdgeFill,
+                            { width: `${Math.max(4, Math.min(progress, 100))}%` },
+                          ]}
+                        />
                       </View>
                     </LinearGradient>
                   </TouchableOpacity>
@@ -1055,147 +1147,179 @@ const getStyles = (colors) => StyleSheet.create({
   },
   portfolioCardBadgeText: { fontSize: 10, color: 'rgba(255,255,255,0.9)', fontWeight: '700' },
 
-  // Active Investments - Premium Modern Redesign
-  premiumPlanCard: {
-    borderRadius: 20,
-    marginBottom: 12,
+  // Active Investments - Unique Orbital & Circular Dial Design
+  uniqueOrbitalCard: {
+    borderRadius: 22,
+    marginBottom: 14,
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.16)',
+    borderColor: 'rgba(16, 185, 129, 0.18)',
     shadowColor: '#0E3D23',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.07,
-    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
     elevation: 4,
     overflow: 'hidden',
   },
-  premiumPlanGradient: {
-    flexDirection: 'row',
+  uniqueOrbitalGradient: {
+    position: 'relative',
+    overflow: 'hidden',
   },
-  premiumPlanAccentStripe: {
-    width: 4.5,
+  orbitalAmbientCircleLarge: {
+    position: 'absolute',
+    top: -24,
+    right: -24,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
   },
-  premiumPlanInner: {
-    flex: 1,
+  orbitalAmbientCircleSmall: {
+    position: 'absolute',
+    bottom: -15,
+    left: -15,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+  },
+  uniqueOrbitalInner: {
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingTop: 16,
+    paddingBottom: 14,
   },
-  premiumPlanHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  premiumPlanTitleGroup: {
+  uniqueOrbitalRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    flex: 1,
-    marginRight: 10,
+    gap: 14,
   },
-  premiumPlanIconBadge: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+  // Circular Gauge Component
+  circleGaugeContainer: {
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  premiumPlanCategory: {
+  circleGaugeOuterRing: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    borderWidth: 2.5,
+    padding: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  circleGaugeInnerCore: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 24,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  circleGaugePercentText: {
+    fontSize: 11.5,
+    fontWeight: '900',
+    letterSpacing: -0.3,
+  },
+  // Center Details
+  uniqueOrbitalCenter: {
+    flex: 1,
+  },
+  uniqueOrbitalTagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 3,
+  },
+  uniqueOrbitalCategoryPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+  },
+  uniqueOrbitalCategoryText: {
     fontSize: 9,
     fontWeight: '800',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
-    marginBottom: 1,
   },
-  premiumPlanName: {
+  uniqueLiveDotWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  uniqueLivePulseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  uniqueLiveLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  uniqueOrbitalTitle: {
     fontSize: 15,
     fontWeight: '800',
     color: colors.text,
     letterSpacing: -0.2,
-  },
-  premiumLivePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.25)',
-  },
-  premiumLiveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#10B981',
-  },
-  premiumLiveText: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    color: '#047857',
-    letterSpacing: 0.5,
-  },
-  premiumPlanMetricRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    marginBottom: 12,
-  },
-  premiumPlanAmountLabel: {
-    fontSize: 9.5,
-    fontWeight: '700',
-    color: colors.textMuted,
-    letterSpacing: 0.6,
     marginBottom: 2,
-    textTransform: 'uppercase',
   },
-  premiumPlanAmount: {
-    fontSize: 21,
+  uniqueOrbitalAmount: {
+    fontSize: 20,
     fontWeight: '900',
     color: colors.text,
     letterSpacing: -0.5,
+    marginBottom: 8,
   },
-  premiumRatePill: {
+  uniqueOrbitalBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  uniqueReturnPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 8,
     borderWidth: 1,
   },
-  premiumRateText: {
-    fontSize: 12,
+  uniqueReturnText: {
+    fontSize: 11,
     fontWeight: '800',
   },
-  premiumProgressSection: {
-    gap: 6,
-    marginTop: 2,
-  },
-  premiumProgressBarBg: {
-    height: 6,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  premiumProgressBarFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  premiumProgressFooter: {
+  uniqueTermPill: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 8,
   },
-  premiumProgressLabel: {
+  uniqueTermText: {
     fontSize: 11,
     fontWeight: '600',
     color: colors.textMuted,
   },
-  premiumProgressPercent: {
-    fontSize: 11,
-    fontWeight: '800',
+  // Right Column Action Cue
+  uniqueOrbitalRight: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  uniqueActionCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Bottom Edge Progress Line
+  uniqueBottomEdgeTrack: {
+    height: 3.5,
+    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+    overflow: 'hidden',
+  },
+  uniqueBottomEdgeFill: {
+    height: '100%',
   },
 
   // Legacy fallback
