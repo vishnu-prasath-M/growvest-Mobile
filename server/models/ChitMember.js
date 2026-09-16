@@ -17,7 +17,7 @@ const chitMemberSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'active', 'cancelled', 'rejected'],
+    enum: ['pending', 'active', 'cancelled', 'rejected', 'completed', 'ended', 'withdrawn'],
     default: 'pending',
   },
   adminApprovalStatus: {
@@ -90,7 +90,7 @@ const chitMemberSchema = new mongoose.Schema({
   },
   withdrawalStatus: {
     type: String,
-    enum: ['pending', 'completed'],
+    enum: ['pending', 'completed', 'withdrawn', 'requested', 'approved'],
     default: 'pending',
   },
   withdrawalWeek: {

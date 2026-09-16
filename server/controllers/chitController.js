@@ -3,9 +3,10 @@ const ChitMember = require('../models/ChitMember');
 const ChitPayment = require('../models/ChitPayment');
 const Transaction = require('../models/Transaction');
 const User = require('../models/User');
+const Withdrawal = require('../models/Withdrawal');
 const Settings = require('../models/Settings');
 const mongoose = require('mongoose');
-const { sendNotification } = require('../services/notificationHelper');
+const { sendNotification, notifyAdmins } = require('../services/notificationHelper');
 
 // ─── Sunday Helpers ─────────────────────────────────────────────────────────
 
@@ -774,6 +775,22 @@ const withdrawChitPayout = async (req, res) => {
       user.balance = (user.balance || 0) + finalWithdrawalAmount;
       await user.save({ session });
 
+      // Create Withdrawal record for Admin Dashboard tracking
+      const withdrawalRecord = new Withdrawal({
+        userId: user._id,
+        userEmail: user.email || 'user@growvest.in',
+        userName: user.name || user.username || 'User',
+        amount: finalWithdrawalAmount,
+        upiId: user.upiId || 'Wallet Balance',
+        date: new Date().toLocaleDateString('en-IN'),
+        status: 'paid', // Auto-credited to user balance
+        withdrawType: 'chit',
+        processed: true,
+        paidAt: new Date(),
+        paidBy: 'System / Chit Payout',
+      });
+      await withdrawalRecord.save({ session });
+
       const transactionType = isSettlement ? 'chit_settlement' : 'chit_withdrawal';
       const description = isSettlement
         ? `Chit Fund Settlement - ${member.chitId.name}`
@@ -811,6 +828,13 @@ const withdrawChitPayout = async (req, res) => {
           metadata: { memberId: member._id, amount: finalWithdrawalAmount },
           pushData: { screen: 'MyChits' },
         });
+
+        await notifyAdmins({
+          title: isSettlement ? '🎉 Chit Fund Settlement Claimed' : '💸 Chit Payout Claimed',
+          description: `${user.name || user.email} withdrew ₹${finalWithdrawalAmount.toLocaleString('en-IN')} (${isSettlement ? 'Settlement' : `${isWeekly ? 'Week' : 'Month'} ${currentUnit} Price Amount`}) from Chit "${member.chitId.name}".`,
+          type: 'general',
+          metadata: { memberId: member._id, amount: finalWithdrawalAmount, withdrawalId: withdrawalRecord._id },
+        });
       } catch (notifErr) {
         console.warn('[Chit Withdraw] Notification failed:', notifErr.message);
       }
@@ -818,7 +842,8 @@ const withdrawChitPayout = async (req, res) => {
       res.json({
         message: isSettlement ? 'Settlement processed successfully' : 'Payout processed successfully',
         member,
-        transaction
+        transaction,
+        withdrawal: withdrawalRecord
       });
     } catch (err) {
       await session.abortTransaction();

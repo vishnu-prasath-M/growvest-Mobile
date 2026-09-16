@@ -521,6 +521,14 @@ const ChitDetailsScreen = ({ navigation, route }) => {
                     </View>
                   </View>
                   <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Chit Payout Status</Text>
+                    <View style={[styles.statusBadge, { backgroundColor: isWithdrawn ? themeColors.successLight : themeColors.primaryLight }]}>
+                      <Text style={[styles.statusText, { color: isWithdrawn ? themeColors.success : themeColors.primary }]}>
+                        {isWithdrawn ? `Withdrawn (${formatCurrency(myMembership.withdrawalAmount)})` : (myMembership.status === 'completed' ? 'Completed' : 'Active')}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Total Amount Paid</Text>
                     <Text style={styles.detailValue}>{formatCurrency(totalPaid)}</Text>
                   </View>
