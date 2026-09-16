@@ -11,6 +11,8 @@ import {
   Lock,
   Users,
   Star,
+  Repeat,
+  Coins,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -214,6 +216,78 @@ const AboutPage = () => {
                 ].map((f) => (
                   <li key={f} className="flex items-start gap-2.5 text-sm font-body text-foreground">
                     <CheckCircle className="h-4 w-4 text-secondary shrink-0 mt-0.5" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
+
+            {/* Systematic Investment Plan (SIP) */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.45, delay: 0.1 }}
+              className="card-premium p-8 relative overflow-hidden group border-emerald-500/30"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:bg-emerald-500/10 transition-colors duration-500" />
+              <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-6">
+                <Repeat className="h-6 w-6 text-emerald-600" />
+              </div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-heading text-2xl font-bold text-foreground">Systematic Investment Plan</h3>
+                <span className="text-3xl font-heading font-bold text-emerald-600">26%</span>
+              </div>
+              <p className="text-sm font-body text-muted-foreground font-medium mb-1">up to 26% p.a. · compound growth</p>
+              <p className="text-sm font-body text-muted-foreground leading-relaxed mb-6">
+                Disciplined wealth building with daily, weekly, or monthly contributions.
+                Automated streak tracking, milestone rewards, and compound returns.
+              </p>
+              <ul className="space-y-3">
+                {[
+                  "Daily, weekly, or monthly flexible frequencies",
+                  "Automated compounding returns up to 26% p.a.",
+                  "Micro-installments starting from ₹10",
+                  "Track streak milestones & claim completion bonuses",
+                ].map((f) => (
+                  <li key={f} className="flex items-start gap-2.5 text-sm font-body text-foreground">
+                    <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
+
+            {/* Chit Funds & Pocket Money */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.45, delay: 0.2 }}
+              className="card-premium p-8 relative overflow-hidden group border-amber-500/30"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:bg-amber-500/10 transition-colors duration-500" />
+              <div className="h-12 w-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-6">
+                <Coins className="h-6 w-6 text-amber-600" />
+              </div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-heading text-2xl font-bold text-foreground">Chits & Pocket Money</h3>
+                <span className="text-2xl font-heading font-bold text-amber-600">Smart Plans</span>
+              </div>
+              <p className="text-sm font-body text-muted-foreground font-medium mb-1">community savings & daily cashflow</p>
+              <p className="text-sm font-body text-muted-foreground leading-relaxed mb-6">
+                Join structured community chit circles for lump sum payouts or activate
+                Pocket Money plans for regular daily/weekly earnings.
+              </p>
+              <ul className="space-y-3">
+                {[
+                  "Transparent chit fund slots with scheduled contributions",
+                  "Guaranteed payouts with live tracking and late-fee grace",
+                  "Daily & weekly pocket money payout releases",
+                  "Real-time wallet and withdrawal ledger tracking",
+                ].map((f) => (
+                  <li key={f} className="flex items-start gap-2.5 text-sm font-body text-foreground">
+                    <CheckCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
                     {f}
                   </li>
                 ))}

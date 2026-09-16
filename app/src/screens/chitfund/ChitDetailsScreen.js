@@ -172,10 +172,11 @@ const ChitDetailsScreen = ({ navigation, route }) => {
   const generateCycleSchedule = generateWeeklySchedule;
   const getCycleRowData = getWeeklyRowData;
 
-  const handleWithdrawal = async (memberId) => {
+  const handleWithdrawal = async (memberId, withdrawalAmount) => {
+    const amountLabel = withdrawalAmount ? ` of ${formatCurrency(withdrawalAmount)}` : '';
     Alert.alert(
       'Confirm Payout Withdrawal',
-      'Are you sure you want to withdraw your Chit payout now? You can only withdraw ONCE per Chit cycle.',
+      `Are you sure you want to withdraw your Chit payout${amountLabel} now? You can only withdraw ONCE per Chit cycle.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -433,6 +434,8 @@ const ChitDetailsScreen = ({ navigation, route }) => {
                         {(() => {
                           const row = getWeeklyRowData(baseAmount, totalUnits, currentUnit);
                           const totalDividend = getTotalDividend(baseAmount, totalUnits);
+                          const isSettlement = currentUnit >= totalUnits || installmentsPaid >= totalUnits;
+                          const eligibleWithdrawalAmount = isSettlement ? row.totalValue : row.priceAmount;
                           return (
                             <>
                               <View style={styles.detailRow}>
@@ -444,9 +447,16 @@ const ChitDetailsScreen = ({ navigation, route }) => {
                                 <Text style={styles.detailValue}>{formatCurrency(totalDividend)}</Text>
                               </View>
                               <View style={styles.detailRow}>
-                                <Text style={styles.detailLabel}>Total Value (Withdrawal Amount)</Text>
-                                <Text style={{ fontSize: 16, fontWeight: 'bold', color: themeColors.primary }}>{formatCurrency(row.totalValue)}</Text>
+                                <Text style={styles.detailLabel}>
+                                  {isSettlement ? 'Total Value (Withdrawal Amount)' : 'Withdrawal Amount (Price Amount)'}
+                                </Text>
+                                <Text style={{ fontSize: 16, fontWeight: 'bold', color: themeColors.primary }}>{formatCurrency(eligibleWithdrawalAmount)}</Text>
                               </View>
+                              {!isSettlement && (
+                                <Text style={{ fontSize: 11, color: themeColors.textSecondary, marginTop: 8, fontStyle: 'italic', lineHeight: 16 }}>
+                                  * Note: Early payout allows withdrawing the unlocked price amount ({formatCurrency(row.priceAmount)}). Total dividend earned ({formatCurrency(totalDividend)}) is eligible upon completion ({isWeekly ? 'Week' : 'Month'} {totalUnits}).
+                                </Text>
+                              )}
                             </>
                           );
                         })()}
@@ -454,7 +464,12 @@ const ChitDetailsScreen = ({ navigation, route }) => {
                       <TouchableOpacity
                         style={styles.withdrawBtn}
                         activeOpacity={0.85}
-                        onPress={() => handleWithdrawal(myMembership._id)}
+                        onPress={() => {
+                          const row = getWeeklyRowData(baseAmount, totalUnits, currentUnit);
+                          const isSettlement = currentUnit >= totalUnits || installmentsPaid >= totalUnits;
+                          const eligibleWithdrawalAmount = isSettlement ? row.totalValue : row.priceAmount;
+                          handleWithdrawal(myMembership._id, eligibleWithdrawalAmount);
+                        }}
                       >
                         <MaterialCommunityIcons name="cash-fast" size={20} color={themeColors.white} />
                         <Text style={styles.joinNowBtnText}>Withdraw Payout</Text>

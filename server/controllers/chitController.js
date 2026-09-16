@@ -740,7 +740,9 @@ const withdrawChitPayout = async (req, res) => {
 
       priceAmount = totalContribution - (totalContribution * actionPercentage / 100);
       accumulatedDividend = totalDividend;
-      finalWithdrawalAmount = priceAmount + accumulatedDividend;
+      // Rule: Before chit completes, only allow the unlocked price amount (not dividend).
+      // Full amount with dividend is allowed only upon chit completion.
+      finalWithdrawalAmount = priceAmount;
     }
 
     const user = await User.findById(userId);
@@ -753,7 +755,7 @@ const withdrawChitPayout = async (req, res) => {
 
     try {
       member.withdrawalStatus = 'completed';
-      member.withdrawalWeek = currentWeek;
+      member.withdrawalWeek = currentUnit;
       member.withdrawalAmount = finalWithdrawalAmount;
       member.actionPercentage = actionPercentage;
       member.priceAmount = priceAmount;
@@ -775,7 +777,7 @@ const withdrawChitPayout = async (req, res) => {
       const transactionType = isSettlement ? 'chit_settlement' : 'chit_withdrawal';
       const description = isSettlement
         ? `Chit Fund Settlement - ${member.chitId.name}`
-        : `Chit Fund Payout - ${member.chitId.name} Week ${currentWeek}`;
+        : `Chit Fund Payout - ${member.chitId.name} ${isWeekly ? 'Week' : 'Month'} ${currentUnit}`;
 
       const transaction = new Transaction({
         userId,

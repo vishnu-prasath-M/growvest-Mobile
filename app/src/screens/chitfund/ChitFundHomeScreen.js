@@ -300,8 +300,50 @@ const ChitFundHomeScreen = ({ navigation }) => {
               </LinearGradient>
             </View>
 
-            {/* Quick Actions Section */}
-            <View style={{ marginTop: 16 }}>
+            {/* Urgent / Next Due Payment Banner (if due > 0) */}
+            {dashboard.upcomingDue > 0 && (
+              <View style={styles.dueBannerOuter}>
+                <Pressable
+                  style={styles.dueBannerCard}
+                  onPress={() => navigation.navigate('MonthlyDue')}
+                >
+                  <LinearGradient
+                    colors={['#FFFBEB', '#FEF3C7']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.dueBannerGradient}
+                  >
+                    <View style={styles.dueBannerLeft}>
+                      <View style={styles.dueIconWrap}>
+                        <Ionicons name="calendar" size={22} color="#D97706" />
+                        <View style={styles.duePulseDot} />
+                      </View>
+                      <View style={styles.dueTextWrap}>
+                        <View style={styles.dueTitleRow}>
+                          <Text style={styles.dueTitle}>Upcoming Installment Due</Text>
+                          <View style={styles.dueBadgePill}>
+                            <Text style={styles.dueBadgeText}>
+                              {dashboard.pendingDueCount || 1} PENDING
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={styles.dueAmount}>{formatCurrency(dashboard.upcomingDue)}</Text>
+                        <Text style={styles.dueSubText}>
+                          {dashboard.nextDueDate ? `Due by ${dashboard.nextDueDate}` : 'Pay before next auction'}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.dueActionBtn}>
+                      <Text style={styles.dueActionText}>Pay Now</Text>
+                      <Ionicons name="arrow-forward" size={14} color="#FFFFFF" />
+                    </View>
+                  </LinearGradient>
+                </Pressable>
+              </View>
+            )}
+
+            {/* Quick Actions Hub (4 Grid) */}
+            <View style={{ marginTop: 8 }}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Quick Actions</Text>
               </View>
@@ -315,37 +357,246 @@ const ChitFundHomeScreen = ({ navigation }) => {
                   image={require('../../../assets/my-chits.png')}
                   label="My Chits"
                   onPress={() => navigation.navigate('MyChits')}
+                  badge={dashboard.activeChits > 0 ? dashboard.activeChits : null}
                 />
                 <QuickAction
                   image={require('../../../assets/due.png')}
                   label="Pay Due"
                   onPress={() => navigation.navigate('MonthlyDue')}
-                  badge={dashboard.upcomingDue > 0 ? dashboard.pendingDueCount || '!' : null}
+                  badge={dashboard.upcomingDue > 0 ? (dashboard.pendingDueCount || '!') : null}
+                />
+                <QuickAction
+                  image={require('../../../assets/auction.png')}
+                  label="Auctions"
+                  onPress={() => navigation.navigate('WinnerHistory')}
+                  badge="LIVE"
                 />
               </View>
             </View>
 
-            {/* Overview Section */}
-            <View style={{ marginTop: 8 }}>
+            {/* Chit Intelligence & Yield Advantage (Unique Circular Dial Cards) */}
+            <View style={{ marginTop: 12 }}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Overview</Text>
+                <Text style={styles.sectionTitle}>Chit Intelligence</Text>
+                <Text style={styles.sectionSubtitle}>Why community chits beat regular savings</Text>
               </View>
-              <View style={styles.statsGrid}>
-                <StatCard
-                  icon="people-circle-outline"
-                  label="Joined Chits"
-                  value={dashboard.myJoinedChits.toString()}
-                  tint={colors.primaryLight}
-                  iconColor={colors.primary}
-                />
-                <StatCard
-                  icon="calendar-outline"
-                  label="Next Due"
-                  value={formatCurrency(dashboard.upcomingDue)}
-                  tint="#fef3c7"
-                  iconColor="#d97706"
-                />
+
+              <View style={styles.uniqueChitGrid}>
+                {/* Card 1: Dividend Yield Advantage */}
+                <Pressable
+                  style={styles.uniqueChitCard}
+                  onPress={() => navigation.navigate('DividendHistory')}
+                >
+                  <LinearGradient
+                    colors={['#FFFFFF', '#F2FAF5', '#E6F7EE']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.uniqueChitGradient}
+                  >
+                    <View style={styles.uniqueChitAmbientCircle} />
+                    <View style={styles.uniqueChitRow}>
+                      <View style={styles.uniqueChitDialOuter}>
+                        <View style={styles.uniqueChitDialInner}>
+                          <Ionicons name="trending-up" size={16} color="#059669" />
+                          <Text style={styles.uniqueChitDialText}>12%</Text>
+                        </View>
+                      </View>
+                      <View style={styles.uniqueChitBody}>
+                        <View style={styles.uniqueChitHeaderRow}>
+                          <Text style={styles.uniqueChitTag}>DIVIDEND BONUS</Text>
+                          <Ionicons name="arrow-forward" size={14} color="#059669" />
+                        </View>
+                        <Text style={styles.uniqueChitTitle}>Monthly Dividend Pool</Text>
+                        <Text style={styles.uniqueChitDesc}>
+                          Non-bidding members receive equal shares of auction discount credited directly back.
+                        </Text>
+                      </View>
+                    </View>
+                  </LinearGradient>
+                </Pressable>
+
+                {/* Card 2: 0% Interest Borrowing */}
+                <Pressable
+                  style={styles.uniqueChitCard}
+                  onPress={() => navigation.navigate('ChitRules')}
+                >
+                  <LinearGradient
+                    colors={['#FFFFFF', '#F0F7FB', '#E2F0F9']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.uniqueChitGradient}
+                  >
+                    <View style={[styles.uniqueChitAmbientCircle, { backgroundColor: 'rgba(2, 132, 199, 0.08)' }]} />
+                    <View style={styles.uniqueChitRow}>
+                      <View style={[styles.uniqueChitDialOuter, { borderColor: 'rgba(2, 132, 199, 0.35)', backgroundColor: 'rgba(2, 132, 199, 0.06)' }]}>
+                        <View style={[styles.uniqueChitDialInner, { borderColor: '#0284C7', backgroundColor: 'rgba(2, 132, 199, 0.12)' }]}>
+                          <Ionicons name="shield-checkmark" size={16} color="#0284C7" />
+                          <Text style={[styles.uniqueChitDialText, { color: '#0284C7' }]}>0%</Text>
+                        </View>
+                      </View>
+                      <View style={styles.uniqueChitBody}>
+                        <View style={styles.uniqueChitHeaderRow}>
+                          <Text style={[styles.uniqueChitTag, { color: '#0284C7' }]}>EMERGENCY POT</Text>
+                          <Ionicons name="arrow-forward" size={14} color="#0284C7" />
+                        </View>
+                        <Text style={styles.uniqueChitTitle}>Zero Interest Liquidity</Text>
+                        <Text style={styles.uniqueChitDesc}>
+                          Bid in the monthly auction whenever you need urgent cash without bank loan paperwork.
+                        </Text>
+                      </View>
+                    </View>
+                  </LinearGradient>
+                </Pressable>
               </View>
+            </View>
+
+            {/* Chit Records & Hub (2x2 Modern Cards) */}
+            <View style={{ marginTop: 20 }}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Chit Services & Records</Text>
+              </View>
+
+              <View style={styles.toolsGrid}>
+                {/* 1. Winner Gallery */}
+                <Pressable
+                  style={styles.toolCard}
+                  onPress={() => navigation.navigate('WinnerHistory')}
+                >
+                  <View style={[styles.toolIconWrap, { backgroundColor: '#FEF3C7' }]}>
+                    <Ionicons name="trophy-outline" size={22} color="#D97706" />
+                  </View>
+                  <Text style={styles.toolTitle}>Winner Gallery</Text>
+                  <Text style={styles.toolSub}>Auction winners & payouts</Text>
+                  <View style={styles.toolArrow}>
+                    <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+                  </View>
+                </Pressable>
+
+                {/* 2. Dividend History */}
+                <Pressable
+                  style={styles.toolCard}
+                  onPress={() => navigation.navigate('DividendHistory')}
+                >
+                  <View style={[styles.toolIconWrap, { backgroundColor: '#D1FAE5' }]}>
+                    <Ionicons name="gift-outline" size={22} color="#059669" />
+                  </View>
+                  <Text style={styles.toolTitle}>Dividend Log</Text>
+                  <Text style={styles.toolSub}>Track dividend returns</Text>
+                  <View style={styles.toolArrow}>
+                    <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+                  </View>
+                </Pressable>
+
+                {/* 3. Receipts */}
+                <Pressable
+                  style={styles.toolCard}
+                  onPress={() => navigation.navigate('Receipts')}
+                >
+                  <View style={[styles.toolIconWrap, { backgroundColor: '#E0F2FE' }]}>
+                    <Ionicons name="receipt-outline" size={22} color="#0284C7" />
+                  </View>
+                  <Text style={styles.toolTitle}>Payment Receipts</Text>
+                  <Text style={styles.toolSub}>Download invoices</Text>
+                  <View style={styles.toolArrow}>
+                    <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+                  </View>
+                </Pressable>
+
+                {/* 4. Chit Rules */}
+                <Pressable
+                  style={styles.toolCard}
+                  onPress={() => navigation.navigate('ChitRules')}
+                >
+                  <View style={[styles.toolIconWrap, { backgroundColor: '#EDE9FE' }]}>
+                    <Ionicons name="book-outline" size={22} color="#7C3AED" />
+                  </View>
+                  <Text style={styles.toolTitle}>Rules & Caps</Text>
+                  <Text style={styles.toolSub}>Chit acts & commission</Text>
+                  <View style={styles.toolArrow}>
+                    <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+                  </View>
+                </Pressable>
+              </View>
+            </View>
+
+            {/* How Chit Bidding Works (3-Step Timeline) */}
+            <View style={{ marginTop: 24 }}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>How Chit Bidding Works</Text>
+                <Text style={styles.sectionSubtitle}>Simple 3-step community cycle</Text>
+              </View>
+
+              <View style={styles.stepsCardOuter}>
+                <View style={styles.stepsCard}>
+                  {/* Step 1 */}
+                  <View style={styles.stepItem}>
+                    <View style={styles.stepIndicatorCol}>
+                      <View style={[styles.stepNode, { backgroundColor: '#059669' }]}>
+                        <Text style={styles.stepNodeNumber}>1</Text>
+                      </View>
+                      <View style={styles.stepLine} />
+                    </View>
+                    <View style={styles.stepContent}>
+                      <Text style={styles.stepTitle}>Monthly Pot Pooling</Text>
+                      <Text style={styles.stepDesc}>
+                        Members deposit equal monthly installments to form a collective lump-sum prize pot.
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Step 2 */}
+                  <View style={styles.stepItem}>
+                    <View style={styles.stepIndicatorCol}>
+                      <View style={[styles.stepNode, { backgroundColor: '#0284C7' }]}>
+                        <Text style={styles.stepNodeNumber}>2</Text>
+                      </View>
+                      <View style={styles.stepLine} />
+                    </View>
+                    <View style={styles.stepContent}>
+                      <Text style={styles.stepTitle}>Reverse Live Auction</Text>
+                      <Text style={styles.stepDesc}>
+                        Members in need of funds bid a discount. The lowest bidder wins the prize pool instantly.
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Step 3 */}
+                  <View style={styles.stepItem}>
+                    <View style={styles.stepIndicatorCol}>
+                      <View style={[styles.stepNode, { backgroundColor: '#D97706' }]}>
+                        <Text style={styles.stepNodeNumber}>3</Text>
+                      </View>
+                    </View>
+                    <View style={styles.stepContent}>
+                      <Text style={styles.stepTitle}>Equal Dividend Payout</Text>
+                      <Text style={styles.stepDesc}>
+                        The auction discount is shared equally among all non-winning members as dividend earnings!
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* Trust & FAQ Footer Banner */}
+            <View style={styles.trustBannerOuter}>
+              <Pressable
+                style={styles.trustBannerCard}
+                onPress={() => navigation.navigate('ChitFAQ')}
+              >
+                <View style={styles.trustBannerLeft}>
+                  <View style={styles.trustIconWrap}>
+                    <Ionicons name="shield-checkmark" size={24} color="#10B981" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.trustTitle}>100% Regulated & Secure</Text>
+                    <Text style={styles.trustSub}>
+                      Governed by state Chit Fund Acts with transparent digital ledgers.
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="help-circle-outline" size={22} color={colors.primary} />
+              </Pressable>
             </View>
 
             <View style={{ height: 110 }} />
@@ -510,17 +761,89 @@ const getStyles = (colors) => StyleSheet.create({
   availableSub: { fontSize: 13, color: colors.textMuted },
 
   // Sections
-  sectionHeader: { paddingHorizontal: 20, marginBottom: 16 },
+  sectionHeader: { paddingHorizontal: 20, marginBottom: 12 },
   sectionTitle: { fontSize: 18, fontWeight: '800', color: colors.text, letterSpacing: -0.4 },
+  sectionSubtitle: { fontSize: 12.5, color: colors.textMuted, marginTop: 2, fontWeight: '500' },
+
+  // Due Banner
+  dueBannerOuter: { paddingHorizontal: 20, marginBottom: 16 },
+  dueBannerCard: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#D97706',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  dueBannerGradient: {
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dueBannerLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 12 },
+  dueIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    position: 'relative',
+  },
+  duePulseDot: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#DC2626',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  dueTextWrap: { flex: 1 },
+  dueTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
+  dueTitle: { fontSize: 12, fontWeight: '700', color: '#92400E', textTransform: 'uppercase', letterSpacing: 0.5 },
+  dueBadgePill: {
+    backgroundColor: 'rgba(220, 38, 38, 0.1)',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 4,
+  },
+  dueBadgeText: { fontSize: 8.5, fontWeight: '800', color: '#DC2626' },
+  dueAmount: { fontSize: 20, fontWeight: '900', color: '#78350F', letterSpacing: -0.5 },
+  dueSubText: { fontSize: 11.5, color: '#B45309', marginTop: 1, fontWeight: '500' },
+  dueActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#D97706',
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    borderRadius: 12,
+    shadowColor: '#D97706',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  dueActionText: { fontSize: 12.5, fontWeight: '800', color: '#FFFFFF' },
 
   // Quick Actions
   quickActionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     paddingHorizontal: 12,
-    marginBottom: 24,
+    marginBottom: 8,
   },
-  quickAction: { width: '33.33%', alignItems: 'center', marginBottom: 16 },
+  quickAction: { width: '25%', alignItems: 'center', marginBottom: 12 },
   quickActionIconWrap: {
     width: 56,
     height: 56,
@@ -538,27 +861,267 @@ const getStyles = (colors) => StyleSheet.create({
     elevation: 3,
     position: 'relative',
   },
-  quickActionLabel: { fontSize: 12, fontWeight: '600', color: colors.text },
+  quickActionLabel: { fontSize: 11.5, fontWeight: '700', color: colors.text },
   quickActionBadge: {
     position: 'absolute',
     top: -4,
     right: -4,
     backgroundColor: colors.error,
-    width: 20,
+    minWidth: 20,
     height: 20,
+    paddingHorizontal: 4,
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: colors.background,
   },
-  quickActionBadgeText: { fontSize: 10, fontWeight: '800', color: colors.white },
+  quickActionBadgeText: { fontSize: 9.5, fontWeight: '800', color: colors.white },
   quickActionImage: {
-    width: 35,
-    height: 35,
+    width: 32,
+    height: 32,
   },
 
-  // Stats Grid
+  // Unique Chit Intelligence Cards
+  uniqueChitGrid: {
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  uniqueChitCard: {
+    borderRadius: 22,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.18)',
+    shadowColor: '#0E3D23',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.07,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  uniqueChitGradient: {
+    padding: 16,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  uniqueChitAmbientCircle: {
+    position: 'absolute',
+    top: -20,
+    right: -20,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+  },
+  uniqueChitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  uniqueChitDialOuter: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 2.5,
+    borderColor: 'rgba(16, 185, 129, 0.35)',
+    backgroundColor: 'rgba(16, 185, 129, 0.06)',
+    padding: 3,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  uniqueChitDialInner: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 23,
+    borderWidth: 1.5,
+    borderColor: '#10B981',
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  uniqueChitDialText: {
+    fontSize: 10.5,
+    fontWeight: '900',
+    color: '#047857',
+    marginTop: 1,
+  },
+  uniqueChitBody: {
+    flex: 1,
+  },
+  uniqueChitHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  uniqueChitTag: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#059669',
+    letterSpacing: 0.8,
+  },
+  uniqueChitTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.text,
+    letterSpacing: -0.2,
+    marginBottom: 2,
+  },
+  uniqueChitDesc: {
+    fontSize: 12,
+    color: colors.textMuted,
+    lineHeight: 16.5,
+  },
+
+  // Chit Services & Tools (2x2 Grid)
+  toolsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  toolCard: {
+    width: (SCREEN_WIDTH - 40 - 12) / 2,
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    shadowColor: '#0E3D23',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    position: 'relative',
+  },
+  toolIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  toolTitle: {
+    fontSize: 14.5,
+    fontWeight: '800',
+    color: colors.text,
+    marginBottom: 2,
+  },
+  toolSub: {
+    fontSize: 11.5,
+    color: colors.textMuted,
+    fontWeight: '500',
+  },
+  toolArrow: {
+    position: 'absolute',
+    top: 16,
+    right: 14,
+  },
+
+  // How Chit Bidding Works
+  stepsCardOuter: {
+    paddingHorizontal: 20,
+  },
+  stepsCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 22,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    shadowColor: '#0E3D23',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2,
+    gap: 16,
+  },
+  stepItem: {
+    flexDirection: 'row',
+    gap: 14,
+  },
+  stepIndicatorCol: {
+    alignItems: 'center',
+    width: 28,
+  },
+  stepNode: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stepNodeNumber: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  stepLine: {
+    width: 2,
+    flex: 1,
+    minHeight: 28,
+    backgroundColor: 'rgba(0, 0, 0, 0.08)',
+    marginTop: 6,
+  },
+  stepContent: {
+    flex: 1,
+    paddingTop: 3,
+  },
+  stepTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.text,
+    marginBottom: 2,
+  },
+  stepDesc: {
+    fontSize: 12,
+    color: colors.textMuted,
+    lineHeight: 16.5,
+  },
+
+  // Trust & Security Banner
+  trustBannerOuter: {
+    paddingHorizontal: 20,
+    marginTop: 20,
+  },
+  trustBannerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+  },
+  trustBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+    marginRight: 10,
+  },
+  trustIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  trustTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#065F46',
+    marginBottom: 1,
+  },
+  trustSub: {
+    fontSize: 11,
+    color: '#047857',
+    lineHeight: 14,
+  },
+
+  // Stats Grid (Legacy / fallback)
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

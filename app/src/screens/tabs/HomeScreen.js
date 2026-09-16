@@ -11,6 +11,7 @@ import {
   StatusBar,
   Image,
   ImageBackground,
+  PanResponder,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -142,6 +143,542 @@ const getTransactionIcon = (type) => {
     default: return { icon: 'swap-horizontal', color: '#7B8794', bg: '#F2F4F6' };
   }
 };
+
+const getPlanCardData = (inv) => {
+  if (!inv) return null;
+  const durationDays = inv.duration ? Number(inv.duration) : 30;
+  const startMs = inv.startDate ? new Date(inv.startDate).getTime() : Date.now();
+  const isDays = inv.durationDays || durationDays > 12;
+  const totalDays = isDays ? durationDays : durationDays * 30;
+  const elapsedDays = Math.max(0, (Date.now() - startMs) / (24 * 60 * 60 * 1000));
+  const progress = totalDays > 0 ? Math.min((elapsedDays / totalDays) * 100, 100) : 0;
+  const isFixed = inv.type === 'fixed';
+  const planTitle = inv.planName || (isFixed ? 'Fixed Yield Deposit' : 'Smart Savings Growth');
+  const categoryLabel = isFixed ? 'CAPITAL GUARANTEE' : 'FLEXIBLE SAVINGS';
+  const iconName = isFixed ? 'shield-lock-outline' : 'sprout';
+  const rate = inv.interestRate || inv.returnRate || (isFixed ? 24 : 12);
+  return { durationDays, totalDays, progress, isFixed, planTitle, categoryLabel, iconName, rate };
+};
+
+const ActivePlansCardDeck = React.memo(({
+  investments,
+  navigation,
+  hideBalance,
+  formatCurrency,
+  themeColors,
+  isDarkMode,
+  styles,
+}) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [cardHeight, setCardHeight] = useState(0);
+  const [swipeDir, setSwipeDir] = useState('next'); // 'next' or 'prev'
+  const pan = useRef(new Animated.ValueXY()).current;
+  const isAnimating = useRef(false);
+  const totalCount = investments.length;
+
+  useEffect(() => {
+    if (currentIndex >= investments.length) {
+      setCurrentIndex(0);
+    }
+  }, [investments.length, currentIndex]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        if (totalCount <= 1 || isAnimating.current) return false;
+        return Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.3;
+      },
+      onPanResponderGrant: () => {
+        pan.setValue({ x: 0, y: 0 });
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        if (gestureState.dx > 8) {
+          setSwipeDir('prev');
+        } else if (gestureState.dx < -8) {
+          setSwipeDir('next');
+        }
+        pan.setValue({ x: gestureState.dx, y: 0 });
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        if (totalCount <= 1) {
+          Animated.spring(pan, { toValue: { x: 0, y: 0 }, friction: 7, tension: 60, useNativeDriver: false }).start();
+          return;
+        }
+        const SWIPE_THRESHOLD = 60;
+        const SWIPE_VELOCITY = 0.3;
+
+        if (gestureState.dx < -SWIPE_THRESHOLD || gestureState.vx < -SWIPE_VELOCITY) {
+          // Swiped Left -> go to NEXT card
+          isAnimating.current = true;
+          setSwipeDir('next');
+          Animated.timing(pan, {
+            toValue: { x: -SCREEN_WIDTH * 1.3, y: 0 },
+            duration: 200,
+            useNativeDriver: false,
+          }).start(() => {
+            pan.setValue({ x: 0, y: 0 });
+            setCurrentIndex((prev) => (prev + 1) % totalCount);
+            isAnimating.current = false;
+          });
+        } else if (gestureState.dx > SWIPE_THRESHOLD || gestureState.vx > SWIPE_VELOCITY) {
+          // Swiped Right -> go to PREVIOUS card
+          isAnimating.current = true;
+          setSwipeDir('prev');
+          Animated.timing(pan, {
+            toValue: { x: SCREEN_WIDTH * 1.3, y: 0 },
+            duration: 200,
+            useNativeDriver: false,
+          }).start(() => {
+            pan.setValue({ x: 0, y: 0 });
+            setCurrentIndex((prev) => (prev - 1 + totalCount) % totalCount);
+            setSwipeDir('next');
+            isAnimating.current = false;
+          });
+        } else {
+          // Below threshold -> bounce back smoothly
+          Animated.spring(pan, {
+            toValue: { x: 0, y: 0 },
+            friction: 7,
+            tension: 60,
+            useNativeDriver: false,
+          }).start(() => {
+            isAnimating.current = false;
+            setSwipeDir('next');
+          });
+        }
+      },
+      onPanResponderTerminate: () => {
+        isAnimating.current = false;
+        Animated.spring(pan, { toValue: { x: 0, y: 0 }, friction: 7, tension: 60, useNativeDriver: false }).start();
+      },
+    })
+  ).current;
+
+  const goNext = () => {
+    if (isAnimating.current || totalCount <= 1) return;
+    isAnimating.current = true;
+    setSwipeDir('next');
+    Animated.timing(pan, {
+      toValue: { x: -SCREEN_WIDTH * 1.3, y: 0 },
+      duration: 200,
+      useNativeDriver: false,
+    }).start(() => {
+      pan.setValue({ x: 0, y: 0 });
+      setCurrentIndex((prev) => (prev + 1) % totalCount);
+      isAnimating.current = false;
+    });
+  };
+
+  const goPrev = () => {
+    if (isAnimating.current || totalCount <= 1) return;
+    isAnimating.current = true;
+    setSwipeDir('prev');
+    Animated.timing(pan, {
+      toValue: { x: SCREEN_WIDTH * 1.3, y: 0 },
+      duration: 200,
+      useNativeDriver: false,
+    }).start(() => {
+      pan.setValue({ x: 0, y: 0 });
+      setCurrentIndex((prev) => (prev - 1 + totalCount) % totalCount);
+      setSwipeDir('next');
+      isAnimating.current = false;
+    });
+  };
+
+  const goToIndex = (targetIndex) => {
+    if (isAnimating.current || targetIndex === currentIndex) return;
+    isAnimating.current = true;
+    const direction = targetIndex > currentIndex ? -1 : 1;
+    setSwipeDir(targetIndex > currentIndex ? 'next' : 'prev');
+    Animated.timing(pan, {
+      toValue: { x: direction * SCREEN_WIDTH * 0.8, y: 0 },
+      duration: 180,
+      useNativeDriver: false,
+    }).start(() => {
+      setCurrentIndex(targetIndex);
+      pan.setValue({ x: -direction * SCREEN_WIDTH * 0.4, y: 0 });
+      Animated.spring(pan, {
+        toValue: { x: 0, y: 0 },
+        friction: 7,
+        tension: 60,
+        useNativeDriver: false,
+      }).start(() => {
+        isAnimating.current = false;
+      });
+    });
+  };
+
+  const handleFrontLayout = (e) => {
+    const h = e.nativeEvent.layout.height;
+    if (h && Math.abs(h - cardHeight) > 1) {
+      setCardHeight(h);
+    }
+  };
+
+  const rotateStr = pan.x.interpolate({
+    inputRange: [-SCREEN_WIDTH * 0.7, 0, SCREEN_WIDTH * 0.7],
+    outputRange: ['-6deg', '0deg', '6deg'],
+    extrapolate: 'clamp',
+  });
+
+  const frontOpacity = pan.x.interpolate({
+    inputRange: [-SCREEN_WIDTH * 0.7, -SCREEN_WIDTH * 0.35, 0, SCREEN_WIDTH * 0.35, SCREEN_WIDTH * 0.7],
+    outputRange: [0.75, 0.95, 1, 0.95, 0.75],
+    extrapolate: 'clamp',
+  });
+
+  const card1Scale = pan.x.interpolate({
+    inputRange: [-180, 0, 180],
+    outputRange: [1.0, 0.93, 1.0],
+    extrapolate: 'clamp',
+  });
+
+  const card1TranslateY = pan.x.interpolate({
+    inputRange: [-180, 0, 180],
+    outputRange: [0, -14, 0],
+    extrapolate: 'clamp',
+  });
+
+  const card2Scale = pan.x.interpolate({
+    inputRange: [-180, 0, 180],
+    outputRange: [0.93, 0.86, 0.93],
+    extrapolate: 'clamp',
+  });
+
+  const card2TranslateY = pan.x.interpolate({
+    inputRange: [-180, 0, 180],
+    outputRange: [-14, -26, -14],
+    extrapolate: 'clamp',
+  });
+
+  if (!investments || investments.length === 0) return null;
+
+  const frontInv = investments[currentIndex] || investments[0];
+  const frontData = getPlanCardData(frontInv);
+
+  const card1Index = swipeDir === 'prev'
+    ? (currentIndex - 1 + totalCount) % totalCount
+    : (currentIndex + 1) % totalCount;
+  const card1Inv = investments[card1Index];
+  const card1Data = getPlanCardData(card1Inv);
+
+  const card2Index = swipeDir === 'prev'
+    ? (currentIndex - 2 + totalCount) % totalCount
+    : (currentIndex + 2) % totalCount;
+  const card2Inv = investments[card2Index];
+  const card2Data = getPlanCardData(card2Inv);
+
+  const renderCardBody = (inv, planData) => {
+    if (!inv || !planData) return null;
+    const isFixed = planData.isFixed;
+    const bgColors = isDarkMode
+      ? (isFixed ? ['#132438', '#0D1B2A'] : ['#0F291E', '#0A1E15'])
+      : (isFixed ? ['#FFFFFF', '#F2F8FC', '#E5F3F9'] : ['#FFFFFF', '#F2FAF5', '#E6F7EE']);
+
+    return (
+      <LinearGradient
+        colors={bgColors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.uniqueOrbitalGradient}
+      >
+        {/* Ambient background glowing orbs */}
+        <View
+          style={[
+            styles.orbitalAmbientCircleLarge,
+            { backgroundColor: isFixed ? 'rgba(2, 132, 199, 0.09)' : 'rgba(16, 185, 129, 0.1)' },
+          ]}
+        />
+        <View
+          style={[
+            styles.orbitalAmbientCircleSmall,
+            { backgroundColor: isFixed ? 'rgba(2, 132, 199, 0.05)' : 'rgba(16, 185, 129, 0.06)' },
+          ]}
+        />
+
+        {/* Main Card Content */}
+        <View style={styles.uniqueOrbitalInner}>
+          <View style={styles.uniqueOrbitalRow}>
+            {/* 1. Left: Modern Circular Gauge Orb */}
+            <View style={styles.circleGaugeContainer}>
+              <View
+                style={[
+                  styles.circleGaugeOuterRing,
+                  {
+                    borderColor: isFixed ? 'rgba(2, 132, 199, 0.35)' : 'rgba(16, 185, 129, 0.35)',
+                    backgroundColor: isFixed ? 'rgba(2, 132, 199, 0.06)' : 'rgba(16, 185, 129, 0.06)',
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.circleGaugeInnerCore,
+                    {
+                      borderColor: isFixed ? '#0284C7' : '#10B981',
+                      backgroundColor: isFixed ? 'rgba(2, 132, 199, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+                    },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name={planData.iconName}
+                    size={16}
+                    color={isFixed ? '#0284C7' : '#059669'}
+                    style={{ marginBottom: 1 }}
+                  />
+                  <Text
+                    style={[
+                      styles.circleGaugePercentText,
+                      { color: isFixed ? '#0284C7' : '#047857' },
+                    ]}
+                  >
+                    {planData.progress.toFixed(0)}%
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* 2. Center: Plan Details & Financials */}
+            <View style={styles.uniqueOrbitalCenter}>
+              {/* Category + Live Status */}
+              <View style={styles.uniqueOrbitalTagRow}>
+                <View
+                  style={[
+                    styles.uniqueOrbitalCategoryPill,
+                    { backgroundColor: isFixed ? 'rgba(2, 132, 199, 0.12)' : 'rgba(16, 185, 129, 0.12)' },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.uniqueOrbitalCategoryText,
+                      { color: isFixed ? '#0284C7' : '#059669' },
+                    ]}
+                  >
+                    {planData.categoryLabel}
+                  </Text>
+                </View>
+                <View style={styles.uniqueLiveDotWrapper}>
+                  <View style={[styles.uniqueLivePulseDot, { backgroundColor: isFixed ? '#0284C7' : '#10B981' }]} />
+                  <Text style={[styles.uniqueLiveLabel, { color: isFixed ? '#0284C7' : '#047857' }]}>
+                    Active
+                  </Text>
+                </View>
+              </View>
+
+              {/* Plan Name */}
+              <Text style={[styles.uniqueOrbitalTitle, isDarkMode && { color: '#F8FAF9' }]} numberOfLines={1}>
+                {planData.planTitle}
+              </Text>
+
+              {/* Invested Amount */}
+              <Text style={[styles.uniqueOrbitalAmount, isDarkMode && { color: '#F8FAF9' }]}>
+                {hideBalance ? '₹ ••••••' : formatCurrency(inv.amount || 0)}
+              </Text>
+
+              {/* Bottom Metric Badges */}
+              <View style={styles.uniqueOrbitalBadgeRow}>
+                <View
+                  style={[
+                    styles.uniqueReturnPill,
+                    {
+                      backgroundColor: isFixed ? 'rgba(2, 132, 199, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                      borderColor: isFixed ? 'rgba(2, 132, 199, 0.25)' : 'rgba(16, 185, 129, 0.25)',
+                    },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name="trending-up"
+                    size={13}
+                    color={isFixed ? '#0284C7' : '#059669'}
+                  />
+                  <Text
+                    style={[
+                      styles.uniqueReturnText,
+                      { color: isFixed ? '#0284C7' : '#047857' },
+                    ]}
+                  >
+                    {planData.rate}% p.a.
+                  </Text>
+                </View>
+
+                <View style={styles.uniqueTermPill}>
+                  <MaterialCommunityIcons name="clock-outline" size={12} color={colors.textMuted} />
+                  <Text style={styles.uniqueTermText}>
+                    {planData.totalDays > 0 ? `${planData.totalDays}d term` : 'Flexi'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* 3. Right: Circular Action Cue */}
+            <View style={styles.uniqueOrbitalRight}>
+              <View
+                style={[
+                  styles.uniqueActionCircle,
+                  {
+                    backgroundColor: isFixed ? 'rgba(2, 132, 199, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+                    borderColor: isFixed ? 'rgba(2, 132, 199, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                  },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="arrow-top-right"
+                  size={16}
+                  color={isFixed ? '#0284C7' : '#059669'}
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Bottom Edge Micro Progress Bar */}
+        <View style={styles.uniqueBottomEdgeTrack}>
+          <LinearGradient
+            colors={isFixed ? ['#38BDF8', '#0284C7'] : ['#34D399', '#059669']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={[
+              styles.uniqueBottomEdgeFill,
+              { width: `${Math.max(4, Math.min(planData.progress, 100))}%` },
+            ]}
+          />
+        </View>
+      </LinearGradient>
+    );
+  };
+
+  const currentHeight = cardHeight > 0 ? cardHeight : 156;
+
+  return (
+    <View style={styles.deckContainer}>
+      <View style={styles.deckWrapper}>
+        {/* Layer 2 (Deepest back card - visible when >= 3 cards) */}
+        {totalCount >= 3 && card2Data && (
+          <Animated.View
+            key={`back2-${card2Inv?._id || card2Index}`}
+            pointerEvents="none"
+            style={[
+              styles.deckCardBase,
+              styles.deckBackCard2,
+              {
+                height: currentHeight,
+                borderColor: card2Data.isFixed
+                  ? (isDarkMode ? 'rgba(56, 189, 248, 0.28)' : 'rgba(2, 132, 199, 0.22)')
+                  : (isDarkMode ? 'rgba(52, 211, 153, 0.28)' : 'rgba(16, 185, 129, 0.22)'),
+                transform: [
+                  { translateY: card2TranslateY },
+                  { scaleX: card2Scale },
+                ],
+              },
+            ]}
+          >
+            {renderCardBody(card2Inv, card2Data)}
+          </Animated.View>
+        )}
+
+        {/* Layer 1 (Middle back card - visible when >= 2 cards) */}
+        {totalCount >= 2 && card1Data && (
+          <Animated.View
+            key={`back1-${card1Inv?._id || card1Index}`}
+            pointerEvents="none"
+            style={[
+              styles.deckCardBase,
+              styles.deckBackCard1,
+              {
+                height: currentHeight,
+                borderColor: card1Data.isFixed
+                  ? (isDarkMode ? 'rgba(56, 189, 248, 0.35)' : 'rgba(2, 132, 199, 0.28)')
+                  : (isDarkMode ? 'rgba(52, 211, 153, 0.35)' : 'rgba(16, 185, 129, 0.28)'),
+                transform: [
+                  { translateY: card1TranslateY },
+                  { scaleX: card1Scale },
+                ],
+              },
+            ]}
+          >
+            {renderCardBody(card1Inv, card1Data)}
+          </Animated.View>
+        )}
+
+        {/* Front Active Card */}
+        {frontData && (
+          <Animated.View
+            key={`front-${frontInv?._id || currentIndex}`}
+            onLayout={handleFrontLayout}
+            style={[
+              styles.deckCardBase,
+              styles.deckFrontCard,
+              {
+                borderColor: frontData.isFixed
+                  ? (isDarkMode ? 'rgba(56, 189, 248, 0.45)' : 'rgba(2, 132, 199, 0.32)')
+                  : (isDarkMode ? 'rgba(52, 211, 153, 0.45)' : 'rgba(16, 185, 129, 0.32)'),
+                transform: [
+                  { translateX: pan.x },
+                  { rotate: rotateStr },
+                ],
+                opacity: frontOpacity,
+              },
+            ]}
+            {...(totalCount > 1 ? panResponder.panHandlers : {})}
+          >
+            <TouchableOpacity
+              activeOpacity={0.92}
+              onPress={() => navigation.navigate('Investments')}
+            >
+              {renderCardBody(frontInv, frontData)}
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+      </View>
+
+      {/* Modern Navigation: Chevrons + Dots + Swipe Cue */}
+      {totalCount > 1 && (
+        <View style={styles.deckFooterRow}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <TouchableOpacity
+              onPress={goPrev}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={styles.deckArrowBtn}
+            >
+              <MaterialCommunityIcons name="chevron-left" size={16} color={themeColors.text} />
+            </TouchableOpacity>
+
+            <View style={styles.deckDotsWrapper}>
+              {investments.map((_, i) => (
+                <TouchableOpacity
+                  key={i}
+                  onPress={() => goToIndex(i)}
+                  hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                >
+                  <View
+                    style={[
+                      styles.deckDot,
+                      i === currentIndex && [styles.deckDotActive, { backgroundColor: themeColors.primary }],
+                      isDarkMode && i !== currentIndex && { backgroundColor: 'rgba(255, 255, 255, 0.2)' },
+                    ]}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              onPress={goNext}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={styles.deckArrowBtn}
+            >
+              <MaterialCommunityIcons name="chevron-right" size={16} color={themeColors.text} />
+            </TouchableOpacity>
+          </View>
+
+          {/* <View style={styles.deckSwipeHint}>
+            <MaterialCommunityIcons name="gesture-swipe-horizontal" size={14} color={themeColors.textMuted} />
+            <Text style={[styles.deckSwipeText, { color: themeColors.textMuted }]}>Swipe left / right</Text>
+          </View> */}
+        </View>
+      )}
+    </View>
+  );
+});
 
 const HomeScreen = ({ navigation }) => {
   const { isDarkMode, colors: themeColors } = useTheme();
@@ -539,54 +1076,31 @@ const HomeScreen = ({ navigation }) => {
           {activeInvestments.length > 0 && (
             <View style={[styles.section, { marginTop: 24 }]}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Active Plans</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={styles.sectionTitle}>Active Plans</Text>
+                  {activeInvestments.length > 1 && (
+                    <View style={styles.deckCountBadge}>
+                      <Text style={styles.deckCountText}>
+                        {activeInvestments.length} plans
+                      </Text>
+                    </View>
+                  )}
+                </View>
                 <TouchableOpacity style={styles.viewAllBtn} onPress={() => navigation.navigate('Investments')}>
                   <Text style={styles.viewAllText}>View All</Text>
                   <MaterialCommunityIcons name="chevron-right" size={14} color={themeColors.primary} />
                 </TouchableOpacity>
               </View>
-              {activeInvestments.slice(0, 3).map((inv, idx) => {
-                const progress = inv.duration > 0
-                  ? Math.min(((Date.now() - new Date(inv.startDate)) / (inv.duration * 30 * 24 * 60 * 60 * 1000)) * 100, 100)
-                  : 0;
-                return (
-                  <TouchableOpacity
-                    key={inv._id || idx}
-                    style={styles.investmentItem}
-                    activeOpacity={0.85}
-                    onPress={() => navigation.navigate('Investments')}
-                  >
-                    <View style={[styles.investmentIconBox, { backgroundColor: '#E8F5EE' }]}>
-                      <MaterialCommunityIcons name="trending-up" size={20} color="#1A5C39" />
-                    </View>
-                    <View style={styles.investmentContent}>
-                      <View style={styles.investmentTopRow}>
-                        <Text style={styles.investmentTitle} numberOfLines={1}>
-                          {inv.planName || inv.type || 'Investment Plan'}
-                        </Text>
-                        <View style={[styles.statusBadge, { backgroundColor: '#E8F5EE' }]}>
-                          <View style={[styles.statusDot, { backgroundColor: '#2D9A5A' }]} />
-                          <Text style={[styles.statusText, { color: '#1A5C39' }]}>Active</Text>
-                        </View>
-                      </View>
-                      <View style={styles.investmentMeta}>
-                        <Text style={styles.investmentAmount}>
-                          {hideBalance ? '₹ ••••' : formatCurrency(inv.amount || 0)}
-                        </Text>
-                        <Text style={styles.investmentRate}>
-                          {inv.interestRate || inv.returnRate || 0}% p.a.
-                        </Text>
-                      </View>
-                      <View style={styles.progressBarContainer}>
-                        <View style={styles.progressBarBg}>
-                          <View style={[styles.progressBarFill, { width: `${progress.toFixed(0)}%` }]} />
-                        </View>
-                        <Text style={styles.progressText}>{progress.toFixed(0)}%</Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
+
+              <ActivePlansCardDeck
+                investments={activeInvestments}
+                navigation={navigation}
+                hideBalance={hideBalance}
+                formatCurrency={formatCurrency}
+                themeColors={themeColors}
+                isDarkMode={isDarkMode}
+                styles={styles}
+              />
             </View>
           )}
 
@@ -999,7 +1513,280 @@ const getStyles = (colors) => StyleSheet.create({
   },
   portfolioCardBadgeText: { fontSize: 10, color: 'rgba(255,255,255,0.9)', fontWeight: '700' },
 
-  // Active Investments
+  // Active Investments - Unique Orbital & Circular Dial Design
+  uniqueOrbitalCard: {
+    borderRadius: 22,
+    marginBottom: 14,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.18)',
+    shadowColor: '#0E3D23',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
+    overflow: 'hidden',
+  },
+  uniqueOrbitalGradient: {
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  orbitalAmbientCircleLarge: {
+    position: 'absolute',
+    top: -24,
+    right: -24,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+  },
+  orbitalAmbientCircleSmall: {
+    position: 'absolute',
+    bottom: -15,
+    left: -15,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+  },
+  uniqueOrbitalInner: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 14,
+  },
+  uniqueOrbitalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  // Circular Gauge Component
+  circleGaugeContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  circleGaugeOuterRing: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    borderWidth: 2.5,
+    padding: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  circleGaugeInnerCore: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 24,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  circleGaugePercentText: {
+    fontSize: 11.5,
+    fontWeight: '900',
+    letterSpacing: -0.3,
+  },
+  // Center Details
+  uniqueOrbitalCenter: {
+    flex: 1,
+  },
+  uniqueOrbitalTagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 3,
+  },
+  uniqueOrbitalCategoryPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+  },
+  uniqueOrbitalCategoryText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  uniqueLiveDotWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  uniqueLivePulseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  uniqueLiveLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  uniqueOrbitalTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.text,
+    letterSpacing: -0.2,
+    marginBottom: 2,
+  },
+  uniqueOrbitalAmount: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: colors.text,
+    letterSpacing: -0.5,
+    marginBottom: 8,
+  },
+  uniqueOrbitalBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  uniqueReturnPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  uniqueReturnText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  uniqueTermPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 8,
+  },
+  uniqueTermText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textMuted,
+  },
+  // Right Column Action Cue
+  uniqueOrbitalRight: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  uniqueActionCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Bottom Edge Progress Line
+  uniqueBottomEdgeTrack: {
+    height: 3.5,
+    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+    overflow: 'hidden',
+  },
+  uniqueBottomEdgeFill: {
+    height: '100%',
+  },
+
+  // Active Plans Stacked Deck Styles
+  deckContainer: {
+    marginBottom: 8,
+  },
+  deckWrapper: {
+    paddingTop: 30,
+    position: 'relative',
+  },
+  deckCardBase: {
+    borderRadius: 24,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    overflow: 'hidden',
+  },
+  deckFrontCard: {
+    shadowColor: '#0E3D23',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 6,
+    zIndex: 10,
+  },
+  deckBackCard1: {
+    position: 'absolute',
+    top: 30,
+    left: 0,
+    right: 0,
+    shadowColor: '#0E3D23',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 4,
+    zIndex: 9,
+  },
+  deckBackCard2: {
+    position: 'absolute',
+    top: 30,
+    left: 0,
+    right: 0,
+    shadowColor: '#0E3D23',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+    zIndex: 8,
+  },
+  deckFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 6,
+    marginTop: 14,
+  },
+  deckDotsWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  deckDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(0, 0, 0, 0.16)',
+  },
+  deckDotActive: {
+    width: 20,
+    borderRadius: 4,
+  },
+  deckArrowBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deckSwipeHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  deckSwipeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+  },
+  deckCountBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: 10,
+  },
+  deckCountText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#059669',
+  },
+
+  // Legacy fallback
   investmentItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
