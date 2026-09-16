@@ -721,11 +721,11 @@ const withdrawChitPayout = async (req, res) => {
     const { settlementAmount, totalDividend } = generateCycleSchedule(installmentAmount, totalUnits);
 
     if (isSettlement) {
-      // Settlement payout: total contribution + total dividend
+      // Settlement payout: total contribution + total dividend + any redistributed bonus dividend
       actionPercentage = 0;
       priceAmount = totalContribution;
-      accumulatedDividend = totalDividend;
-      finalWithdrawalAmount = settlementAmount;
+      accumulatedDividend = totalDividend + (member.bonusDividendShare || 0);
+      finalWithdrawalAmount = settlementAmount + (member.bonusDividendShare || 0);
     } else {
       // Normal withdrawal during the cycle
       // Check lock periods: first Math.floor((totalUnits - 1) / 2) units are locked
@@ -755,7 +755,7 @@ const withdrawChitPayout = async (req, res) => {
     session.startTransaction();
 
     try {
-      member.withdrawalStatus = 'completed';
+      member.withdrawalStatus = 'requested';
       member.withdrawalWeek = currentUnit;
       member.withdrawalAmount = finalWithdrawalAmount;
       member.actionPercentage = actionPercentage;
@@ -770,40 +770,58 @@ const withdrawChitPayout = async (req, res) => {
       if (isSettlement) {
         member.status = 'completed'; // Safe completion on settlement
       }
+
+      // Rule: If user withdrew price amount before complete, their forfeited dividend goes equally to other active members
+      if (!isSettlement && accumulatedDividend > 0) {
+        const otherMembers = await ChitMember.find({
+          chitId: member.chitId._id || member.chitId,
+          _id: { $ne: member._id },
+          status: { $ne: 'cancelled' },
+          withdrawalStatus: { $nin: ['completed', 'requested'] },
+        }).session(session);
+
+        if (otherMembers.length > 0) {
+          const bonusShare = Math.round(accumulatedDividend / otherMembers.length);
+          for (const om of otherMembers) {
+            om.bonusDividendShare = (om.bonusDividendShare || 0) + bonusShare;
+            om.totalDividendEarned = (om.totalDividendEarned || 0) + bonusShare;
+            await om.save({ session });
+          }
+        }
+      }
+
       await member.save({ session });
 
-      user.balance = (user.balance || 0) + finalWithdrawalAmount;
-      await user.save({ session });
-
-      // Create Withdrawal record for Admin Dashboard tracking
+      // Create Withdrawal record with 'pending' status so Admin can review and click $ Pay in Admin Dashboard
+      const resolvedUPI = req.body?.upiId || user.upiId || 'prasathhari713@okhdfcbank';
       const withdrawalRecord = new Withdrawal({
         userId: user._id,
         userEmail: user.email || 'user@growvest.in',
         userName: user.name || user.username || 'User',
         amount: finalWithdrawalAmount,
-        upiId: user.upiId || 'Wallet Balance',
+        upiId: resolvedUPI,
         date: new Date().toLocaleDateString('en-IN'),
-        status: 'paid', // Auto-credited to user balance
+        status: 'pending', // Pending admin approval and payment
         withdrawType: 'chit',
-        processed: true,
-        paidAt: new Date(),
-        paidBy: 'System / Chit Payout',
+        investmentId: member._id,
+        processed: false,
+        isEarlyWithdrawal: !isSettlement,
       });
       await withdrawalRecord.save({ session });
 
       const transactionType = isSettlement ? 'chit_settlement' : 'chit_withdrawal';
       const description = isSettlement
-        ? `Chit Fund Settlement - ${member.chitId.name}`
-        : `Chit Fund Payout - ${member.chitId.name} ${isWeekly ? 'Week' : 'Month'} ${currentUnit}`;
+        ? `Chit Fund Settlement Request - ${member.chitId.name}`
+        : `Chit Fund Payout Request - ${member.chitId.name} ${isWeekly ? 'Week' : 'Month'} ${currentUnit}`;
 
       const transaction = new Transaction({
         userId,
         userEmail: user.email || 'no-email@growvest.com',
         type: transactionType,
         amount: finalWithdrawalAmount,
-        status: 'approved',
-        referenceId: member._id,
-        referenceType: 'ChitMember',
+        status: 'requested',
+        referenceId: withdrawalRecord._id,
+        referenceType: 'Withdrawal',
         description,
       });
       await transaction.save({ session });
@@ -815,23 +833,23 @@ const withdrawChitPayout = async (req, res) => {
       session.endSession();
 
       try {
-        const notifTitle = isSettlement ? '🎉 Chit Fund Settled' : '💸 Chit Payout Completed';
+        const notifTitle = isSettlement ? '⏳ Chit Settlement Requested' : '⏳ Chit Payout Requested';
         const notifDesc = isSettlement
-          ? `Your Chit Fund "${member.chitId.name}" has completed. Settlement amount of ₹${finalWithdrawalAmount.toLocaleString('en-IN')} has been credited to your balance.`
-          : `Your payout of ₹${finalWithdrawalAmount.toLocaleString('en-IN')} for "${member.chitId.name}" has been processed and credited to your balance.`;
+          ? `Your Chit Fund "${member.chitId.name}" settlement request of ₹${finalWithdrawalAmount.toLocaleString('en-IN')} has been submitted for admin verification.`
+          : `Your payout request of ₹${finalWithdrawalAmount.toLocaleString('en-IN')} for "${member.chitId.name}" has been submitted for admin verification.`;
 
         await sendNotification({
           userId,
           title: notifTitle,
           description: notifDesc,
-          type: isSettlement ? 'chit_payment_approved' : 'auction_winner',
-          metadata: { memberId: member._id, amount: finalWithdrawalAmount },
+          type: 'general',
+          metadata: { memberId: member._id, amount: finalWithdrawalAmount, withdrawalId: withdrawalRecord._id },
           pushData: { screen: 'MyChits' },
         });
 
         await notifyAdmins({
-          title: isSettlement ? '🎉 Chit Fund Settlement Claimed' : '💸 Chit Payout Claimed',
-          description: `${user.name || user.email} withdrew ₹${finalWithdrawalAmount.toLocaleString('en-IN')} (${isSettlement ? 'Settlement' : `${isWeekly ? 'Week' : 'Month'} ${currentUnit} Price Amount`}) from Chit "${member.chitId.name}".`,
+          title: isSettlement ? '💸 Chit Settlement Request' : '💸 Chit Payout Request',
+          description: `${user.name || user.email} requested to withdraw ₹${finalWithdrawalAmount.toLocaleString('en-IN')} (${isSettlement ? 'Settlement' : `${isWeekly ? 'Week' : 'Month'} ${currentUnit} Price Amount`}) from Chit "${member.chitId.name}".`,
           type: 'general',
           metadata: { memberId: member._id, amount: finalWithdrawalAmount, withdrawalId: withdrawalRecord._id },
         });
@@ -840,7 +858,7 @@ const withdrawChitPayout = async (req, res) => {
       }
 
       res.json({
-        message: isSettlement ? 'Settlement processed successfully' : 'Payout processed successfully',
+        message: 'Withdrawal request submitted successfully. Pending admin approval.',
         member,
         transaction,
         withdrawal: withdrawalRecord

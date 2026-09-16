@@ -126,6 +126,10 @@ const chitMemberSchema = new mongoose.Schema({
   accumulatedDividend: {
     type: Number,
   },
+  bonusDividendShare: {
+    type: Number,
+    default: 0,
+  },
   membershipId: {
     type: String,
     unique: true,
