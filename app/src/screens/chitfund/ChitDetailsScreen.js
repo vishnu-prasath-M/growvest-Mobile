@@ -392,6 +392,7 @@ const ChitDetailsScreen = ({ navigation, route }) => {
             const eligibleStart = Math.floor((totalUnits - 1) / 2) + 1;
             const isEligible = currentUnit >= eligibleStart;
             const isWithdrawn = myMembership.withdrawalStatus === 'completed';
+            const isRequested = myMembership.withdrawalStatus === 'requested';
 
             return (
               <View>
@@ -427,6 +428,24 @@ const ChitDetailsScreen = ({ navigation, route }) => {
                         Your payout has been credited to your Growvest balance. Please continue paying the remaining dues ({remainingInstallments} {isWeekly ? 'weeks' : 'months'} left).
                       </Text>
                     </View>
+                  ) : isRequested ? (
+                    <View style={{ backgroundColor: themeColors.surface2, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: themeColors.warning, gap: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <MaterialCommunityIcons name="clock-outline" size={24} color={themeColors.warning} />
+                        <Text style={{ fontSize: 15, fontWeight: '800', color: themeColors.warning }}>Payout Request Pending Admin Approval</Text>
+                      </View>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Requested In {isWeekly ? 'Week' : 'Month'}</Text>
+                        <Text style={styles.detailValue}>{isWeekly ? 'Week' : 'Month'} {myMembership.withdrawalWeek}</Text>
+                      </View>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Requested Amount</Text>
+                        <Text style={{ fontSize: 16, fontWeight: '800', color: themeColors.warning }}>{formatCurrency(myMembership.withdrawalAmount)}</Text>
+                      </View>
+                      <Text style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 6, lineHeight: 18 }}>
+                        Your payout request of {formatCurrency(myMembership.withdrawalAmount)} has been submitted to the administrator. The funds will be transferred to your account upon verification.
+                      </Text>
+                    </View>
                   ) : isEligible ? (
                     <View>
                       <View style={{ backgroundColor: themeColors.primaryLight, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: themeColors.primary, marginBottom: 16 }}>
@@ -435,7 +454,7 @@ const ChitDetailsScreen = ({ navigation, route }) => {
                           const row = getWeeklyRowData(baseAmount, totalUnits, currentUnit);
                           const totalDividend = getTotalDividend(baseAmount, totalUnits);
                           const isSettlement = currentUnit >= totalUnits || installmentsPaid >= totalUnits;
-                          const eligibleWithdrawalAmount = isSettlement ? row.totalValue : row.priceAmount;
+                          const eligibleWithdrawalAmount = isSettlement ? (row.totalValue + (myMembership.bonusDividendShare || 0)) : row.priceAmount;
                           return (
                             <>
                               <View style={styles.detailRow}>
@@ -444,7 +463,7 @@ const ChitDetailsScreen = ({ navigation, route }) => {
                               </View>
                               <View style={styles.detailRow}>
                                 <Text style={styles.detailLabel}>Share Dividend</Text>
-                                <Text style={styles.detailValue}>{formatCurrency(totalDividend)}</Text>
+                                <Text style={styles.detailValue}>{formatCurrency(totalDividend + (myMembership.bonusDividendShare || 0))}</Text>
                               </View>
                               <View style={styles.detailRow}>
                                 <Text style={styles.detailLabel}>
@@ -467,7 +486,7 @@ const ChitDetailsScreen = ({ navigation, route }) => {
                         onPress={() => {
                           const row = getWeeklyRowData(baseAmount, totalUnits, currentUnit);
                           const isSettlement = currentUnit >= totalUnits || installmentsPaid >= totalUnits;
-                          const eligibleWithdrawalAmount = isSettlement ? row.totalValue : row.priceAmount;
+                          const eligibleWithdrawalAmount = isSettlement ? (row.totalValue + (myMembership.bonusDividendShare || 0)) : row.priceAmount;
                           handleWithdrawal(myMembership._id, eligibleWithdrawalAmount);
                         }}
                       >
@@ -522,9 +541,9 @@ const ChitDetailsScreen = ({ navigation, route }) => {
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Chit Payout Status</Text>
-                    <View style={[styles.statusBadge, { backgroundColor: isWithdrawn ? themeColors.successLight : themeColors.primaryLight }]}>
-                      <Text style={[styles.statusText, { color: isWithdrawn ? themeColors.success : themeColors.primary }]}>
-                        {isWithdrawn ? `Withdrawn (${formatCurrency(myMembership.withdrawalAmount)})` : (myMembership.status === 'completed' ? 'Completed' : 'Active')}
+                    <View style={[styles.statusBadge, { backgroundColor: isWithdrawn ? themeColors.successLight : isRequested ? themeColors.warningLight : themeColors.primaryLight }]}>
+                      <Text style={[styles.statusText, { color: isWithdrawn ? themeColors.success : isRequested ? themeColors.warning : themeColors.primary }]}>
+                        {isWithdrawn ? `Withdrawn (${formatCurrency(myMembership.withdrawalAmount)})` : isRequested ? `Pending Admin Approval (${formatCurrency(myMembership.withdrawalAmount)})` : (myMembership.status === 'completed' ? 'Completed' : 'Active')}
                       </Text>
                     </View>
                   </View>

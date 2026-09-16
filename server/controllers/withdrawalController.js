@@ -389,9 +389,21 @@ exports.updateWithdrawalStatus = async (req, res) => {
               });
               console.log(`[withdrawalController] Investment ${targetInvId} partial withdrawal processed; remaining balance stays available.`);
             }
+          } else if (withdrawal.withdrawType === 'chit') {
+            const ChitMember = require('../models/ChitMember');
+            const member = await ChitMember.findById(targetInvId);
+            if (member) {
+              member.withdrawalStatus = 'completed';
+              member.hasWon = true;
+              member.winningDate = new Date();
+              member.winningAmount = updatedWithdrawal.amount;
+              member.withdrawnAt = new Date();
+              await member.save();
+              console.log(`[withdrawalController] ChitMember ${targetInvId} marked as completed / paid.`);
+            }
           }
         } catch (invErr) {
-          console.warn('[withdrawalController] Could not update investment status (non-fatal):', invErr.message);
+          console.warn('[withdrawalController] Could not update investment/chit status (non-fatal):', invErr.message);
         }
       }
 
@@ -422,7 +434,7 @@ exports.updateWithdrawalStatus = async (req, res) => {
     const updateData = { status };
     const updatedWithdrawal = await Withdrawal.findByIdAndUpdate(id, updateData, { new: true });
 
-    // If linked to an investment, unlock it so user can request again
+    // If linked to an investment or chit, unlock it so user can request again
     const rejectedTargetInvId = withdrawal.investmentId || (mongoose.Types.ObjectId.isValid(withdrawal.withdrawType) ? withdrawal.withdrawType : null);
     if (rejectedTargetInvId) {
       try {
@@ -432,6 +444,14 @@ exports.updateWithdrawalStatus = async (req, res) => {
           withdrawalRequestId: null,
         });
       } catch (e) {}
+      if (withdrawal.withdrawType === 'chit') {
+        try {
+          const ChitMember = require('../models/ChitMember');
+          await ChitMember.findByIdAndUpdate(rejectedTargetInvId, {
+            withdrawalStatus: 'pending',
+          });
+        } catch (e) {}
+      }
     }
 
     // Update transaction record for rejected status
