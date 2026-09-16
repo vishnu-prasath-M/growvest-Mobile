@@ -122,14 +122,14 @@ const MyChitsScreen = ({ navigation }) => {
                     styles.winBadge, 
                     isPending ? { backgroundColor: themeColors.warningLight } : 
                     isRejected ? { backgroundColor: '#fee2e2' } : 
-                    chit.hasWon ? styles.wonBadge : styles.notWonBadge,
+                    (chit.withdrawalStatus === 'completed' || chit.status === 'completed' || chit.hasWon) ? styles.wonBadge : styles.notWonBadge,
                   ]}>
                     <Text style={[styles.winBadgeText, { 
                       color: isPending ? themeColors.warning : 
                              isRejected ? '#ef4444' : 
-                             chit.hasWon ? themeColors.success : themeColors.textTertiary 
+                             (chit.withdrawalStatus === 'completed' || chit.status === 'completed' || chit.hasWon) ? themeColors.success : themeColors.textTertiary 
                     }]}>
-                      {isPending ? 'Pending' : isRejected ? 'Rejected' : chit.hasWon ? 'Won' : 'Active'}
+                      {isPending ? 'Pending' : isRejected ? 'Rejected' : chit.status === 'completed' ? 'Completed' : chit.withdrawalStatus === 'completed' ? 'Withdrawn' : chit.hasWon ? 'Won' : 'Active'}
                     </Text>
                   </View>
                 </View>
