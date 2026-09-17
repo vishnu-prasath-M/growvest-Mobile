@@ -5,17 +5,13 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  Dimensions,
-  Animated,
   Platform,
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
 /**
- * ModernAlertModal - Premium iOS-Grade Bottom Sheet Confirmation & Alert Modal
+ * ModernAlertModal - 100% Fidelity iOS Bottom Sheet Confirmation & Alert Modal
  *
  * Props:
  * - visible: boolean
@@ -43,39 +39,6 @@ const ModernAlertModal = ({
 }) => {
   const { isDarkMode } = useTheme();
   const styles = React.useMemo(() => getStyles(isDarkMode), [isDarkMode]);
-  const slideAnim = React.useRef(new Animated.Value(SCREEN_HEIGHT * 0.5)).current;
-  const fadeAnim = React.useRef(new Animated.Value(0)).current;
-
-  React.useEffect(() => {
-    if (visible) {
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          bounciness: 3,
-          speed: 16,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: SCREEN_HEIGHT * 0.5,
-          duration: 180,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
-  }, [visible]);
 
   if (!visible) return null;
 
@@ -85,7 +48,7 @@ const ModernAlertModal = ({
         return {
           bg: '#34C759',
           border: 'transparent',
-          component: <Ionicons name="checkmark" size={38} color="#FFFFFF" />,
+          component: <Ionicons name="checkmark" size={36} color="#FFFFFF" />,
         };
       case 'warning':
       case 'problem':
@@ -138,37 +101,38 @@ const ModernAlertModal = ({
   const iconConfig = getIconConfig();
   const hasTwoButtons = !!secondaryButtonText;
 
+  const handleDismiss = () => {
+    if (typeof onClose === 'function') {
+      onClose();
+    } else if (typeof onSecondaryPress === 'function') {
+      onSecondaryPress();
+    } else if (typeof onPrimaryPress === 'function') {
+      onPrimaryPress();
+    }
+  };
+
   return (
     <Modal
       visible={visible}
       transparent={true}
-      animationType="none"
+      animationType="slide"
       statusBarTranslucent={true}
-      onRequestClose={onClose || onSecondaryPress || onPrimaryPress}
+      onRequestClose={handleDismiss}
     >
-      <View style={styles.modalRoot}>
-        {/* Fullscreen Backdrop */}
-        <Animated.View style={[StyleSheet.absoluteFillObject, styles.backdrop, { opacity: fadeAnim }]}>
-          <TouchableOpacity
-            style={StyleSheet.absoluteFillObject}
-            activeOpacity={1}
-            onPress={onClose || onSecondaryPress || onPrimaryPress}
-          />
-        </Animated.View>
+      <View style={styles.overlay}>
+        {/* Backdrop touchable to dismiss */}
+        <TouchableOpacity
+          style={StyleSheet.absoluteFillObject}
+          activeOpacity={1}
+          onPress={handleDismiss}
+        />
 
-        {/* Bottom Sheet Modal Body */}
-        <Animated.View
-          style={[
-            styles.sheetContainer,
-            {
-              transform: [{ translateY: slideAnim }],
-            },
-          ]}
-        >
-          {/* iOS Drag Indicator Bar */}
+        {/* Bottom Sheet Card */}
+        <View style={styles.sheetCard}>
+          {/* Top Grab Bar / Drag Handle */}
           <View style={styles.dragHandle} />
 
-          {/* Icon Badge */}
+          {/* Centered iOS-Style Icon Circle */}
           <View
             style={[
               styles.iconCircle,
@@ -182,17 +146,19 @@ const ModernAlertModal = ({
             {iconConfig.component}
           </View>
 
-          {/* Title & Message */}
+          {/* Title */}
           {title ? <Text style={styles.title}>{title}</Text> : null}
+
+          {/* Message / Description */}
           {message ? <Text style={styles.message}>{message}</Text> : null}
 
-          {/* Action Buttons */}
+          {/* Action Buttons Row */}
           <View style={styles.buttonRow}>
             {hasTwoButtons && (
               <TouchableOpacity
                 style={styles.secondaryButton}
                 activeOpacity={0.75}
-                onPress={onSecondaryPress || onClose}
+                onPress={onSecondaryPress || handleDismiss}
               >
                 <Text style={styles.secondaryButtonText}>{secondaryButtonText}</Text>
               </TouchableOpacity>
@@ -210,7 +176,7 @@ const ModernAlertModal = ({
               <Text style={styles.primaryButtonText}>{primaryButtonText}</Text>
             </TouchableOpacity>
           </View>
-        </Animated.View>
+        </View>
       </View>
     </Modal>
   );
@@ -218,25 +184,19 @@ const ModernAlertModal = ({
 
 const getStyles = (isDarkMode) =>
   StyleSheet.create({
-    modalRoot: {
+    overlay: {
       flex: 1,
-      width: SCREEN_WIDTH,
-      height: SCREEN_HEIGHT,
       justifyContent: 'flex-end',
-      backgroundColor: 'transparent',
-    },
-    backdrop: {
-      ...StyleSheet.absoluteFillObject,
       backgroundColor: 'rgba(0, 0, 0, 0.52)',
     },
-    sheetContainer: {
-      width: SCREEN_WIDTH,
+    sheetCard: {
+      width: '100%',
       backgroundColor: isDarkMode ? '#1C1C1E' : '#FFFFFF',
       borderTopLeftRadius: 32,
       borderTopRightRadius: 32,
       paddingHorizontal: 24,
       paddingTop: 12,
-      paddingBottom: Platform.OS === 'ios' ? 42 : 30,
+      paddingBottom: Platform.OS === 'ios' ? 42 : 28,
       alignItems: 'center',
       shadowColor: '#000',
       shadowOffset: { width: 0, height: -6 },
