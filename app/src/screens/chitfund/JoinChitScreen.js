@@ -290,7 +290,7 @@ const JoinChitScreen = ({ navigation, route }) => {
               </TouchableOpacity>
             </View>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* Email Required Modal */}
