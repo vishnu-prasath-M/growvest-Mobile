@@ -453,8 +453,8 @@ const ChitDetailsScreen = ({ navigation, route }) => {
                         {(() => {
                           const row = getWeeklyRowData(baseAmount, totalUnits, currentUnit);
                           const totalDividend = getTotalDividend(baseAmount, totalUnits);
-                          const isSettlement = currentUnit >= totalUnits || installmentsPaid >= totalUnits;
-                          const eligibleWithdrawalAmount = isSettlement ? (row.totalValue + (myMembership.bonusDividendShare || 0)) : row.priceAmount;
+                          const isSettlement = currentUnit >= totalUnits;
+                          const eligibleWithdrawalAmount = isSettlement ? row.totalValue : row.priceAmount;
                           return (
                             <>
                               <View style={styles.detailRow}>
@@ -463,7 +463,7 @@ const ChitDetailsScreen = ({ navigation, route }) => {
                               </View>
                               <View style={styles.detailRow}>
                                 <Text style={styles.detailLabel}>Share Dividend</Text>
-                                <Text style={styles.detailValue}>{formatCurrency(totalDividend + (myMembership.bonusDividendShare || 0))}</Text>
+                                <Text style={styles.detailValue}>{formatCurrency(totalDividend)}</Text>
                               </View>
                               <View style={styles.detailRow}>
                                 <Text style={styles.detailLabel}>
@@ -485,8 +485,8 @@ const ChitDetailsScreen = ({ navigation, route }) => {
                         activeOpacity={0.85}
                         onPress={() => {
                           const row = getWeeklyRowData(baseAmount, totalUnits, currentUnit);
-                          const isSettlement = currentUnit >= totalUnits || installmentsPaid >= totalUnits;
-                          const eligibleWithdrawalAmount = isSettlement ? (row.totalValue + (myMembership.bonusDividendShare || 0)) : row.priceAmount;
+                          const isSettlement = currentUnit >= totalUnits;
+                          const eligibleWithdrawalAmount = isSettlement ? row.totalValue : row.priceAmount;
                           handleWithdrawal(myMembership._id, eligibleWithdrawalAmount);
                         }}
                       >

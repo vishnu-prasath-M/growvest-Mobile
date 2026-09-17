@@ -706,7 +706,7 @@ const withdrawChitPayout = async (req, res) => {
     const paidUnits = isWeekly ? (member.paidWeeks || 0) : (member.currentMonth || 0);
 
     // Check if it is a settlement or regular withdrawal
-    const isSettlement = currentUnit >= settlementUnit || paidUnits >= totalUnits;
+    const isSettlement = currentUnit >= totalUnits;
 
     let actionPercentage = 0;
     let priceAmount = 0;
@@ -721,11 +721,11 @@ const withdrawChitPayout = async (req, res) => {
     const { settlementAmount, totalDividend } = generateCycleSchedule(installmentAmount, totalUnits);
 
     if (isSettlement) {
-      // Settlement payout: total contribution + total dividend + any redistributed bonus dividend
+      // Settlement payout: total contribution + total dividend
       actionPercentage = 0;
       priceAmount = totalContribution;
-      accumulatedDividend = totalDividend + (member.bonusDividendShare || 0);
-      finalWithdrawalAmount = settlementAmount + (member.bonusDividendShare || 0);
+      accumulatedDividend = totalDividend;
+      finalWithdrawalAmount = settlementAmount;
     } else {
       // Normal withdrawal during the cycle
       // Check lock periods: first Math.floor((totalUnits - 1) / 2) units are locked
@@ -769,25 +769,6 @@ const withdrawChitPayout = async (req, res) => {
       
       if (isSettlement) {
         member.status = 'completed'; // Safe completion on settlement
-      }
-
-      // Rule: If user withdrew price amount before complete, their forfeited dividend goes equally to other active members
-      if (!isSettlement && accumulatedDividend > 0) {
-        const otherMembers = await ChitMember.find({
-          chitId: member.chitId._id || member.chitId,
-          _id: { $ne: member._id },
-          status: { $ne: 'cancelled' },
-          withdrawalStatus: { $nin: ['completed', 'requested'] },
-        }).session(session);
-
-        if (otherMembers.length > 0) {
-          const bonusShare = Math.round(accumulatedDividend / otherMembers.length);
-          for (const om of otherMembers) {
-            om.bonusDividendShare = (om.bonusDividendShare || 0) + bonusShare;
-            om.totalDividendEarned = (om.totalDividendEarned || 0) + bonusShare;
-            await om.save({ session });
-          }
-        }
       }
 
       await member.save({ session });
