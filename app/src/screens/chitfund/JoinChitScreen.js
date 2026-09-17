@@ -243,11 +243,15 @@ const JoinChitScreen = ({ navigation, route }) => {
       </View>
 
       {/* Confirmation Modal */}
-      <Modal visible={showConfirm} transparent animationType="fade">
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowConfirm(false)}>
-          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+      <Modal visible={showConfirm} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowConfirm(false)}>
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => setShowConfirm(false)} />
+          <View style={styles.modalContent}>
+            {/* Grab Handle */}
+            <View style={styles.dragHandle} />
+
             <View style={styles.modalIconWrap}>
-              <MaterialCommunityIcons name="cash-check" size={40} color={colors.primary} />
+              <MaterialCommunityIcons name="cash-check" size={38} color={colors.primary} />
             </View>
             <Text style={styles.modalTitle}>Confirm Payment</Text>
             <Text style={styles.modalSubtitle}>Please verify the payment details</Text>
@@ -392,23 +396,24 @@ const getStyles = (colors) => StyleSheet.create({
   proceedBtnTextDisabled: { color: colors.textTertiary },
   
   // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { width: '85%', backgroundColor: colors.surface, borderRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 15 },
-  modalIconWrap: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center', alignSelf: 'center', marginBottom: 16 },
-  modalTitle: { fontSize: 20, fontWeight: '800', color: colors.text, textAlign: 'center', marginBottom: 4, letterSpacing: -0.4 },
-  modalSubtitle: { fontSize: 13, color: colors.textMuted, textAlign: 'center', marginBottom: 24 },
-  modalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 },
+  modalOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end', alignItems: 'center' },
+  modalContent: { width: '100%', backgroundColor: colors.surface, borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingHorizontal: 24, paddingTop: 12, paddingBottom: Platform.OS === 'ios' ? 44 : 28, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.22, shadowRadius: 20, elevation: 35 },
+  dragHandle: { width: 36, height: 4.5, borderRadius: 3, backgroundColor: '#E5E7EB', marginBottom: 16, alignSelf: 'center' },
+  modalIconWrap: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center', alignSelf: 'center', marginBottom: 12 },
+  modalTitle: { fontSize: 20, fontWeight: '700', color: colors.text, textAlign: 'center', marginBottom: 4, letterSpacing: -0.3 },
+  modalSubtitle: { fontSize: 13, color: colors.textMuted, textAlign: 'center', marginBottom: 20 },
+  modalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, width: '100%' },
   modalLabel: { fontSize: 14, color: colors.textSecondary },
   modalValue: { fontSize: 14, fontWeight: '600', color: colors.text },
-  modalDivider: { height: 1, backgroundColor: colors.borderLight, marginVertical: 8 },
+  modalDivider: { height: 1, backgroundColor: colors.borderLight, marginVertical: 8, width: '100%' },
   modalTotalLabel: { fontSize: 16, fontWeight: '700', color: colors.text },
   modalTotalValue: { fontSize: 18, fontWeight: '800', color: colors.primary },
-  modalButtons: { flexDirection: 'row', gap: 12, marginTop: 24 },
-  cancelBtn: { flex: 1, height: 50, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },
-  cancelBtnText: { fontSize: 15, fontWeight: '700', color: colors.textSecondary },
+  modalButtons: { flexDirection: 'row', gap: 12, marginTop: 22, width: '100%' },
+  cancelBtn: { flex: 1, height: 48, borderRadius: 24, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' },
+  cancelBtnText: { fontSize: 15, fontWeight: '600', color: '#1F2937' },
   payBtnOuter: { flex: 1.5 },
-  payBtnGradient: { height: 50, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  payBtnText: { fontSize: 15, fontWeight: '700', color: colors.white },
+  payBtnGradient: { height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
+  payBtnText: { fontSize: 15, fontWeight: '600', color: colors.white },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   modalCloseBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },
   modalText: { fontSize: 15, color: colors.textSecondary, marginBottom: 24, lineHeight: 22 },
