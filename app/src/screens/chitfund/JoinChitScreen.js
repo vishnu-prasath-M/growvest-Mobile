@@ -7,8 +7,6 @@ import {
   TouchableOpacity,
   Modal,
   Alert,
-  TouchableWithoutFeedback,
-  Platform,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -247,9 +245,7 @@ const JoinChitScreen = ({ navigation, route }) => {
       {/* Confirmation Modal */}
       <Modal visible={showConfirm} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowConfirm(false)}>
         <View style={styles.modalOverlay}>
-          <TouchableWithoutFeedback onPress={() => setShowConfirm(false)}>
-            <View style={{ flex: 1, width: '100%' }} />
-          </TouchableWithoutFeedback>
+          <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => setShowConfirm(false)} />
           <View style={styles.modalContent}>
             {/* Grab Handle */}
             <View style={styles.dragHandle} />
