@@ -1737,7 +1737,7 @@ const getStyles = (colors) => StyleSheet.create({
   deckFooterRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: 6,
     marginTop: 14,
   },
