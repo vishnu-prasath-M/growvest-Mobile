@@ -18,6 +18,7 @@ import { appLockService } from '../../services/appLockService';
 import { useAuth } from '../../context/AuthContext';
 import { colors } from '../../theme/theme';
 import { useTheme } from '../../context/ThemeContext';
+import { useAlert } from '../../context/AlertContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -30,6 +31,7 @@ const TIMEOUT_OPTIONS = [
 
 export default function AppLockSettingsScreen({ navigation }) {
   const { colors: themeColors, isDarkMode } = useTheme();
+  const { showSuccess, showWarning, showError } = useAlert();
   const { user } = useAuth();
   const {
     isAppLockEnabled,
@@ -118,7 +120,7 @@ export default function AppLockSettingsScreen({ navigation }) {
               if (biometricInfo.hasHardware && biometricInfo.isEnrolled) {
                 setPromptBiometricVisible(true);
               } else {
-                Alert.alert('Success', 'App Lock enabled successfully.');
+                showSuccess('Success', 'App Lock enabled successfully.');
               }
             } else {
               setPinError('PINs do not match. Please try again.');
@@ -167,7 +169,7 @@ export default function AppLockSettingsScreen({ navigation }) {
               await refreshLockPreferences();
               setModalVisible(false);
               resetPinInputs();
-              Alert.alert('Success', 'PIN updated successfully.');
+              showSuccess('Success', 'PIN updated successfully.');
             } else {
               setPinError('PINs do not match. Please try again.');
               setPinConfirm('');
@@ -229,7 +231,7 @@ export default function AppLockSettingsScreen({ navigation }) {
     await appLockService.disableAppLock(userId);
     await refreshLockPreferences();
     setDisableModalVisible(false);
-    Alert.alert('Disabled', 'App Lock has been disabled.');
+    showSuccess('Disabled', 'App Lock has been disabled.');
   };
 
   /**
@@ -237,11 +239,11 @@ export default function AppLockSettingsScreen({ navigation }) {
    */
   const handleToggleBiometric = async (value) => {
     if (!biometricInfo.hasHardware) {
-      Alert.alert('Not Supported', 'Biometric authentication is not supported on this device.');
+      showWarning('Not Supported', 'Biometric authentication is not supported on this device.');
       return;
     }
     if (!biometricInfo.isEnrolled) {
-      Alert.alert('Not Configured', 'Please set up a Fingerprint or Face lock in your device settings first.');
+      showWarning('Not Configured', 'Please set up a Fingerprint or Face lock in your device settings first.');
       return;
     }
 

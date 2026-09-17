@@ -20,10 +20,12 @@ import { colors } from '../../theme/theme';
 import { sipService } from '../../services/sipService';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
 import { openRazorpayCheckout } from '../../services/razorpayHandler';
+import { useAlert } from '../../context/AlertContext';
 
 const SIPDetailsScreen = ({ route, navigation }) => {
   const { sipId, sipRefId } = route.params || {};
   const { colors: themeColors, isDarkMode } = useTheme();
+  const { showSuccess, showError, showWarning, showConfirm } = useAlert();
   const isDark = Boolean(isDarkMode);
   const insets = useScreenInsets(16);
   const styles = React.useMemo(() => getStyles(themeColors, isDark), [themeColors, isDark]);
@@ -112,26 +114,26 @@ const SIPDetailsScreen = ({ route, navigation }) => {
             });
 
             if (verifyRes?.success) {
-              Alert.alert('Payment Successful', `Contribution #${contrib.installmentNumber} has been verified and marked as Paid.`);
+              showSuccess('Payment Successful', `Contribution #${contrib.installmentNumber} has been verified and marked as Paid.`);
               loadSIPDetails();
             } else {
-              Alert.alert('Verification', verifyRes?.message || 'Payment received. Updating status shortly.');
+              showWarning('Verification', verifyRes?.message || 'Payment received. Updating status shortly.');
               loadSIPDetails();
             }
           } catch (vErr) {
-            Alert.alert('Error', 'Payment verification failed.');
+            showError('Error', 'Payment verification failed.');
           } finally {
             setPayingContributionId(null);
           }
         },
         onError: () => {
           setPayingContributionId(null);
-          Alert.alert('Payment Cancelled', 'You can retry paying your due installment anytime.');
+          showWarning('Payment Cancelled', 'You can retry paying your due installment anytime.');
         },
       });
     } catch (error) {
       setPayingContributionId(null);
-      Alert.alert('Error', error?.message || 'Failed to initiate installment payment.');
+      showError('Error', error?.message || 'Failed to initiate installment payment.');
     }
   };
 
@@ -139,18 +141,18 @@ const SIPDetailsScreen = ({ route, navigation }) => {
   const handleWithdraw = async () => {
     const numAmt = Number(withdrawAmount);
     if (!numAmt || numAmt <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid withdrawal amount.');
+      showWarning('Invalid Amount', 'Please enter a valid withdrawal amount.');
       return;
     }
 
     if (!withdrawUpi.trim() || !/^[a-zA-Z0-9.\-_]{2,100}@[a-zA-Z0-9.\-_]{2,64}$/.test(withdrawUpi.trim())) {
-      Alert.alert('Invalid UPI ID', 'Please enter a valid UPI ID (e.g. name@okhdfcbank or 9876543210@paytm).');
+      showWarning('Invalid UPI ID', 'Please enter a valid UPI ID (e.g. name@okhdfcbank or 9876543210@paytm).');
       return;
     }
 
     const available = sip?.availablePrincipal || 0;
     if (numAmt > available) {
-      Alert.alert('Insufficient Balance', `Available balance for ${sip.sipId} is ₹${available.toLocaleString('en-IN')}`);
+      showWarning('Insufficient Balance', `Available balance for ${sip.sipId} is ₹${available.toLocaleString('en-IN')}`);
       return;
     }
 
@@ -161,16 +163,16 @@ const SIPDetailsScreen = ({ route, navigation }) => {
         setShowWithdrawModal(false);
         setWithdrawAmount('');
         setWithdrawUpi('');
-        Alert.alert(
+        showSuccess(
           'Withdrawal Requested',
           `Your withdrawal request of ₹${numAmt.toLocaleString('en-IN')} from ${sip.sipId} has been submitted for admin processing.`
         );
         loadSIPDetails();
       } else {
-        Alert.alert('Withdrawal Failed', res?.message || 'Could not submit withdrawal request.');
+        showError('Withdrawal Failed', res?.message || 'Could not submit withdrawal request.');
       }
     } catch (error) {
-      Alert.alert('Error', error?.message || 'Withdrawal request failed.');
+      showError('Error', error?.message || 'Withdrawal request failed.');
     } finally {
       setWithdrawing(false);
     }
@@ -183,16 +185,16 @@ const SIPDetailsScreen = ({ route, navigation }) => {
       const res = await sipService.cancelSIP(sip._id);
       if (res?.success) {
         setShowCancelModal(false);
-        Alert.alert(
+        showSuccess(
           'SIP Cancelled',
           `Future contributions for ${sip.sipId} have been stopped. Your existing paid balance of ₹${sip.totalPaidAmount.toLocaleString('en-IN')} remains completely safe.`
         );
         loadSIPDetails();
       } else {
-        Alert.alert('Error', res?.message || 'Could not cancel SIP.');
+        showError('Error', res?.message || 'Could not cancel SIP.');
       }
     } catch (error) {
-      Alert.alert('Error', error?.message || 'Cancellation failed.');
+      showError('Error', error?.message || 'Cancellation failed.');
     } finally {
       setCancelling(false);
     }

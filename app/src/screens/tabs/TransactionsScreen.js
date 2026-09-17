@@ -22,6 +22,7 @@ import StatusChip from '../../components/StatusChip';
 import { generateAndShareTransactionStatement } from '../../utils/pdfGenerator';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
 import { useTheme } from '../../context/ThemeContext';
+import { useAlert } from '../../context/AlertContext';
 
 const FILTER_OPTIONS = [
   { id: 'all', label: 'All Transactions' },
@@ -31,8 +32,9 @@ const FILTER_OPTIONS = [
 ];
 
 const TransactionsScreen = ({ navigation }) => {
-  const { colors: themeColors } = useTheme();
-  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
+  const { colors: themeColors, isDarkMode } = useTheme();
+  const { showWarning } = useAlert();
+  const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
   const insets = useScreenInsets(8);
   const canGoBack = navigation?.canGoBack?.() ?? false;
   const [currentUser, setCurrentUser] = useState(null);
@@ -172,7 +174,7 @@ const TransactionsScreen = ({ navigation }) => {
 
   const handleDownloadStatement = async () => {
     if (filteredTxns.length === 0) {
-      Alert.alert('No Transactions', 'There are no transactions to generate a statement.');
+      showWarning('No Transactions', 'There are no transactions to generate a statement.');
       return;
     }
     setDownloadingPdf(true);
