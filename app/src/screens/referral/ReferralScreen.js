@@ -23,9 +23,11 @@ import { colors } from '../../theme/theme';
 import TopBar from '../../components/TopBar';
 import api from '../../services/apiService';
 import StatusChip from '../../components/StatusChip';
+import { useAlert } from '../../context/AlertContext';
 
 const ReferralScreen = ({ navigation }) => {
   const { colors: themeColors, isDarkMode } = useTheme();
+  const { showSuccess, showWarning, showError } = useAlert();
   const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
   
   const {
@@ -121,14 +123,14 @@ const ReferralScreen = ({ navigation }) => {
     if (result?.success) {
       fetchAllData();
     } else if (result?.message) {
-      Alert.alert('Notice', result.message);
+      showWarning('Notice', result.message);
       fetchAllData();
     }
   };
 
   const handleWithdrawCoins = async () => {
     if (!withdrawUpiId.trim() || !/^[a-zA-Z0-9.\-_]{2,100}@[a-zA-Z0-9.\-_]{2,64}$/.test(withdrawUpiId.trim())) {
-      Alert.alert('Invalid UPI ID', 'Please enter a valid UPI ID (e.g. name@okhdfcbank or 9876543210@paytm).');
+      showWarning('Invalid UPI ID', 'Please enter a valid UPI ID (e.g. name@okhdfcbank or 9876543210@paytm).');
       return;
     }
 
@@ -139,7 +141,7 @@ const ReferralScreen = ({ navigation }) => {
       });
 
       if (res.data) {
-        Alert.alert(
+        showSuccess(
           'Withdrawal Requested! 🚀',
           res.data.message || 'Your reward withdrawal request has been submitted successfully.'
         );
@@ -149,7 +151,7 @@ const ReferralScreen = ({ navigation }) => {
       }
     } catch (err) {
       const msg = err.response?.data?.message || 'Failed to submit withdrawal request.';
-      Alert.alert('Withdrawal Error', msg);
+      showError('Withdrawal Error', msg);
     } finally {
       setWithdrawing(false);
     }

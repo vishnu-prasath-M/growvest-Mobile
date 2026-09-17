@@ -20,6 +20,7 @@ import { authService } from '../../services/authService';
 import api from '../../services/apiService';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
 import { useTheme } from '../../context/ThemeContext';
+import { useAlert } from '../../context/AlertContext';
 
 const getUnitLabel = (isWeekly, count = 1) => {
   if (isWeekly) {
@@ -30,6 +31,7 @@ const getUnitLabel = (isWeekly, count = 1) => {
 
 const MonthlyDueScreen = ({ navigation }) => {
   const { colors: themeColors } = useTheme();
+  const { showSuccess, showWarning, showError } = useAlert();
   const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const insets = useScreenInsets(8);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -47,7 +49,7 @@ const MonthlyDueScreen = ({ navigation }) => {
       
       const { status } = await Notifications.requestPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Please enable notifications in settings to receive reminders.');
+        showWarning('Permission Denied', 'Please enable notifications in settings to receive reminders.');
         return;
       }
 
@@ -138,10 +140,10 @@ const MonthlyDueScreen = ({ navigation }) => {
       // Schedule real server FCM Push
       api.post('/notifications/schedule-due-reminder', {
         seconds: reminderSeconds,
-        chitName: reminderChit?.chitName || 'Chit Plan',
-        amount: reminderChit?.nextDueAmount || 0,
-        isWeekly,
-      }).catch(err => console.warn('[DueReminder] Server push schedule fallback:', err?.message));
+        title: '📅 Growvest Due Reminder',
+        message: `Your ${isWeekly ? 'weekly' : 'monthly'} due of ${formatCurrency(reminderChit?.nextDueAmount)} for "${reminderChit?.chitName}" is approaching.`,
+        data: { screen: 'MonthlyDue', chitId: reminderChit?.chitId },
+      }).catch(err => console.warn('[DueReminder] Server FCM schedule failed:', err.message));
 
       // Also schedule local notification
       try {
@@ -160,13 +162,13 @@ const MonthlyDueScreen = ({ navigation }) => {
         console.warn('[DueReminder] Local notification non-fatal:', localErr?.message);
       }
 
-      Alert.alert(
+      showSuccess(
         'Reminder Set',
         `We'll send you a notification ${timeLabel} to remind you of this due.`
       );
     } catch (error) {
       console.error('Error setting reminder:', error);
-      Alert.alert('Error', 'Failed to set reminder. Please try again.');
+      showError('Error', 'Failed to set reminder. Please try again.');
     }
   };
 

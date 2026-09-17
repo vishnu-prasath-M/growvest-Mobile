@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../theme/theme';
 import { registerApiListeners } from '../services/apiService';
 import { API_BASE_URL } from '../config/api';
+import ModernAlertModal from '../components/ModernAlertModal';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -195,62 +196,15 @@ export const FeedbackProvider = ({ children }) => {
       )}
 
       {/* ── 4. Global Action Popup Modal (Success, Error, Warning) ── */}
-      {popupVisible && (
-        <Modal visible={popupVisible} transparent animationType="none">
-          <Animated.View style={[styles.popupOverlay, { opacity: popupAnim }]}>
-            <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={closePopup} />
-            <Animated.View
-              style={[
-                styles.popupCard,
-                {
-                  transform: [
-                    { scale: popupAnim },
-                    {
-                      translateY: popupAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [60, 0],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            >
-              <View style={[
-                styles.popupIconCircle,
-                popupConfig.type === 'success' && styles.iconSuccess,
-                popupConfig.type === 'error' && styles.iconError,
-                popupConfig.type === 'warning' && styles.iconWarning,
-              ]}>
-                <Ionicons
-                  name={
-                    popupConfig.type === 'success' ? 'checkmark-done' :
-                    popupConfig.type === 'error' ? 'close' : 'warning-outline'
-                  }
-                  size={36}
-                  color={
-                    popupConfig.type === 'success' ? '#0E3D23' :
-                    popupConfig.type === 'error' ? '#D32F2F' : '#D4A843'
-                  }
-                />
-              </View>
-              <Text style={styles.popupTitle}>{popupConfig.title}</Text>
-              <Text style={styles.popupMsg}>{popupConfig.message}</Text>
-              
-              <TouchableOpacity
-                onPress={closePopup}
-                style={[
-                  styles.popupButton,
-                  popupConfig.type === 'success' && styles.btnSuccess,
-                  popupConfig.type === 'error' && styles.btnError,
-                  popupConfig.type === 'warning' && styles.btnWarning,
-                ]}
-              >
-                <Text style={styles.popupButtonText}>Okay</Text>
-              </TouchableOpacity>
-            </Animated.View>
-          </Animated.View>
-        </Modal>
-      )}
+      <ModernAlertModal
+        visible={popupVisible}
+        type={popupConfig.type}
+        title={popupConfig.title}
+        message={popupConfig.message}
+        primaryButtonText="Okay"
+        onPrimaryPress={closePopup}
+        onClose={closePopup}
+      />
     </FeedbackContext.Provider>
   );
 };

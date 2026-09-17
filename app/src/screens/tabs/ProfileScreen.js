@@ -24,10 +24,12 @@ import { SkeletonLoader } from '../../components/SkeletonLoader';
 import { useTheme } from '../../context/ThemeContext';
 import { useAppLock } from '../../context/AppLockContext';
 import { appLockService } from '../../services/appLockService';
+import { useAlert } from '../../context/AlertContext';
 
 const ProfileScreen = ({ navigation }) => {
   const { isDarkMode, toggleTheme, colors: themeColors } = useTheme();
   const { isAppLockEnabled, isBiometricEnabled, refreshLockPreferences, activeUserId } = useAppLock();
+  const { showConfirm, showSuccess, showError } = useAlert();
   const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
   const insets = useScreenInsets(8);
   const [userData, setUserData] = useState(null);
@@ -78,10 +80,17 @@ const ProfileScreen = ({ navigation }) => {
   useFocusEffect(useCallback(() => { fetchUserData(); fetchKYCStatus(); }, []));
 
   const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Logout', style: 'destructive', onPress: async () => { await logout(); } },
-    ]);
+    showConfirm({
+      type: 'logout',
+      title: 'Logout',
+      message: 'Are you sure you want to logout?',
+      confirmText: 'Logout',
+      cancelText: 'Cancel',
+      isDestructive: true,
+      onConfirm: async () => {
+        await logout();
+      },
+    });
   };
 
   const formatDate = (dateString) => {
@@ -113,13 +122,13 @@ const ProfileScreen = ({ navigation }) => {
   };
 
   const handleSaveUsername = async () => {
-    if (!newUsername.trim()) { Alert.alert('Error', 'Username cannot be empty'); return; }
+    if (!newUsername.trim()) { showError('Error', 'Username cannot be empty'); return; }
     setSavingUsername(true);
     try {
       const updatedUser = await authService.updateUsername(newUsername.trim());
       await updateUser(updatedUser); setUserData(updatedUser); setEditModalVisible(false);
-      Alert.alert('Success', 'Profile name updated successfully');
-    } catch (error) { Alert.alert('Error', getErrorMessage(error)); }
+      showSuccess('Success', 'Profile name updated successfully');
+    } catch (error) { showError('Error', getErrorMessage(error)); }
     finally { setSavingUsername(false); }
   };
 
@@ -130,16 +139,16 @@ const ProfileScreen = ({ navigation }) => {
   };
 
   const handleSaveMobileNumber = async () => {
-    if (!newMobileNumber.trim()) { Alert.alert('Error', 'Mobile number cannot be empty'); return; }
+    if (!newMobileNumber.trim()) { showError('Error', 'Mobile number cannot be empty'); return; }
     if (newMobileNumber.trim().length !== 10 || !/^\d{10}$/.test(newMobileNumber.trim())) {
-      Alert.alert('Error', 'Please enter a valid 10-digit mobile number'); return;
+      showError('Error', 'Please enter a valid 10-digit mobile number'); return;
     }
     setSavingMobile(true);
     try {
       const updatedUser = await authService.updateMobileNumber(newMobileNumber.trim());
       await updateUser(updatedUser); setUserData(updatedUser); setEditMobileModalVisible(false);
-      Alert.alert('Success', 'Mobile number updated successfully');
-    } catch (error) { Alert.alert('Error', getErrorMessage(error)); }
+      showSuccess('Success', 'Mobile number updated successfully');
+    } catch (error) { showError('Error', getErrorMessage(error)); }
     finally { setSavingMobile(false); }
   };
 
@@ -150,14 +159,14 @@ const ProfileScreen = ({ navigation }) => {
   };
 
   const handleSaveEmail = async () => {
-    if (!newEmail.trim()) { Alert.alert('Error', 'Email cannot be empty'); return; }
-    if (!/\S+@\S+\.\S+/.test(newEmail)) { Alert.alert('Error', 'Please enter a valid email address'); return; }
+    if (!newEmail.trim()) { showError('Error', 'Email cannot be empty'); return; }
+    if (!/\S+@\S+\.\S+/.test(newEmail)) { showError('Error', 'Please enter a valid email address'); return; }
     setSavingEmail(true);
     try {
       const updatedUser = await authService.updateEmail(newEmail.trim());
       await updateUser(updatedUser); setUserData(updatedUser); setEditEmailModalVisible(false);
-      Alert.alert('Success', 'Email updated successfully');
-    } catch (error) { Alert.alert('Error', getErrorMessage(error)); }
+      showSuccess('Success', 'Email updated successfully');
+    } catch (error) { showError('Error', getErrorMessage(error)); }
     finally { setSavingEmail(false); }
   };
 
@@ -167,14 +176,14 @@ const ProfileScreen = ({ navigation }) => {
 
   const handleToggleBiometric = async () => {
     if (!isAppLockEnabled) {
-      Alert.alert(
-        'App Lock Required',
-        'Please set up an App Lock PIN first to enable Biometric Unlock.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Setup App Lock', onPress: () => navigation.navigate('AppLockSettings') },
-        ]
-      );
+      showConfirm({
+        type: 'applock',
+        title: 'App Lock Required',
+        message: 'Please set up an App Lock PIN first to enable Biometric Unlock.',
+        confirmText: 'Setup App Lock',
+        cancelText: 'Cancel',
+        onConfirm: () => navigation.navigate('AppLockSettings'),
+      });
       return;
     }
     const currentUserId = (userData || authUser)?._id || (userData || authUser)?.id || activeUserId;
@@ -186,7 +195,7 @@ const ProfileScreen = ({ navigation }) => {
         await refreshLockPreferences();
       }
     } catch (err) {
-      Alert.alert('Error', 'Failed to update biometric settings');
+      showError('Error', 'Failed to update biometric settings');
     }
   };
 

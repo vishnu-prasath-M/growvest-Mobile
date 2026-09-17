@@ -17,9 +17,11 @@ import { chitFundService } from '../../services/chitFundService';
 import { authService } from '../../services/authService';
 import KycRequiredModal from '../../components/KycRequiredModal';
 import { kycService } from '../../services/kycService';
+import { useAlert } from '../../context/AlertContext';
 
 const JoinChitScreen = ({ navigation, route }) => {
   const { colors: themeColors } = useTheme();
+  const { showError, showWarning } = useAlert();
   const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const insets = useScreenInsets(8);
   const { chitId } = route.params || {};
@@ -53,7 +55,7 @@ const JoinChitScreen = ({ navigation, route }) => {
       setChit(data);
     } catch (error) {
       console.error('Error fetching chit details:', error);
-      Alert.alert('Error', 'Failed to load chit details');
+      showError('Error', 'Failed to load chit details');
     } finally {
       setLoading(false);
     }
@@ -88,7 +90,7 @@ const JoinChitScreen = ({ navigation, route }) => {
       console.error('Error joining chit:', error);
       console.error('Error response:', error.response?.data);
       const serverMsg = error.response?.data?.message || error.message || 'Failed to join chit fund';
-      Alert.alert('Unable to Join', serverMsg);
+      showWarning('Unable to Join', serverMsg);
       setShowConfirm(false);
     } finally {
       setProcessing(false);

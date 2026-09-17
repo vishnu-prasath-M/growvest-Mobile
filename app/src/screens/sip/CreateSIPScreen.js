@@ -19,6 +19,7 @@ import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { colors } from '../../theme/theme';
 import { sipService } from '../../services/sipService';
 import { openRazorpayCheckout } from '../../services/razorpayHandler';
+import { useAlert } from '../../context/AlertContext';
 
 // Frequency Definitions
 const FREQUENCIES = [
@@ -28,9 +29,9 @@ const FREQUENCIES = [
 ];
 
 const PRESETS_BY_FREQ = {
-  daily: [10, 50, 100, 500],
-  weekly: [100, 250, 500, 1000],
-  monthly: [500, 1000, 2000, 5000],
+  daily: [10, 20, 50, 100],
+  weekly: [50, 100, 200, 500],
+  monthly: [200, 500, 1000, 2000],
 };
 
 const WEEK_DAYS = [
@@ -54,20 +55,24 @@ const DURATIONS_BY_FREQ = {
     { count: 365, label: '365 Days', sub: '1 Year' },
   ],
   weekly: [
-    { count: 12, label: '12 Weeks', sub: '~3 Months' },
-    { count: 24, label: '24 Weeks', sub: '~6 Months' },
+    { count: 4, label: '4 Weeks', sub: '1 Month' },
+    { count: 8, label: '8 Weeks', sub: '2 Months' },
+    { count: 12, label: '12 Weeks', sub: '3 Months' },
+    { count: 24, label: '24 Weeks', sub: '6 Months' },
     { count: 52, label: '52 Weeks', sub: '1 Year' },
   ],
   monthly: [
-    { count: 6, label: '6 Months', sub: '6 Installments' },
-    { count: 12, label: '12 Months', sub: '12 Installments' },
-    { count: 24, label: '24 Months', sub: '24 Installments' },
-    { count: 36, label: '36 Months', sub: '36 Installments' },
+    { count: 3, label: '3 Months', sub: 'Short term' },
+    { count: 6, label: '6 Months', sub: 'Half year' },
+    { count: 12, label: '12 Months', sub: '1 Year' },
+    { count: 24, label: '24 Months', sub: '2 Years' },
+    { count: 36, label: '36 Months', sub: '3 Years' },
   ],
 };
 
-const CreateSIPScreen = ({ navigation }) => {
+const CreateSIPScreen = ({ navigation, route }) => {
   const { colors: themeColors, isDarkMode } = useTheme();
+  const { showSuccess, showWarning, showError } = useAlert();
   const isDark = Boolean(isDarkMode);
   const insets = useScreenInsets(16);
   const styles = React.useMemo(() => getStyles(themeColors, isDark), [themeColors, isDark]);
@@ -171,7 +176,7 @@ const CreateSIPScreen = ({ navigation }) => {
 
   const handleStartSIP = () => {
     if (currentAmount < 10) {
-      Alert.alert('Invalid Amount', 'Minimum SIP contribution amount is ₹10.');
+      showWarning('Invalid Amount', 'Minimum SIP contribution amount is ₹10.');
       return;
     }
     setShowConfirmModal(true);
@@ -222,26 +227,22 @@ const CreateSIPScreen = ({ navigation }) => {
             });
 
             if (verifyRes?.success) {
-              Alert.alert(
+              showSuccess(
                 '🎉 SIP Created Successfully!',
                 `Your ${selectedFrequency.toUpperCase()} SIP plan (${sip.sipId}) is now active with your first contribution of ₹${currentAmount.toLocaleString('en-IN')} paid.`,
-                [
-                  {
-                    text: 'View SIP Details',
-                    onPress: () =>
-                      navigation.replace('SIPDetails', {
-                        sipId: sip._id,
-                        sipRefId: sip.sipId,
-                      }),
-                  },
-                ]
+                () =>
+                  navigation.replace('SIPDetails', {
+                    sipId: sip._id,
+                    sipRefId: sip.sipId,
+                  }),
+                'View SIP Details'
               );
             } else {
-              Alert.alert('Verification Issue', verifyRes?.message || 'Please check contribution status in SIP details.');
+              showWarning('Verification Issue', verifyRes?.message || 'Please check contribution status in SIP details.');
               navigation.replace('SIPDashboard');
             }
           } catch (vErr) {
-            Alert.alert('Error', 'Payment verification encountered an issue. Our support team will confirm shortly.');
+            showError('Error', 'Payment verification encountered an issue. Our support team will confirm shortly.');
             navigation.replace('SIPDashboard');
           } finally {
             setSubmitting(false);
@@ -256,12 +257,12 @@ const CreateSIPScreen = ({ navigation }) => {
           } catch (cancelErr) {
             console.warn('[CreateSIP] Discard pending SIP failed (non-fatal):', cancelErr?.message);
           }
-          Alert.alert('Payment Cancelled', 'SIP setup was cancelled and no plan was created. You will only join after a successful payment.');
+          showWarning('Payment Cancelled', 'SIP setup was cancelled and no plan was created. You will only join after a successful payment.');
         },
       });
     } catch (error) {
       setSubmitting(false);
-      Alert.alert('Error', error?.message || 'Failed to create SIP. Please try again.');
+      showError('Error', error?.message || 'Failed to create SIP. Please try again.');
     }
   };
 

@@ -13,12 +13,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors, typography } from '../../theme/theme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { useTheme } from '../../context/ThemeContext';
+import { useAlert } from '../../context/AlertContext';
 import { chitFundService } from '../../services/chitFundService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const ChitDetailsScreen = ({ navigation, route }) => {
   const { colors: themeColors } = useTheme();
+  const { showConfirm, showSuccess, showError } = useAlert();
   const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const insets = useScreenInsets(8);
   const { chitId } = route.params || {};
@@ -174,28 +176,25 @@ const ChitDetailsScreen = ({ navigation, route }) => {
 
   const handleWithdrawal = async (memberId, withdrawalAmount) => {
     const amountLabel = withdrawalAmount ? ` of ${formatCurrency(withdrawalAmount)}` : '';
-    Alert.alert(
-      'Confirm Payout Withdrawal',
-      `Are you sure you want to withdraw your Chit payout${amountLabel} now? You can only withdraw ONCE per Chit cycle.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Withdraw',
-          onPress: async () => {
-            try {
-              setLoading(true);
-              const res = await chitFundService.withdrawChitPayout(memberId);
-              Alert.alert('Success', res.message || 'Payout completed successfully!');
-              fetchData();
-            } catch (err) {
-              Alert.alert('Error', err.response?.data?.message || err.message || 'Withdrawal failed');
-            } finally {
-              setLoading(false);
-            }
-          }
+    showConfirm({
+      type: 'payout',
+      title: 'Confirm Payout Withdrawal',
+      message: `Are you sure you want to withdraw your Chit payout${amountLabel} now? You can only withdraw ONCE per Chit cycle.`,
+      confirmText: 'Withdraw',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          const res = await chitFundService.withdrawChitPayout(memberId);
+          showSuccess('Success', res.message || 'Payout completed successfully!');
+          fetchData();
+        } catch (err) {
+          showError('Error', err.response?.data?.message || err.message || 'Withdrawal failed');
+        } finally {
+          setLoading(false);
         }
-      ]
-    );
+      },
+    });
   };
 
   const renderWeeklyTable = () => {

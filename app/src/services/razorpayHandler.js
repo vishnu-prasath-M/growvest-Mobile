@@ -1,5 +1,6 @@
-import { Alert, NativeModules } from 'react-native';
+import { NativeModules } from 'react-native';
 import { paymentService } from './paymentService';
+import { customAlert } from '../context/AlertContext';
 
 /**
  * Dynamically resolves Razorpay native checkout if native module is available
@@ -89,7 +90,7 @@ export const executeRazorpayPayment = async ({
         if (onFailure) {
           onFailure(error);
         } else {
-          Alert.alert(
+          customAlert.warning(
             'Payment Incomplete',
             error.description || error.message || 'Payment was cancelled or could not be processed.'
           );
@@ -97,52 +98,46 @@ export const executeRazorpayPayment = async ({
       }
     } else {
       // Test Mode Simulation fallback when running in Expo Go without native build
-      Alert.alert(
-        'Razorpay Native Mode',
-        `Official Razorpay checkout with UPI & Cards opens natively in the Standalone APK / Dev Client build.\n\nRunning in Expo Go currently. Simulate test payment of ₹${amount} for Order ${orderId}?`,
-        [
-          {
-            text: 'Cancel Payment',
-            style: 'cancel',
-            onPress: () => {
-              if (setLoading) setLoading(false);
-              if (onFailure) onFailure(new Error('User cancelled payment'));
-            },
-          },
-          {
-            text: 'Simulate Pay',
-            onPress: async () => {
-              try {
-                const mockPaymentId = `pay_${Date.now()}`;
-                // Signature simulation token sent to backend for test verify
-                const signature = `simulated_signature_${orderId}_${mockPaymentId}`;
+      customAlert.confirm({
+        type: 'payout',
+        title: 'Razorpay Native Mode',
+        message: `Official Razorpay checkout with UPI & Cards opens natively in the Standalone APK / Dev Client build.\n\nRunning in Expo Go currently. Simulate test payment of ₹${amount} for Order ${orderId}?`,
+        cancelText: 'Cancel Payment',
+        confirmText: 'Simulate Pay',
+        onCancel: () => {
+          if (setLoading) setLoading(false);
+          if (onFailure) onFailure(new Error('User cancelled payment'));
+        },
+        onConfirm: async () => {
+          try {
+            const mockPaymentId = `pay_${Date.now()}`;
+            // Signature simulation token sent to backend for test verify
+            const signature = `simulated_signature_${orderId}_${mockPaymentId}`;
 
-                const verification = await paymentService.verifyPayment({
-                  razorpay_order_id: orderId,
-                  razorpay_payment_id: mockPaymentId,
-                  razorpay_signature: signature,
-                  paymentType,
-                  payloadData,
-                });
+            const verification = await paymentService.verifyPayment({
+              razorpay_order_id: orderId,
+              razorpay_payment_id: mockPaymentId,
+              razorpay_signature: signature,
+              paymentType,
+              payloadData,
+            });
 
-                if (setLoading) setLoading(false);
-                if (onSuccess) onSuccess(verification);
-              } catch (verifyErr) {
-                if (setLoading) setLoading(false);
-                const msg = verifyErr.response?.data?.message || verifyErr.message || 'Verification failed';
-                Alert.alert('Payment Verification Failed', msg);
-                if (onFailure) onFailure(verifyErr);
-              }
-            },
-          },
-        ]
-      );
+            if (setLoading) setLoading(false);
+            if (onSuccess) onSuccess(verification);
+          } catch (verifyErr) {
+            if (setLoading) setLoading(false);
+            const msg = verifyErr.response?.data?.message || verifyErr.message || 'Verification failed';
+            customAlert.error('Payment Verification Failed', msg);
+            if (onFailure) onFailure(verifyErr);
+          }
+        },
+      });
     }
   } catch (error) {
     if (setLoading) setLoading(false);
     console.error('[Razorpay] Order creation error:', error);
     const msg = error.response?.data?.message || error.message || 'Failed to initiate Razorpay payment';
-    Alert.alert('Error', msg);
+    customAlert.error('Error', msg);
     if (onFailure) onFailure(error);
   }
 };
@@ -196,32 +191,26 @@ export const openRazorpayCheckout = async ({
   } else {
     // Simulator fallback for Expo Go
     const displayAmount = Math.round(amount / 100);
-    Alert.alert(
-      'Razorpay Native Mode',
-      `Official Razorpay checkout with UPI & Cards opens natively in the Standalone APK / Dev Client build.\n\nSimulate test payment of ₹${displayAmount.toLocaleString('en-IN')} for ${description}?`,
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-          onPress: () => {
-            if (onError) onError(new Error('User cancelled'));
-          },
-        },
-        {
-          text: 'Simulate Pay',
-          onPress: () => {
-            const mockPaymentId = `pay_${Date.now()}`;
-            const signature = `simulated_signature_${orderId}_${mockPaymentId}`;
-            if (onSuccess) {
-              onSuccess({
-                razorpay_order_id: orderId,
-                razorpay_payment_id: mockPaymentId,
-                razorpay_signature: signature,
-              });
-            }
-          },
-        },
-      ]
-    );
+    customAlert.confirm({
+      type: 'payout',
+      title: 'Razorpay Native Mode',
+      message: `Official Razorpay checkout with UPI & Cards opens natively in the Standalone APK / Dev Client build.\n\nSimulate test payment of ₹${displayAmount.toLocaleString('en-IN')} for ${description}?`,
+      cancelText: 'Cancel',
+      confirmText: 'Simulate Pay',
+      onCancel: () => {
+        if (onError) onError(new Error('User cancelled'));
+      },
+      onConfirm: () => {
+        const mockPaymentId = `pay_${Date.now()}`;
+        const signature = `simulated_signature_${orderId}_${mockPaymentId}`;
+        if (onSuccess) {
+          onSuccess({
+            razorpay_order_id: orderId,
+            razorpay_payment_id: mockPaymentId,
+            razorpay_signature: signature,
+          });
+        }
+      },
+    });
   }
 };

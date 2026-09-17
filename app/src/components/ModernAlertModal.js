@@ -7,28 +7,29 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   Dimensions,
+  Animated,
+  Platform,
 } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
-import { colors } from '../theme/theme';
 
 const { width } = Dimensions.get('window');
 
 /**
- * ModernAlertModal - A premium, fintech-grade popup dialog replacing default Alert.alert
+ * ModernAlertModal - 100% Fidelity Bottom Sheet Confirmation & Alert Modal
  *
  * Props:
  * - visible: boolean
- * - type: 'success' | 'info' | 'warning' | 'error' | 'bank' | 'payout' (default: 'success')
+ * - type: 'success' | 'warning' | 'error' | 'payout' | 'logout' | 'lock' | 'processing' | 'info'
  * - title: string
  * - message: string
- * - primaryButtonText: string (default: 'OK')
+ * - primaryButtonText: string (default: 'Close' or 'OK')
  * - onPrimaryPress: function
- * - secondaryButtonText?: string
+ * - secondaryButtonText?: string (e.g. 'Cancel' or 'Close')
  * - onSecondaryPress?: function
  * - onClose?: function
- * - iconName?: string (optional override)
+ * - isDestructive?: boolean (e.g. for Logout or Delete)
+ * - iconName?: string (custom icon override)
  */
 const ModernAlertModal = ({
   visible,
@@ -40,204 +41,280 @@ const ModernAlertModal = ({
   secondaryButtonText,
   onSecondaryPress,
   onClose,
+  isDestructive = false,
   iconName,
 }) => {
-  const { colors: themeColors, isDarkMode } = useTheme();
-  const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
+  const { isDarkMode } = useTheme();
+  const styles = React.useMemo(() => getStyles(isDarkMode), [isDarkMode]);
+  const slideAnim = React.useRef(new Animated.Value(300)).current;
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          bounciness: 4,
+          speed: 14,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 300,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
 
   if (!visible) return null;
 
-  const getTypeConfig = () => {
+  const getIconConfig = () => {
     switch (type) {
       case 'success':
         return {
-          icon: iconName || 'check-circle-outline',
-          iconColor: '#10B981',
-          iconBg: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5',
-          iconBorder: isDarkMode ? 'rgba(52, 211, 153, 0.3)' : '#A7F3D0',
-          gradient: ['#0E3D23', '#1C6B3F'],
+          bg: '#22C55E',
+          component: <Ionicons name="checkmark" size={36} color="#FFFFFF" />,
         };
-      case 'bank':
-        return {
-          icon: iconName || 'bank-check',
-          iconColor: '#10B981',
-          iconBg: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5',
-          iconBorder: isDarkMode ? 'rgba(52, 211, 153, 0.3)' : '#A7F3D0',
-          gradient: ['#0E3D23', '#1C6B3F'],
-        };
-      case 'payout':
       case 'warning':
+      case 'problem':
         return {
-          icon: iconName || 'clock-check-outline',
-          iconColor: '#F59E0B',
-          iconBg: isDarkMode ? 'rgba(245, 158, 11, 0.15)' : '#FFFBEB',
-          iconBorder: isDarkMode ? 'rgba(251, 191, 36, 0.35)' : '#FDE68A',
-          gradient: ['#78350F', '#B45309'],
+          bg: isDarkMode ? '#3B2A05' : '#FFFBEB',
+          borderColor: isDarkMode ? '#F59E0B' : '#FDE68A',
+          component: <Ionicons name="warning" size={38} color="#F59E0B" />,
         };
       case 'error':
         return {
-          icon: iconName || 'alert-circle-outline',
-          iconColor: '#EF4444',
-          iconBg: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2',
-          iconBorder: isDarkMode ? 'rgba(248, 113, 113, 0.3)' : '#FECACA',
-          gradient: ['#7F1D1D', '#B91C1C'],
+          bg: isDarkMode ? '#3B1212' : '#FEF2F2',
+          borderColor: isDarkMode ? '#EF4444' : '#FECACA',
+          component: <Ionicons name="alert-circle" size={38} color="#EF4444" />,
+        };
+      case 'logout':
+        return {
+          bg: isDarkMode ? '#3B1212' : '#FEE2E2',
+          borderColor: isDarkMode ? '#EF4444' : '#FCA5A5',
+          component: <MaterialCommunityIcons name="logout-variant" size={34} color="#DC2626" />,
+        };
+      case 'lock':
+      case 'applock':
+        return {
+          bg: isDarkMode ? '#0E2E1D' : '#ECFDF5',
+          borderColor: isDarkMode ? '#10B981' : '#A7F3D0',
+          component: <MaterialCommunityIcons name="shield-lock-outline" size={36} color="#059669" />,
+        };
+      case 'payout':
+      case 'chit':
+        return {
+          bg: isDarkMode ? '#0E2E1D' : '#ECFDF5',
+          borderColor: isDarkMode ? '#10B981' : '#A7F3D0',
+          component: <MaterialCommunityIcons name="cash-fast" size={36} color="#059669" />,
+        };
+      case 'processing':
+        return {
+          bg: isDarkMode ? '#0E2E1D' : '#ECFDF5',
+          borderColor: isDarkMode ? '#10B981' : '#A7F3D0',
+          component: <Ionicons name="paper-plane" size={34} color="#059669" />,
         };
       default:
         return {
-          icon: iconName || 'information-outline',
-          iconColor: colors.primary,
-          iconBg: isDarkMode ? 'rgba(8, 84, 40, 0.2)' : '#E8F5E9',
-          iconBorder: isDarkMode ? 'rgba(34, 197, 94, 0.3)' : '#C8E6C9',
-          gradient: ['#0E3D23', '#1C6B3F'],
+          bg: isDarkMode ? '#0E2E1D' : '#ECFDF5',
+          borderColor: isDarkMode ? '#10B981' : '#A7F3D0',
+          component: <Ionicons name="information-circle" size={38} color="#059669" />,
         };
     }
   };
 
-  const config = getTypeConfig();
+  const iconConfig = getIconConfig();
+  const hasTwoButtons = !!secondaryButtonText;
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose || onPrimaryPress}>
-      <TouchableWithoutFeedback onPress={onClose || onPrimaryPress}>
-        <View style={styles.overlay}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={onClose || onSecondaryPress || onPrimaryPress}
+    >
+      <TouchableWithoutFeedback onPress={onClose || onSecondaryPress || onPrimaryPress}>
+        <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
           <TouchableWithoutFeedback>
-            <View style={styles.card}>
-              {/* Top Illuminated Icon Badge */}
-              <View style={[styles.iconOuter, { backgroundColor: config.iconBg, borderColor: config.iconBorder }]}>
-                <MaterialCommunityIcons name={config.icon} size={36} color={config.iconColor} />
+            <Animated.View
+              style={[
+                styles.sheetContainer,
+                { transform: [{ translateY: slideAnim }] },
+              ]}
+            >
+              {/* Drag Handle Bar */}
+              <View style={styles.dragHandle} />
+
+              {/* Centered Top Icon Badge */}
+              <View
+                style={[
+                  styles.iconCircle,
+                  {
+                    backgroundColor: iconConfig.bg,
+                    borderColor: iconConfig.borderColor || 'transparent',
+                    borderWidth: iconConfig.borderColor ? 1.5 : 0,
+                  },
+                ]}
+              >
+                {iconConfig.component}
               </View>
 
               {/* Title & Message */}
-              <Text style={styles.title}>{title}</Text>
+              {title ? <Text style={styles.title}>{title}</Text> : null}
               {message ? <Text style={styles.message}>{message}</Text> : null}
 
-              {/* Buttons */}
-              <View style={styles.buttonContainer}>
-                {secondaryButtonText ? (
+              {/* Action Buttons */}
+              <View style={styles.buttonRow}>
+                {hasTwoButtons && (
                   <TouchableOpacity
-                    style={styles.secondaryBtn}
+                    style={styles.secondaryButton}
                     activeOpacity={0.8}
-                    onPress={onSecondaryPress}
+                    onPress={onSecondaryPress || onClose}
                   >
-                    <Text style={styles.secondaryBtnText}>{secondaryButtonText}</Text>
+                    <Text style={styles.secondaryButtonText}>{secondaryButtonText}</Text>
                   </TouchableOpacity>
-                ) : null}
+                )}
 
                 <TouchableOpacity
-                  style={[styles.primaryBtnWrapper, !secondaryButtonText && { flex: 1, width: '100%' }]}
+                  style={[
+                    styles.primaryButton,
+                    !hasTwoButtons && styles.singlePrimaryButton,
+                    (isDestructive || type === 'logout') && styles.destructivePrimaryButton,
+                  ]}
                   activeOpacity={0.85}
                   onPress={onPrimaryPress}
                 >
-                  <LinearGradient
-                    colors={config.gradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.primaryGradient}
-                  >
-                    <Text style={styles.primaryBtnText}>{primaryButtonText}</Text>
-                  </LinearGradient>
+                  <Text style={styles.primaryButtonText}>{primaryButtonText}</Text>
                 </TouchableOpacity>
               </View>
-            </View>
+            </Animated.View>
           </TouchableWithoutFeedback>
-        </View>
+        </Animated.View>
       </TouchableWithoutFeedback>
     </Modal>
   );
 };
 
-const getStyles = (themeColors, isDarkMode) =>
+const getStyles = (isDarkMode) =>
   StyleSheet.create({
     overlay: {
       flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.72)',
-      justifyContent: 'center',
+      backgroundColor: 'rgba(0, 0, 0, 0.52)',
+      justifyContent: 'flex-end',
       alignItems: 'center',
-      paddingHorizontal: 24,
     },
-    card: {
-      width: Math.min(width - 48, 380),
-      backgroundColor: isDarkMode ? '#131B15' : '#FFFFFF',
-      borderRadius: 24,
+    sheetContainer: {
+      width: '100%',
+      backgroundColor: isDarkMode ? '#161B22' : '#FFFFFF',
+      borderTopLeftRadius: 32,
+      borderTopRightRadius: 32,
       paddingHorizontal: 24,
-      paddingTop: 28,
-      paddingBottom: 24,
+      paddingTop: 14,
+      paddingBottom: Platform.OS === 'ios' ? 38 : 28,
       alignItems: 'center',
-      borderWidth: 1.5,
-      borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.06)',
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 10 },
-      shadowOpacity: 0.35,
-      shadowRadius: 20,
-      elevation: 12,
+      shadowOffset: { width: 0, height: -6 },
+      shadowOpacity: 0.18,
+      shadowRadius: 16,
+      elevation: 20,
     },
-    iconOuter: {
-      width: 72,
-      height: 72,
-      borderRadius: 36,
+    dragHandle: {
+      width: 42,
+      height: 4.5,
+      borderRadius: 3,
+      backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.2)' : '#E5E7EB',
+      marginBottom: 20,
+    },
+    iconCircle: {
+      width: 68,
+      height: 68,
+      borderRadius: 34,
       justifyContent: 'center',
       alignItems: 'center',
-      borderWidth: 1.5,
-      marginBottom: 18,
+      marginBottom: 16,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 4,
     },
     title: {
       fontSize: 20,
-      fontWeight: '800',
-      color: isDarkMode ? '#FFFFFF' : '#111827',
+      fontWeight: '700',
+      color: isDarkMode ? '#F3F4F6' : '#111827',
       textAlign: 'center',
-      marginBottom: 10,
-      letterSpacing: -0.3,
+      marginBottom: 8,
+      letterSpacing: -0.2,
+      paddingHorizontal: 12,
     },
     message: {
       fontSize: 14,
       lineHeight: 21,
-      color: isDarkMode ? 'rgba(229, 231, 235, 0.85)' : '#4B5563',
+      color: isDarkMode ? '#9CA3AF' : '#6B7280',
       textAlign: 'center',
-      marginBottom: 24,
-      paddingHorizontal: 4,
+      marginBottom: 26,
+      paddingHorizontal: 8,
     },
-    buttonContainer: {
+    buttonRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 12,
       width: '100%',
     },
-    primaryBtnWrapper: {
-      borderRadius: 14,
-      overflow: 'hidden',
+    secondaryButton: {
       flex: 1,
-      elevation: 3,
-      shadowColor: '#0E3D23',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.25,
-      shadowRadius: 6,
-    },
-    primaryGradient: {
-      paddingVertical: 14,
-      paddingHorizontal: 18,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    primaryBtnText: {
-      color: '#FFFFFF',
-      fontSize: 15,
-      fontWeight: '700',
-      letterSpacing: 0.3,
-    },
-    secondaryBtn: {
-      flex: 1,
-      paddingVertical: 13,
-      paddingHorizontal: 16,
-      borderRadius: 14,
+      height: 48,
+      borderRadius: 24,
       backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#F3F4F6',
-      alignItems: 'center',
       justifyContent: 'center',
+      alignItems: 'center',
       borderWidth: 1,
       borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.12)' : '#E5E7EB',
     },
-    secondaryBtnText: {
-      color: isDarkMode ? '#E5E7EB' : '#374151',
-      fontSize: 14,
+    secondaryButtonText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: isDarkMode ? '#E5E7EB' : '#1F2937',
+    },
+    primaryButton: {
+      flex: 1,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: '#111827',
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: '#111827',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.2,
+      shadowRadius: 6,
+      elevation: 3,
+    },
+    singlePrimaryButton: {
+      flex: 1,
+      width: '100%',
+    },
+    destructivePrimaryButton: {
+      backgroundColor: '#DC2626',
+      shadowColor: '#DC2626',
+    },
+    primaryButtonText: {
+      fontSize: 15,
       fontWeight: '700',
+      color: '#FFFFFF',
     },
   });
 

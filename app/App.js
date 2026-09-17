@@ -20,6 +20,7 @@ import { AppLockProvider } from './src/context/AppLockContext';
 import { AppLockOverlay } from './src/components/AppLockOverlay';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { FeedbackProvider } from './src/context/FeedbackContext';
+import { AlertProvider } from './src/context/AlertContext';
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -141,7 +142,9 @@ export default function App() {
     <ErrorBoundary>
       <ThemeProvider>
         <FeedbackProvider>
-          <AppContent />
+          <AlertProvider>
+            <AppContent />
+          </AlertProvider>
         </FeedbackProvider>
       </ThemeProvider>
     </ErrorBoundary>
