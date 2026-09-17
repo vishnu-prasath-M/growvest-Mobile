@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Modal,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
+  Pressable,
   Platform,
   Dimensions,
+  Animated,
+  Easing,
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -43,7 +44,7 @@ const ModernAlertModal = ({
   const { isDarkMode } = useTheme();
   const styles = React.useMemo(() => getStyles(isDarkMode), [isDarkMode]);
 
-  // Window & Screen dimensions for full-screen backdrop coverage on Android & iOS
+  // Window & Screen dimensions for bulletproof full-screen coverage
   const { width: winWidth, height: winHeight } = useWindowDimensions();
   const [screenDims, setScreenDims] = useState(() => {
     const s = Dimensions.get('screen');
@@ -67,7 +68,50 @@ const ModernAlertModal = ({
   const modalWidth = Math.max(screenDims.width, winWidth);
   const modalHeight = Math.max(screenDims.height, winHeight);
 
-  if (!visible) return null;
+  // Animation values - useNativeDriver: false ensures Android layout hit bounds stay synchronized with sheet
+  const slideAnim = useRef(new Animated.Value(500)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [isRendered, setIsRendered] = useState(visible);
+
+  useEffect(() => {
+    if (visible) {
+      setIsRendered(true);
+      slideAnim.setValue(500);
+      fadeAnim.setValue(0);
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: false,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          bounciness: 4,
+          speed: 15,
+          useNativeDriver: false,
+        }),
+      ]).start();
+    } else if (isRendered) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: false,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 500,
+          duration: 160,
+          easing: Easing.in(Easing.ease),
+          useNativeDriver: false,
+        }),
+      ]).start(() => {
+        setIsRendered(false);
+      });
+    }
+  }, [visible]);
+
+  if (!visible && !isRendered) return null;
 
   const handlePrimaryPress = () => {
     if (typeof onPrimaryPress === 'function') {
@@ -156,9 +200,9 @@ const ModernAlertModal = ({
 
   return (
     <Modal
-      visible={visible}
+      visible={visible || isRendered}
       transparent={true}
-      animationType="slide"
+      animationType="none"
       statusBarTranslucent={true}
       onRequestClose={handleDismiss}
     >
@@ -171,61 +215,93 @@ const ModernAlertModal = ({
           },
         ]}
       >
-        {/* Backdrop touch area: consumes empty space ABOVE sheet to dismiss */}
-        <TouchableWithoutFeedback onPress={handleDismiss}>
-          <View style={styles.backdropTouchArea} />
-        </TouchableWithoutFeedback>
+        {/* Animated Dark Backdrop */}
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFillObject,
+            {
+              width: modalWidth,
+              height: modalHeight,
+              backgroundColor: 'rgba(0, 0, 0, 0.55)',
+              opacity: fadeAnim,
+            },
+          ]}
+        >
+          <Pressable
+            style={StyleSheet.absoluteFillObject}
+            onPress={handleDismiss}
+          />
+        </Animated.View>
 
-        {/* Bottom Sheet Card: sits naturally at the bottom */}
-        <View style={styles.sheetCard}>
-          {/* Top Grab Handle */}
-          <View style={styles.dragHandle} />
-
-          {/* Centered iOS-Style Icon Badge */}
-          <View
-            style={[
-              styles.iconCircle,
-              {
-                backgroundColor: iconConfig.bg,
-                borderColor: iconConfig.border,
-                borderWidth: iconConfig.border !== 'transparent' ? 1.5 : 0,
-              },
-            ]}
+        {/* Animated iOS Bottom Sheet Card */}
+        <Animated.View
+          style={[
+            styles.sheetCard,
+            {
+              width: modalWidth,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
+          <Pressable
+            style={{ width: '100%', alignItems: 'center' }}
+            onPress={(e) => {
+              if (e && e.stopPropagation) e.stopPropagation();
+            }}
           >
-            {iconConfig.component}
-          </View>
+            {/* Top Grab Handle */}
+            <View style={styles.dragHandle} />
 
-          {/* Centered Title */}
-          {title ? <Text style={styles.title}>{title}</Text> : null}
-
-          {/* Centered Subtitle / Message */}
-          {message ? <Text style={styles.message}>{message}</Text> : null}
-
-          {/* Action Buttons Row */}
-          <View style={styles.buttonRow}>
-            {hasTwoButtons && (
-              <TouchableOpacity
-                style={styles.secondaryButton}
-                activeOpacity={0.7}
-                onPress={handleSecondaryPress}
-              >
-                <Text style={styles.secondaryButtonText}>{secondaryButtonText}</Text>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity
+            {/* Centered iOS-Style Icon Badge */}
+            <View
               style={[
-                styles.primaryButton,
-                !hasTwoButtons && styles.singlePrimaryButton,
-                (isDestructive || type === 'logout') && styles.destructivePrimaryButton,
+                styles.iconCircle,
+                {
+                  backgroundColor: iconConfig.bg,
+                  borderColor: iconConfig.border,
+                  borderWidth: iconConfig.border !== 'transparent' ? 1.5 : 0,
+                },
               ]}
-              activeOpacity={0.7}
-              onPress={handlePrimaryPress}
             >
-              <Text style={styles.primaryButtonText}>{primaryButtonText}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+              {iconConfig.component}
+            </View>
+
+            {/* Centered Title */}
+            {title ? <Text style={styles.title}>{title}</Text> : null}
+
+            {/* Centered Subtitle / Message */}
+            {message ? <Text style={styles.message}>{message}</Text> : null}
+
+            {/* Action Buttons Row */}
+            <View style={styles.buttonRow}>
+              {hasTwoButtons && (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.secondaryButton,
+                    pressed && { opacity: 0.7 },
+                  ]}
+                  hitSlop={10}
+                  onPress={handleSecondaryPress}
+                >
+                  <Text style={styles.secondaryButtonText}>{secondaryButtonText}</Text>
+                </Pressable>
+              )}
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.primaryButton,
+                  !hasTwoButtons && styles.singlePrimaryButton,
+                  (isDestructive || type === 'logout') && styles.destructivePrimaryButton,
+                  pressed && { opacity: 0.8 },
+                ]}
+                hitSlop={10}
+                onPress={handlePrimaryPress}
+              >
+                <Text style={styles.primaryButtonText}>{primaryButtonText}</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -234,16 +310,21 @@ const ModernAlertModal = ({
 const getStyles = (isDarkMode) =>
   StyleSheet.create({
     modalRoot: {
-      flex: 1,
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
       justifyContent: 'flex-end',
-      backgroundColor: 'rgba(0, 0, 0, 0.55)',
-    },
-    backdropTouchArea: {
-      flex: 1,
-      width: '100%',
+      alignItems: 'center',
+      zIndex: 999999,
+      elevation: 999999,
     },
     sheetCard: {
-      width: '100%',
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
       backgroundColor: isDarkMode ? '#1C1C1E' : '#FFFFFF',
       borderTopLeftRadius: 32,
       borderTopRightRadius: 32,
@@ -255,7 +336,8 @@ const getStyles = (isDarkMode) =>
       shadowOffset: { width: 0, height: -8 },
       shadowOpacity: 0.22,
       shadowRadius: 20,
-      elevation: 35,
+      elevation: 50,
+      zIndex: 1000,
     },
     dragHandle: {
       width: 36,
