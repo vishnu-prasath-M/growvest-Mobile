@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -620,11 +621,9 @@ const CreateSIPScreen = ({ navigation, route }) => {
       {/* Confirmation Modal */}
       <Modal visible={showConfirmModal} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowConfirmModal(false)}>
         <View style={styles.modalOverlay}>
-          <TouchableOpacity
-            style={StyleSheet.absoluteFillObject}
-            activeOpacity={1}
-            onPress={() => setShowConfirmModal(false)}
-          />
+          <TouchableWithoutFeedback onPress={() => setShowConfirmModal(false)}>
+            <View style={{ flex: 1, width: '100%' }} />
+          </TouchableWithoutFeedback>
           <View style={styles.modalContent}>
             {/* Grab Handle */}
             <View style={styles.dragHandle} />

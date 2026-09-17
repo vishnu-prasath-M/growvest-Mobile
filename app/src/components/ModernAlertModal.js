@@ -1,14 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Modal,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   Platform,
   Dimensions,
-  Animated,
-  Easing,
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -44,7 +43,7 @@ const ModernAlertModal = ({
   const { isDarkMode } = useTheme();
   const styles = React.useMemo(() => getStyles(isDarkMode), [isDarkMode]);
 
-  // Window & Screen dimensions for bulletproof full-screen coverage
+  // Window & Screen dimensions for full-screen backdrop coverage on Android & iOS
   const { width: winWidth, height: winHeight } = useWindowDimensions();
   const [screenDims, setScreenDims] = useState(() => {
     const s = Dimensions.get('screen');
@@ -68,50 +67,7 @@ const ModernAlertModal = ({
   const modalWidth = Math.max(screenDims.width, winWidth);
   const modalHeight = Math.max(screenDims.height, winHeight);
 
-  // Animation values
-  const slideAnim = useRef(new Animated.Value(500)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const [isRendered, setIsRendered] = useState(visible);
-
-  useEffect(() => {
-    if (visible) {
-      setIsRendered(true);
-      slideAnim.setValue(500);
-      fadeAnim.setValue(0);
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 220,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          bounciness: 4,
-          speed: 15,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else if (isRendered) {
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 160,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: 500,
-          duration: 180,
-          easing: Easing.in(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        setIsRendered(false);
-      });
-    }
-  }, [visible]);
-
-  if (!visible && !isRendered) return null;
+  if (!visible) return null;
 
   const handlePrimaryPress = () => {
     if (typeof onPrimaryPress === 'function') {
@@ -130,10 +86,10 @@ const ModernAlertModal = ({
   };
 
   const handleDismiss = () => {
-    if (typeof onClose === 'function') {
-      onClose();
-    } else if (typeof onSecondaryPress === 'function') {
+    if (typeof onSecondaryPress === 'function') {
       onSecondaryPress();
+    } else if (typeof onClose === 'function') {
+      onClose();
     } else if (typeof onPrimaryPress === 'function') {
       onPrimaryPress();
     }
@@ -200,9 +156,9 @@ const ModernAlertModal = ({
 
   return (
     <Modal
-      visible={visible || isRendered}
+      visible={visible}
       transparent={true}
-      animationType="none"
+      animationType="slide"
       statusBarTranslucent={true}
       onRequestClose={handleDismiss}
     >
@@ -215,36 +171,13 @@ const ModernAlertModal = ({
           },
         ]}
       >
-        {/* Animated Dark Backdrop */}
-        <Animated.View
-          style={[
-            StyleSheet.absoluteFillObject,
-            {
-              width: modalWidth,
-              height: modalHeight,
-              backgroundColor: 'rgba(0, 0, 0, 0.55)',
-              opacity: fadeAnim,
-            },
-          ]}
-        >
-          <TouchableOpacity
-            style={StyleSheet.absoluteFillObject}
-            activeOpacity={1}
-            onPress={handleDismiss}
-          />
-        </Animated.View>
+        {/* Backdrop touch area: consumes empty space ABOVE sheet to dismiss */}
+        <TouchableWithoutFeedback onPress={handleDismiss}>
+          <View style={styles.backdropTouchArea} />
+        </TouchableWithoutFeedback>
 
-        {/* Animated iOS Bottom Sheet Card */}
-        <Animated.View
-          pointerEvents="auto"
-          style={[
-            styles.sheetCard,
-            {
-              width: modalWidth,
-              transform: [{ translateY: slideAnim }],
-            },
-          ]}
-        >
+        {/* Bottom Sheet Card: sits naturally at the bottom */}
+        <View style={styles.sheetCard}>
           {/* Top Grab Handle */}
           <View style={styles.dragHandle} />
 
@@ -274,7 +207,6 @@ const ModernAlertModal = ({
               <TouchableOpacity
                 style={styles.secondaryButton}
                 activeOpacity={0.7}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 onPress={handleSecondaryPress}
               >
                 <Text style={styles.secondaryButtonText}>{secondaryButtonText}</Text>
@@ -288,13 +220,12 @@ const ModernAlertModal = ({
                 (isDestructive || type === 'logout') && styles.destructivePrimaryButton,
               ]}
               activeOpacity={0.7}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               onPress={handlePrimaryPress}
             >
               <Text style={styles.primaryButtonText}>{primaryButtonText}</Text>
             </TouchableOpacity>
           </View>
-        </Animated.View>
+        </View>
       </View>
     </Modal>
   );
@@ -303,21 +234,16 @@ const ModernAlertModal = ({
 const getStyles = (isDarkMode) =>
   StyleSheet.create({
     modalRoot: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
+      flex: 1,
       justifyContent: 'flex-end',
-      alignItems: 'center',
-      zIndex: 999999,
-      elevation: 999999,
+      backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    },
+    backdropTouchArea: {
+      flex: 1,
+      width: '100%',
     },
     sheetCard: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
+      width: '100%',
       backgroundColor: isDarkMode ? '#1C1C1E' : '#FFFFFF',
       borderTopLeftRadius: 32,
       borderTopRightRadius: 32,
@@ -329,8 +255,7 @@ const getStyles = (isDarkMode) =>
       shadowOffset: { width: 0, height: -8 },
       shadowOpacity: 0.22,
       shadowRadius: 20,
-      elevation: 50,
-      zIndex: 1000,
+      elevation: 35,
     },
     dragHandle: {
       width: 36,
