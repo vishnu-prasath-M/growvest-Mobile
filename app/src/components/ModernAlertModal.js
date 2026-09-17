@@ -5,7 +5,6 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   Dimensions,
   Animated,
   Platform,
@@ -13,7 +12,7 @@ import {
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 
-const { width } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 /**
  * ModernAlertModal - 100% Fidelity Bottom Sheet Confirmation & Alert Modal
@@ -23,13 +22,12 @@ const { width } = Dimensions.get('window');
  * - type: 'success' | 'warning' | 'error' | 'payout' | 'logout' | 'lock' | 'processing' | 'info'
  * - title: string
  * - message: string
- * - primaryButtonText: string (default: 'Close' or 'OK')
+ * - primaryButtonText: string (default: 'OK')
  * - onPrimaryPress: function
  * - secondaryButtonText?: string (e.g. 'Cancel' or 'Close')
  * - onSecondaryPress?: function
  * - onClose?: function
- * - isDestructive?: boolean (e.g. for Logout or Delete)
- * - iconName?: string (custom icon override)
+ * - isDestructive?: boolean (e.g. for Logout)
  */
 const ModernAlertModal = ({
   visible,
@@ -42,11 +40,10 @@ const ModernAlertModal = ({
   onSecondaryPress,
   onClose,
   isDestructive = false,
-  iconName,
 }) => {
   const { isDarkMode } = useTheme();
   const styles = React.useMemo(() => getStyles(isDarkMode), [isDarkMode]);
-  const slideAnim = React.useRef(new Animated.Value(300)).current;
+  const slideAnim = React.useRef(new Animated.Value(400)).current;
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
@@ -54,13 +51,13 @@ const ModernAlertModal = ({
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 200,
+          duration: 180,
           useNativeDriver: true,
         }),
         Animated.spring(slideAnim, {
           toValue: 0,
           bounciness: 4,
-          speed: 14,
+          speed: 16,
           useNativeDriver: true,
         }),
       ]).start();
@@ -68,12 +65,12 @@ const ModernAlertModal = ({
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 0,
-          duration: 150,
+          duration: 140,
           useNativeDriver: true,
         }),
         Animated.timing(slideAnim, {
-          toValue: 300,
-          duration: 180,
+          toValue: 400,
+          duration: 160,
           useNativeDriver: true,
         }),
       ]).start();
@@ -94,13 +91,13 @@ const ModernAlertModal = ({
         return {
           bg: isDarkMode ? '#3B2A05' : '#FFFBEB',
           borderColor: isDarkMode ? '#F59E0B' : '#FDE68A',
-          component: <Ionicons name="warning" size={38} color="#F59E0B" />,
+          component: <Ionicons name="warning" size={36} color="#F59E0B" />,
         };
       case 'error':
         return {
           bg: isDarkMode ? '#3B1212' : '#FEF2F2',
           borderColor: isDarkMode ? '#EF4444' : '#FECACA',
-          component: <Ionicons name="alert-circle" size={38} color="#EF4444" />,
+          component: <Ionicons name="alert-circle" size={36} color="#EF4444" />,
         };
       case 'logout':
         return {
@@ -145,66 +142,75 @@ const ModernAlertModal = ({
       visible={visible}
       transparent
       animationType="none"
+      statusBarTranslucent
       onRequestClose={onClose || onSecondaryPress || onPrimaryPress}
     >
-      <TouchableWithoutFeedback onPress={onClose || onSecondaryPress || onPrimaryPress}>
-        <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
-          <TouchableWithoutFeedback>
-            <Animated.View
-              style={[
-                styles.sheetContainer,
-                { transform: [{ translateY: slideAnim }] },
-              ]}
-            >
-              {/* Drag Handle Bar */}
-              <View style={styles.dragHandle} />
-
-              {/* Centered Top Icon Badge */}
-              <View
-                style={[
-                  styles.iconCircle,
-                  {
-                    backgroundColor: iconConfig.bg,
-                    borderColor: iconConfig.borderColor || 'transparent',
-                    borderWidth: iconConfig.borderColor ? 1.5 : 0,
-                  },
-                ]}
-              >
-                {iconConfig.component}
-              </View>
-
-              {/* Title & Message */}
-              {title ? <Text style={styles.title}>{title}</Text> : null}
-              {message ? <Text style={styles.message}>{message}</Text> : null}
-
-              {/* Action Buttons */}
-              <View style={styles.buttonRow}>
-                {hasTwoButtons && (
-                  <TouchableOpacity
-                    style={styles.secondaryButton}
-                    activeOpacity={0.8}
-                    onPress={onSecondaryPress || onClose}
-                  >
-                    <Text style={styles.secondaryButtonText}>{secondaryButtonText}</Text>
-                  </TouchableOpacity>
-                )}
-
-                <TouchableOpacity
-                  style={[
-                    styles.primaryButton,
-                    !hasTwoButtons && styles.singlePrimaryButton,
-                    (isDestructive || type === 'logout') && styles.destructivePrimaryButton,
-                  ]}
-                  activeOpacity={0.85}
-                  onPress={onPrimaryPress}
-                >
-                  <Text style={styles.primaryButtonText}>{primaryButtonText}</Text>
-                </TouchableOpacity>
-              </View>
-            </Animated.View>
-          </TouchableWithoutFeedback>
+      <View style={styles.overlay}>
+        {/* Backdrop Dismiss */}
+        <Animated.View style={[StyleSheet.absoluteFillObject, styles.backdrop, { opacity: fadeAnim }]}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            activeOpacity={1}
+            onPress={onClose || onSecondaryPress || onPrimaryPress}
+          />
         </Animated.View>
-      </TouchableWithoutFeedback>
+
+        {/* Bottom Sheet Card */}
+        <Animated.View
+          style={[
+            styles.sheetContainer,
+            {
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
+          {/* Drag Handle Bar */}
+          <View style={styles.dragHandle} />
+
+          {/* Centered Top Icon Badge */}
+          <View
+            style={[
+              styles.iconCircle,
+              {
+                backgroundColor: iconConfig.bg,
+                borderColor: iconConfig.borderColor || 'transparent',
+                borderWidth: iconConfig.borderColor ? 1.5 : 0,
+              },
+            ]}
+          >
+            {iconConfig.component}
+          </View>
+
+          {/* Title & Message */}
+          {title ? <Text style={styles.title}>{title}</Text> : null}
+          {message ? <Text style={styles.message}>{message}</Text> : null}
+
+          {/* Action Buttons */}
+          <View style={styles.buttonRow}>
+            {hasTwoButtons && (
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                activeOpacity={0.8}
+                onPress={onSecondaryPress || onClose}
+              >
+                <Text style={styles.secondaryButtonText}>{secondaryButtonText}</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={[
+                styles.primaryButton,
+                !hasTwoButtons && styles.singlePrimaryButton,
+                (isDestructive || type === 'logout') && styles.destructivePrimaryButton,
+              ]}
+              activeOpacity={0.85}
+              onPress={onPrimaryPress}
+            >
+              <Text style={styles.primaryButtonText}>{primaryButtonText}</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </View>
     </Modal>
   );
 };
@@ -212,10 +218,19 @@ const ModernAlertModal = ({
 const getStyles = (isDarkMode) =>
   StyleSheet.create({
     overlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.52)',
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      width: '100%',
+      height: '100%',
       justifyContent: 'flex-end',
       alignItems: 'center',
+      zIndex: 999999,
+    },
+    backdrop: {
+      backgroundColor: 'rgba(0, 0, 0, 0.58)',
     },
     sheetContainer: {
       width: '100%',
@@ -226,23 +241,24 @@ const getStyles = (isDarkMode) =>
       paddingTop: 14,
       paddingBottom: Platform.OS === 'ios' ? 38 : 28,
       alignItems: 'center',
+      alignSelf: 'stretch',
       shadowColor: '#000',
       shadowOffset: { width: 0, height: -6 },
-      shadowOpacity: 0.18,
-      shadowRadius: 16,
-      elevation: 20,
+      shadowOpacity: 0.22,
+      shadowRadius: 18,
+      elevation: 24,
     },
     dragHandle: {
       width: 42,
       height: 4.5,
       borderRadius: 3,
-      backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.2)' : '#E5E7EB',
+      backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.22)' : '#E5E7EB',
       marginBottom: 20,
     },
     iconCircle: {
-      width: 68,
-      height: 68,
-      borderRadius: 34,
+      width: 66,
+      height: 66,
+      borderRadius: 33,
       justifyContent: 'center',
       alignItems: 'center',
       marginBottom: 16,
@@ -260,6 +276,7 @@ const getStyles = (isDarkMode) =>
       marginBottom: 8,
       letterSpacing: -0.2,
       paddingHorizontal: 12,
+      alignSelf: 'center',
     },
     message: {
       fontSize: 14,
@@ -268,10 +285,12 @@ const getStyles = (isDarkMode) =>
       textAlign: 'center',
       marginBottom: 26,
       paddingHorizontal: 8,
+      alignSelf: 'center',
     },
     buttonRow: {
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'center',
       gap: 12,
       width: '100%',
     },
