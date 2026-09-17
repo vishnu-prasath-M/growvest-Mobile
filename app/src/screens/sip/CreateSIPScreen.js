@@ -1118,7 +1118,8 @@ const getStyles = (themeColors, isDark) =>
       shadowOffset: { width: 0, height: -8 },
       shadowOpacity: 0.22,
       shadowRadius: 20,
-      elevation: 35,
+      elevation: 50,
+      zIndex: 1000,
     },
     dragHandle: {
       width: 36,
