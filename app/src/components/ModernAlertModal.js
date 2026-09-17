@@ -92,7 +92,7 @@ const ModernAlertModal = ({
           useNativeDriver: true,
         }),
       ]).start();
-    } else {
+    } else if (isRendered) {
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 0,
@@ -113,27 +113,30 @@ const ModernAlertModal = ({
 
   if (!visible && !isRendered) return null;
 
-  const animateAndDismiss = (actionFn) => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 160,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 500,
-        duration: 180,
-        easing: Easing.in(Easing.ease),
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setIsRendered(false);
-      if (typeof actionFn === 'function') {
-        actionFn();
-      } else if (typeof onClose === 'function') {
-        onClose();
-      }
-    });
+  const handlePrimaryPress = () => {
+    if (typeof onPrimaryPress === 'function') {
+      onPrimaryPress();
+    } else if (typeof onClose === 'function') {
+      onClose();
+    }
+  };
+
+  const handleSecondaryPress = () => {
+    if (typeof onSecondaryPress === 'function') {
+      onSecondaryPress();
+    } else if (typeof onClose === 'function') {
+      onClose();
+    }
+  };
+
+  const handleDismiss = () => {
+    if (typeof onClose === 'function') {
+      onClose();
+    } else if (typeof onSecondaryPress === 'function') {
+      onSecondaryPress();
+    } else if (typeof onPrimaryPress === 'function') {
+      onPrimaryPress();
+    }
   };
 
   const getIconConfig = () => {
@@ -201,7 +204,7 @@ const ModernAlertModal = ({
       transparent={true}
       animationType="none"
       statusBarTranslucent={true}
-      onRequestClose={() => animateAndDismiss(onSecondaryPress || onClose || onPrimaryPress)}
+      onRequestClose={handleDismiss}
     >
       <View
         style={[
@@ -227,12 +230,13 @@ const ModernAlertModal = ({
           <TouchableOpacity
             style={StyleSheet.absoluteFillObject}
             activeOpacity={1}
-            onPress={() => animateAndDismiss(onSecondaryPress || onClose)}
+            onPress={handleDismiss}
           />
         </Animated.View>
 
         {/* Animated iOS Bottom Sheet Card */}
         <Animated.View
+          pointerEvents="auto"
           style={[
             styles.sheetCard,
             {
@@ -269,8 +273,9 @@ const ModernAlertModal = ({
             {hasTwoButtons && (
               <TouchableOpacity
                 style={styles.secondaryButton}
-                activeOpacity={0.75}
-                onPress={() => animateAndDismiss(onSecondaryPress || onClose)}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                onPress={handleSecondaryPress}
               >
                 <Text style={styles.secondaryButtonText}>{secondaryButtonText}</Text>
               </TouchableOpacity>
@@ -282,8 +287,9 @@ const ModernAlertModal = ({
                 !hasTwoButtons && styles.singlePrimaryButton,
                 (isDestructive || type === 'logout') && styles.destructivePrimaryButton,
               ]}
-              activeOpacity={0.85}
-              onPress={() => animateAndDismiss(onPrimaryPress)}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={handlePrimaryPress}
             >
               <Text style={styles.primaryButtonText}>{primaryButtonText}</Text>
             </TouchableOpacity>
@@ -323,7 +329,8 @@ const getStyles = (isDarkMode) =>
       shadowOffset: { width: 0, height: -8 },
       shadowOpacity: 0.22,
       shadowRadius: 20,
-      elevation: 35,
+      elevation: 50,
+      zIndex: 1000,
     },
     dragHandle: {
       width: 36,
