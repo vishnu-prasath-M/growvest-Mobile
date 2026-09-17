@@ -9,17 +9,17 @@ import {
   Animated,
   Platform,
 } from 'react-native';
-import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 /**
- * ModernAlertModal - 100% Fidelity Bottom Sheet Confirmation & Alert Modal
+ * ModernAlertModal - Premium iOS-Grade Bottom Sheet Confirmation & Alert Modal
  *
  * Props:
  * - visible: boolean
- * - type: 'success' | 'warning' | 'error' | 'payout' | 'logout' | 'lock' | 'processing' | 'info'
+ * - type: 'success' | 'warning' | 'error' | 'payout' | 'logout' | 'lock' | 'applock' | 'processing' | 'info'
  * - title: string
  * - message: string
  * - primaryButtonText: string (default: 'OK')
@@ -43,7 +43,7 @@ const ModernAlertModal = ({
 }) => {
   const { isDarkMode } = useTheme();
   const styles = React.useMemo(() => getStyles(isDarkMode), [isDarkMode]);
-  const slideAnim = React.useRef(new Animated.Value(400)).current;
+  const slideAnim = React.useRef(new Animated.Value(SCREEN_HEIGHT * 0.5)).current;
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
@@ -51,12 +51,12 @@ const ModernAlertModal = ({
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 180,
+          duration: 200,
           useNativeDriver: true,
         }),
         Animated.spring(slideAnim, {
           toValue: 0,
-          bounciness: 4,
+          bounciness: 3,
           speed: 16,
           useNativeDriver: true,
         }),
@@ -65,12 +65,12 @@ const ModernAlertModal = ({
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 0,
-          duration: 140,
+          duration: 150,
           useNativeDriver: true,
         }),
         Animated.timing(slideAnim, {
-          toValue: 400,
-          duration: 160,
+          toValue: SCREEN_HEIGHT * 0.5,
+          duration: 180,
           useNativeDriver: true,
         }),
       ]).start();
@@ -83,53 +83,54 @@ const ModernAlertModal = ({
     switch (type) {
       case 'success':
         return {
-          bg: '#22C55E',
-          component: <Ionicons name="checkmark" size={36} color="#FFFFFF" />,
+          bg: '#34C759',
+          border: 'transparent',
+          component: <Ionicons name="checkmark" size={38} color="#FFFFFF" />,
         };
       case 'warning':
       case 'problem':
         return {
-          bg: isDarkMode ? '#3B2A05' : '#FFFBEB',
-          borderColor: isDarkMode ? '#F59E0B' : '#FDE68A',
-          component: <Ionicons name="warning" size={36} color="#F59E0B" />,
+          bg: isDarkMode ? '#3A2800' : '#FFF9E6',
+          border: '#FF9F0A',
+          component: <Ionicons name="warning" size={34} color="#FF9F0A" />,
         };
       case 'error':
         return {
-          bg: isDarkMode ? '#3B1212' : '#FEF2F2',
-          borderColor: isDarkMode ? '#EF4444' : '#FECACA',
-          component: <Ionicons name="alert-circle" size={36} color="#EF4444" />,
+          bg: isDarkMode ? '#3A1010' : '#FFEEEE',
+          border: '#FF3B30',
+          component: <Ionicons name="close" size={36} color="#FF3B30" />,
         };
       case 'logout':
         return {
-          bg: isDarkMode ? '#3B1212' : '#FEE2E2',
-          borderColor: isDarkMode ? '#EF4444' : '#FCA5A5',
-          component: <MaterialCommunityIcons name="logout-variant" size={34} color="#DC2626" />,
+          bg: isDarkMode ? '#3A1010' : '#FEE2E2',
+          border: '#FF3B30',
+          component: <Ionicons name="log-out-outline" size={34} color="#FF3B30" />,
         };
       case 'lock':
       case 'applock':
         return {
           bg: isDarkMode ? '#0E2E1D' : '#ECFDF5',
-          borderColor: isDarkMode ? '#10B981' : '#A7F3D0',
-          component: <MaterialCommunityIcons name="shield-lock-outline" size={36} color="#059669" />,
+          border: '#34C759',
+          component: <Ionicons name="shield-checkmark" size={34} color="#34C759" />,
         };
       case 'payout':
       case 'chit':
         return {
           bg: isDarkMode ? '#0E2E1D' : '#ECFDF5',
-          borderColor: isDarkMode ? '#10B981' : '#A7F3D0',
-          component: <MaterialCommunityIcons name="cash-fast" size={36} color="#059669" />,
+          border: '#34C759',
+          component: <Ionicons name="wallet-outline" size={34} color="#34C759" />,
         };
       case 'processing':
         return {
-          bg: isDarkMode ? '#0E2E1D' : '#ECFDF5',
-          borderColor: isDarkMode ? '#10B981' : '#A7F3D0',
-          component: <Ionicons name="paper-plane" size={34} color="#059669" />,
+          bg: isDarkMode ? '#0D2B45' : '#EBF5FF',
+          border: '#007AFF',
+          component: <Ionicons name="paper-plane" size={32} color="#007AFF" />,
         };
       default:
         return {
-          bg: isDarkMode ? '#0E2E1D' : '#ECFDF5',
-          borderColor: isDarkMode ? '#10B981' : '#A7F3D0',
-          component: <Ionicons name="information-circle" size={38} color="#059669" />,
+          bg: isDarkMode ? '#0D2B45' : '#EBF5FF',
+          border: '#007AFF',
+          component: <Ionicons name="information-circle" size={36} color="#007AFF" />,
         };
     }
   };
@@ -140,13 +141,13 @@ const ModernAlertModal = ({
   return (
     <Modal
       visible={visible}
-      transparent
+      transparent={true}
       animationType="none"
-      statusBarTranslucent
+      statusBarTranslucent={true}
       onRequestClose={onClose || onSecondaryPress || onPrimaryPress}
     >
-      <View style={styles.overlay}>
-        {/* Backdrop Dismiss */}
+      <View style={styles.modalRoot}>
+        {/* Fullscreen Backdrop */}
         <Animated.View style={[StyleSheet.absoluteFillObject, styles.backdrop, { opacity: fadeAnim }]}>
           <TouchableOpacity
             style={StyleSheet.absoluteFillObject}
@@ -155,7 +156,7 @@ const ModernAlertModal = ({
           />
         </Animated.View>
 
-        {/* Bottom Sheet Card */}
+        {/* Bottom Sheet Modal Body */}
         <Animated.View
           style={[
             styles.sheetContainer,
@@ -164,17 +165,17 @@ const ModernAlertModal = ({
             },
           ]}
         >
-          {/* Drag Handle Bar */}
+          {/* iOS Drag Indicator Bar */}
           <View style={styles.dragHandle} />
 
-          {/* Centered Top Icon Badge */}
+          {/* Icon Badge */}
           <View
             style={[
               styles.iconCircle,
               {
                 backgroundColor: iconConfig.bg,
-                borderColor: iconConfig.borderColor || 'transparent',
-                borderWidth: iconConfig.borderColor ? 1.5 : 0,
+                borderColor: iconConfig.border,
+                borderWidth: iconConfig.border !== 'transparent' ? 2 : 0,
               },
             ]}
           >
@@ -190,7 +191,7 @@ const ModernAlertModal = ({
             {hasTwoButtons && (
               <TouchableOpacity
                 style={styles.secondaryButton}
-                activeOpacity={0.8}
+                activeOpacity={0.75}
                 onPress={onSecondaryPress || onClose}
               >
                 <Text style={styles.secondaryButtonText}>{secondaryButtonText}</Text>
@@ -217,75 +218,68 @@ const ModernAlertModal = ({
 
 const getStyles = (isDarkMode) =>
   StyleSheet.create({
-    overlay: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      width: '100%',
-      height: '100%',
+    modalRoot: {
+      flex: 1,
+      width: SCREEN_WIDTH,
+      height: SCREEN_HEIGHT,
       justifyContent: 'flex-end',
-      alignItems: 'center',
-      zIndex: 999999,
+      backgroundColor: 'transparent',
     },
     backdrop: {
-      backgroundColor: 'rgba(0, 0, 0, 0.58)',
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0, 0, 0, 0.52)',
     },
     sheetContainer: {
-      width: '100%',
-      backgroundColor: isDarkMode ? '#161B22' : '#FFFFFF',
+      width: SCREEN_WIDTH,
+      backgroundColor: isDarkMode ? '#1C1C1E' : '#FFFFFF',
       borderTopLeftRadius: 32,
       borderTopRightRadius: 32,
       paddingHorizontal: 24,
-      paddingTop: 14,
-      paddingBottom: Platform.OS === 'ios' ? 38 : 28,
+      paddingTop: 12,
+      paddingBottom: Platform.OS === 'ios' ? 42 : 30,
       alignItems: 'center',
-      alignSelf: 'stretch',
       shadowColor: '#000',
       shadowOffset: { width: 0, height: -6 },
-      shadowOpacity: 0.22,
-      shadowRadius: 18,
-      elevation: 24,
+      shadowOpacity: 0.18,
+      shadowRadius: 16,
+      elevation: 30,
     },
     dragHandle: {
-      width: 42,
+      width: 38,
       height: 4.5,
-      borderRadius: 3,
+      borderRadius: 2.5,
       backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.22)' : '#E5E7EB',
       marginBottom: 20,
     },
     iconCircle: {
-      width: 66,
-      height: 66,
-      borderRadius: 33,
+      width: 68,
+      height: 68,
+      borderRadius: 34,
       justifyContent: 'center',
       alignItems: 'center',
       marginBottom: 16,
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
+      shadowOffset: { width: 0, height: 3 },
       shadowOpacity: 0.1,
-      shadowRadius: 8,
+      shadowRadius: 6,
       elevation: 4,
     },
     title: {
       fontSize: 20,
       fontWeight: '700',
-      color: isDarkMode ? '#F3F4F6' : '#111827',
+      color: isDarkMode ? '#F2F2F7' : '#000000',
       textAlign: 'center',
       marginBottom: 8,
-      letterSpacing: -0.2,
+      letterSpacing: -0.3,
       paddingHorizontal: 12,
-      alignSelf: 'center',
     },
     message: {
       fontSize: 14,
-      lineHeight: 21,
-      color: isDarkMode ? '#9CA3AF' : '#6B7280',
+      lineHeight: 20,
+      color: isDarkMode ? '#8E8E93' : '#6B7280',
       textAlign: 'center',
       marginBottom: 26,
       paddingHorizontal: 8,
-      alignSelf: 'center',
     },
     buttonRow: {
       flexDirection: 'row',
@@ -296,30 +290,28 @@ const getStyles = (isDarkMode) =>
     },
     secondaryButton: {
       flex: 1,
-      height: 48,
-      borderRadius: 24,
-      backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#F3F4F6',
+      height: 50,
+      borderRadius: 25,
+      backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : '#F2F2F7',
       justifyContent: 'center',
       alignItems: 'center',
-      borderWidth: 1,
-      borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.12)' : '#E5E7EB',
     },
     secondaryButtonText: {
       fontSize: 15,
       fontWeight: '600',
-      color: isDarkMode ? '#E5E7EB' : '#1F2937',
+      color: isDarkMode ? '#F2F2F7' : '#1C1C1E',
     },
     primaryButton: {
       flex: 1,
-      height: 48,
-      borderRadius: 24,
-      backgroundColor: '#111827',
+      height: 50,
+      borderRadius: 25,
+      backgroundColor: '#1C1C1E',
       justifyContent: 'center',
       alignItems: 'center',
-      shadowColor: '#111827',
-      shadowOffset: { width: 0, height: 3 },
-      shadowOpacity: 0.2,
-      shadowRadius: 6,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.15,
+      shadowRadius: 4,
       elevation: 3,
     },
     singlePrimaryButton: {
@@ -327,8 +319,8 @@ const getStyles = (isDarkMode) =>
       width: '100%',
     },
     destructivePrimaryButton: {
-      backgroundColor: '#DC2626',
-      shadowColor: '#DC2626',
+      backgroundColor: '#FF3B30',
+      shadowColor: '#FF3B30',
     },
     primaryButtonText: {
       fontSize: 15,
