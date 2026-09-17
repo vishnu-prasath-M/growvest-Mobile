@@ -618,9 +618,17 @@ const CreateSIPScreen = ({ navigation, route }) => {
       </ScrollView>
 
       {/* Confirmation Modal */}
-      <Modal visible={showConfirmModal} transparent animationType="fade">
+      <Modal visible={showConfirmModal} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowConfirmModal(false)}>
         <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            activeOpacity={1}
+            onPress={() => setShowConfirmModal(false)}
+          />
           <View style={styles.modalContent}>
+            {/* Grab Handle */}
+            <View style={styles.dragHandle} />
+
             <View style={styles.modalIconWrap}>
               <MaterialCommunityIcons name="shield-check" size={36} color="#085428" />
             </View>
@@ -1088,49 +1096,69 @@ const getStyles = (themeColors, isDark) =>
       fontWeight: '700',
     },
     modalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.7)',
-      justifyContent: 'center',
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.55)',
+      justifyContent: 'flex-end',
       alignItems: 'center',
-      padding: 20,
     },
     modalContent: {
       width: '100%',
-      backgroundColor: isDark ? '#0E1E15' : (themeColors.surface || '#FFFFFF'),
-      borderRadius: 20,
-      padding: 20,
+      backgroundColor: isDark ? '#1C1C1E' : (themeColors.surface || '#FFFFFF'),
+      borderTopLeftRadius: 32,
+      borderTopRightRadius: 32,
+      paddingHorizontal: 24,
+      paddingTop: 12,
+      paddingBottom: Platform.OS === 'ios' ? 44 : 28,
       alignItems: 'center',
-      borderWidth: 1,
-      borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: -8 },
+      shadowOpacity: 0.22,
+      shadowRadius: 20,
+      elevation: 35,
+    },
+    dragHandle: {
+      width: 36,
+      height: 4.5,
+      borderRadius: 3,
+      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.2)' : '#E5E7EB',
+      marginBottom: 16,
+      alignSelf: 'center',
     },
     modalIconWrap: {
-      width: 60,
-      height: 60,
-      borderRadius: 30,
+      width: 64,
+      height: 64,
+      borderRadius: 32,
       backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : '#DCFCE7',
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: 12,
     },
     modalTitle: {
-      fontSize: 18,
-      fontWeight: '800',
-      color: themeColors.text || (isDark ? '#FFFFFF' : '#0F172A'),
+      fontSize: 20,
+      fontWeight: '700',
+      color: themeColors.text || (isDark ? '#F9FAFB' : '#111827'),
       marginBottom: 4,
+      textAlign: 'center',
+      letterSpacing: -0.3,
     },
     modalSubtitle: {
       fontSize: 13,
-      color: themeColors.textMuted || (isDark ? '#9CA3AF' : '#64748B'),
+      color: themeColors.textMuted || (isDark ? '#9CA3AF' : '#6B7280'),
       textAlign: 'center',
       marginBottom: 16,
       lineHeight: 18,
+      paddingHorizontal: 8,
     },
     modalBreakdown: {
       width: '100%',
       backgroundColor: isDark ? '#14291D' : '#F8FAFC',
-      padding: 12,
-      borderRadius: 12,
-      marginBottom: 12,
+      padding: 14,
+      borderRadius: 16,
+      marginBottom: 14,
       borderWidth: 1,
       borderColor: isDark ? 'rgba(255, 255, 255, 0.06)' : '#E2E8F0',
     },
@@ -1152,36 +1180,44 @@ const getStyles = (themeColors, isDark) =>
       fontSize: 11,
       color: isDark ? '#FBBF24' : '#D97706',
       textAlign: 'center',
-      marginBottom: 16,
+      marginBottom: 18,
       lineHeight: 16,
+      paddingHorizontal: 8,
     },
     modalBtnRow: {
       flexDirection: 'row',
-      gap: 10,
+      gap: 12,
       width: '100%',
     },
     modalCancelBtn: {
       flex: 1,
-      paddingVertical: 12,
+      height: 48,
+      borderRadius: 24,
       alignItems: 'center',
-      borderRadius: 12,
-      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
+      justifyContent: 'center',
+      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.12)' : '#F3F4F6',
     },
     modalCancelBtnText: {
-      fontSize: 14,
-      fontWeight: '700',
-      color: isDark ? '#E2E8F0' : '#0F172A',
+      fontSize: 15,
+      fontWeight: '600',
+      color: isDark ? '#F3F4F6' : '#1F2937',
     },
     modalConfirmBtn: {
       flex: 1.5,
-      paddingVertical: 12,
+      height: 48,
+      borderRadius: 24,
       alignItems: 'center',
-      borderRadius: 12,
-      backgroundColor: '#085428',
+      justifyContent: 'center',
+      backgroundColor: '#111827',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.18,
+      shadowRadius: 4,
+      elevation: 3,
     },
     modalConfirmBtnText: {
-      fontSize: 14,
-      fontWeight: '700',
+      fontSize: 15,
+      fontWeight: '600',
       color: '#FFFFFF',
     },
   });
