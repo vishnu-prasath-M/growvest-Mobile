@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Alert,
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
@@ -12,9 +11,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { investmentService } from '../../services/investmentService';
 import { colors } from '../../theme/theme';
 import { useTheme } from '../../context/ThemeContext';
+import { useAlert } from '../../context/AlertContext';
 
 const InvestmentStatusScreen = ({ navigation, route }) => {
   const { colors: themeColors } = useTheme();
+  const { showConfirm, showSuccess, showError } = useAlert();
   const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const { amount, type, userData } = route.params;
   const [loading, setLoading] = useState(false);
@@ -23,14 +24,16 @@ const InvestmentStatusScreen = ({ navigation, route }) => {
     `₹${value?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`;
 
   const handleConfirm = () => {
-    Alert.alert(
-      'Submit Investment',
-      'Your investment request will be sent to the admin for approval. Continue?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Submit', onPress: async () => { await submitInvestment(); } },
-      ]
-    );
+    showConfirm({
+      title: 'Submit Investment',
+      message: 'Your investment request will be sent to the admin for approval. Continue?',
+      confirmText: 'Submit',
+      cancelText: 'Cancel',
+      type: 'info',
+      onConfirm: async () => {
+        await submitInvestment();
+      },
+    });
   };
 
   const submitInvestment = async () => {
@@ -44,21 +47,16 @@ const InvestmentStatusScreen = ({ navigation, route }) => {
         mobileNumber: userData?.mobileNumber,
       });
       
-      Alert.alert(
+      showSuccess(
         'Investment Submitted!',
         'Your investment request has been submitted successfully. It will be approved within 24-48 hours.',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
-            },
-          },
-        ]
+        () => {
+          navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+        }
       );
     } catch (error) {
       console.error('Error submitting investment:', error);
-      Alert.alert('Error', error.message || 'Failed to submit investment request');
+      showError('Error', error.message || 'Failed to submit investment request');
     } finally {
       setLoading(false);
     }

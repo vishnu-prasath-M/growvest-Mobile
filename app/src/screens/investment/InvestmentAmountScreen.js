@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   TouchableOpacity,
   Modal,
   ActivityIndicator,
@@ -21,9 +20,11 @@ import TopBar from '../../components/TopBar';
 import { useTheme } from '../../context/ThemeContext';
 import KycRequiredModal from '../../components/KycRequiredModal';
 import { kycService } from '../../services/kycService';
+import { useAlert } from '../../context/AlertContext';
 
 const InvestmentAmountScreen = ({ navigation, route }) => {
-  const { colors: themeColors, isDarkMode } = useTheme();
+  const { colors: themeColors } = useTheme();
+  const { showError, showWarning } = useAlert();
   const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
   
   const initialPlan = route.params?.initialPlan || route.params?.type || null;
@@ -144,12 +145,12 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
 
   const handleContinue = async () => {
     if (!amount || parseFloat(amount) <= 0) {
-      Alert.alert('Error', 'Please enter a valid amount');
+      showError('Error', 'Please enter a valid amount');
       return;
     }
 
     if (parseFloat(amount) < 10) {
-      Alert.alert('Error', 'Minimum investment amount is ₹10');
+      showError('Error', 'Minimum investment amount is ₹10');
       return;
     }
 
@@ -159,7 +160,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
     const minAllowedDate = new Date(todayMidnight.getTime() + 2 * 24 * 60 * 60 * 1000);
 
     if (isNaN(chosenDate.getTime()) || chosenDate < minAllowedDate) {
-      Alert.alert('Invalid Duration', 'Minimum investment duration is 2 days. Same-day or 1-day investments are not permitted.');
+      showWarning('Invalid Duration', 'Minimum investment duration is 2 days. Same-day or 1-day investments are not permitted.');
       return;
     }
 
@@ -177,7 +178,7 @@ const InvestmentAmountScreen = ({ navigation, route }) => {
     }
 
     if (isReinvestment && maturedAmount && parseFloat(amount) > maturedAmount) {
-      Alert.alert(
+      showWarning(
         'Amount Exceeds Available',
         `The maximum available amount to reinvest from this matured investment is ₹${maturedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}.`
       );

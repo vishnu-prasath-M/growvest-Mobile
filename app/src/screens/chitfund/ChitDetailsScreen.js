@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
-  Alert,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,7 +19,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const ChitDetailsScreen = ({ navigation, route }) => {
   const { colors: themeColors } = useTheme();
-  const { showConfirm, showSuccess, showError } = useAlert();
+  const { showConfirm, showSuccess, showError, showWarning } = useAlert();
   const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const insets = useScreenInsets(8);
   const { chitId } = route.params || {};
@@ -630,7 +629,7 @@ const ChitDetailsScreen = ({ navigation, route }) => {
               activeOpacity={0.85}
               onPress={() => {
                 if (isFull) {
-                  Alert.alert('Slot Full', 'This Chit is already full.');
+                  showWarning('Slot Full', 'This Chit is already full.');
                 } else if (!isClosed) {
                   navigation.navigate('JoinChit', { chitId: chit._id });
                 }

@@ -682,7 +682,7 @@ const ActivePlansCardDeck = React.memo(({
 
 const HomeScreen = ({ navigation }) => {
   const { isDarkMode, colors: themeColors } = useTheme();
-  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
+  const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
   const insets = useScreenInsets(8);
   const { user: authUser, updateUser } = useAuth();
   const [dashboardData, setDashboardData] = useState(null);
@@ -1053,20 +1053,48 @@ const HomeScreen = ({ navigation }) => {
 
           {/* ── Pending Requests (if any) ── */}
           {pendingRequests > 0 && (
-            <View style={[styles.section, { marginTop: 16 }]}>
+            <View style={[styles.section, { marginTop: 18 }]}>
               <TouchableOpacity
-                style={styles.pendingBanner}
-                activeOpacity={0.8}
+                style={styles.pendingCardWrapper}
+                activeOpacity={0.88}
                 onPress={() => navigation.navigate('Withdraw')}
               >
-                <View style={styles.pendingIconBox}>
-                  <MaterialCommunityIcons name="clock-outline" size={18} color={colors.warning} />
-                </View>
-                <View style={styles.pendingContent}>
-                  <Text style={styles.pendingLabel}>Pending Requests</Text>
-                  <Text style={styles.pendingCount}>{pendingRequests} awaiting approval</Text>
-                </View>
-                <MaterialCommunityIcons name="chevron-right" size={18} color={themeColors.textMuted} />
+                <LinearGradient
+                  colors={isDarkMode ? ['#241D12', '#18130B'] : ['#FFFDF5', '#FEF8EB']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.pendingBanner}
+                >
+                  {/* Ambient decorative glow */}
+                  <View style={styles.pendingGlowAura} />
+
+                  {/* Dual-tone squircle icon */}
+                  <LinearGradient
+                    colors={['#F59E0B', '#D97706']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.pendingIconBox}
+                  >
+                    <MaterialCommunityIcons name="clock-time-four" size={20} color="#FFFFFF" />
+                  </LinearGradient>
+
+                  <View style={styles.pendingContent}>
+                    <View style={styles.pendingHeaderRow}>
+                      <Text style={[styles.pendingLabel, { color: themeColors.text }]}>Pending Requests</Text>
+                      <View style={styles.pendingStatusBadge}>
+                        <View style={styles.pendingPulseDot} />
+                        <Text style={styles.pendingStatusBadgeText}>ACTION REQUIRED</Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.pendingCount, { color: themeColors.textSecondary }]}>
+                      {pendingRequests} {pendingRequests === 1 ? 'request' : 'requests'} awaiting verification
+                    </Text>
+                  </View>
+
+                  <View style={styles.pendingActionCircle}>
+                    <MaterialCommunityIcons name="chevron-right" size={20} color={isDarkMode ? '#F59E0B' : '#B45309'} />
+                  </View>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           )}
@@ -1351,7 +1379,7 @@ const HomeScreen = ({ navigation }) => {
 };
 
 // ─── Styles ─────────────────────────────────────────────────────────────────
-const getStyles = (colors) => StyleSheet.create({
+const getStyles = (colors, isDarkMode = false) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 20 },
@@ -1468,20 +1496,96 @@ const getStyles = (colors) => StyleSheet.create({
   quickActionImage: { width: 34, height: 34 },
 
   // Pending Banner
+  pendingCardWrapper: {
+    borderRadius: 20,
+    shadowColor: '#D97706',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: isDarkMode ? 0.22 : 0.08,
+    shadowRadius: 10,
+    elevation: 3,
+  },
   pendingBanner: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.warningLight, borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 20,
     padding: 14,
-    borderWidth: 1, borderColor: '#FDEBC4',
+    borderWidth: 1.5,
+    borderColor: isDarkMode ? 'rgba(245, 158, 11, 0.28)' : 'rgba(245, 158, 11, 0.22)',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  pendingGlowAura: {
+    position: 'absolute',
+    top: -30,
+    right: -20,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.08)' : 'rgba(245, 158, 11, 0.06)',
   },
   pendingIconBox: {
-    width: 36, height: 36, borderRadius: 12,
-    backgroundColor: '#FEF3C2', justifyContent: 'center', alignItems: 'center',
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 12,
+    shadowColor: '#D97706',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  pendingContent: { flex: 1 },
-  pendingLabel: { fontSize: 13, fontWeight: '600', color: colors.warning },
-  pendingCount: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  pendingContent: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  pendingHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    flexWrap: 'wrap',
+    marginBottom: 3,
+  },
+  pendingLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  pendingStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.20)' : 'rgba(245, 158, 11, 0.12)',
+  },
+  pendingPulseDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#F59E0B',
+  },
+  pendingStatusBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: isDarkMode ? '#FBBF24' : '#D97706',
+    letterSpacing: 0.4,
+  },
+  pendingCount: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  pendingActionCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.15)' : 'rgba(245, 158, 11, 0.10)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
 
   // Portfolio Overview Grid
   portfolioGrid: { flexDirection: 'row', gap: 12 },

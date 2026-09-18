@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  Alert,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,9 +15,11 @@ import TopBar from '../../components/TopBar';
 import api from '../../services/apiService';
 import { kycService } from '../../services/kycService';
 import KycRequiredModal from '../../components/KycRequiredModal';
+import { useAlert } from '../../context/AlertContext';
 
 const PocketMoneyScreen = ({ navigation }) => {
   const { colors: themeColors, isDarkMode } = useTheme();
+  const { showSuccess, showError } = useAlert();
   const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
   const [pocketPlans, setPocketPlans] = useState([]);
   const [transactions, setTransactions] = useState([]);
@@ -40,13 +41,13 @@ const PocketMoneyScreen = ({ navigation }) => {
       if (!planId) return;
       const res = await api.post(`/pocket-money/request-payout/${planId}`);
       if (res && res.data) {
-        Alert.alert('Request Sent', `Your payout request of ₹${payoutAmt} has been sent to Admin. You will be notified once released!`);
+        showSuccess('Request Sent', `Your payout request of ₹${payoutAmt} has been sent to Admin. You will be notified once released!`);
         setPayoutStatuses((prev) => ({ ...prev, [planId]: 'requested' }));
         loadData();
       }
     } catch (error) {
       const msg = error.response?.data?.message || 'Failed to request payout. Try again tomorrow.';
-      Alert.alert('Request Failed', msg);
+      showError('Request Failed', msg);
     }
   };
 

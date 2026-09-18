@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   TouchableOpacity,
   Modal,
 } from 'react-native';
@@ -17,9 +16,11 @@ import TopBar from '../../components/TopBar';
 import { useTheme } from '../../context/ThemeContext';
 import KycRequiredModal from '../../components/KycRequiredModal';
 import { kycService } from '../../services/kycService';
+import { useAlert } from '../../context/AlertContext';
 
 const PocketMoneyAmountScreen = ({ navigation }) => {
   const { colors: themeColors } = useTheme();
+  const { showError } = useAlert();
   const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const [amount, setAmount] = useState('');
   const [frequency, setFrequency] = useState('daily');
@@ -48,12 +49,12 @@ const PocketMoneyAmountScreen = ({ navigation }) => {
 
   const handleContinue = async () => {
     if (!amount || parseFloat(amount) <= 0) {
-      Alert.alert('Error', 'Please enter a valid amount');
+      showError('Invalid Amount', 'Please enter a valid amount');
       return;
     }
 
     if (parseFloat(amount) < 1000) {
-      Alert.alert('Error', 'Minimum investment amount is ₹1,000');
+      showError('Minimum Limit', 'Minimum investment amount is ₹1,000');
       return;
     }
 
