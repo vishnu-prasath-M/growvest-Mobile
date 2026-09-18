@@ -6,7 +6,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   TouchableOpacity,
   Dimensions,
   Image,
@@ -20,26 +19,42 @@ import { authService } from '../../services/authService';
 import { useAuth } from '../../context/AuthContext';
 import { colors } from '../../theme/theme';
 import { useTheme } from '../../context/ThemeContext';
+import { useAlert } from '../../context/AlertContext';
 
 const { width, height } = Dimensions.get('window');
 
 const LoginScreen = ({ navigation }) => {
-  const { colors: themeColors } = useTheme();
+  const { colors: themeColors, isDarkMode } = useTheme();
+  const { showError } = useAlert();
   const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
-
+  const [loading, setLoading] = useState(false);
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const { login } = useAuth();
 
   const validateForm = () => {
-    const newErrors = {};
-    if (!email.trim()) newErrors.email = 'Email is required';
-    if (!password) newErrors.password = 'Password is required';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    let isValid = true;
+    if (!email) {
+      setEmailError('Email is required');
+      isValid = false;
+    } else if (!/\S+@\S+\.\S+/.test(email)) {
+      setEmailError('Invalid email format');
+      isValid = false;
+    } else {
+      setEmailError('');
+    }
+
+    if (!password) {
+      setPasswordError('Password is required');
+      isValid = false;
+    } else {
+      setPasswordError('');
+    }
+
+    return isValid;
   };
 
   const handleLogin = async () => {
@@ -50,7 +65,7 @@ const LoginScreen = ({ navigation }) => {
       const res = await authService.login(email, password);
       await login(res.token, res);
     } catch (error) {
-      Alert.alert('Login Failed', error.message || 'Something went wrong');
+      showError('Login Failed', error.message || 'Something went wrong');
     } finally {
       setLoading(false);
     }

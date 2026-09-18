@@ -11,15 +11,15 @@ import {
   Linking,
   Switch,
   ImageBackground,
+  StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { authService } from '../../services/authService';
 import { useAuth } from '../../context/AuthContext';
 import { colors } from '../../theme/theme';
-import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
 import { useTheme } from '../../context/ThemeContext';
 import { useAppLock } from '../../context/AppLockContext';
@@ -30,8 +30,10 @@ const ProfileScreen = ({ navigation }) => {
   const { isDarkMode, toggleTheme, colors: themeColors } = useTheme();
   const { isAppLockEnabled, isBiometricEnabled, refreshLockPreferences, activeUserId } = useAppLock();
   const { showConfirm, showSuccess, showError } = useAlert();
-  const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
-  const insets = useScreenInsets(8);
+  const isFocused = useIsFocused();
+  const insets = useSafeAreaInsets();
+  const [isScrolled, setIsScrolled] = useState(false);
+  const styles = React.useMemo(() => getStyles(themeColors, isDarkMode, insets), [themeColors, isDarkMode, insets]);
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [personalInfoModalVisible, setPersonalInfoModalVisible] = useState(false);
@@ -235,8 +237,33 @@ const ProfileScreen = ({ navigation }) => {
   const activeUserObj = userData || authUser;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+    <View style={styles.container}>
+      {isFocused && (
+        <StatusBar
+          barStyle={isScrolled ? (isDarkMode ? 'light-content' : 'dark-content') : 'light-content'}
+          backgroundColor="transparent"
+          translucent
+        />
+      )}
+      {/* Dynamic status bar background strip: only shows after scroll */}
+      {isScrolled && (
+        <View
+          style={[
+            styles.statusBarOverlay,
+            { height: insets.top, backgroundColor: themeColors.surface || themeColors.background },
+          ]}
+        />
+      )}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        onScroll={(e) => {
+          const y = e.nativeEvent.contentOffset.y;
+          setIsScrolled(y > 45);
+        }}
+        scrollEventThrottle={16}
+      >
         {/* Hero Banner */}
         <View style={styles.heroBannerOuter}>
           <LinearGradient
@@ -663,12 +690,21 @@ const ProfileScreen = ({ navigation }) => {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 
-const getStyles = (themeColors, isDarkMode) => StyleSheet.create({
+const getStyles = (themeColors, isDarkMode, insets = { top: 0 }) => StyleSheet.create({
   container: { flex: 1, backgroundColor: themeColors.background },
+  statusBarOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 999,
+    borderBottomWidth: 1,
+    borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+  },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 20 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -680,7 +716,13 @@ const getStyles = (themeColors, isDarkMode) => StyleSheet.create({
 
   // Hero
   heroBannerOuter: { position: 'relative', marginBottom: 60 },
-  heroBanner: { height: 160, borderBottomLeftRadius: 40, borderBottomRightRadius: 40, overflow: 'hidden' },
+  heroBanner: {
+    height: 160 + (insets?.top || 0),
+    paddingTop: insets?.top || 0,
+    borderBottomLeftRadius: 40,
+    borderBottomRightRadius: 40,
+    overflow: 'hidden',
+  },
   heroBlobGold: {
     position: 'absolute', bottom: -30, right: -30,
     width: 160, height: 160, borderRadius: 80,

@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Switch,
   Modal,
-  Alert,
   Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -31,7 +30,7 @@ const TIMEOUT_OPTIONS = [
 
 export default function AppLockSettingsScreen({ navigation }) {
   const { colors: themeColors, isDarkMode } = useTheme();
-  const { showSuccess, showWarning, showError } = useAlert();
+  const { showSuccess, showWarning, showError, showConfirm } = useAlert();
   const { user } = useAuth();
   const {
     isAppLockEnabled,
@@ -54,12 +53,6 @@ export default function AppLockSettingsScreen({ navigation }) {
   const [pinFirst, setPinFirst] = useState('');
   const [pinConfirm, setPinConfirm] = useState('');
   const [pinError, setPinError] = useState('');
-
-  // Biometric prompt modal after initial setup
-  const [promptBiometricVisible, setPromptBiometricVisible] = useState(false);
-
-  // Disable Confirmation Modal
-  const [disableModalVisible, setDisableModalVisible] = useState(false);
 
   const resetPinInputs = () => {
     setPinCurrent('');
@@ -118,7 +111,21 @@ export default function AppLockSettingsScreen({ navigation }) {
 
               // If device supports biometrics, offer immediate toggle
               if (biometricInfo.hasHardware && biometricInfo.isEnrolled) {
-                setPromptBiometricVisible(true);
+                showConfirm({
+                  title: `Enable ${biometricInfo.label || 'Biometrics'}?`,
+                  message: `Would you like to use your ${biometricInfo.biometryType || 'fingerprint'} for faster unlock?`,
+                  confirmText: 'Enable',
+                  cancelText: 'PIN Only',
+                  type: 'info',
+                  onConfirm: async () => {
+                    await appLockService.setBiometricEnabled(userId, true);
+                    await refreshLockPreferences();
+                    showSuccess('Success', 'App Lock and Biometric unlock enabled!');
+                  },
+                  onCancel: () => {
+                    showSuccess('Success', 'App Lock enabled successfully.');
+                  },
+                });
               } else {
                 showSuccess('Success', 'App Lock enabled successfully.');
               }
@@ -187,7 +194,15 @@ export default function AppLockSettingsScreen({ navigation }) {
           if (isValid) {
             setModalVisible(false);
             resetPinInputs();
-            setDisableModalVisible(true);
+            showConfirm({
+              title: 'Disable App Lock?',
+              message: 'Your app will open without requiring PIN or biometric verification.',
+              confirmText: 'Disable',
+              cancelText: 'Cancel',
+              type: 'warning',
+              isDestructive: true,
+              onConfirm: handleConfirmDisable,
+            });
           } else {
             setPinError('Incorrect PIN');
             setPinCurrent('');
@@ -220,7 +235,15 @@ export default function AppLockSettingsScreen({ navigation }) {
     if (result.success) {
       setModalVisible(false);
       resetPinInputs();
-      setDisableModalVisible(true);
+      showConfirm({
+        title: 'Disable App Lock?',
+        message: 'Your app will open without requiring PIN or biometric verification.',
+        confirmText: 'Disable',
+        cancelText: 'Cancel',
+        type: 'warning',
+        isDestructive: true,
+        onConfirm: handleConfirmDisable,
+      });
     }
   };
 
@@ -230,7 +253,6 @@ export default function AppLockSettingsScreen({ navigation }) {
   const handleConfirmDisable = async () => {
     await appLockService.disableAppLock(userId);
     await refreshLockPreferences();
-    setDisableModalVisible(false);
     showSuccess('Disabled', 'App Lock has been disabled.');
   };
 
@@ -617,77 +639,6 @@ export default function AppLockSettingsScreen({ navigation }) {
               </View>
             </View>
           </SafeAreaView>
-        </View>
-      </Modal>
-
-      {/* Biometric Prompt Offer Modal after successful PIN setup */}
-      <Modal visible={promptBiometricVisible} transparent animationType="fade">
-        <View style={styles.confirmBackdrop}>
-          <View style={[styles.confirmCard, { backgroundColor: themeColors.surface }]}>
-            <View style={styles.confirmIconBox}>
-              <MaterialCommunityIcons
-                name={biometricInfo.biometryType === 'Face' ? 'face-recognition' : 'fingerprint'}
-                size={32}
-                color="#0E3D23"
-              />
-            </View>
-            <Text style={[styles.confirmTitle, { color: themeColors.text }]}>Enable {biometricInfo.label || 'Biometrics'}?</Text>
-            <Text style={[styles.confirmSubtitle, { color: themeColors.textMuted }]}>
-              Would you like to use your {biometricInfo.biometryType || 'fingerprint'} for faster unlock?
-            </Text>
-
-            <View style={styles.confirmButtons}>
-              <TouchableOpacity
-                style={[styles.confirmBtnCancel, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#F1F5F9' }]}
-                onPress={() => setPromptBiometricVisible(false)}
-              >
-                <Text style={[styles.confirmTextCancel, { color: themeColors.textSecondary }]}>PIN Only</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.confirmBtnAction}
-                onPress={async () => {
-                  await appLockService.setBiometricEnabled(userId, true);
-                  await refreshLockPreferences();
-                  setPromptBiometricVisible(false);
-                  Alert.alert('Success', 'App Lock and Biometric unlock enabled!');
-                }}
-              >
-                <Text style={styles.confirmTextAction}>Enable</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Disable App Lock Confirmation Modal */}
-      <Modal visible={disableModalVisible} transparent animationType="fade">
-        <View style={styles.confirmBackdrop}>
-          <View style={[styles.confirmCard, { backgroundColor: themeColors.surface }]}>
-            <View style={[styles.confirmIconBox, { backgroundColor: '#FEE2E2' }]}>
-              <MaterialCommunityIcons name="shield-off-outline" size={32} color="#DC2626" />
-            </View>
-            <Text style={[styles.confirmTitle, { color: themeColors.text }]}>Disable App Lock?</Text>
-            <Text style={[styles.confirmSubtitle, { color: themeColors.textMuted }]}>
-              Your app will open without requiring PIN or biometric verification.
-            </Text>
-
-            <View style={styles.confirmButtons}>
-              <TouchableOpacity
-                style={[styles.confirmBtnCancel, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#F1F5F9' }]}
-                onPress={() => setDisableModalVisible(false)}
-              >
-                <Text style={[styles.confirmTextCancel, { color: themeColors.textSecondary }]}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.confirmBtnAction, { backgroundColor: '#DC2626' }]}
-                onPress={handleConfirmDisable}
-              >
-                <Text style={styles.confirmTextAction}>Disable</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
         </View>
       </Modal>
     </SafeAreaView>

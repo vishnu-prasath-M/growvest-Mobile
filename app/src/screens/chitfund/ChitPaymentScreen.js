@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
@@ -16,9 +15,11 @@ import { authService } from '../../services/authService';
 import KycRequiredModal from '../../components/KycRequiredModal';
 import { kycService } from '../../services/kycService';
 import { useTheme } from '../../context/ThemeContext';
+import { useAlert } from '../../context/AlertContext';
 
 const ChitPaymentScreen = ({ navigation, route }) => {
   const { colors: themeColors } = useTheme();
+  const { showError } = useAlert();
   const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const { chitId, memberId, month, amount, lateFee = 0, type, chitName, returnScreen, isWeekly } = route.params;
   const [loading, setLoading] = useState(false);
@@ -83,10 +84,10 @@ const ChitPaymentScreen = ({ navigation, route }) => {
       },
       onFailure: (error) => {
         console.error('[ChitPayment] Payment failed or cancelled:', error);
-        Alert.alert(
+        showError(
           'Payment Not Completed',
           'Payment was cancelled or failed. Your Chit membership has not been created.',
-          [{ text: 'OK', onPress: () => navigation.goBack() }]
+          () => navigation.goBack()
         );
       },
     });

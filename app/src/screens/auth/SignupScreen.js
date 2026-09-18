@@ -22,11 +22,13 @@ import { authService } from '../../services/authService';
 import { useAuth } from '../../context/AuthContext';
 import { colors } from '../../theme/theme';
 import { useTheme } from '../../context/ThemeContext';
+import { useAlert } from '../../context/AlertContext';
 
 const { width, height } = Dimensions.get('window');
 
 const SignupScreen = ({ navigation }) => {
   const { colors: themeColors } = useTheme();
+  const { showError } = useAlert();
   const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const [username, setUsername] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
@@ -101,7 +103,7 @@ const SignupScreen = ({ navigation }) => {
       });
       await login(res.token, res);
     } catch (error) {
-      Alert.alert('Signup Failed', error.message || 'Something went wrong');
+      showError('Signup Failed', error.message || 'Something went wrong');
     } finally {
       setLoading(false);
     }

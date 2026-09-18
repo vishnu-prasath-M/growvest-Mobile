@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Alert,
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
@@ -11,8 +10,10 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/theme';
 import { chitFundService } from '../../services/chitFundService';
+import { useAlert } from '../../context/AlertContext';
 
 const ChitPaymentStatusScreen = ({ navigation, route }) => {
+  const { showConfirm } = useAlert();
   const { chitId, memberId, month, amount, lateFee, type, chitName, returnScreen } = route.params;
   const [loading, setLoading] = useState(false);
 
@@ -64,14 +65,14 @@ const ChitPaymentStatusScreen = ({ navigation, route }) => {
   };
 
   const handleConfirm = () => {
-    Alert.alert(
-      'Confirm Submission',
-      'Please ensure you have completed the UPI payment before submitting.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Submit Payment', onPress: submitPayment },
-      ]
-    );
+    showConfirm({
+      title: 'Confirm Submission',
+      message: 'Please ensure you have completed the UPI payment before submitting.',
+      confirmText: 'Submit Payment',
+      cancelText: 'Cancel',
+      type: 'info',
+      onConfirm: submitPayment,
+    });
   };
 
   return (
