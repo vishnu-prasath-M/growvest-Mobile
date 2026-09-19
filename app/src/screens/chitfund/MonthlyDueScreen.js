@@ -30,9 +30,9 @@ const getUnitLabel = (isWeekly, count = 1) => {
 };
 
 const MonthlyDueScreen = ({ navigation }) => {
-  const { colors: themeColors } = useTheme();
+  const { colors: themeColors, isDarkMode } = useTheme();
   const { showSuccess, showWarning, showError } = useAlert();
-  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
+  const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
   const insets = useScreenInsets(8);
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedChit, setSelectedChit] = useState(null);
@@ -475,13 +475,20 @@ const MonthlyDueScreen = ({ navigation }) => {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      <Modal visible={showConfirm} transparent animationType="fade">
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowConfirm(false)}>
+      {/* Confirmation Modal */}
+      <Modal visible={showConfirm} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowConfirm(false)}>
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => setShowConfirm(false)} />
           <View style={styles.modalContent}>
+            {/* Grab Handle */}
+            <View style={styles.dragHandle} />
+
             <View style={styles.modalIconWrap}>
-              <MaterialCommunityIcons name="cash-check" size={44} color={colors.primary} />
+              <MaterialCommunityIcons name="cash-check" size={38} color={colors.primary} />
             </View>
             <Text style={styles.modalTitle}>Confirm Payment</Text>
+            <Text style={styles.modalSubtitle}>Please verify your payment details</Text>
+
             <View style={styles.modalRow}>
               <Text style={styles.modalLabel}>Due Installment</Text>
               <Text style={styles.modalValue}>{formatCurrency(selectedChit?.nextDueAmount || selectedChit?.baseDueAmount)}</Text>
@@ -502,41 +509,52 @@ const MonthlyDueScreen = ({ navigation }) => {
               </Text>
             </View>
             <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowConfirm(false)}>
+              <TouchableOpacity style={styles.cancelBtn} activeOpacity={0.7} onPress={() => setShowConfirm(false)}>
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.payBtn}
+                style={styles.payBtnOuter}
+                activeOpacity={0.85}
                 onPress={handlePaymentSuccess}
               >
-                <Text style={styles.payBtnText}>
-                  Pay {formatCurrency((selectedChit?.nextDueAmount || selectedChit?.baseDueAmount || 0) + (selectedChit?.lateFee || 0))}
-                </Text>
+                <LinearGradient
+                  colors={['#0E3D23', '#1A5C39']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.payBtnGradient}
+                >
+                  <Text style={styles.payBtnText}>
+                    Pay {formatCurrency((selectedChit?.nextDueAmount || selectedChit?.baseDueAmount || 0) + (selectedChit?.lateFee || 0))}
+                  </Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* Email Required Modal */}
-      <Modal visible={showEmailModal} transparent animationType="fade" onRequestClose={() => setShowEmailModal(false)}>
+      <Modal visible={showEmailModal} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowEmailModal(false)}>
         <View style={styles.modalOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => setShowEmailModal(false)} />
           <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitleEmail}>Email Required</Text>
-              <TouchableOpacity onPress={() => setShowEmailModal(false)} style={styles.modalCloseBtn}>
-                <MaterialCommunityIcons name="close" size={18} color={colors.textSecondary} />
-              </TouchableOpacity>
+            {/* Grab Handle */}
+            <View style={styles.dragHandle} />
+
+            <View style={[styles.modalIconWrap, { backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.15)' : '#FEF3C7' }]}>
+              <MaterialCommunityIcons name="email-alert-outline" size={34} color="#D97706" />
             </View>
-            <Text style={styles.modalTextEmail}>
+            <Text style={styles.modalTitle}>Email Required</Text>
+            <Text style={styles.modalSubtitle}>
               Your email address is required before making payments. Please update your email in your Profile.
             </Text>
             <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.cancelBtnEmail} onPress={() => setShowEmailModal(false)}>
-                <Text style={styles.cancelBtnTextEmail}>Cancel</Text>
+              <TouchableOpacity style={styles.cancelBtn} activeOpacity={0.7} onPress={() => setShowEmailModal(false)}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.payBtnOuterEmail}
+                style={styles.payBtnOuter}
+                activeOpacity={0.85}
                 onPress={() => {
                   setShowEmailModal(false);
                   navigation.navigate('Profile');
@@ -546,9 +564,9 @@ const MonthlyDueScreen = ({ navigation }) => {
                   colors={['#0E3D23', '#1A5C39']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={styles.payBtnGradientEmail}
+                  style={styles.payBtnGradient}
                 >
-                  <Text style={styles.payBtnTextEmail}>Update Profile</Text>
+                  <Text style={styles.payBtnText}>Update Profile</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -557,47 +575,97 @@ const MonthlyDueScreen = ({ navigation }) => {
       </Modal>
 
       {/* Reminder Modal */}
-      <Modal visible={showReminderModal} transparent animationType="fade" onRequestClose={() => setShowReminderModal(false)}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowReminderModal(false)}>
+      <Modal visible={showReminderModal} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowReminderModal(false)}>
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => setShowReminderModal(false)} />
           <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitleEmail}>Set Reminder</Text>
-              <TouchableOpacity onPress={() => setShowReminderModal(false)} style={styles.modalCloseBtn}>
-                <MaterialCommunityIcons name="close" size={18} color={colors.textSecondary} />
-              </TouchableOpacity>
+            {/* Grab Handle */}
+            <View style={styles.dragHandle} />
+
+            <View style={styles.reminderIconWrap}>
+              <MaterialCommunityIcons name="bell-ring-outline" size={32} color={colors.primary} />
             </View>
-            <Text style={styles.modalTextEmail}>
-              Set a local notification reminder for your upcoming installment of {formatCurrency(reminderChit?.nextDueAmount)} for "{reminderChit?.chitName}".
+            <Text style={styles.modalTitle}>Set Reminder</Text>
+            <Text style={styles.modalSubtitle}>
+              Get notified for your upcoming installment of {formatCurrency(reminderChit?.nextDueAmount)} for "{reminderChit?.chitName}"
             </Text>
             
-            <View style={styles.reminderOptions}>
-              <TouchableOpacity style={styles.reminderOptionBtn} activeOpacity={0.7} onPress={() => handleSetReminder('tomorrow_morning')}>
-                <MaterialCommunityIcons name="weather-sunny" size={20} color={colors.primary} />
-                <Text style={styles.reminderOptionText}>Tomorrow morning (9:00 AM)</Text>
+            <View style={styles.reminderCardsContainer}>
+              <TouchableOpacity
+                style={styles.reminderOptionCard}
+                activeOpacity={0.7}
+                onPress={() => handleSetReminder('tomorrow_morning')}
+              >
+                <View style={styles.reminderOptionLeft}>
+                  <View style={styles.reminderOptionIconBadge}>
+                    <MaterialCommunityIcons name="weather-sunny" size={22} color={colors.primary} />
+                  </View>
+                  <View style={styles.reminderOptionTextWrap}>
+                    <Text style={styles.reminderOptionTitle}>Tomorrow morning</Text>
+                    <Text style={styles.reminderOptionSub}>9:00 AM notification</Text>
+                  </View>
+                </View>
+                <View style={styles.reminderOptionChevron}>
+                  <MaterialCommunityIcons name="chevron-right" size={20} color={colors.primary} />
+                </View>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.reminderOptionBtn} activeOpacity={0.7} onPress={() => handleSetReminder('two_days')}>
-                <MaterialCommunityIcons name="calendar-clock" size={20} color={colors.primary} />
-                <Text style={styles.reminderOptionText}>In 2 Days</Text>
+              <TouchableOpacity
+                style={styles.reminderOptionCard}
+                activeOpacity={0.7}
+                onPress={() => handleSetReminder('two_days')}
+              >
+                <View style={styles.reminderOptionLeft}>
+                  <View style={styles.reminderOptionIconBadge}>
+                    <MaterialCommunityIcons name="calendar-clock" size={22} color={colors.primary} />
+                  </View>
+                  <View style={styles.reminderOptionTextWrap}>
+                    <Text style={styles.reminderOptionTitle}>In 2 Days</Text>
+                    <Text style={styles.reminderOptionSub}>9:00 AM notification</Text>
+                  </View>
+                </View>
+                <View style={styles.reminderOptionChevron}>
+                  <MaterialCommunityIcons name="chevron-right" size={20} color={colors.primary} />
+                </View>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.reminderOptionBtn} activeOpacity={0.7} onPress={() => handleSetReminder('due_date')}>
-                <MaterialCommunityIcons name="alert-decagram-outline" size={20} color={colors.primary} />
-                <Text style={styles.reminderOptionText}>On Due Date ({reminderChit?.nextDueDateFormatted})</Text>
+              <TouchableOpacity
+                style={styles.reminderOptionCard}
+                activeOpacity={0.7}
+                onPress={() => handleSetReminder('due_date')}
+              >
+                <View style={styles.reminderOptionLeft}>
+                  <View style={styles.reminderOptionIconBadge}>
+                    <MaterialCommunityIcons name="calendar-check" size={22} color={colors.primary} />
+                  </View>
+                  <View style={styles.reminderOptionTextWrap}>
+                    <Text style={styles.reminderOptionTitle}>On Due Date</Text>
+                    <Text style={styles.reminderOptionSub} numberOfLines={2}>
+                      {reminderChit?.nextDueDateFormatted} (9:00 AM)
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.reminderOptionChevron}>
+                  <MaterialCommunityIcons name="chevron-right" size={20} color={colors.primary} />
+                </View>
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity style={[styles.cancelBtn, { marginTop: 16 }]} onPress={() => setShowReminderModal(false)}>
-              <Text style={styles.cancelBtnText}>Close</Text>
+            <TouchableOpacity
+              style={styles.cancelBtnFull}
+              activeOpacity={0.7}
+              onPress={() => setShowReminderModal(false)}
+            >
+              <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
     </View>
   );
 };
 
-const getStyles = (colors) => StyleSheet.create({
+const getStyles = (colors, isDarkMode) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 100 },
@@ -638,37 +706,187 @@ const getStyles = (colors) => StyleSheet.create({
   closedText: { fontSize: 16, fontWeight: '700', color: colors.textTertiary },
   closedBtn: { backgroundColor: colors.muted, paddingVertical: 14, borderRadius: 14, alignItems: 'center', width: '100%' },
   closedBtnText: { fontSize: 16, fontWeight: '700', color: colors.textTertiary },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { width: '85%', backgroundColor: colors.surface, borderRadius: 24, padding: 24, borderWidth: 1, borderColor: colors.border, ...colors.shadow.elevated },
-  modalIconWrap: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center', alignSelf: 'center', marginBottom: 16 },
-  modalTitle: { fontSize: 20, fontWeight: '700', color: colors.text, textAlign: 'center', marginBottom: 20 },
-  modalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 },
+
+  // Bottom Sheet Modal
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '100%',
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 44 : 28,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.22,
+    shadowRadius: 20,
+    elevation: 50,
+    zIndex: 1000,
+  },
+  dragHandle: {
+    width: 36,
+    height: 4.5,
+    borderRadius: 3,
+    backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.2)' : '#E5E7EB',
+    marginBottom: 16,
+    alignSelf: 'center',
+  },
+  modalIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: 4,
+    letterSpacing: -0.3,
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: colors.textMuted || colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: 18,
+    paddingHorizontal: 10,
+    lineHeight: 18,
+  },
+  modalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    width: '100%',
+  },
   modalLabel: { fontSize: 14, color: colors.textSecondary },
   modalValue: { fontSize: 14, fontWeight: '600', color: colors.text },
-  modalDivider: { height: 1, backgroundColor: colors.border, marginVertical: 8 },
+  modalDivider: {
+    height: 1,
+    backgroundColor: colors.borderLight || colors.border,
+    marginVertical: 8,
+    width: '100%',
+  },
   modalTotalLabel: { fontSize: 16, fontWeight: '700', color: colors.text },
   modalTotalValue: { fontSize: 18, fontWeight: '800', color: colors.primary },
-  modalButtons: { flexDirection: 'row', gap: 12, marginTop: 24 },
-  cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: colors.background, alignItems: 'center' },
-  cancelBtnText: { fontSize: 15, fontWeight: '700', color: colors.textSecondary },
-  payBtn: { flex: 2, paddingVertical: 14, borderRadius: 14, backgroundColor: colors.primary, alignItems: 'center', ...colors.shadow.button },
+  modalButtons: { flexDirection: 'row', gap: 12, marginTop: 22, width: '100%' },
+  cancelBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cancelBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: isDarkMode ? '#E5E7EB' : '#1F2937',
+  },
+  payBtnOuter: { flex: 1.5 },
+  payBtnGradient: {
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   payBtnText: { fontSize: 15, fontWeight: '700', color: colors.white },
+
+  // Reminder Specific Styles
+  reminderIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: isDarkMode ? 'rgba(34, 197, 94, 0.15)' : colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  reminderCardsContainer: {
+    width: '100%',
+    gap: 10,
+    marginBottom: 8,
+  },
+  reminderOptionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : '#F8FAFC',
+    borderWidth: 1,
+    borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    width: '100%',
+  },
+  reminderOptionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 10,
+  },
+  reminderOptionIconBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: isDarkMode ? 'rgba(34, 197, 94, 0.18)' : colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  reminderOptionTextWrap: {
+    flex: 1,
+  },
+  reminderOptionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 2,
+  },
+  reminderOptionSub: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    flexWrap: 'wrap',
+  },
+  reminderOptionChevron: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#EDF2F7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cancelBtnFull: {
+    width: '100%',
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+
   loadingContainer: { padding: 40, alignItems: 'center' },
   loadingText: { color: colors.textSecondary, fontSize: 14 },
   emptyContainer: { padding: 40, alignItems: 'center' },
   emptyText: { color: colors.textSecondary, fontSize: 14 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  modalTitleEmail: { fontSize: 19, fontWeight: '700', color: colors.text, letterSpacing: -0.4 },
-  modalCloseBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },
-  modalTextEmail: { fontSize: 15, color: colors.textSecondary, marginBottom: 24, lineHeight: 22 },
-  cancelBtnEmail: { flex: 1, height: 48, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },
-  cancelBtnTextEmail: { fontSize: 15, fontWeight: '600', color: colors.textSecondary },
-  payBtnOuterEmail: { flex: 1 },
-  payBtnGradientEmail: { height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  payBtnTextEmail: { fontSize: 15, fontWeight: '700', color: colors.white },
-  reminderOptions: { gap: 10, marginVertical: 10 },
-  reminderOptionBtn: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, backgroundColor: colors.primaryLight, borderRadius: 14 },
-  reminderOptionText: { fontSize: 14, fontWeight: '600', color: colors.text },
 });
 
 export default MonthlyDueScreen;
