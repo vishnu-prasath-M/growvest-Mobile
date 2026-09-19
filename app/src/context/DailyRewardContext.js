@@ -16,6 +16,8 @@ export const getISTDateString = () => {
   return istTime.toISOString().split('T')[0];
 };
 
+export const TARGET_SESSION_SECONDS = 100;
+
 export const DailyRewardProvider = ({ children }) => {
   const { user, isAuthenticated } = useAuth();
   const userId = user?._id || user?.id || 'guest';
@@ -99,13 +101,13 @@ export const DailyRewardProvider = ({ children }) => {
       if (res.data?.success) {
         hasClaimedDailyRef.current = true;
         setHasClaimedDaily(true);
-        await AsyncStorage.setItem(storageKey, JSON.stringify({ seconds: 30, claimed: true, date: todayStr }));
+        await AsyncStorage.setItem(storageKey, JSON.stringify({ seconds: TARGET_SESSION_SECONDS, claimed: true, date: todayStr }));
         triggerCelebrationBanner(res.data?.message, res.data?.coinsAwarded || 2);
         return { success: true, message: res.data?.message };
       } else if (res.data?.alreadyClaimed) {
         hasClaimedDailyRef.current = true;
         setHasClaimedDaily(true);
-        await AsyncStorage.setItem(storageKey, JSON.stringify({ seconds: 30, claimed: true, date: todayStr }));
+        await AsyncStorage.setItem(storageKey, JSON.stringify({ seconds: TARGET_SESSION_SECONDS, claimed: true, date: todayStr }));
         return { success: false, alreadyClaimed: true, message: res.data?.message };
       }
     } catch (err) {
@@ -113,7 +115,7 @@ export const DailyRewardProvider = ({ children }) => {
       if (err.response?.data?.alreadyClaimed || err.response?.status === 400) {
         hasClaimedDailyRef.current = true;
         setHasClaimedDaily(true);
-        await AsyncStorage.setItem(storageKey, JSON.stringify({ seconds: 30, claimed: true, date: todayStr }));
+        await AsyncStorage.setItem(storageKey, JSON.stringify({ seconds: TARGET_SESSION_SECONDS, claimed: true, date: todayStr }));
       }
       return { success: false, message: msg };
     } finally {
@@ -141,7 +143,7 @@ export const DailyRewardProvider = ({ children }) => {
           if (parsed.claimed) {
             setHasClaimedDaily(true);
             hasClaimedDailyRef.current = true;
-            setSessionSeconds(30);
+            setSessionSeconds(TARGET_SESSION_SECONDS);
             return;
           } else if (typeof parsed.seconds === 'number') {
             setSessionSeconds(parsed.seconds);
@@ -155,7 +157,7 @@ export const DailyRewardProvider = ({ children }) => {
           if (res.data?.hasClaimedDailyToday) {
             setHasClaimedDaily(true);
             hasClaimedDailyRef.current = true;
-            await AsyncStorage.setItem(storageKey, JSON.stringify({ seconds: 30, claimed: true, date: todayStr }));
+            await AsyncStorage.setItem(storageKey, JSON.stringify({ seconds: TARGET_SESSION_SECONDS, claimed: true, date: todayStr }));
           }
         } catch (apiErr) {
           // ignore network failures on initial check
@@ -168,7 +170,7 @@ export const DailyRewardProvider = ({ children }) => {
     loadDailyStatus();
   }, [isAuthenticated, userId]);
 
-  // AppState Listener & 30-Second Active Session Timer
+  // AppState Listener & 100-Second Active Session Timer
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -194,8 +196,8 @@ export const DailyRewardProvider = ({ children }) => {
         AsyncStorage.setItem(storageKey, JSON.stringify({ seconds: nextSec, claimed: false, date: todayStr })).catch(() => {});
       }
 
-      // If reached 30 seconds, automatically trigger claim in background!
-      if (nextSec >= 30 && !hasClaimedDailyRef.current && !isClaimingRef.current) {
+      // If reached 100 seconds, automatically trigger claim in background!
+      if (nextSec >= TARGET_SESSION_SECONDS && !hasClaimedDailyRef.current && !isClaimingRef.current) {
         claimReward(false);
       }
     }, 1000);
@@ -214,6 +216,7 @@ export const DailyRewardProvider = ({ children }) => {
     <DailyRewardContext.Provider
       value={{
         sessionSeconds,
+        targetSessionSeconds: TARGET_SESSION_SECONDS,
         hasClaimedDaily,
         isClaiming,
         claimReward,

@@ -393,7 +393,7 @@ const claimDailyLoginReward = async (userId) => {
       type: 'DAILY_LOGIN',
       coins: 2,
       description: `Daily login reward for ${todayStr}`,
-      sourceEvent: 'DAILY_LOGIN_30S',
+      sourceEvent: 'DAILY_LOGIN_100S',
       idempotencyKey,
     });
 
