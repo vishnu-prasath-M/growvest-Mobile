@@ -144,8 +144,8 @@ const QuickAction = React.memo(({ icon, label, onPress, badge, image }) => {
 
 // ---------- Main Screen ----------
 const ChitFundHomeScreen = ({ navigation }) => {
-  const { colors: themeColors } = useTheme();
-  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
+  const { colors: themeColors, isDarkMode } = useTheme();
+  const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
   const insets = useScreenInsets(8);
   const [refreshing, setRefreshing] = useState(false);
   const [dashboard, setDashboard] = useState(null);
@@ -410,29 +410,121 @@ const ChitFundHomeScreen = ({ navigation }) => {
               </View>
             </View>
 
-            {/* Discover High-Yield Chit Groups */}
-            <View style={styles.exploreOuter}>
-              <Pressable
-                style={styles.exploreCard}
-                onPress={() => navigation.navigate('ExploreChits')}
-              >
-                <View style={styles.exploreLeft}>
-                  <View style={styles.exploreIconWrap}>
-                    <Ionicons name="sparkles" size={20} color={colors.primary} />
+            {/* How Chit Fund Works (Connected Stepper UI) */}
+            <View style={styles.howItWorksOuter}>
+              <View style={styles.howItWorksCard}>
+                {/* Header */}
+                <View style={styles.howItWorksHeader}>
+                  <View style={styles.howItWorksHeaderLeft}>
+                    <LinearGradient
+                      colors={['#10B981', '#059669']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.howItWorksIconWrap}
+                    >
+                      <Ionicons name="git-network-outline" size={18} color="#FFFFFF" />
+                    </LinearGradient>
+                    <View>
+                      <Text style={styles.howItWorksTitle}>How Chit Fund Works</Text>
+                      <Text style={styles.howItWorksSubtitle}>Save, borrow & earn in 3 simple steps</Text>
+                    </View>
                   </View>
-                  <View style={styles.exploreTextWrap}>
-                    <Text style={styles.exploreTitle}>Explore New Chit Groups</Text>
-                    <Text style={styles.exploreSub}>
-                      {dashboard.availableChits > 0
-                        ? `${dashboard.availableChits} verified pools open for registration`
-                        : 'Join verified community savings pools'}
-                    </Text>
+                  <View style={styles.howItWorksStepBadge}>
+                    <View style={styles.howItWorksDot} />
+                    <Text style={styles.howItWorksBadgeText}>3 STEPS</Text>
                   </View>
                 </View>
-                <View style={styles.exploreArrow}>
-                  <Ionicons name="chevron-forward" size={18} color={colors.primary} />
+
+                {/* Connected Steps */}
+                <View style={styles.stepperContainer}>
+                  {/* Step 1 */}
+                  <View style={styles.stepRow}>
+                    <View style={styles.nodeColumn}>
+                      <LinearGradient
+                        colors={['#10B981', '#059669']}
+                        style={styles.stepNode}
+                      >
+                        <Text style={styles.stepNodeText}>1</Text>
+                      </LinearGradient>
+                      <LinearGradient
+                        colors={['#10B981', '#F59E0B']}
+                        style={styles.connectingLine}
+                      />
+                    </View>
+                    <View style={styles.stepContent}>
+                      <View style={styles.stepTitleRow}>
+                        <Text style={styles.stepTitle}>Pool & Save</Text>
+                        <View style={styles.stepChip}>
+                          <Text style={styles.stepChipText}>Equal Dues</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.stepDesc}>
+                        Verified members contribute a fixed installment every cycle into a common secured fund.
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Step 2 */}
+                  <View style={styles.stepRow}>
+                    <View style={styles.nodeColumn}>
+                      <LinearGradient
+                        colors={['#F59E0B', '#D97706']}
+                        style={styles.stepNode}
+                      >
+                        <Text style={styles.stepNodeText}>2</Text>
+                      </LinearGradient>
+                      <LinearGradient
+                        colors={['#F59E0B', '#059669']}
+                        style={styles.connectingLine}
+                      />
+                    </View>
+                    <View style={styles.stepContent}>
+                      <View style={styles.stepTitleRow}>
+                        <Text style={styles.stepTitle}>Reverse Auction</Text>
+                        <View style={[styles.stepChip, { backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.2)' : '#FEF3C7' }]}>
+                          <Text style={[styles.stepChipText, { color: isDarkMode ? '#FBBF24' : '#D97706' }]}>Instant Cash</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.stepDesc}>
+                        Need money urgently? Bid for the lowest discount to claim the entire prize pool with zero paperwork.
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Step 3 */}
+                  <View style={styles.stepRow}>
+                    <View style={styles.nodeColumn}>
+                      <LinearGradient
+                        colors={['#059669', '#047857']}
+                        style={styles.stepNode}
+                      >
+                        <Text style={styles.stepNodeText}>3</Text>
+                      </LinearGradient>
+                    </View>
+                    <View style={styles.stepContent}>
+                      <View style={styles.stepTitleRow}>
+                        <Text style={styles.stepTitle}>Win Pot & Dividends</Text>
+                        <View style={styles.stepChip}>
+                          <Text style={styles.stepChipText}>High Returns</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.stepDesc}>
+                        The winning bidder receives the cash payout, while the auction discount is distributed equally to all members as dividend profit!
+                      </Text>
+                    </View>
+                  </View>
                 </View>
-              </Pressable>
+
+                {/* Footer Action */}
+                <Pressable
+                  style={styles.howItWorksFooter}
+                  onPress={() => navigation.navigate('ChitFAQ')}
+                >
+                  <Ionicons name="help-circle-outline" size={16} color={colors.primary} />
+                  <Text style={styles.howItWorksFooterText}>Read rules, bidding limits & FAQs</Text>
+                  <Ionicons name="chevron-forward" size={14} color={colors.primary} />
+                </Pressable>
+              </View>
             </View>
 
             {/* Trust & FAQ Footer Banner */}
@@ -464,7 +556,7 @@ const ChitFundHomeScreen = ({ navigation }) => {
   );
 };
 
-const getStyles = (colors) => StyleSheet.create({
+const getStyles = (colors, isDarkMode = false) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 20 },
@@ -770,62 +862,163 @@ const getStyles = (colors) => StyleSheet.create({
     height: 32,
   },
 
-  // Explore Card
-  exploreOuter: {
+  // How Chit Fund Works (Connected Stepper)
+  howItWorksOuter: {
     paddingHorizontal: 20,
-    marginTop: 16,
+    marginTop: 18,
   },
-  exploreCard: {
+  howItWorksCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 22,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(14, 61, 35, 0.1)',
+    shadowColor: '#0E3D23',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: isDarkMode ? 0.25 : 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  howItWorksHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.surface,
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    shadowColor: '#0E3D23',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: isDarkMode ? 'rgba(255, 255, 255, 0.06)' : colors.borderLight,
   },
-  exploreLeft: {
+  howItWorksHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
     flex: 1,
-    marginRight: 10,
   },
-  exploreIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: colors.primaryLight,
+  howItWorksIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  exploreTextWrap: {
-    flex: 1,
-  },
-  exploreTitle: {
-    fontSize: 14.5,
+  howItWorksTitle: {
+    fontSize: 15,
     fontWeight: '800',
     color: colors.text,
-    marginBottom: 2,
+    letterSpacing: -0.3,
   },
-  exploreSub: {
-    fontSize: 11.5,
+  howItWorksSubtitle: {
+    fontSize: 11,
     color: colors.textMuted,
-    lineHeight: 15,
+    marginTop: 1,
   },
-  exploreArrow: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: colors.primaryLight,
+  howItWorksStepBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.1)',
+  },
+  howItWorksDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
+  howItWorksBadgeText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#10B981',
+    letterSpacing: 0.5,
+  },
+  stepperContainer: {
+    paddingLeft: 2,
+  },
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  nodeColumn: {
+    alignItems: 'center',
+    width: 26,
+    marginRight: 12,
+  },
+  stepNode: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  stepNodeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  connectingLine: {
+    width: 2,
+    height: 48,
+    marginVertical: 3,
+    borderRadius: 1,
+  },
+  stepContent: {
+    flex: 1,
+    paddingBottom: 12,
+  },
+  stepTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 3,
+  },
+  stepTitle: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: colors.text,
+    letterSpacing: -0.2,
+  },
+  stepChip: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.1)',
+  },
+  stepChipText: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: '#10B981',
+  },
+  stepDesc: {
+    fontSize: 11.5,
+    color: colors.textSecondary,
+    lineHeight: 16,
+  },
+  howItWorksFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 4,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: isDarkMode ? 'rgba(255, 255, 255, 0.06)' : colors.borderLight,
+  },
+  howItWorksFooterText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primary,
   },
 
   // Trust & Security Banner

@@ -195,7 +195,28 @@ const TransactionsScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <TopBar title="Transactions" navigation={navigation} showBack={canGoBack} />
+      <TopBar
+        title="Transactions"
+        navigation={navigation}
+        showBack={canGoBack}
+        right={
+          <TouchableOpacity
+            style={styles.headerDownloadBtn}
+            activeOpacity={0.8}
+            onPress={handleDownloadStatement}
+            disabled={downloadingPdf}
+          >
+            {downloadingPdf ? (
+              <ActivityIndicator size="small" color={colors.white} />
+            ) : (
+              <>
+                <MaterialCommunityIcons name="file-download-outline" size={16} color={colors.white} />
+                <Text style={styles.headerDownloadText}>Statement</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        }
+      />
 
       {/* Search Bar & Filter Button */}
       <View style={styles.searchRow}>
@@ -526,6 +547,27 @@ const getStyles = (colors) => StyleSheet.create({
     elevation: 4,
   },
   downloadBtnText: { fontSize: 13, fontWeight: '700', color: colors.white },
+
+  headerDownloadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    gap: 5,
+    shadowColor: '#0E3D23',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  headerDownloadText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.white,
+    letterSpacing: -0.2,
+  },
 
   // Empty
   emptyState: { alignItems: 'center', paddingVertical: 60, paddingHorizontal: 40 },

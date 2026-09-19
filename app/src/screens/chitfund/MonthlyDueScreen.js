@@ -370,8 +370,10 @@ const MonthlyDueScreen = ({ navigation }) => {
           <>
             {/* Amount & Due Date Row */}
             <View style={styles.dueAmountRow}>
-              <View>
-                <Text style={styles.dueLabel}>{chit.isOverdue && chit.lateFee > 0 ? 'TOTAL DUE (INC. LATE FEE)' : 'CURRENT DUE'}</Text>
+              <View style={styles.dueAmountLeft}>
+                <Text style={styles.dueLabel} numberOfLines={1}>
+                  {chit.isOverdue && chit.lateFee > 0 ? 'TOTAL DUE (INC. LATE FEE)' : 'CURRENT DUE'}
+                </Text>
                 <Text style={[styles.dueAmount, chit.isOverdue && { color: colors.error }]}>
                   {formatCurrency(chit.totalDueAmount || chit.nextDueAmount)}
                 </Text>
@@ -612,12 +614,13 @@ const getStyles = (colors) => StyleSheet.create({
   dueChitName: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: 2 },
   dueChitDetail: { fontSize: 12, color: colors.textSecondary },
   dueDivider: { height: 1, backgroundColor: colors.borderLight, marginBottom: 16 },
-  dueAmountRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  dueLabel: { fontSize: 12, color: colors.textTertiary, fontWeight: '600', textTransform: 'uppercase', marginBottom: 4 },
-  dueAmount: { fontSize: 28, fontWeight: '800', color: colors.text },
-  dueDate: { fontSize: 16, fontWeight: '600', color: colors.text, textAlign: 'right' },
-  dueDateWrap: { alignItems: 'flex-end' },
-  remainingDays: { fontSize: 16, fontWeight: '700', color: colors.primary, textAlign: 'right' },
+  dueAmountRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
+  dueAmountLeft: { flex: 1, marginRight: 10 },
+  dueLabel: { fontSize: 11, color: colors.textTertiary, fontWeight: '700', textTransform: 'uppercase', marginBottom: 4, letterSpacing: 0.3 },
+  dueAmount: { fontSize: 26, fontWeight: '800', color: colors.text },
+  dueDate: { fontSize: 14, fontWeight: '700', color: colors.text, textAlign: 'right', flexWrap: 'wrap', lineHeight: 18 },
+  dueDateWrap: { alignItems: 'flex-end', maxWidth: '48%', flexShrink: 1 },
+  remainingDays: { fontSize: 15, fontWeight: '700', color: colors.primary, textAlign: 'left' },
   lateFeeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16, padding: 10, backgroundColor: colors.warningLight, borderRadius: 10, borderWidth: 1, borderColor: colors.borderLight },
   lateFeeText: { fontSize: 12, color: colors.warning, fontWeight: '500', flex: 1 },
   dueActions: { flexDirection: 'row', gap: 12 },
