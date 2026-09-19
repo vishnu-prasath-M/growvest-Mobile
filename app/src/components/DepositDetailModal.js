@@ -40,6 +40,10 @@ const DepositDetailModal = ({ visible, item, onClose, onWithdraw, onReinvest }) 
   const isChit = item._itemType === 'chit' || item.isChit;
   const isPocketMoney = item._itemType === 'pocket_money' || item.isPocketMoney;
 
+  const isChitWithdrawn = isChit && (item.isWithdrawn || item.withdrawalStatus === 'completed' || item.withdrawalStatus === 'withdrawn' || item.withdrawalStatus === 'approved');
+  const isChitRequested = isChit && (item.isRequested || item.withdrawalStatus === 'requested');
+  const isChitUnlocked = isChit && (item.isUnlocked === true || item.status === 'unlocked');
+
   const isMatured = item.maturityDate && new Date() >= new Date(item.maturityDate);
   const isWithdrawn = item.status === 'withdrawn' || item.withdrawalStatus === 'withdrawn';
   const isReinvested = item.status === 'reinvested' || item.withdrawalStatus === 'reinvested';
@@ -49,7 +53,25 @@ const DepositDetailModal = ({ visible, item, onClose, onWithdraw, onReinvest }) 
   let badgeBg = isDarkMode ? 'rgba(16, 185, 129, 0.16)' : '#DCFCE7';
   let badgeColor = isDarkMode ? '#34D399' : '#059669';
 
-  if (isWithdrawn) {
+  if (isChit) {
+    if (isChitWithdrawn) {
+      statusLabel = 'WITHDRAWN';
+      badgeBg = isDarkMode ? 'rgba(255,255,255,0.06)' : '#F1F5F9';
+      badgeColor = isDarkMode ? '#9CA3AF' : '#64748B';
+    } else if (isChitRequested) {
+      statusLabel = 'PENDING APPROVAL';
+      badgeBg = isDarkMode ? 'rgba(245, 158, 11, 0.18)' : '#FEF3C7';
+      badgeColor = isDarkMode ? '#FBBF24' : '#D97706';
+    } else if (isChitUnlocked) {
+      statusLabel = 'UNLOCKED';
+      badgeBg = isDarkMode ? 'rgba(16, 185, 129, 0.2)' : '#DCFCE7';
+      badgeColor = isDarkMode ? '#34D399' : '#059669';
+    } else {
+      statusLabel = 'LOCKED';
+      badgeBg = isDarkMode ? 'rgba(245, 158, 11, 0.18)' : '#FEF3C7';
+      badgeColor = isDarkMode ? '#FBBF24' : '#D97706';
+    }
+  } else if (isWithdrawn) {
     statusLabel = 'WITHDRAWN';
     badgeBg = isDarkMode ? 'rgba(255,255,255,0.06)' : '#F1F5F9';
     badgeColor = isDarkMode ? '#9CA3AF' : '#64748B';
@@ -69,10 +91,6 @@ const DepositDetailModal = ({ visible, item, onClose, onWithdraw, onReinvest }) 
     statusLabel = 'FAILED';
     badgeBg = isDarkMode ? 'rgba(239, 68, 68, 0.18)' : '#FEE2E2';
     badgeColor = isDarkMode ? '#F87171' : '#DC2626';
-  } else if (isChit && item.hasWon) {
-    statusLabel = 'AUCTION WON';
-    badgeBg = isDarkMode ? 'rgba(16, 185, 129, 0.2)' : '#DCFCE7';
-    badgeColor = isDarkMode ? '#34D399' : '#059669';
   } else if (isPocketMoney && item.status === 'completed') {
     statusLabel = 'COMPLETED';
     badgeBg = isDarkMode ? 'rgba(16, 185, 129, 0.2)' : '#DCFCE7';
@@ -156,24 +174,44 @@ const DepositDetailModal = ({ visible, item, onClose, onWithdraw, onReinvest }) 
               >
                 <View style={styles.heroBlob} />
                 <View style={styles.heroTopRow}>
-                  <Text style={styles.heroLabel}>Principal Invested</Text>
+                  <Text style={styles.heroLabel}>
+                    {isChit
+                      ? (isChitWithdrawn ? 'Withdrawn Chit Payout' : isChitRequested ? 'Requested Chit Payout' : isChitUnlocked ? 'Eligible Price Amount' : 'Total Paid Installments')
+                      : 'Principal Invested'}
+                  </Text>
                   <View style={[styles.heroBadgePill, { backgroundColor: badgeBg }]}>
                     <Text style={[styles.heroBadgeText, { color: badgeColor }]}>{statusLabel}</Text>
                   </View>
                 </View>
-                <Text style={styles.heroAmount}>{formatCurrency(principal)}</Text>
+                <Text style={styles.heroAmount}>
+                  {isChit
+                    ? (isChitWithdrawn || isChitRequested
+                        ? formatCurrency(item.withdrawalAmount || item.priceAmount || item.amount)
+                        : isChitUnlocked
+                        ? formatCurrency(item.priceAmount || item.amount)
+                        : formatCurrency(item.totalPaid || item.amount))
+                    : formatCurrency(principal)}
+                </Text>
               </LinearGradient>
             </View>
 
             {/* Status Notice Banner */}
             <View style={styles.statusBox}>
               <MaterialCommunityIcons
-                name={isWithdrawn ? 'check-all' : isReinvested ? 'refresh-circle' : isMatured ? 'check-circle' : isPending ? 'clock-outline' : 'shield-lock-outline'}
+                name={isChit ? (isChitWithdrawn ? 'check-decagram' : isChitRequested ? 'clock-outline' : isChitUnlocked ? 'lock-open-outline' : 'lock-outline') : (isWithdrawn ? 'check-all' : isReinvested ? 'refresh-circle' : isMatured ? 'check-circle' : isPending ? 'clock-outline' : 'shield-lock-outline')}
                 size={16}
                 color={isDarkMode ? '#34D399' : '#0E3D23'}
               />
               <Text style={styles.statusNote}>
-                {isWithdrawn
+                {isChit
+                  ? isChitWithdrawn
+                    ? `Payout of ${formatCurrency(item.withdrawalAmount || item.priceAmount || item.amount)} has been withdrawn to your verified account.`
+                    : isChitRequested
+                    ? `Payout request of ${formatCurrency(item.withdrawalAmount || item.priceAmount || item.amount)} has been submitted and is pending admin approval.`
+                    : isChitUnlocked
+                    ? `Payout unlocked! You are eligible to withdraw the price amount of ${formatCurrency(item.priceAmount || item.amount)}.`
+                    : `Payout unlocks at Week ${(item.lockedCount || 0) + 1}. Continue regular payments to unlock.`
+                  : isWithdrawn
                   ? 'Already withdrawn to your verified bank account.'
                   : isReinvested
                   ? 'Matured funds successfully reinvested into a new plan.'
@@ -188,110 +226,208 @@ const DepositDetailModal = ({ visible, item, onClose, onWithdraw, onReinvest }) 
             </View>
 
             {/* Grouped Details Card (Modern unified card matching Profile & Settings design) */}
-            <View style={styles.groupedCard}>
-              {/* Interest Rate */}
-              <View style={styles.cardRow}>
-                <View style={styles.cardRowLeft}>
-                  <View style={styles.rowIconWrap}>
-                    <MaterialCommunityIcons name="percent-outline" size={16} color={isDarkMode ? '#34D399' : '#0E3D23'} />
-                  </View>
-                  <Text style={styles.cardRowLabel}>Interest Rate</Text>
-                </View>
-                <Text style={styles.cardRowValue}>{rate}% p.a.</Text>
-              </View>
-
-              <View style={styles.rowDivider} />
-
-              {/* Daily Earnings */}
-              <View style={styles.cardRow}>
-                <View style={styles.cardRowLeft}>
-                  <View style={styles.rowIconWrap}>
-                    <MaterialCommunityIcons name="cash-fast" size={16} color={isDarkMode ? '#34D399' : '#0E3D23'} />
-                  </View>
-                  <Text style={styles.cardRowLabel}>Daily Earnings</Text>
-                </View>
-                <Text style={styles.cardRowValue}>{formatCurrency(dailyInterest)}/day</Text>
-              </View>
-
-              <View style={styles.rowDivider} />
-
-              {/* Accrued Interest */}
-              <View style={styles.cardRow}>
-                <View style={styles.cardRowLeft}>
-                  <View style={styles.rowIconWrap}>
-                    <MaterialCommunityIcons name="trending-up" size={16} color={isDarkMode ? '#34D399' : '#0E3D23'} />
-                  </View>
-                  <Text style={styles.cardRowLabel}>Accrued Interest</Text>
-                </View>
-                <Text style={[styles.cardRowValue, { color: isDarkMode ? '#34D399' : '#059669' }]}>
-                  +{formatCurrency(accrued)}
-                </Text>
-              </View>
-
-              <View style={styles.rowDivider} />
-
-              {/* Maturity Payout */}
-              <View style={styles.cardRow}>
-                <View style={styles.cardRowLeft}>
-                  <View style={styles.rowIconWrap}>
-                    <MaterialCommunityIcons name="trophy-outline" size={16} color="#F59E0B" />
-                  </View>
-                  <Text style={styles.cardRowLabel}>Maturity Payout</Text>
-                </View>
-                <Text style={[styles.cardRowValue, { color: '#F59E0B' }]}>
-                  {formatCurrency(maturityAmount)}
-                </Text>
-              </View>
-
-              <View style={styles.rowDivider} />
-
-              {/* Start Date */}
-              <View style={styles.cardRow}>
-                <View style={styles.cardRowLeft}>
-                  <View style={styles.rowIconWrap}>
-                    <MaterialCommunityIcons name="calendar-start" size={16} color={themeColors.textMuted} />
-                  </View>
-                  <Text style={styles.cardRowLabel}>Start Date</Text>
-                </View>
-                <Text style={styles.cardRowValue}>{formatDate(item.startDate || item.joinedAt || item.createdAt)}</Text>
-              </View>
-
-              {item.maturityDate ? (
-                <>
-                  <View style={styles.rowDivider} />
-                  {/* Maturity Date */}
-                  <View style={styles.cardRow}>
-                    <View style={styles.cardRowLeft}>
-                      <View style={styles.rowIconWrap}>
-                        <MaterialCommunityIcons name="calendar-check" size={16} color={themeColors.textMuted} />
-                      </View>
-                      <Text style={styles.cardRowLabel}>Maturity Date</Text>
+            {isChit ? (
+              <View style={styles.groupedCard}>
+                {/* Weekly Installment */}
+                <View style={styles.cardRow}>
+                  <View style={styles.cardRowLeft}>
+                    <View style={styles.rowIconWrap}>
+                      <MaterialCommunityIcons name="calendar-repeat" size={16} color={isDarkMode ? '#34D399' : '#0E3D23'} />
                     </View>
-                    <Text style={styles.cardRowValue}>{formatDate(item.maturityDate)}</Text>
+                    <Text style={styles.cardRowLabel}>Installment</Text>
                   </View>
-                </>
-              ) : null}
-
-              {/* Payout Destination */}
-              <View style={styles.rowDivider} />
-              <View style={styles.cardRow}>
-                <View style={styles.cardRowLeft}>
-                  <View style={styles.rowIconWrap}>
-                    <MaterialCommunityIcons name="bank-outline" size={16} color={themeColors.textMuted} />
-                  </View>
-                  <Text style={styles.cardRowLabel}>Payout Target</Text>
+                  <Text style={styles.cardRowValue}>{formatCurrency(item.weeklyAmount || item.monthlyAmount || item.amount)}/{item.isWeekly !== false ? 'wk' : 'mo'}</Text>
                 </View>
-                <Text style={styles.cardRowValue}>Verified Bank Account</Text>
+
+                <View style={styles.rowDivider} />
+
+                {/* Cycle Progress */}
+                <View style={styles.cardRow}>
+                  <View style={styles.cardRowLeft}>
+                    <View style={styles.rowIconWrap}>
+                      <MaterialCommunityIcons name="clock-time-four-outline" size={16} color={isDarkMode ? '#34D399' : '#0E3D23'} />
+                    </View>
+                    <Text style={styles.cardRowLabel}>Cycle Progress</Text>
+                  </View>
+                  <Text style={styles.cardRowValue}>Week {item.currentWeek || 1} of {item.totalWeeks || 10}</Text>
+                </View>
+
+                <View style={styles.rowDivider} />
+
+                {/* Total Paid */}
+                <View style={styles.cardRow}>
+                  <View style={styles.cardRowLeft}>
+                    <View style={styles.rowIconWrap}>
+                      <MaterialCommunityIcons name="wallet-outline" size={16} color={isDarkMode ? '#34D399' : '#0E3D23'} />
+                    </View>
+                    <Text style={styles.cardRowLabel}>Total Paid</Text>
+                  </View>
+                  <Text style={[styles.cardRowValue, { color: isDarkMode ? '#34D399' : '#059669' }]}>
+                    {formatCurrency(item.totalPaid || item.amount)}
+                  </Text>
+                </View>
+
+                {(isChitUnlocked || isChitWithdrawn || isChitRequested) && (
+                  <>
+                    <View style={styles.rowDivider} />
+                    {/* Price Amount */}
+                    <View style={styles.cardRow}>
+                      <View style={styles.cardRowLeft}>
+                        <View style={styles.rowIconWrap}>
+                          <MaterialCommunityIcons name="trophy-outline" size={16} color="#F59E0B" />
+                        </View>
+                        <Text style={styles.cardRowLabel}>
+                          {isChitWithdrawn ? 'Withdrawn Price Amount' : isChitRequested ? 'Requested Price Amount' : 'Unlocked Price Amount'}
+                        </Text>
+                      </View>
+                      <Text style={[styles.cardRowValue, { color: '#F59E0B', fontWeight: '800' }]}>
+                        {formatCurrency(item.withdrawalAmount || item.priceAmount || item.amount)}
+                      </Text>
+                    </View>
+                  </>
+                )}
+
+                <View style={styles.rowDivider} />
+
+                {/* Payout Status */}
+                <View style={styles.cardRow}>
+                  <View style={styles.cardRowLeft}>
+                    <View style={styles.rowIconWrap}>
+                      <MaterialCommunityIcons name="information-outline" size={16} color={themeColors.textMuted} />
+                    </View>
+                    <Text style={styles.cardRowLabel}>Payout Status</Text>
+                  </View>
+                  <Text style={[styles.cardRowValue, { color: badgeColor, fontWeight: '700' }]}>
+                    {isChitWithdrawn
+                      ? `Withdrawn (Wk ${item.withdrawalWeek || item.currentWeek})`
+                      : isChitRequested
+                      ? 'Pending Admin Approval'
+                      : isChitUnlocked
+                      ? 'Unlocked (Eligible)'
+                      : `Locked (Unlocks Wk ${(item.lockedCount || 0) + 1})`}
+                  </Text>
+                </View>
+
+                <View style={styles.rowDivider} />
+
+                {/* Joined Date */}
+                <View style={styles.cardRow}>
+                  <View style={styles.cardRowLeft}>
+                    <View style={styles.rowIconWrap}>
+                      <MaterialCommunityIcons name="calendar-start" size={16} color={themeColors.textMuted} />
+                    </View>
+                    <Text style={styles.cardRowLabel}>Join Date</Text>
+                  </View>
+                  <Text style={styles.cardRowValue}>{formatDate(item.joinedAt || item.startDate || item.createdAt)}</Text>
+                </View>
               </View>
-            </View>
+            ) : (
+              <View style={styles.groupedCard}>
+                {/* Interest Rate */}
+                <View style={styles.cardRow}>
+                  <View style={styles.cardRowLeft}>
+                    <View style={styles.rowIconWrap}>
+                      <MaterialCommunityIcons name="percent-outline" size={16} color={isDarkMode ? '#34D399' : '#0E3D23'} />
+                    </View>
+                    <Text style={styles.cardRowLabel}>Interest Rate</Text>
+                  </View>
+                  <Text style={styles.cardRowValue}>{rate}% p.a.</Text>
+                </View>
+
+                <View style={styles.rowDivider} />
+
+                {/* Daily Earnings */}
+                <View style={styles.cardRow}>
+                  <View style={styles.cardRowLeft}>
+                    <View style={styles.rowIconWrap}>
+                      <MaterialCommunityIcons name="cash-fast" size={16} color={isDarkMode ? '#34D399' : '#0E3D23'} />
+                    </View>
+                    <Text style={styles.cardRowLabel}>Daily Earnings</Text>
+                  </View>
+                  <Text style={styles.cardRowValue}>{formatCurrency(dailyInterest)}/day</Text>
+                </View>
+
+                <View style={styles.rowDivider} />
+
+                {/* Accrued Interest */}
+                <View style={styles.cardRow}>
+                  <View style={styles.cardRowLeft}>
+                    <View style={styles.rowIconWrap}>
+                      <MaterialCommunityIcons name="trending-up" size={16} color={isDarkMode ? '#34D399' : '#0E3D23'} />
+                    </View>
+                    <Text style={styles.cardRowLabel}>Accrued Interest</Text>
+                  </View>
+                  <Text style={[styles.cardRowValue, { color: isDarkMode ? '#34D399' : '#059669' }]}>
+                    +{formatCurrency(accrued)}
+                  </Text>
+                </View>
+
+                <View style={styles.rowDivider} />
+
+                {/* Maturity Payout */}
+                <View style={styles.cardRow}>
+                  <View style={styles.cardRowLeft}>
+                    <View style={styles.rowIconWrap}>
+                      <MaterialCommunityIcons name="trophy-outline" size={16} color="#F59E0B" />
+                    </View>
+                    <Text style={styles.cardRowLabel}>Maturity Payout</Text>
+                  </View>
+                  <Text style={[styles.cardRowValue, { color: '#F59E0B' }]}>
+                    {formatCurrency(maturityAmount)}
+                  </Text>
+                </View>
+
+                <View style={styles.rowDivider} />
+
+                {/* Start Date */}
+                <View style={styles.cardRow}>
+                  <View style={styles.cardRowLeft}>
+                    <View style={styles.rowIconWrap}>
+                      <MaterialCommunityIcons name="calendar-start" size={16} color={themeColors.textMuted} />
+                    </View>
+                    <Text style={styles.cardRowLabel}>Start Date</Text>
+                  </View>
+                  <Text style={styles.cardRowValue}>{formatDate(item.startDate || item.joinedAt || item.createdAt)}</Text>
+                </View>
+
+                {item.maturityDate ? (
+                  <>
+                    <View style={styles.rowDivider} />
+                    {/* Maturity Date */}
+                    <View style={styles.cardRow}>
+                      <View style={styles.cardRowLeft}>
+                        <View style={styles.rowIconWrap}>
+                          <MaterialCommunityIcons name="calendar-check" size={16} color={themeColors.textMuted} />
+                        </View>
+                        <Text style={styles.cardRowLabel}>Maturity Date</Text>
+                      </View>
+                      <Text style={styles.cardRowValue}>{formatDate(item.maturityDate)}</Text>
+                    </View>
+                  </>
+                ) : null}
+
+                {/* Payout Destination */}
+                <View style={styles.rowDivider} />
+                <View style={styles.cardRow}>
+                  <View style={styles.cardRowLeft}>
+                    <View style={styles.rowIconWrap}>
+                      <MaterialCommunityIcons name="bank-outline" size={16} color={themeColors.textMuted} />
+                    </View>
+                    <Text style={styles.cardRowLabel}>Payout Target</Text>
+                  </View>
+                  <Text style={styles.cardRowValue}>Verified Bank Account</Text>
+                </View>
+              </View>
+            )}
 
             <View style={{ height: 16 }} />
           </ScrollView>
 
           {/* Actions Footer (Fixed at bottom for instant access) */}
-          {isMatured && !isWithdrawn && !isReinvested && (onReinvest || onWithdraw) ? (
+          {((isMatured && !isWithdrawn && !isReinvested && (onReinvest || onWithdraw)) ||
+            (isChit && isChitUnlocked && !isChitWithdrawn && !isChitRequested && onWithdraw)) ? (
             <View style={styles.actionRow}>
-              {onReinvest ? (
+              {!isChit && onReinvest ? (
                 <TouchableOpacity
                   onPress={() => {
                     onClose();
@@ -328,7 +464,9 @@ const DepositDetailModal = ({ visible, item, onClose, onWithdraw, onReinvest }) 
                     style={styles.btnGradient}
                   >
                     <MaterialCommunityIcons name="cash-multiple" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                    <Text style={styles.btnText}>Withdraw</Text>
+                    <Text style={styles.btnText}>
+                      {isChit ? `Withdraw Payout (${formatCurrency(item.priceAmount || item.amount)})` : 'Withdraw'}
+                    </Text>
                   </LinearGradient>
                 </TouchableOpacity>
               ) : null}

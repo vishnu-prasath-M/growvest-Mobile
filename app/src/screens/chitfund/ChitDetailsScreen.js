@@ -185,8 +185,13 @@ const ChitDetailsScreen = ({ navigation, route }) => {
         try {
           setLoading(true);
           const res = await chitFundService.withdrawChitPayout(memberId);
-          showSuccess('Success', res.message || 'Payout completed successfully!');
-          fetchData();
+          showSuccess('Success', res.message || 'Payout request submitted successfully!');
+          if (res?.member) {
+            setMyChits(prev => prev.map(m => (m._id === memberId ? { ...m, ...res.member, withdrawalStatus: res.member.withdrawalStatus || 'requested' } : m)));
+          } else {
+            setMyChits(prev => prev.map(m => (m._id === memberId ? { ...m, withdrawalStatus: 'requested', withdrawalAmount: withdrawalAmount || m.withdrawalAmount } : m)));
+          }
+          await fetchData();
         } catch (err) {
           showError('Error', err.response?.data?.message || err.message || 'Withdrawal failed');
         } finally {
@@ -389,8 +394,12 @@ const ChitDetailsScreen = ({ navigation, route }) => {
 
             const eligibleStart = Math.floor((totalUnits - 1) / 2) + 1;
             const isEligible = currentUnit >= eligibleStart;
-            const isWithdrawn = myMembership.withdrawalStatus === 'completed';
+            const isWithdrawn = myMembership.withdrawalStatus === 'completed' || myMembership.withdrawalStatus === 'withdrawn' || myMembership.withdrawalStatus === 'approved' || (myMembership.hasWon && myMembership.withdrawalStatus !== 'requested');
             const isRequested = myMembership.withdrawalStatus === 'requested';
+
+            const currentUnitRow = getWeeklyRowData(baseAmount, totalUnits, currentUnit);
+            const isSettlement = currentUnit >= totalUnits;
+            const eligibleWithdrawalAmount = isSettlement ? currentUnitRow.totalValue : currentUnitRow.priceAmount;
 
             return (
               <View>
@@ -539,9 +548,15 @@ const ChitDetailsScreen = ({ navigation, route }) => {
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Chit Payout Status</Text>
-                    <View style={[styles.statusBadge, { backgroundColor: isWithdrawn ? themeColors.successLight : isRequested ? themeColors.warningLight : themeColors.primaryLight }]}>
-                      <Text style={[styles.statusText, { color: isWithdrawn ? themeColors.success : isRequested ? themeColors.warning : themeColors.primary }]}>
-                        {isWithdrawn ? `Withdrawn (${formatCurrency(myMembership.withdrawalAmount)})` : isRequested ? `Pending Admin Approval (${formatCurrency(myMembership.withdrawalAmount)})` : (myMembership.status === 'completed' ? 'Completed' : 'Active')}
+                    <View style={[styles.statusBadge, { backgroundColor: isWithdrawn ? themeColors.successLight : isRequested ? themeColors.warningLight : isEligible ? themeColors.successLight : themeColors.primaryLight }]}>
+                      <Text style={[styles.statusText, { color: isWithdrawn ? themeColors.success : isRequested ? themeColors.warning : isEligible ? themeColors.success : themeColors.primary }]}>
+                        {isWithdrawn
+                          ? `Withdrawn (${formatCurrency(myMembership.withdrawalAmount || eligibleWithdrawalAmount)})`
+                          : isRequested
+                          ? `Pending Admin Approval (${formatCurrency(myMembership.withdrawalAmount || eligibleWithdrawalAmount)})`
+                          : isEligible
+                          ? `Unlocked (${formatCurrency(eligibleWithdrawalAmount)})`
+                          : (myMembership.status === 'completed' ? 'Completed' : `Locked (Unlocks Wk ${eligibleStart})`)}
                       </Text>
                     </View>
                   </View>
