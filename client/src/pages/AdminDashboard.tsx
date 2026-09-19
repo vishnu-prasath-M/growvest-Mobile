@@ -1716,9 +1716,19 @@ const AdminDashboard = () => {
                         </div>
                       ) : (
                         <div className="flex gap-3 items-center">
-                          <span className="text-xs font-body font-bold text-green-600 px-3 py-1.5 bg-green-50 rounded-xl border border-green-200">
-                            Paid
-                          </span>
+                          {w.status === "rejected" ? (
+                            <span className="text-xs font-body font-bold text-red-600 px-3 py-1.5 bg-red-50 rounded-xl border border-red-200">
+                              Rejected
+                            </span>
+                          ) : w.status === "approved" ? (
+                            <span className="text-xs font-body font-bold text-emerald-600 px-3 py-1.5 bg-emerald-50 rounded-xl border border-emerald-200">
+                              Approved
+                            </span>
+                          ) : (
+                            <span className="text-xs font-body font-bold text-green-600 px-3 py-1.5 bg-green-50 rounded-xl border border-green-200">
+                              Paid
+                            </span>
+                          )}
                         </div>
                       )}
                     </div>
