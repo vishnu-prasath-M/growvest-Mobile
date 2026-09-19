@@ -103,21 +103,57 @@ const WithdrawScreen = ({ navigation }) => {
       const validInvestments = (allInvestments || []).filter(inv => inv.status !== 'rejected');
 
       // Chit Fund memberships
-      const activeChitItems = (myChits || []).filter(c => c.status === 'active' || c.status === 'approved').map(c => ({
-        _id: c._id,
-        chitId: c.chitId?._id || c.chitId || c._id,
-        isChit: true,
-        type: 'chit',
-        chitName: c.chitName || 'Chit Fund Plan',
-        amount: c.totalPaid || (Number(c.paidWeeks || 0) * Number(c.weeklyAmount || 0)),
-        weeklyAmount: c.weeklyAmount || 0,
-        currentWeek: c.currentWeek || 1,
-        totalWeeks: c.totalWeeks || 10,
-        hasWon: c.hasWon || false,
-        winningAmount: c.winningAmount || 0,
-        status: 'approved',
-        joinedAt: c.joinedAt,
-      }));
+      const activeChitItems = (myChits || []).filter(c => c.status === 'active' || c.status === 'approved' || c.status === 'completed').map(c => {
+        const totalWeeks = c.totalWeeks || c.duration || 10;
+        const currentWeek = c.currentWeek || c.currentMonth || c.paidWeeks || 1;
+        const lockedCount = c.lockedCount !== undefined ? c.lockedCount : Math.floor((totalWeeks - 1) / 2);
+        const isUnlocked = c.isUnlocked !== undefined ? c.isUnlocked : (currentWeek > lockedCount);
+        const isSettlement = currentWeek >= totalWeeks;
+
+        let priceAmount = Number(c.priceAmount) || 0;
+        if (!priceAmount) {
+          const totalPot = Number(c.totalPot) || ((Number(c.weeklyAmount || c.monthlyAmount || 0)) * totalWeeks);
+          if (isSettlement) {
+            priceAmount = totalPot;
+          } else if (isUnlocked) {
+            const baseEndPct = totalWeeks >= 20 ? 8 : 6;
+            const actionPct = baseEndPct + 2 * (totalWeeks - currentWeek);
+            priceAmount = totalPot - (totalPot * actionPct / 100);
+          }
+        }
+
+        const isWithdrawn = c.withdrawalStatus === 'completed' || c.withdrawalStatus === 'withdrawn' || c.withdrawalStatus === 'approved';
+        const isRequested = c.withdrawalStatus === 'requested';
+        const withdrawalAmount = Number(c.withdrawalAmount) || priceAmount;
+        const totalPaid = Number(c.totalPaid) || (Number(c.paidWeeks || currentWeek) * Number(c.weeklyAmount || 0));
+
+        return {
+          _id: c._id,
+          chitId: c.chitId?._id || c.chitId || c._id,
+          isChit: true,
+          type: 'chit',
+          chitName: c.chitName || 'Chit Fund Plan',
+          amount: isWithdrawn || isRequested ? withdrawalAmount : (isUnlocked ? priceAmount : totalPaid),
+          displayAmount: isWithdrawn || isRequested ? withdrawalAmount : (isUnlocked ? priceAmount : totalPaid),
+          priceAmount,
+          isUnlocked,
+          isWithdrawn,
+          isRequested,
+          withdrawalStatus: c.withdrawalStatus,
+          withdrawalAmount,
+          withdrawalWeek: c.withdrawalWeek || currentWeek,
+          totalPaid,
+          weeklyAmount: c.weeklyAmount || 0,
+          currentWeek,
+          totalWeeks,
+          lockedCount,
+          eligibleStart: lockedCount + 1,
+          hasWon: c.hasWon || false,
+          winningAmount: c.winningAmount || priceAmount,
+          status: isWithdrawn ? 'withdrawn' : (isRequested ? 'requested' : (isUnlocked ? 'unlocked' : 'active')),
+          joinedAt: c.joinedAt,
+        };
+      });
 
       // Pocket Money investments
       const pocketMoneyPlans = (pocketMoneyRes?.data || []);
@@ -193,7 +229,19 @@ const WithdrawScreen = ({ navigation }) => {
   const investmentEarnings = investments.reduce((sum, inv) => {
     if (inv.isPocketMoney) return sum; // Pocket money is NOT mixed in available to withdraw
     if (inv.isChit) {
-      return sum + (inv.hasWon && inv.withdrawalStatus !== 'completed' ? (Number(inv.winningAmount) || 0) : 0);
+      if (inv.isWithdrawn || inv.withdrawalStatus === 'completed' || inv.withdrawalStatus === 'withdrawn' || inv.withdrawalStatus === 'approved') {
+        return sum;
+      }
+      if (inv.isRequested || inv.withdrawalStatus === 'requested') {
+        return sum;
+      }
+      if (inv.isUnlocked) {
+        return sum + (Number(inv.priceAmount) || Number(inv.amount) || 0);
+      }
+      if (inv.hasWon) {
+        return sum + (Number(inv.winningAmount) || 0);
+      }
+      return sum;
     }
     const isMatured = inv.maturityDate && new Date() >= new Date(inv.maturityDate);
     const isWithdrawn = inv.status === 'withdrawn' || inv.withdrawalStatus === 'withdrawn';
@@ -216,10 +264,42 @@ const WithdrawScreen = ({ navigation }) => {
         ? Number(userData.availableToWithdraw)
         : investmentEarnings);
 
+  const handleChitWithdrawal = (chitItem) => {
+    const payoutAmt = Number(chitItem.priceAmount) || Number(chitItem.amount) || 0;
+    showAlert(
+      'confirm',
+      'Confirm Chit Payout Withdrawal',
+      `Are you sure you want to withdraw your Chit payout price amount of ${formatCurrency(payoutAmt)} now? You can only withdraw once per Chit cycle.`,
+      'Withdraw',
+      async () => {
+        try {
+          setLoading(true);
+          const res = await chitFundService.withdrawChitPayout(chitItem._id);
+          showAlert(
+            'payout',
+            'Withdrawal Requested ⌛',
+            res?.message || `Your Chit payout request of ${formatCurrency(payoutAmt)} has been submitted successfully and is pending admin approval.`,
+            'Got It'
+          );
+          fetchUserData();
+        } catch (err) {
+          const errMsg = err?.response?.data?.message || err?.message || 'Could not process chit withdrawal.';
+          showAlert('error', 'Withdrawal Failed', errMsg);
+        } finally {
+          setLoading(false);
+        }
+      }
+    );
+  };
+
   const openWithdrawModal = (type) => {
     setWithdrawType(type);
     const targetInv = investments.find(inv => String(inv._id) === String(type));
     if (targetInv) {
+      if (targetInv.isChit) {
+        handleChitWithdrawal(targetInv);
+        return;
+      }
       const defaultAmt = targetInv.availableToWithdraw || targetInv.earlyPrincipalOnlyAmount || targetInv.amount || 0;
       setAmount(String(defaultAmt || ''));
     }
@@ -289,7 +369,17 @@ const WithdrawScreen = ({ navigation }) => {
     
     setWithdrawing(true);
     try {
-      if (withdrawType && withdrawType !== 'saving' && withdrawType !== 'fixed') {
+      const targetInv = investments.find(inv => String(inv._id) === String(withdrawType));
+      if (targetInv && targetInv.isChit) {
+        await chitFundService.withdrawChitPayout(targetInv._id);
+        const formattedAmt = `₹${numAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        showAlert(
+          'payout',
+          'Withdrawal Requested ⌛',
+          `Your Chit payout request of ${formattedAmt} has been submitted successfully and is pending admin approval.`,
+          'Got It'
+        );
+      } else if (withdrawType && withdrawType !== 'saving' && withdrawType !== 'fixed') {
         const res = await investmentService.withdrawInvestment(withdrawType, upiId.trim(), numAmt);
         const formattedAmt = `₹${numAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         showAlert(
@@ -519,11 +609,29 @@ const WithdrawScreen = ({ navigation }) => {
                   badgeColor = inv.status === 'completed' ? '#059669' : '#D97706';
                 } else if (isChit) {
                   planTitle = inv.chitName || 'Chit Fund Plan';
-                  planSubtitle = `Paid: ${formatCurrency(inv.amount)} • Wk ${inv.currentWeek || 1}/${inv.totalWeeks || 10}`;
                   iconName = 'account-group-outline';
-                  badgeLabel = inv.hasWon ? 'AUCTION WON' : 'ACTIVE CHIT';
-                  badgeBg = inv.hasWon ? '#DCFCE7' : '#FEF3C7';
-                  badgeColor = inv.hasWon ? '#059669' : '#D97706';
+
+                  if (inv.isWithdrawn || inv.withdrawalStatus === 'completed' || inv.withdrawalStatus === 'withdrawn' || inv.withdrawalStatus === 'approved') {
+                    planSubtitle = `Withdrawn: ${formatCurrency(inv.withdrawalAmount || inv.priceAmount || inv.amount)} • Wk ${inv.withdrawalWeek || inv.currentWeek || 1}`;
+                    badgeLabel = 'WITHDRAWN';
+                    badgeBg = isDarkMode ? 'rgba(255,255,255,0.06)' : '#F1F5F9';
+                    badgeColor = isDarkMode ? '#9CA3AF' : '#64748B';
+                  } else if (inv.isRequested || inv.withdrawalStatus === 'requested') {
+                    planSubtitle = `Requested: ${formatCurrency(inv.withdrawalAmount || inv.priceAmount || inv.amount)} • Pending Approval`;
+                    badgeLabel = 'PENDING';
+                    badgeBg = isDarkMode ? 'rgba(245, 158, 11, 0.18)' : '#FEF3C7';
+                    badgeColor = isDarkMode ? '#FBBF24' : '#D97706';
+                  } else if (inv.isUnlocked) {
+                    planSubtitle = `Price Amount: ${formatCurrency(inv.priceAmount)} (Unlocked) • Wk ${inv.currentWeek || 1}/${inv.totalWeeks || 10}`;
+                    badgeLabel = 'UNLOCKED';
+                    badgeBg = isDarkMode ? 'rgba(16, 185, 129, 0.2)' : '#DCFCE7';
+                    badgeColor = isDarkMode ? '#34D399' : '#059669';
+                  } else {
+                    planSubtitle = `Paid: ${formatCurrency(inv.totalPaid || inv.amount)} • Unlocks at Wk ${(inv.lockedCount || 0) + 1}`;
+                    badgeLabel = 'LOCKED';
+                    badgeBg = isDarkMode ? 'rgba(245, 158, 11, 0.18)' : '#FEF3C7';
+                    badgeColor = isDarkMode ? '#FBBF24' : '#D97706';
+                  }
                 }
 
                 return (
@@ -654,7 +762,11 @@ const WithdrawScreen = ({ navigation }) => {
         onClose={() => setSelectedDeposit(null)}
         onWithdraw={(inv) => {
           setSelectedDeposit(null);
-          openWithdrawModal(inv._id);
+          if (inv.isChit) {
+            handleChitWithdrawal(inv);
+          } else {
+            openWithdrawModal(inv._id);
+          }
         }}
       />
 

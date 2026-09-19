@@ -332,10 +332,17 @@ const getMyChits = async (req, res) => {
       const totalMembers = chit?.totalMembers || 0;
       const availableSlots = chit?.availableSlots || 0;
       const filledMembers = Math.max(0, totalMembers - availableSlots);
-      const remainingInstallments = Math.max(0, durationUnits - currentUnit);
-      const totalContribution = chit?.totalContribution || chit?.totalPot || (baseAmount * durationUnits);
-      const totalPaid = m.status === 'active' ? Math.max(baseAmount, m.totalPaid || 0, paidCount * baseAmount) : 0;
-      const remainingAmount = Math.max(0, totalContribution - totalPaid);
+      const lockedCount = Math.floor((durationUnits - 1) / 2);
+      const isUnlocked = currentUnit > lockedCount;
+      const isSettlement = currentUnit >= durationUnits;
+      let calculatedPriceAmount = 0;
+      if (isSettlement) {
+        calculatedPriceAmount = totalContribution;
+      } else if (isUnlocked) {
+        const baseEndPct = durationUnits >= 20 ? 8 : 6;
+        const actionPct = baseEndPct + 2 * (durationUnits - currentUnit);
+        calculatedPriceAmount = totalContribution - (totalContribution * actionPct / 100);
+      }
 
       return {
         _id: m._id,
@@ -362,6 +369,10 @@ const getMyChits = async (req, res) => {
         currentWeek: currentUnit,
         paidWeeks: currentUnit,
         unpaidWeeks: m.unpaidWeeks,
+        priceAmount: m.priceAmount || calculatedPriceAmount,
+        isUnlocked,
+        lockedCount,
+        eligibleStart: lockedCount + 1,
         withdrawalStatus: m.withdrawalStatus,
         withdrawalWeek: m.withdrawalWeek,
         withdrawalAmount: m.withdrawalAmount,
