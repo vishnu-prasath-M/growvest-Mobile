@@ -23,7 +23,7 @@ import { kycService } from '../../services/kycService';
 import { useAlert } from '../../context/AlertContext';
 
 const InvestmentAmountScreen = ({ navigation, route }) => {
-  const { colors: themeColors } = useTheme();
+  const { colors: themeColors, isDarkMode } = useTheme();
   const { showError, showWarning } = useAlert();
   const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
   
