@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Switch,
   Modal,
   Dimensions,
 } from 'react-native';
@@ -18,6 +17,7 @@ import { useAuth } from '../../context/AuthContext';
 import { colors } from '../../theme/theme';
 import { useTheme } from '../../context/ThemeContext';
 import { useAlert } from '../../context/AlertContext';
+import SmoothToggle from '../../components/SmoothToggle';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -348,12 +348,10 @@ export default function AppLockSettingsScreen({ navigation }) {
                   </Text>
                 </View>
               </View>
-              <Switch
-                value={isAppLockEnabled}
+              <SmoothToggle
+                value={Boolean(isAppLockEnabled)}
                 onValueChange={handleToggleLock}
-                trackColor={{ false: isDarkMode ? '#374151' : '#E2E4DC', true: '#0E3D23' }}
-                thumbColor="#FFFFFF"
-                ios_backgroundColor={isDarkMode ? '#374151' : '#E2E4DC'}
+                activeColor="#10B981"
               />
             </View>
           </View>
@@ -414,13 +412,11 @@ export default function AppLockSettingsScreen({ navigation }) {
                       </Text>
                     </View>
                   </View>
-                  <Switch
+                  <SmoothToggle
                     value={Boolean(isBiometricEnabled && biometricInfo.hasHardware && biometricInfo.isEnrolled)}
                     onValueChange={handleToggleBiometric}
                     disabled={!biometricInfo.hasHardware || !biometricInfo.isEnrolled}
-                    trackColor={{ false: isDarkMode ? '#374151' : '#E2E4DC', true: '#0E3D23' }}
-                    thumbColor="#FFFFFF"
-                    ios_backgroundColor={isDarkMode ? '#374151' : '#E2E4DC'}
+                    activeColor="#10B981"
                   />
                 </View>
               </View>
