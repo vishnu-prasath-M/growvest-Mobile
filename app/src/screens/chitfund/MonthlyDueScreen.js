@@ -323,8 +323,9 @@ const MonthlyDueScreen = ({ navigation }) => {
     const unitTitle = getUnitLabel(isWeekly, 1);
     const isFullyPaid = chit.isFullyPaid;
     
-    // Payment window: active dues (upcoming or overdue) can always be paid
-    const canPay = !isClosed && !isFullyPaid;
+    // Payment window: active dues only when overdue or due date has arrived (remainingDays <= 0)
+    const isDueNow = chit.isOverdue || chit.remainingDays <= 0;
+    const canPay = !isClosed && !isFullyPaid && isDueNow;
 
     return (
       <View key={chit._id} style={styles.dueCard}>
@@ -439,11 +440,39 @@ const MonthlyDueScreen = ({ navigation }) => {
                   </TouchableOpacity>
                 </>
               ) : (
-                <View style={[styles.payNowBtnEnabled, { backgroundColor: colors.muted, flex: 1 }]}>
-                  <Text style={[styles.payNowBtnText, { color: colors.textMuted }]}>
-                    🔒 Next due in {chit.remainingDays} days
-                  </Text>
-                </View>
+                <>
+                  <View
+                    style={[
+                      styles.payNowBtnEnabled,
+                      {
+                        backgroundColor: isDarkMode ? '#242426' : '#F3F4F6',
+                        flex: 2,
+                        borderWidth: 1,
+                        borderColor: isDarkMode ? '#333338' : '#E5E7EB',
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.payNowBtnText,
+                        { color: isDarkMode ? '#9CA3AF' : '#6B7280', fontSize: 13.5 },
+                      ]}
+                    >
+                      🔒 Next due in {chit.remainingDays} {chit.remainingDays === 1 ? 'day' : 'days'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.reminderBtn}
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      setReminderChit(chit);
+                      setShowReminderModal(true);
+                    }}
+                  >
+                    <MaterialCommunityIcons name="bell-outline" size={20} color={colors.primary} />
+                    <Text style={styles.reminderBtnText}>Remind</Text>
+                  </TouchableOpacity>
+                </>
               )}
             </View>
           </>

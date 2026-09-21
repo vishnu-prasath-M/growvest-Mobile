@@ -10,6 +10,8 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
+  Platform,
+  Pressable,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -25,10 +27,10 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAlert } from '../../context/AlertContext';
 
 const FILTER_OPTIONS = [
-  { id: 'all', label: 'All Transactions' },
-  { id: 'last_week', label: 'Last Week' },
-  { id: 'last_month', label: 'Last Month' },
-  { id: 'last_3_months', label: 'Last 3 Months' },
+  { id: 'all', label: 'All Transactions', subtitle: 'View complete transaction history', icon: 'format-list-bulleted' },
+  { id: 'last_week', label: 'Last Week', subtitle: 'Past 7 days activity', icon: 'calendar-week' },
+  { id: 'last_month', label: 'Last Month', subtitle: 'Past 30 days activity', icon: 'calendar-month' },
+  { id: 'last_3_months', label: 'Last 3 Months', subtitle: 'Past 90 days activity', icon: 'calendar-range' },
 ];
 
 const TransactionsScreen = ({ navigation }) => {
@@ -367,65 +369,120 @@ const TransactionsScreen = ({ navigation }) => {
         <View style={{ height: 110 }} />
       </ScrollView>
 
-      {/* Filter Modal */}
+      {/* Filter Modal (Modern Bottom-Sheet Confirm Popup Style) */}
       <Modal
         visible={filterModalVisible}
         transparent
         animationType="slide"
         onRequestClose={() => setFilterModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Filter Transactions</Text>
-              <TouchableOpacity onPress={() => setFilterModalVisible(false)} style={styles.modalCloseBtn}>
-                <MaterialCommunityIcons name="close" size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setFilterModalVisible(false)}
+        >
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation?.()}>
+            {/* Drag Handle */}
+            <View style={styles.modalDragHandle} />
+
+            {/* Icon Badge */}
+            <View style={styles.modalIconBadge}>
+              <MaterialCommunityIcons name="filter-variant" size={28} color="#10B981" />
             </View>
 
-            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+            {/* Title & Subtitle */}
+            <Text style={styles.modalTitle}>Filter Transactions</Text>
+            <Text style={styles.modalSubtitle}>Select a timeframe to filter your transaction activity</Text>
+
+            {/* Option Cards */}
+            <View style={styles.modalOptionsWrap}>
               {FILTER_OPTIONS.map((opt) => {
                 const isSelected = selectedFilter === opt.id;
                 return (
                   <TouchableOpacity
                     key={opt.id}
-                    style={[styles.filterOptionRow, isSelected && styles.filterOptionRowSelected]}
-                    activeOpacity={0.7}
+                    style={[
+                      styles.filterOptionCard,
+                      isSelected && styles.filterOptionCardSelected,
+                    ]}
+                    activeOpacity={0.75}
                     onPress={() => {
                       setSelectedFilter(opt.id);
                       setFilterModalVisible(false);
                     }}
                   >
-                    <Text style={[styles.filterOptionText, isSelected && styles.filterOptionTextSelected]}>
-                      {opt.label}
-                    </Text>
-                    {isSelected && (
-                      <MaterialCommunityIcons name="check-circle" size={18} color={colors.primary} />
-                    )}
+                    <View
+                      style={[
+                        styles.filterOptionIconWrap,
+                        isSelected && styles.filterOptionIconWrapSelected,
+                      ]}
+                    >
+                      <MaterialCommunityIcons
+                        name={opt.icon}
+                        size={20}
+                        color={isSelected ? '#10B981' : (isDarkMode ? '#9CA3AF' : '#6B7280')}
+                      />
+                    </View>
+                    <View style={styles.filterOptionTextCol}>
+                      <Text
+                        style={[
+                          styles.filterOptionLabel,
+                          isSelected && styles.filterOptionLabelSelected,
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                      <Text style={styles.filterOptionSub}>
+                        {opt.subtitle}
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.filterRadioRing,
+                        isSelected && styles.filterRadioRingSelected,
+                      ]}
+                    >
+                      {isSelected && (
+                        <MaterialCommunityIcons name="check" size={14} color="#FFFFFF" />
+                      )}
+                    </View>
                   </TouchableOpacity>
                 );
               })}
-            </ScrollView>
+            </View>
 
-            <View style={styles.modalFooter}>
+            {/* Footer Buttons */}
+            <View style={styles.modalFooterRow}>
+              {selectedFilter !== 'all' && (
+                <TouchableOpacity
+                  style={styles.modalResetBtn}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    setSelectedFilter('all');
+                    setFilterModalVisible(false);
+                  }}
+                >
+                  <Text style={styles.modalResetBtnText}>Reset Filter</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
-                style={styles.modalResetBtn}
-                onPress={() => {
-                  setSelectedFilter('all');
-                  setFilterModalVisible(false);
-                }}
+                style={[
+                  styles.modalClosePillBtn,
+                  selectedFilter === 'all' && { flex: 1 },
+                ]}
+                activeOpacity={0.85}
+                onPress={() => setFilterModalVisible(false)}
               >
-                <Text style={styles.modalResetBtnText}>Reset Filter</Text>
+                <Text style={styles.modalClosePillText}>Close</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );
 };
 
-const getStyles = (colors) => StyleSheet.create({
+const getStyles = (colors, isDarkMode) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 20 },
@@ -590,43 +647,156 @@ const getStyles = (colors) => StyleSheet.create({
   emptyResetBtn: { marginTop: 16, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: colors.primaryLight, borderRadius: 20 },
   emptyResetBtnText: { fontSize: 13, fontWeight: '700', color: colors.primary },
 
-  // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  // Modal (Modern Bottom-Sheet Confirm Popup Style)
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'flex-end',
+  },
   modalContent: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingTop: 20,
-    paddingBottom: 30,
-    maxHeight: '75%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
+    backgroundColor: isDarkMode ? '#1C1C1E' : '#FFFFFF',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingTop: 12,
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 26,
     alignItems: 'center',
-    justify: 'space-between',
-    paddingHorizontal: 24,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 18,
+    elevation: 30,
   },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
-  modalCloseBtn: { padding: 4 },
-  modalBody: { paddingHorizontal: 16, paddingTop: 8 },
-  filterOptionRow: {
-    flexDirection: 'row',
+  modalDragHandle: {
+    width: 38,
+    height: 4.5,
+    borderRadius: 3,
+    backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.2)' : '#E2E8F0',
+    marginBottom: 16,
+    alignSelf: 'center',
+  },
+  modalIconBadge: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.16)' : '#ECFDF5',
+    borderWidth: 1.5,
+    borderColor: isDarkMode ? 'rgba(16, 185, 129, 0.35)' : '#A7F3D0',
+    justifyContent: 'center',
     alignItems: 'center',
-    justify: 'space-between',
-    paddingVertical: 14,
+    marginBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: isDarkMode ? '#F9FAFB' : '#111827',
+    textAlign: 'center',
+    marginBottom: 4,
+    letterSpacing: -0.4,
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: isDarkMode ? '#9CA3AF' : '#6B7280',
+    textAlign: 'center',
+    marginBottom: 20,
     paddingHorizontal: 16,
-    borderRadius: 14,
-    marginVertical: 2,
+    lineHeight: 18,
   },
-  filterOptionRowSelected: { backgroundColor: colors.primaryLight },
-  filterOptionText: { fontSize: 15, fontWeight: '500', color: colors.text },
-  filterOptionTextSelected: { fontWeight: '700', color: colors.primary },
-  modalFooter: { paddingHorizontal: 24, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.borderLight },
-  modalResetBtn: { alignItems: 'center', paddingVertical: 12 },
-  modalResetBtnText: { fontSize: 14, fontWeight: '700', color: colors.error },
+  modalOptionsWrap: {
+    width: '100%',
+    gap: 10,
+    marginBottom: 20,
+  },
+  filterOptionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    backgroundColor: isDarkMode ? '#242426' : '#F9FAFB',
+    borderWidth: 1.5,
+    borderColor: isDarkMode ? '#2E2E32' : '#F1F5F9',
+  },
+  filterOptionCardSelected: {
+    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.14)' : '#ECFDF5',
+    borderColor: '#10B981',
+  },
+  filterOptionIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: isDarkMode ? '#2E2E32' : '#EEF2F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  filterOptionIconWrapSelected: {
+    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.22)' : '#D1FAE5',
+  },
+  filterOptionTextCol: {
+    flex: 1,
+  },
+  filterOptionLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: isDarkMode ? '#E5E7EB' : '#1F2937',
+    marginBottom: 2,
+  },
+  filterOptionLabelSelected: {
+    fontWeight: '700',
+    color: isDarkMode ? '#10B981' : '#047857',
+  },
+  filterOptionSub: {
+    fontSize: 11.5,
+    color: isDarkMode ? '#9CA3AF' : '#6B7280',
+  },
+  filterRadioRing: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: isDarkMode ? '#52525B' : '#D1D5DB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterRadioRingSelected: {
+    borderColor: '#10B981',
+    backgroundColor: '#10B981',
+  },
+  modalFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    width: '100%',
+  },
+  modalResetBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.14)' : '#FEF2F2',
+    borderWidth: 1,
+    borderColor: isDarkMode ? 'rgba(239, 68, 68, 0.3)' : '#FEE2E2',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalResetBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#EF4444',
+  },
+  modalClosePillBtn: {
+    flex: 1.2,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalClosePillText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
 });
 
 export default TransactionsScreen;

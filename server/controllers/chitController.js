@@ -218,16 +218,19 @@ const getDashboard = async (req, res) => {
 
         const pendingCount = Math.max(0, expectedUnits - paidUnits);
         
-        // If user has overdue pending installments, multiply by pending count.
-        // If current installment is paid up to date, next due is 1 installment for the next cycle.
-        const dueInstallmentCount = pendingCount > 0 ? pendingCount : 1;
-        upcomingDue += weeklyAmount * dueInstallmentCount;
-        pendingDueCount += Math.max(1, pendingCount);
-
         const due = isWeekly 
           ? calcNextWeeklyDueDate(m.joinedAt, paidUnits)
           : calcNextDueDate(m.joinedAt, paidUnits);
         if (!nextDueDate || due < nextDueDate) nextDueDate = due;
+
+        // An installment is only due / payable when expectedUnits > paidUnits or currentDate >= due.
+        // If the user is paid up to date, upcomingDue & pendingDueCount stay 0 so the due card closes.
+        const isDueNow = pendingCount > 0 || currentDate >= due;
+        if (isDueNow) {
+          const count = Math.max(1, pendingCount);
+          upcomingDue += weeklyAmount * count;
+          pendingDueCount += count;
+        }
       }
 
       if (m.withdrawalStatus === 'completed' || m.hasWon) winningStatus = 'Won';
