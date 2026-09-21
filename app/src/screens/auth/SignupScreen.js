@@ -13,7 +13,8 @@ import {
   StatusBar,
   Clipboard,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
 import { TextInput } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -27,9 +28,12 @@ import { useAlert } from '../../context/AlertContext';
 const { width, height } = Dimensions.get('window');
 
 const SignupScreen = ({ navigation }) => {
-  const { colors: themeColors } = useTheme();
+  const { colors: themeColors, isDarkMode } = useTheme();
   const { showError } = useAlert();
-  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
+  const insets = useSafeAreaInsets();
+  const isFocused = useIsFocused();
+  const [isScrolled, setIsScrolled] = useState(false);
+  const styles = React.useMemo(() => getStyles(themeColors, isDarkMode, insets), [themeColors, isDarkMode, insets]);
   const [username, setUsername] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
   const [email, setEmail] = useState('');
@@ -111,17 +115,22 @@ const SignupScreen = ({ navigation }) => {
 
   return (
     <View style={styles.rootContainer}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      <SafeAreaView style={styles.headerSafeArea} edges={['top']}>
-        <View style={styles.headerGradientBg}>
-          <LinearGradient
-            colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
-          />
-        </View>
-      </SafeAreaView>
+      {isFocused && (
+        <StatusBar
+          barStyle={isScrolled ? (isDarkMode ? 'light-content' : 'dark-content') : 'light-content'}
+          backgroundColor="transparent"
+          translucent
+        />
+      )}
+      {/* Dynamic status bar background strip: only shows after scroll */}
+      {isScrolled && (
+        <View
+          style={[
+            styles.statusBarOverlay,
+            { height: insets.top, backgroundColor: themeColors.surface || colors.surface },
+          ]}
+        />
+      )}
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -135,6 +144,11 @@ const SignupScreen = ({ navigation }) => {
           keyboardShouldPersistTaps="handled"
           scrollEnabled={true}
           bounces={true}
+          onScroll={(e) => {
+            const y = e.nativeEvent.contentOffset.y;
+            setIsScrolled(y > 35);
+          }}
+          scrollEventThrottle={16}
         >
           {/* Top Header Card */}
           <LinearGradient
@@ -304,10 +318,17 @@ const SignupScreen = ({ navigation }) => {
   );
 };
 
-const getStyles = (themeColors) => StyleSheet.create({
+const getStyles = (themeColors, isDarkMode, insets = { top: 0 }) => StyleSheet.create({
   rootContainer: { flex: 1, backgroundColor: themeColors.surface || colors.surface },
-  headerSafeArea: { backgroundColor: '#0E3D23' },
-  headerGradientBg: { height: 0 },
+  statusBarOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 999,
+    borderBottomWidth: 1,
+    borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+  },
   safeAreaBottom: { backgroundColor: themeColors.surface || colors.surface },
   keyboardView: { flex: 1, backgroundColor: themeColors.surface || colors.surface },
   scrollView: { flex: 1, backgroundColor: themeColors.surface || colors.surface },
@@ -315,8 +336,8 @@ const getStyles = (themeColors) => StyleSheet.create({
 
   // Header Area
   headerArea: {
-    height: height * 0.28,
-    paddingTop: Platform.OS === 'android' ? 24 : 36,
+    height: height * 0.28 + (insets?.top || 0),
+    paddingTop: (insets?.top || (Platform.OS === 'android' ? 24 : 36)) + 10,
     alignItems: 'center',
     position: 'relative',
     overflow: 'hidden',
