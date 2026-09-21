@@ -768,6 +768,25 @@ const WithdrawScreen = ({ navigation }) => {
             openWithdrawModal(inv._id);
           }
         }}
+        onReinvest={(item) => {
+          setSelectedDeposit(null);
+          const principal = Number(item.amount || item.investedAmount) || 0;
+          const rate = Number(item.interestRate) || 12;
+          const durationDays = Number(item.durationDays) || 365;
+          const dailyInterest = (principal * rate) / 100 / 365;
+          const totalInterest = dailyInterest * durationDays;
+          const maturedAmount = Number(item.maturityAmount) || (principal + (item.totalInterest || totalInterest));
+          const sourceRef = item.ref || item.refId || (item._id ? `INV-${String(item._id).slice(-6).toUpperCase()}` : '');
+
+          navigation.navigate('InvestmentAmount', {
+            isReinvestment: true,
+            sourceInvestmentId: item._id,
+            sourceRef,
+            initialPlan: item.type,
+            initialAmount: String(Number(maturedAmount.toFixed(2))),
+            maturedAmount: Number(maturedAmount.toFixed(2)),
+          });
+        }}
       />
 
       {/* Modern Alert Modal */}

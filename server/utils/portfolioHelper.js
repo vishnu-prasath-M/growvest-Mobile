@@ -227,18 +227,54 @@ async function getUserPortfolioSummary(userIdInput) {
   let activeChitsCount = 0;
 
   chitMemberships.forEach(cm => {
-    if (cm.status === 'active' || cm.status === 'approved') {
+    if (cm.status === 'active' || cm.status === 'approved' || cm.status === 'completed') {
       activeChitsCount++;
       const paidAmt = Number(cm.totalPaid) || (Number(cm.paidWeeks || 0) * Number(cm.weeklyAmount || 0));
       totalChitInvested += paidAmt;
-      totalChitLocked += paidAmt;
+
+      const isWithdrawn = cm.withdrawalStatus === 'completed' || cm.withdrawalStatus === 'withdrawn' || cm.withdrawalStatus === 'approved';
+      const isRequested = cm.withdrawalStatus === 'requested';
+
+      // Determine cycle progress & unlock
+      const chit = cm.chitId;
+      const isWeekly = chit?.isWeekly ?? (cm.weeklyAmount > 0);
+      const totalUnits = isWeekly
+        ? (cm.totalWeeks || chit?.totalWeeks || chit?.duration || 10)
+        : (chit?.duration || chit?.totalWeeks || 12);
+      const currentUnit = isWeekly ? (cm.currentWeek || cm.paidWeeks || 1) : (cm.currentMonth || 1);
+      const lockedCount = Math.floor((totalUnits - 1) / 2);
+      const isUnlocked = currentUnit > lockedCount;
+      const isSettlement = currentUnit >= totalUnits;
+
+      const installmentAmount = isWeekly
+        ? (cm.weeklyAmount || chit?.weeklyAmount || chit?.monthlyAmount || 200)
+        : (chit?.monthlyAmount || chit?.weeklyAmount || cm.monthlyAmount || 1000);
+      const totalContribution = cm.totalContribution || chit?.totalContribution || chit?.totalPot || (installmentAmount * totalUnits);
+
+      let priceAmount = Number(cm.priceAmount) || 0;
+      if (!priceAmount) {
+        if (isSettlement) {
+          priceAmount = totalContribution;
+        } else if (isUnlocked) {
+          const baseEndPct = totalUnits >= 20 ? 8 : 6;
+          const actionPct = baseEndPct + 2 * (totalUnits - currentUnit);
+          priceAmount = totalContribution - (totalContribution * actionPct / 100);
+        }
+      }
+
+      if (!isUnlocked && !isWithdrawn) {
+        totalChitLocked += paidAmt;
+      }
 
       if (cm.hasWon) {
-        const winning = Number(cm.winningAmount) || 0;
+        const winning = Number(cm.winningAmount) || priceAmount;
         totalChitWinningAmount += winning;
-        if (cm.withdrawalStatus !== 'completed') {
+        if (!isWithdrawn && !isRequested) {
           chitWithdrawalAvailable += winning;
         }
+      } else if (isUnlocked && !isWithdrawn && !isRequested) {
+        // Price amount ONLY (before chit completes, strictly price amount without dividend)
+        chitWithdrawalAvailable += priceAmount;
       }
     }
   });
