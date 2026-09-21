@@ -31,30 +31,19 @@ const LoginScreen = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [emailError, setEmailError] = useState('');
-  const [passwordError, setPasswordError] = useState('');
+  const [errors, setErrors] = useState({});
   const { login } = useAuth();
 
   const validateForm = () => {
-    let isValid = true;
-    if (!email) {
-      setEmailError('Email is required');
-      isValid = false;
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
-      setEmailError('Invalid email format');
-      isValid = false;
-    } else {
-      setEmailError('');
+    const newErrors = {};
+    if (!email || !email.trim()) {
+      newErrors.email = 'Email or mobile number is required';
     }
-
     if (!password) {
-      setPasswordError('Password is required');
-      isValid = false;
-    } else {
-      setPasswordError('');
+      newErrors.password = 'Password is required';
     }
-
-    return isValid;
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleLogin = async () => {
@@ -62,7 +51,7 @@ const LoginScreen = ({ navigation }) => {
 
     setLoading(true);
     try {
-      const res = await authService.login(email, password);
+      const res = await authService.login(email.trim(), password);
       await login(res.token, res);
     } catch (error) {
       showError('Login Failed', error.message || 'Something went wrong');
@@ -130,7 +119,10 @@ const LoginScreen = ({ navigation }) => {
                 <Text style={styles.inputLabel}>Email Address or Mobile Number</Text>
                 <TextInput
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={(text) => {
+                    setEmail(text);
+                    if (errors.email) setErrors((prev) => ({ ...prev, email: '' }));
+                  }}
                   mode="flat"
                   style={styles.input}
                   underlineColor="transparent"
@@ -142,14 +134,17 @@ const LoginScreen = ({ navigation }) => {
                   keyboardType="email-address"
                   left={<TextInput.Icon icon="email-outline" color={colors.textMuted} />}
                 />
-                {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+                {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
               </View>
 
               <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>Password</Text>
                 <TextInput
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={(text) => {
+                    setPassword(text);
+                    if (errors.password) setErrors((prev) => ({ ...prev, password: '' }));
+                  }}
                   mode="flat"
                   style={styles.input}
                   underlineColor="transparent"
@@ -167,7 +162,7 @@ const LoginScreen = ({ navigation }) => {
                     />
                   }
                 />
-                {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+                {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
               </View>
 
               <TouchableOpacity style={styles.forgotBtn} activeOpacity={0.8} onPress={() => navigation.navigate('ForgotPassword')}>
