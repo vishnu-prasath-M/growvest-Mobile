@@ -12,6 +12,9 @@ import {
   Switch,
   ImageBackground,
   StatusBar,
+  Animated,
+  Pressable,
+  Easing,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -25,6 +28,87 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAppLock } from '../../context/AppLockContext';
 import { appLockService } from '../../services/appLockService';
 import { useAlert } from '../../context/AlertContext';
+
+const SmoothToggle = ({ value, onValueChange, activeColor = '#10B981', disabled = false }) => {
+  const { isDarkMode } = useTheme();
+  const animatedValue = React.useRef(new Animated.Value(value ? 1 : 0)).current;
+  const isChecked = Boolean(value);
+
+  React.useEffect(() => {
+    Animated.spring(animatedValue, {
+      toValue: isChecked ? 1 : 0,
+      bounciness: 4,
+      speed: 18,
+      useNativeDriver: true,
+    }).start();
+  }, [isChecked]);
+
+  const handlePress = () => {
+    if (disabled) return;
+    const nextValue = !isChecked;
+    // Immediate native animation for zero latency response
+    Animated.spring(animatedValue, {
+      toValue: nextValue ? 1 : 0,
+      bounciness: 4,
+      speed: 18,
+      useNativeDriver: true,
+    }).start();
+    if (onValueChange) {
+      onValueChange(nextValue);
+    }
+  };
+
+  const translateX = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [2, 22],
+  });
+
+  return (
+    <Pressable
+      onPress={handlePress}
+      style={{ opacity: disabled ? 0.6 : 1, padding: 2 }}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+    >
+      <View
+        style={{
+          width: 48,
+          height: 28,
+          borderRadius: 14,
+          backgroundColor: isDarkMode ? '#374151' : '#E2E4DC',
+          justifyContent: 'center',
+          overflow: 'hidden',
+        }}
+      >
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFillObject,
+            {
+              backgroundColor: activeColor || '#10B981',
+              opacity: animatedValue,
+              borderRadius: 14,
+            },
+          ]}
+        />
+        <Animated.View
+          style={{
+            position: 'absolute',
+            left: 0,
+            width: 24,
+            height: 24,
+            borderRadius: 12,
+            backgroundColor: '#FFFFFF',
+            transform: [{ translateX }],
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.22,
+            shadowRadius: 3,
+            elevation: 4,
+          }}
+        />
+      </View>
+    </Pressable>
+  );
+};
 
 const ProfileScreen = ({ navigation }) => {
   const { isDarkMode, toggleTheme, colors: themeColors } = useTheme();
@@ -393,12 +477,10 @@ const ProfileScreen = ({ navigation }) => {
                   <MaterialCommunityIcons name="shield-check-outline" size={20} color={styles.mintIconColor.color} />
                 </View>
                 <Text style={styles.menuLabel}>Biometric Unlock</Text>
-                <Switch
+                <SmoothToggle
                   value={Boolean(isBiometricEnabled)}
                   onValueChange={handleToggleBiometric}
-                  trackColor={{ false: isDarkMode ? '#374151' : '#E2E4DC', true: '#0E3D23' }}
-                  thumbColor="#FFFFFF"
-                  ios_backgroundColor={isDarkMode ? '#374151' : '#E2E4DC'}
+                  activeColor="#10B981"
                 />
               </View>
             </View>
@@ -418,12 +500,10 @@ const ProfileScreen = ({ navigation }) => {
                   />
                 </View>
                 <Text style={styles.menuLabel}>Dark mode</Text>
-                <Switch
+                <SmoothToggle
                   value={isDarkMode}
                   onValueChange={toggleTheme}
-                  trackColor={{ false: isDarkMode ? '#374151' : '#E2E4DC', true: '#0E3D23' }}
-                  thumbColor="#FFFFFF"
-                  ios_backgroundColor={isDarkMode ? '#374151' : '#E2E4DC'}
+                  activeColor="#10B981"
                 />
               </View>
 
