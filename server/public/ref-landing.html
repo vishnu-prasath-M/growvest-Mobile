@@ -115,10 +115,10 @@
     <h1 class="title">Growvest</h1>
     <p class="subtitle">Grow your money. Invest smarter with high-yield savings & chit fund plans.</p>
 
-    <div class="invite-box" onclick="copyRefCode()" style="cursor: pointer;">
-      <div class="invite-label">🎁 You've Been Invited!</div>
-      <div class="subtitle" style="margin-bottom:8px;">Your Referral Code (Tap to Copy)</div>
-      <div class="code-val" id="refCodeDisplay">ABC123</div>
+    <div class="invite-box" id="inviteBox" onclick="copyRefCode()" style="cursor: pointer;">
+      <div class="invite-label" id="inviteLabel">🎁 You've Been Invited!</div>
+      <div class="subtitle" style="margin-bottom:8px;">Referral Code (Tap to Copy)</div>
+      <div class="code-val" id="refCodeDisplay">—</div>
       <div id="copyBadge" style="font-size: 11px; color: #10B981; font-weight: 700; margin-top: 6px;">📋 Click to Copy Code</div>
     </div>
 
@@ -140,12 +140,42 @@
   </div>
 
   <script>
-    const pathParts = window.location.pathname.split('/');
-    const code = (pathParts[pathParts.length - 1] || 'GVREF').trim().toUpperCase();
-    document.getElementById('refCodeDisplay').innerText = code;
+    // Extract referral code from path (/ref/:code) or query string (?ref=:code)
+    const pathParts = window.location.pathname.split('/').filter(Boolean);
+    let code = (pathParts.length > 1 ? pathParts[pathParts.length - 1] : new URLSearchParams(window.location.search).get('ref') || '').trim().toUpperCase();
+
+    // Verify referrer code with server to display personalized invitation
+    if (code && code !== 'REF') {
+      fetch('/api/referral/check/' + encodeURIComponent(code))
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.valid) {
+            document.getElementById('refCodeDisplay').innerText = data.referralCode;
+            document.getElementById('inviteLabel').innerText = '👋 ' + data.referrerName + ' Invited You!';
+            code = data.referralCode;
+
+            // Silently record lead visit
+            fetch('/api/referral/track-download', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ referralCode: code, type: 'LINK_VISIT' })
+            }).catch(() => {});
+          } else {
+            // Invalid code
+            document.getElementById('inviteBox').style.display = 'none';
+          }
+        })
+        .catch(() => {
+          document.getElementById('refCodeDisplay').innerText = code;
+        });
+    } else {
+      // Direct visit without referral code
+      const inviteBox = document.getElementById('inviteBox');
+      if (inviteBox) inviteBox.style.display = 'none';
+    }
 
     function copyRefCode() {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
+      if (code && navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(code).then(() => {
           const badge = document.getElementById('copyBadge');
           if (badge) badge.innerText = '✓ Referral Code Copied!';
@@ -155,15 +185,6 @@
         }).catch(() => {});
       }
     }
-
-    // Auto-track visit on page load
-    try {
-      fetch('/api/referral/track-download', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ referralCode: code, type: 'LINK_VISIT' })
-      }).catch(err => console.log('Visit track note:', err));
-    } catch(e) {}
 
     // Fetch active APK release uploaded from Admin Dashboard
     fetch('/api/referral/apk')

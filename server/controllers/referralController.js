@@ -55,19 +55,19 @@ exports.trackDownloadOrVisit = async (req, res) => {
         status: 'DOWNLOADED',
       });
 
-      // Send real-time in-app / push notification to referrer
-      try {
-        await sendNotification({
-          userId: referrer._id,
-          title: eventType === 'APK_DOWNLOAD' ? '📱 Friend Downloaded the App!' : '🔗 Referral Link Visited!',
-          description: eventType === 'APK_DOWNLOAD'
-            ? 'Someone just downloaded Growvest using your referral link. You will earn Coins once they register!'
-            : 'Someone just checked out your Growvest referral invitation link.',
-          type: 'referral_lead',
-          pushData: { screen: 'Referral' },
-        });
-      } catch (notifErr) {
-        console.warn('[ReferralTrack Notification Warning]', notifErr.message);
+      // Send real-time in-app / push notification to referrer ONLY on actual APK Download, NOT on crawler link previews
+      if (eventType === 'APK_DOWNLOAD') {
+        try {
+          await sendNotification({
+            userId: referrer._id,
+            title: '📱 Friend Downloaded the App!',
+            description: 'Someone just downloaded Growvest using your referral link. You will earn Coins once they register!',
+            type: 'referral_lead',
+            pushData: { screen: 'Referral' },
+          });
+        } catch (notifErr) {
+          console.warn('[ReferralTrack Notification Warning]', notifErr.message);
+        }
       }
 
       return res.status(201).json({ success: true, message: 'Referral tracked', leadId: lead._id });
@@ -77,6 +77,28 @@ exports.trackDownloadOrVisit = async (req, res) => {
   } catch (error) {
     console.error('Error tracking referral download:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// ─── GET /api/referral/check/:code (Public) ──────────────────────────────────
+exports.checkReferralCode = async (req, res) => {
+  try {
+    const { code } = req.params;
+    if (!code) {
+      return res.status(400).json({ valid: false, message: 'Code required' });
+    }
+    const cleanCode = code.toString().trim().toUpperCase();
+    const referrer = await User.findOne({ referralCode: cleanCode }).select('name username referralCode');
+    if (!referrer) {
+      return res.status(404).json({ valid: false, message: 'Invalid referral code' });
+    }
+    return res.status(200).json({
+      valid: true,
+      referrerName: referrer.name || referrer.username || 'Growvest Member',
+      referralCode: referrer.referralCode,
+    });
+  } catch (error) {
+    return res.status(500).json({ valid: false, message: error.message });
   }
 };
 

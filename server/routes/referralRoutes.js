@@ -14,6 +14,7 @@ const upload = multer({
 // Public APK & Referral Tracking Routes
 router.get('/apk', apkController.getActiveAPK);
 router.get('/apk/download', apkController.downloadActiveAPK);
+router.get('/check/:code', referralController.checkReferralCode);
 router.post('/track-download', referralController.trackDownloadOrVisit);
 
 // User Authenticated Routes

@@ -268,10 +268,16 @@ const sendChitDueReminders = async () => {
     }).populate('userId').populate('chitId');
 
     let count = 0;
-    for (const member of activeMembers) {
-      if (!member.userId?._id) continue;
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
 
-      const isWeekly = (member.chitId?.duration || 0) > 0 ? (member.totalWeeks > 0 || (member.weeklyAmount && member.weeklyAmount > 0)) : true;
+    for (const member of activeMembers) {
+      if (!member.userId?._id || !member.chitId) continue;
+
+      const isWeekly = member.chitId.isWeekly !== undefined
+        ? member.chitId.isWeekly
+        : (member.chitId.paymentFrequency === 'weekly' || (member.totalWeeks > 0 && member.totalWeeks === member.chitId.totalWeeks));
+
       const paidUnits = member.paidWeeks || member.currentWeek || member.currentMonth || 0;
       
       let dueDate = member.nextDueDate ? new Date(member.nextDueDate) : null;
@@ -283,8 +289,21 @@ const sendChitDueReminders = async () => {
 
       // Check if due date is within the 4-day window (or overdue)
       if (dueDate && dueDate.getTime() <= fourDaysLater.getTime()) {
-        const dueAmount = member.weeklyAmount || member.chitId?.monthlyAmount || 200;
-        const chitTitle = member.chitId?.name || 'Chit Plan';
+        // Prevent duplicate notification for the same chit to the same user on the same day
+        const alreadySentToday = await Notification.findOne({
+          userId: member.userId._id,
+          type: 'chit_due_reminder',
+          'metadata.chitId': member.chitId._id.toString(),
+          createdAt: { $gte: todayStart },
+        });
+        if (alreadySentToday) continue;
+
+        const dueAmount = isWeekly
+          ? (member.weeklyAmount || member.chitId.weeklyAmount || 200)
+          : (member.chitId.monthlyAmount || member.monthlyAmount || 1000);
+        const chitTitle = member.chitId.name || 'Chit Plan';
+        const frequencyLabel = isWeekly ? 'Weekly' : 'Monthly';
+        const dueDayName = isWeekly ? 'Sunday' : '1st of the month';
 
         const todayMidnight = new Date();
         todayMidnight.setHours(0, 0, 0, 0);
@@ -298,20 +317,20 @@ const sendChitDueReminders = async () => {
         let body = '';
 
         if (diffDays === 0) {
-          title = '🚨 Chit Due Today!';
-          body = `Your contribution of ₹${dueAmount.toLocaleString('en-IN')} for "${chitTitle}" is due today. Pay now to stay eligible for upcoming chit draws!`;
+          title = `🚨 ${frequencyLabel} Chit Due Today!`;
+          body = `Your ${frequencyLabel.toLowerCase()} contribution of ₹${dueAmount.toLocaleString('en-IN')} for "${chitTitle}" is due today. Pay now to stay eligible for upcoming chit draws!`;
         } else if (diffDays === 1) {
-          title = '⏳ Chit Due Tomorrow!';
-          body = `Your contribution of ₹${dueAmount.toLocaleString('en-IN')} for "${chitTitle}" is due tomorrow (Sunday). Pay early to maintain your clean chit record.`;
+          title = `⏳ ${frequencyLabel} Chit Due Tomorrow!`;
+          body = `Your ${frequencyLabel.toLowerCase()} contribution of ₹${dueAmount.toLocaleString('en-IN')} for "${chitTitle}" is due tomorrow (${dueDayName}). Pay early to maintain your clean chit record.`;
         } else if (diffDays > 1) {
-          title = `⏳ Chit Due in ${diffDays} Days!`;
-          body = `Your contribution of ₹${dueAmount.toLocaleString('en-IN')} for "${chitTitle}" is due in ${diffDays} days. Pay early to maintain your clean chit record.`;
+          title = `⏳ ${frequencyLabel} Chit Due in ${diffDays} Days!`;
+          body = `Your ${frequencyLabel.toLowerCase()} contribution of ₹${dueAmount.toLocaleString('en-IN')} for "${chitTitle}" is due in ${diffDays} days (${dueDayName}). Pay early to maintain your clean chit record.`;
         } else {
           // Overdue
           const daysLate = Math.abs(diffDays);
           const lateFee = Math.max(5, daysLate * 5);
-          title = '⚠️ Chit Due Overdue!';
-          body = `Your contribution for "${chitTitle}" was due on Sunday and is overdue by ${daysLate} day${daysLate > 1 ? 's' : ''}. Late fee of ₹${lateFee} applies. Pay now to clear your dues!`;
+          title = `⚠️ ${frequencyLabel} Chit Due Overdue!`;
+          body = `Your ${frequencyLabel.toLowerCase()} contribution for "${chitTitle}" was due on ${dueDayName} and is overdue by ${daysLate} day${daysLate > 1 ? 's' : ''}. Late fee of ₹${lateFee} applies. Pay now to clear your dues!`;
         }
 
         await sendUserNotification(
@@ -319,7 +338,7 @@ const sendChitDueReminders = async () => {
           title,
           body,
           'chit_due_reminder',
-          { screen: 'MonthlyDueScreen', chitId: member.chitId?._id?.toString() }
+          { screen: 'MonthlyDueScreen', chitId: member.chitId._id.toString() }
         );
         count++;
       }
