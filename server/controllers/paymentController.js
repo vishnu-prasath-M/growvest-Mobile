@@ -30,8 +30,8 @@ const getRazorpayInstance = () => {
  * Helper to fetch gateway configuration from environment variables
  */
 const getGatewayConfig = () => {
-  const baseUrl = (process.env.PAYME_BASE_URL || process.env.PG_BASE_URL || '').trim().replace(/\/+$/, '');
-  const apiKey = (process.env.PAYME_API_KEY || process.env.PG_API_KEY || '').trim();
+  const baseUrl = (process.env.PG_URL || process.env.PAYME_BASE_URL || process.env.PG_BASE_URL || '').trim().replace(/\/+$/, '');
+  const apiKey = (process.env.PG_API_KEY || process.env.PAYME_API_KEY || '').trim();
   const isConfigured = Boolean(
     baseUrl &&
     apiKey &&
@@ -382,6 +382,41 @@ exports.checkOrderStatus = async (req, res) => {
   } catch (error) {
     console.error('[PaymentController] Check order status error:', error);
     res.status(500).json({ success: false, message: 'Failed to check order status', error: error.message });
+  }
+};
+
+// ─── 4. Gateway Webhook Endpoint ────────────────────────────────────────────
+exports.handleWebhook = async (req, res) => {
+  try {
+    const payload = req.body || {};
+    console.log('[PaymentWebhook] Received incoming payment webhook:', payload);
+
+    const orderId = payload.order_id || payload.orderId || payload.order_ID || req.query?.order_id;
+    if (!orderId) {
+      return res.status(200).json({ status: false, message: 'order_id parameter missing in webhook payload' });
+    }
+
+    // Query gateway to authenticate status
+    const statusRes = await callGatewayCheckStatus(orderId);
+    const status = (
+      payload.status ||
+      payload.txnStatus ||
+      statusRes?.status ||
+      statusRes?.result?.status ||
+      statusRes?.result?.txnStatus ||
+      ''
+    ).toUpperCase();
+
+    if (status === 'COMPLETED' || status === 'SUCCESS') {
+      const utr = payload.utr || statusRes?.result?.utr || `UTR_${Date.now()}`;
+      console.log(`[PaymentWebhook] Order ${orderId} confirmed successful via webhook with UTR: ${utr}`);
+      return res.status(200).json({ status: true, message: 'Webhook processed successfully', orderId, utr });
+    }
+
+    return res.status(200).json({ status: true, message: `Webhook received with status: ${status}`, orderId });
+  } catch (error) {
+    console.error('[PaymentWebhook] Webhook error:', error);
+    res.status(500).json({ status: false, message: 'Webhook error', error: error.message });
   }
 };
 

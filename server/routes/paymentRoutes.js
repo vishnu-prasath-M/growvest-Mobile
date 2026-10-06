@@ -7,4 +7,8 @@ router.post('/create-order', protect, paymentController.createOrder);
 router.post('/verify', protect, paymentController.verifyPayment);
 router.post('/check-order-status', protect, paymentController.checkOrderStatus);
 
+// Webhook endpoint called by the Payment Gateway server (public, no auth middleware)
+router.post('/webhook', paymentController.handleWebhook);
+router.get('/webhook', paymentController.handleWebhook);
+
 module.exports = router;
