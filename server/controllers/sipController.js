@@ -21,8 +21,8 @@ const getRazorpayInstance = () => {
 
 // Gateway helpers
 const getGatewayConfig = () => {
-  const baseUrl = (process.env.PAYME_BASE_URL || process.env.PG_BASE_URL || '').trim().replace(/\/+$/, '');
-  const apiKey = (process.env.PAYME_API_KEY || process.env.PG_API_KEY || '').trim();
+  const baseUrl = (process.env.PG_URL || process.env.PAYME_BASE_URL || process.env.PG_BASE_URL || '').trim().replace(/\/+$/, '');
+  const apiKey = (process.env.PG_API_KEY || process.env.PAYME_API_KEY || '').trim();
   const isConfigured = Boolean(
     baseUrl &&
     apiKey &&
