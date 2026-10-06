@@ -8,10 +8,71 @@ const { sendNotification, notifyAdmins } = require('../services/notificationHelp
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 
+// ============================================================================
+// === PREVIOUS RAZORPAY GATEWAY (COMMENTED OUT AS REQUESTED) =================
+// ============================================================================
+/*
 const getRazorpayInstance = () => {
   const key_id = process.env.RAZORPAY_KEY_ID || 'rzp_test_xxxxxxxxx';
   const key_secret = process.env.RAZORPAY_KEY_SECRET || 'xxxxxxxxxxxx';
   return new Razorpay({ key_id, key_secret });
+};
+*/
+
+// Gateway helpers
+const getGatewayConfig = () => {
+  const baseUrl = (process.env.PAYME_BASE_URL || process.env.PG_BASE_URL || '').trim().replace(/\/+$/, '');
+  const apiKey = (process.env.PAYME_API_KEY || process.env.PG_API_KEY || '').trim();
+  const isConfigured = Boolean(
+    baseUrl &&
+    apiKey &&
+    !baseUrl.includes('yourdomain.com') &&
+    apiKey !== 'your_api_key_here'
+  );
+  return { baseUrl, apiKey, isConfigured };
+};
+
+const callGatewayCreateOrder = async ({ amount, orderId, mobile, redirectUrl, remark1, remark2 }) => {
+  const { baseUrl, apiKey, isConfigured } = getGatewayConfig();
+  if (!isConfigured) {
+    return { success: false, isSimulated: true, message: 'Gateway not configured; test simulation fallback' };
+  }
+  const formParams = new URLSearchParams({
+    api_key: apiKey,
+    customer_mobile: String(mobile || '9999999999'),
+    amount: String(amount),
+    order_id: String(orderId),
+    redirect_url: redirectUrl || '',
+    remark1: remark1 || 'SIP Payment',
+    remark2: remark2 || '',
+  });
+  const res = await fetch(`${baseUrl}/api/create-order`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: formParams.toString(),
+  });
+  return await res.json();
+};
+
+const callGatewayCheckStatus = async (orderId) => {
+  const { baseUrl, apiKey, isConfigured } = getGatewayConfig();
+  if (!isConfigured) {
+    return {
+      status: 'SIMULATED',
+      isSimulated: true,
+      result: { txnStatus: 'COMPLETED', status: 'SUCCESS', orderId, utr: `SIM_UTR_${Date.now()}` },
+    };
+  }
+  const formParams = new URLSearchParams({
+    api_key: apiKey,
+    order_id: String(orderId),
+  });
+  const res = await fetch(`${baseUrl}/api/check-order-status`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: formParams.toString(),
+  });
+  return await res.json();
 };
 
 // Helper to calculate recurring due date by frequency safely
@@ -167,27 +228,45 @@ exports.createSIP = async (req, res) => {
     }
     await SIPContribution.insertMany(contributions);
 
-    // 3. Create Razorpay Order for Contribution #1
-    let orderId = `order_sim_${Date.now()}`;
+    // 3. Create Order for Contribution #1 with new Gateway
+    const orderId = `ORD_SIP_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+    let paymentUrl = `simulated_pay_${orderId}`;
     let isSimulated = false;
 
+    /*
+    // === PREVIOUS RAZORPAY ORDER FOR CONTRIBUTION #1 (COMMENTED OUT) ===
+    const instance = getRazorpayInstance();
+    const rzpOrder = await instance.orders.create({
+      amount: Math.round(numAmount * 100),
+      currency: 'INR',
+      receipt: `sip_${sipIdStr}_1`,
+      notes: {
+        userId: user._id.toString(),
+        sipId: sip._id.toString(),
+        sipRefId: sipIdStr,
+        installmentNumber: 1,
+        purpose: 'sip_initial',
+      },
+    });
+    const orderId = rzpOrder.id;
+    */
+
     try {
-      const instance = getRazorpayInstance();
-      const rzpOrder = await instance.orders.create({
-        amount: Math.round(numAmount * 100),
-        currency: 'INR',
-        receipt: `sip_${sipIdStr}_1`,
-        notes: {
-          userId: user._id.toString(),
-          sipId: sip._id.toString(),
-          sipRefId: sipIdStr,
-          installmentNumber: 1,
-          purpose: 'sip_initial',
-        },
+      const gwRes = await callGatewayCreateOrder({
+        amount: Math.round(numAmount),
+        orderId,
+        mobile: user.mobileNumber || '9999999999',
+        redirectUrl: `${process.env.APP_URL || 'https://growvest-mobile.onrender.com'}/api/payment/callback`,
+        remark1: `SIP Initial - ${sipIdStr}`,
+        remark2: user._id.toString(),
       });
-      orderId = rzpOrder.id;
-    } catch (rzpErr) {
-      console.warn('[SIPController] Razorpay order fallback:', rzpErr.message);
+      if (gwRes && (gwRes.status === true || gwRes.result?.payment_url)) {
+        paymentUrl = gwRes.result?.payment_url;
+      } else {
+        isSimulated = true;
+      }
+    } catch (gwErr) {
+      console.warn('[SIPController] Gateway order fallback:', gwErr.message);
       isSimulated = true;
     }
 
@@ -198,9 +277,10 @@ exports.createSIP = async (req, res) => {
         sip,
         firstContribution: contributions[0],
         orderId,
-        amount: Math.round(numAmount * 100),
+        paymentUrl,
+        amount: Math.round(numAmount),
         currency: 'INR',
-        keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_xxxxxxxxx',
+        gateway: 'custom_upi',
         isSimulated,
       },
     });
@@ -214,27 +294,66 @@ exports.createSIP = async (req, res) => {
 exports.verifyPayment = async (req, res) => {
   try {
     const {
+      order_id,
+      orderId,
+      utr,
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,
       sipId,
       contributionId,
       installmentNumber,
+      isSimulated: clientIsSimulated,
     } = req.body;
     const userId = req.user._id;
 
-    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-      return res.status(400).json({ message: 'Missing payment verification parameters' });
+    const effectiveOrderId = order_id || orderId || razorpay_order_id;
+    if (!effectiveOrderId) {
+      return res.status(400).json({ message: 'Missing order ID for payment verification' });
     }
 
-    // Verify signature
+    /*
+    // === PREVIOUS RAZORPAY SIGNATURE CHECK (COMMENTED OUT) ===
     const key_secret = process.env.RAZORPAY_KEY_SECRET || 'xxxxxxxxxxxx';
     const body = razorpay_order_id + '|' + razorpay_payment_id;
     const expectedSignature = crypto.createHmac('sha256', key_secret).update(body).digest('hex');
-
     const isValid = expectedSignature === razorpay_signature || razorpay_signature.startsWith('simulated_signature_');
     if (!isValid) {
       return res.status(400).json({ message: 'Invalid payment signature. Verification failed.' });
+    }
+    */
+
+    let verifiedUtr = utr || razorpay_payment_id || `UTR_${Date.now()}`;
+    const isSimulated =
+      clientIsSimulated ||
+      effectiveOrderId.startsWith('order_sim_') ||
+      effectiveOrderId.startsWith('ORD_SIM_') ||
+      (razorpay_signature && razorpay_signature.startsWith('simulated_'));
+
+    if (!isSimulated) {
+      const statusRes = await callGatewayCheckStatus(effectiveOrderId);
+      const status = (
+        statusRes?.status ||
+        statusRes?.result?.status ||
+        statusRes?.result?.txnStatus ||
+        ''
+      ).toUpperCase();
+
+      if (status === 'COMPLETED' || status === 'SUCCESS') {
+        verifiedUtr = statusRes?.result?.utr || verifiedUtr;
+      } else if (status === 'PENDING') {
+        return res.status(200).json({
+          success: false,
+          isPending: true,
+          message: 'Payment is still pending. If you just paid, please wait a few seconds and tap verify again.',
+        });
+      } else if (status === 'FAILED') {
+        return res.status(400).json({
+          success: false,
+          isFailed: true,
+          message: statusRes?.message || 'Payment failed or expired.',
+        });
+      }
     }
 
     // Find SIP & Contribution
@@ -268,9 +387,9 @@ exports.verifyPayment = async (req, res) => {
     const receiptId = `RCP-SIP-${Date.now().toString().slice(-8)}`;
     contribution.paymentStatus = 'paid';
     contribution.paidAt = new Date();
-    contribution.orderId = razorpay_order_id;
-    contribution.paymentId = razorpay_payment_id;
-    contribution.signature = razorpay_signature;
+    contribution.orderId = effectiveOrderId;
+    contribution.paymentId = verifiedUtr;
+    contribution.signature = `VERIFIED_UPI_${effectiveOrderId}`;
     contribution.receiptId = receiptId;
     contribution.withdrawableAmount = contribution.amount;
     await contribution.save();
@@ -305,7 +424,7 @@ exports.verifyPayment = async (req, res) => {
       status: 'approved',
       referenceId: contribution._id,
       referenceType: 'SIP',
-      description: `SIP Contribution #${contribution.installmentNumber} - ${sip.sipId} (Txn: ${razorpay_payment_id})`,
+      description: `UPI SIP Contribution #${contribution.installmentNumber} - ${sip.sipId} (Txn: ${verifiedUtr})`,
     });
     await transaction.save();
 
@@ -508,36 +627,55 @@ exports.payInstallment = async (req, res) => {
       return res.status(400).json({ message: 'This installment has already been paid.' });
     }
 
-    let orderId = `order_sim_${Date.now()}`;
+    const orderId = `ORD_SIP_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+    let paymentUrl = `simulated_pay_${orderId}`;
     let isSimulated = false;
 
+    /*
+    // === PREVIOUS RAZORPAY ORDER FOR INSTALLMENT (COMMENTED OUT) ===
+    const instance = getRazorpayInstance();
+    const rzpOrder = await instance.orders.create({
+      amount: Math.round(contribution.amount * 100),
+      currency: 'INR',
+      receipt: `sip_${sip.sipId}_${contribution.installmentNumber}`,
+      notes: {
+        userId: userId.toString(),
+        sipId: sip._id.toString(),
+        sipRefId: sip.sipId,
+        contributionId: contribution._id.toString(),
+        installmentNumber: contribution.installmentNumber,
+        purpose: 'sip_installment',
+      },
+    });
+    const orderId = rzpOrder.id;
+    */
+
     try {
-      const instance = getRazorpayInstance();
-      const rzpOrder = await instance.orders.create({
-        amount: Math.round(contribution.amount * 100),
-        currency: 'INR',
-        receipt: `sip_${sip.sipId}_${contribution.installmentNumber}`,
-        notes: {
-          userId: userId.toString(),
-          sipId: sip._id.toString(),
-          sipRefId: sip.sipId,
-          contributionId: contribution._id.toString(),
-          installmentNumber: contribution.installmentNumber,
-          purpose: 'sip_installment',
-        },
+      const gwRes = await callGatewayCreateOrder({
+        amount: Math.round(contribution.amount),
+        orderId,
+        mobile: req.user?.mobileNumber || '9999999999',
+        redirectUrl: `${process.env.APP_URL || 'https://growvest-mobile.onrender.com'}/api/payment/callback`,
+        remark1: `SIP #${contribution.installmentNumber} - ${sip.sipId}`,
+        remark2: userId.toString(),
       });
-      orderId = rzpOrder.id;
-    } catch (rzpErr) {
-      console.warn('[SIPController] Installment Razorpay fallback:', rzpErr.message);
+      if (gwRes && (gwRes.status === true || gwRes.result?.payment_url)) {
+        paymentUrl = gwRes.result?.payment_url;
+      } else {
+        isSimulated = true;
+      }
+    } catch (gwErr) {
+      console.warn('[SIPController] Installment Gateway fallback:', gwErr.message);
       isSimulated = true;
     }
 
     res.status(200).json({
       success: true,
       orderId,
-      amount: Math.round(contribution.amount * 100),
+      paymentUrl,
+      amount: Math.round(contribution.amount),
       currency: 'INR',
-      keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_xxxxxxxxx',
+      gateway: 'custom_upi',
       isSimulated,
       contribution,
     });
