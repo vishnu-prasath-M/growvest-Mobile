@@ -95,10 +95,11 @@ const SIPDetailsScreen = ({ route, navigation }) => {
         throw new Error(res?.message || 'Failed to create payment order');
       }
 
-      const { orderId, amount, keyId, isSimulated } = res;
+      const { orderId, paymentUrl, amount, keyId, isSimulated } = res;
 
       await openRazorpayCheckout({
         orderId,
+        paymentUrl,
         amount,
         keyId,
         name: 'Growvest SIP',

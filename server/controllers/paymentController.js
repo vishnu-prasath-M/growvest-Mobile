@@ -11,13 +11,111 @@ const PocketMoney = require('../models/PocketMoney');
 const PocketMoneyPayout = require('../models/PocketMoneyPayout');
 const { calculateInvestmentTier } = require('../services/investmentTierService');
 
+// ============================================================================
+// === PREVIOUS RAZORPAY GATEWAY (COMMENTED OUT AS REQUESTED) =================
+// ============================================================================
+/*
 const getRazorpayInstance = () => {
   const key_id = process.env.RAZORPAY_KEY_ID || 'rzp_test_xxxxxxxxx';
   const key_secret = process.env.RAZORPAY_KEY_SECRET || 'xxxxxxxxxxxx';
   return new Razorpay({ key_id, key_secret });
 };
+*/
 
-// ─── 1. Create Razorpay Order ────────────────────────────────────────────────
+// ============================================================================
+// === NEW CUSTOM UPI / PAYME PAYMENT GATEWAY INTEGRATION =====================
+// ============================================================================
+
+/**
+ * Helper to fetch gateway configuration from environment variables
+ */
+const getGatewayConfig = () => {
+  const baseUrl = (process.env.PAYME_BASE_URL || process.env.PG_BASE_URL || '').trim().replace(/\/+$/, '');
+  const apiKey = (process.env.PAYME_API_KEY || process.env.PG_API_KEY || '').trim();
+  const isConfigured = Boolean(
+    baseUrl &&
+    apiKey &&
+    !baseUrl.includes('yourdomain.com') &&
+    apiKey !== 'your_api_key_here'
+  );
+  return { baseUrl, apiKey, isConfigured };
+};
+
+/**
+ * Helper to call Gateway POST /api/create-order
+ * All APIs use POST method with application/x-www-form-urlencoded content type
+ */
+const callGatewayCreateOrder = async ({ amount, orderId, mobile, redirectUrl, remark1, remark2 }) => {
+  const { baseUrl, apiKey, isConfigured } = getGatewayConfig();
+  if (!isConfigured) {
+    return {
+      success: false,
+      isSimulated: true,
+      message: 'Gateway credentials not configured in .env (PAYME_BASE_URL, PAYME_API_KEY); using simulation fallback.',
+    };
+  }
+
+  const formParams = new URLSearchParams({
+    api_key: apiKey,
+    customer_mobile: String(mobile || '9999999999'),
+    amount: String(amount),
+    order_id: String(orderId),
+    redirect_url: redirectUrl || '',
+    remark1: remark1 || 'Growvest Payment',
+    remark2: remark2 || '',
+  });
+
+  const url = `${baseUrl}/api/create-order`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: formParams.toString(),
+  });
+
+  const data = await response.json();
+  return data;
+};
+
+/**
+ * Helper to call Gateway POST /api/check-order-status
+ * All APIs use POST method with application/x-www-form-urlencoded content type
+ */
+const callGatewayCheckStatus = async (orderId) => {
+  const { baseUrl, apiKey, isConfigured } = getGatewayConfig();
+  if (!isConfigured) {
+    return {
+      status: 'SIMULATED',
+      isSimulated: true,
+      result: {
+        txnStatus: 'COMPLETED',
+        status: 'SUCCESS',
+        orderId,
+        utr: `SIM_UTR_${Date.now()}`,
+      },
+    };
+  }
+
+  const formParams = new URLSearchParams({
+    api_key: apiKey,
+    order_id: String(orderId),
+  });
+
+  const url = `${baseUrl}/api/check-order-status`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: formParams.toString(),
+  });
+
+  const data = await response.json();
+  return data;
+};
+
+// ─── 1. Create Payment Order ─────────────────────────────────────────────────
 exports.createOrder = async (req, res) => {
   try {
     const { amount, purpose, notes } = req.body;
@@ -34,6 +132,8 @@ exports.createOrder = async (req, res) => {
       }
     }
 
+    /*
+    // === PREVIOUS RAZORPAY CREATE ORDER (COMMENTED OUT) ===
     const instance = getRazorpayInstance();
     const options = {
       amount: Math.round(amount * 100), // amount in paise
@@ -45,28 +145,67 @@ exports.createOrder = async (req, res) => {
         ...notes,
       },
     };
+    const order = await instance.orders.create(options);
+    return res.status(200).json({
+      success: true,
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_xxxxxxxxx',
+    });
+    */
+
+    // === NEW UPI / PAYME ORDER CREATION ===
+    const user = req.user;
+    const orderId = `ORD${Date.now()}${Math.floor(1000 + Math.random() * 9000)}`;
+    const redirectUrl = `${process.env.APP_URL || 'https://growvest-mobile.onrender.com'}/api/payment/callback`;
+    const customerMobile = user?.mobileNumber || req.body?.mobileNumber || '9999999999';
 
     try {
-      const instance = getRazorpayInstance();
-      const order = await instance.orders.create(options);
-      return res.status(200).json({
-        success: true,
-        orderId: order.id,
-        amount: order.amount,
-        currency: order.currency,
-        keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_xxxxxxxxx',
+      const gwRes = await callGatewayCreateOrder({
+        amount: Math.round(amount),
+        orderId,
+        mobile: customerMobile,
+        redirectUrl,
+        remark1: purpose || 'Growvest',
+        remark2: user?._id?.toString() || '',
       });
-    } catch (rzpErr) {
-      console.warn('[PaymentController] Razorpay API failed, creating test order fallback:', rzpErr.message);
-      // Fallback for development/test mode if Razorpay API keys are invalid/dummy
-      const fallbackOrderId = `order_sim_${Date.now()}`;
+
+      if (gwRes && (gwRes.status === true || gwRes.result?.payment_url)) {
+        return res.status(200).json({
+          success: true,
+          orderId: gwRes.result?.orderId || orderId,
+          paymentUrl: gwRes.result?.payment_url,
+          amount: Math.round(amount),
+          currency: 'INR',
+          gateway: 'custom_upi',
+          isSimulated: false,
+        });
+      }
+
+      console.warn('[PaymentController] Gateway returned non-success response:', gwRes);
+      // If credentials not configured or live gateway not ready, provide simulated order fallback
       return res.status(200).json({
         success: true,
-        orderId: fallbackOrderId,
-        amount: Math.round(amount * 100),
+        orderId,
+        paymentUrl: `simulated_pay_${orderId}`,
+        amount: Math.round(amount),
         currency: 'INR',
-        keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_xxxxxxxxx',
+        gateway: 'custom_upi',
         isSimulated: true,
+        message: gwRes?.message || 'Gateway running in test simulation mode',
+      });
+    } catch (gwErr) {
+      console.warn('[PaymentController] Gateway API call error, using test order fallback:', gwErr.message);
+      return res.status(200).json({
+        success: true,
+        orderId,
+        paymentUrl: `simulated_pay_${orderId}`,
+        amount: Math.round(amount),
+        currency: 'INR',
+        gateway: 'custom_upi',
+        isSimulated: true,
+        message: 'Gateway offline or unreachable. Test simulation fallback enabled.',
       });
     }
   } catch (error) {
@@ -79,44 +218,94 @@ exports.createOrder = async (req, res) => {
 exports.verifyPayment = async (req, res) => {
   try {
     const {
+      // New gateway parameters
+      order_id,
+      orderId,
+      utr,
+      // Backward compatibility parameters
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,
-      paymentType, // 'investment', 'chit_join', 'chit_payment'
-      payloadData,  // metadata (amount, type, chitId, memberId, month, etc.)
+      // Business logic metadata
+      paymentType, // 'investment', 'chit_join', 'chit_payment', 'pocket_money', 'sip_initial', 'sip_installment'
+      payloadData,
+      isSimulated: clientIsSimulated,
     } = req.body;
 
+    const effectiveOrderId = order_id || orderId || razorpay_order_id;
+    if (!effectiveOrderId) {
+      console.warn('[CHIT_PAYMENT_ERROR] Missing order ID for verification');
+      return res.status(400).json({ message: 'Order ID is required for payment verification' });
+    }
+
     console.log('[CHIT_PAYMENT] verify payment initiated:', {
-      orderId: razorpay_order_id,
-      paymentId: razorpay_payment_id,
+      orderId: effectiveOrderId,
       paymentType,
       userId: req.user?._id,
     });
 
-    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-      console.warn('[CHIT_PAYMENT_ERROR] Missing Razorpay payment verification parameters');
-      return res.status(400).json({ message: 'Missing Razorpay payment verification parameters' });
-    }
-
-    // Signature verification using Razorpay Secret
+    /*
+    // === PREVIOUS RAZORPAY SIGNATURE VERIFICATION (COMMENTED OUT) ===
     const key_secret = process.env.RAZORPAY_KEY_SECRET || 'xxxxxxxxxxxx';
     const body = razorpay_order_id + '|' + razorpay_payment_id;
     const expectedSignature = crypto
       .createHmac('sha256', key_secret)
       .update(body.toString())
       .digest('hex');
-
     const isValid = expectedSignature === razorpay_signature || razorpay_signature.startsWith('simulated_signature_');
-
     if (!isValid) {
-      console.error('[CHIT_PAYMENT_ERROR] Invalid Razorpay signature verification failed:', {
-        orderId: razorpay_order_id,
-        paymentId: razorpay_payment_id,
-      });
       return res.status(400).json({ success: false, message: 'Invalid payment signature. Verification failed.' });
     }
+    */
 
-    console.log('[CHIT_PAYMENT] payment verified successfully:', { orderId: razorpay_order_id, paymentId: razorpay_payment_id });
+    // === NEW UPI / PAYME VERIFICATION ===
+    let verifiedUtr = utr || razorpay_payment_id || `UTR_${Date.now()}`;
+    const isSimulated =
+      clientIsSimulated ||
+      effectiveOrderId.startsWith('order_sim_') ||
+      effectiveOrderId.startsWith('ORD_SIM_') ||
+      (razorpay_signature && razorpay_signature.startsWith('simulated_'));
+
+    if (!isSimulated) {
+      const statusRes = await callGatewayCheckStatus(effectiveOrderId);
+      console.log('[PaymentController] Gateway status check result:', statusRes);
+
+      const status = (
+        statusRes?.status ||
+        statusRes?.result?.status ||
+        statusRes?.result?.txnStatus ||
+        ''
+      ).toUpperCase();
+
+      if (status === 'COMPLETED' || status === 'SUCCESS') {
+        verifiedUtr = statusRes?.result?.utr || verifiedUtr;
+      } else if (status === 'PENDING') {
+        return res.status(200).json({
+          success: false,
+          isPending: true,
+          message: 'Payment is still pending. If you just completed the payment, please wait a few seconds and tap verify again.',
+        });
+      } else if (status === 'FAILED') {
+        return res.status(400).json({
+          success: false,
+          isFailed: true,
+          message: statusRes?.message || 'Payment failed or expired.',
+        });
+      } else if (statusRes?.isSimulated) {
+        // Unconfigured gateway test fallback
+        verifiedUtr = statusRes?.result?.utr || `SIM_UTR_${Date.now()}`;
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: statusRes?.message || 'Order verification returned unexpected status.',
+        });
+      }
+    }
+
+    console.log('[CHIT_PAYMENT] Payment verified successfully:', {
+      orderId: effectiveOrderId,
+      utr: verifiedUtr,
+    });
 
     // Payment Verified! Now complete the requested business operation automatically.
     const user = await User.findById(req.user._id);
@@ -125,34 +314,40 @@ exports.verifyPayment = async (req, res) => {
       return res.status(404).json({ message: 'User record not found' });
     }
 
+    const paymentId = verifiedUtr;
+    const signature = `VERIFIED_UPI_${effectiveOrderId}`;
+
     if (paymentType === 'investment') {
-      const result = await completeInvestment(user, payloadData, razorpay_order_id, razorpay_payment_id, razorpay_signature);
+      const result = await completeInvestment(user, payloadData, effectiveOrderId, paymentId, signature, 'PayMe_UPI');
       await triggerReferralRewardOnInvestment(user._id, result?._id);
       console.log('[CHIT_PAYMENT] completed investment payout activation');
-      return res.status(200).json({ success: true, message: 'Investment payment verified & approved automatically.', data: result });
+      return res.status(200).json({ success: true, message: 'Investment payment verified & approved automatically.', data: result, utr: verifiedUtr });
     } else if (paymentType === 'chit_join') {
-      const result = await completeChitJoin(user, payloadData, razorpay_order_id, razorpay_payment_id, razorpay_signature);
+      const result = await completeChitJoin(user, payloadData, effectiveOrderId, paymentId, signature, 'PayMe_UPI');
       await triggerReferralRewardOnInvestment(user._id, result?._id);
       console.log('[CHIT_PAYMENT] completed chit join membership activation');
-      return res.status(200).json({ success: true, message: 'Chit join payment verified & membership activated.', data: result });
+      return res.status(200).json({ success: true, message: 'Chit join payment verified & membership activated.', data: result, utr: verifiedUtr });
     } else if (paymentType === 'chit_payment') {
-      const result = await completeMonthlyDue(user, payloadData, razorpay_order_id, razorpay_payment_id, razorpay_signature);
+      const result = await completeMonthlyDue(user, payloadData, effectiveOrderId, paymentId, signature, 'PayMe_UPI');
       await triggerReferralRewardOnInvestment(user._id, result?._id);
       console.log('[CHIT_PAYMENT] completed chit monthly/weekly due payment');
-      return res.status(200).json({ success: true, message: 'Chit due payment verified & recorded successfully.', data: result });
+      return res.status(200).json({ success: true, message: 'Chit due payment verified & recorded successfully.', data: result, utr: verifiedUtr });
     } else if (paymentType === 'pocket_money') {
-      const result = await completePocketMoney(user, payloadData, razorpay_order_id, razorpay_payment_id, razorpay_signature);
+      const result = await completePocketMoney(user, payloadData, effectiveOrderId, paymentId, signature, 'PayMe_UPI');
       await triggerReferralRewardOnInvestment(user._id, result?._id);
       console.log('[CHIT_PAYMENT] completed pocket money activation');
-      return res.status(200).json({ success: true, message: 'Pocket Money payment verified & activated.', data: result });
+      return res.status(200).json({ success: true, message: 'Pocket Money payment verified & activated.', data: result, utr: verifiedUtr });
     } else if (paymentType === 'sip_initial' || paymentType === 'sip_installment') {
       const sipController = require('./sipController');
       return await sipController.verifyPayment(
         {
           body: {
-            razorpay_order_id,
-            razorpay_payment_id,
-            razorpay_signature,
+            order_id: effectiveOrderId,
+            razorpay_order_id: effectiveOrderId,
+            razorpay_payment_id: paymentId,
+            razorpay_signature: signature,
+            utr: verifiedUtr,
+            isSimulated,
             sipId: payloadData?.sipId,
             contributionId: payloadData?.contributionId,
             installmentNumber: payloadData?.installmentNumber,
@@ -171,10 +366,29 @@ exports.verifyPayment = async (req, res) => {
   }
 };
 
+// ─── 3. Direct Check Order Status Endpoint ──────────────────────────────────
+exports.checkOrderStatus = async (req, res) => {
+  try {
+    const order_id = req.body?.order_id || req.body?.orderId || req.query?.order_id;
+    if (!order_id) {
+      return res.status(400).json({ success: false, message: 'order_id is required' });
+    }
+
+    const statusData = await callGatewayCheckStatus(order_id);
+    return res.status(200).json({
+      success: true,
+      data: statusData,
+    });
+  } catch (error) {
+    console.error('[PaymentController] Check order status error:', error);
+    res.status(500).json({ success: false, message: 'Failed to check order status', error: error.message });
+  }
+};
+
 // ─── Business Logic Helper Functions ─────────────────────────────────────────
 
 // Complete Investment
-const completeInvestment = async (user, data, orderId, paymentId, signature) => {
+const completeInvestment = async (user, data, orderId, paymentId, signature, provider = 'PayMe_UPI') => {
   const { amount, type } = data;
 
   // Idempotency check: if investment already processed for this paymentId/orderId, return existing
@@ -214,7 +428,7 @@ const completeInvestment = async (user, data, orderId, paymentId, signature) => 
   const investment = new Investment({
     amount: tierCalc.principal,
     ref: refCode,
-    status: 'approved', // Auto-approved upon Razorpay verification
+    status: 'approved', // Auto-approved upon verification
     type: tierCalc.planId,
     userId: user._id,
     userName: user.name || user.username,
@@ -223,7 +437,7 @@ const completeInvestment = async (user, data, orderId, paymentId, signature) => 
     interestRate: tierCalc.applicableInterestRate,
     planInterestRate: tierCalc.maxPlanRate,
     startDate,
-    paymentProvider: 'Razorpay',
+    paymentProvider: provider || 'PayMe_UPI',
     paymentStatus: 'paid',
     orderId,
     paymentId,
@@ -266,7 +480,7 @@ const completeInvestment = async (user, data, orderId, paymentId, signature) => 
     status: 'approved',
     referenceId: investment._id,
     referenceType: 'Investment',
-    description: `Razorpay Deposit in ${type} plan (Txn ID: ${paymentId})`,
+    description: `${provider || 'UPI'} Deposit in ${type} plan (Txn ID: ${paymentId})`,
   });
   await transaction.save();
 
@@ -310,7 +524,7 @@ const completeInvestment = async (user, data, orderId, paymentId, signature) => 
 };
 
 // Complete Chit Join
-const completeChitJoin = async (user, data, orderId, paymentId, signature) => {
+const completeChitJoin = async (user, data, orderId, paymentId, signature, provider = 'PayMe_UPI') => {
   const { chitId, amount } = data;
   const Chit = require('../models/Chit');
 
@@ -409,7 +623,7 @@ const completeChitJoin = async (user, data, orderId, paymentId, signature) => {
     lateFee: 0,
     status: 'paid',
     paidDate: new Date(),
-    paymentProvider: 'Razorpay',
+    paymentProvider: provider || 'PayMe_UPI',
     orderId,
     paymentId,
     signature,
@@ -425,7 +639,7 @@ const completeChitJoin = async (user, data, orderId, paymentId, signature) => {
     status: 'approved',
     referenceId: payment._id,
     referenceType: 'ChitPayment',
-    description: `Razorpay Chit Join Payment - ${chit.name} (Week 1)`,
+    description: `${provider || 'UPI'} Chit Join Payment - ${chit.name} (Week 1)`,
   });
   await transaction.save();
 
@@ -461,7 +675,7 @@ const completeChitJoin = async (user, data, orderId, paymentId, signature) => {
 };
 
 // Complete Monthly Due
-const completeMonthlyDue = async (user, data, orderId, paymentId, signature) => {
+const completeMonthlyDue = async (user, data, orderId, paymentId, signature, provider = 'PayMe_UPI') => {
   const { chitId, month, amount, lateFee = 0 } = data;
   let { memberId } = data;
   const totalPaidAmt = Number(amount) + Number(lateFee);
@@ -505,7 +719,7 @@ const completeMonthlyDue = async (user, data, orderId, paymentId, signature) => 
     lateFee: Number(lateFee),
     status: 'paid',
     paidDate: new Date(),
-    paymentProvider: 'Razorpay',
+    paymentProvider: provider || 'PayMe_UPI',
     orderId,
     paymentId,
     signature,
@@ -521,7 +735,7 @@ const completeMonthlyDue = async (user, data, orderId, paymentId, signature) => 
     status: 'approved',
     referenceId: payment._id,
     referenceType: 'ChitPayment',
-    description: `Razorpay Chit Due Payment Week/Month ${resolvedMonth} (Txn ID: ${paymentId})`,
+    description: `${provider || 'UPI'} Chit Due Payment Week/Month ${resolvedMonth} (Txn ID: ${paymentId})`,
   });
   await transaction.save();
 
@@ -545,7 +759,7 @@ const completeMonthlyDue = async (user, data, orderId, paymentId, signature) => 
 // IMPORTANT: This ONLY creates the investment record.
 // NO payout is created here. Payout flow is:
 //   User requests via requestPayout → Admin approves via confirmReleasePayout → ONLY THEN payout is released.
-const completePocketMoney = async (user, data, orderId, paymentId, signature) => {
+const completePocketMoney = async (user, data, orderId, paymentId, signature, provider = 'PayMe_UPI') => {
   const { amount, frequency } = data;
 
   // Idempotency check: if already processed for this paymentId, return existing
@@ -622,7 +836,7 @@ const completePocketMoney = async (user, data, orderId, paymentId, signature) =>
     bonusAmount: eligibleInterestAmount,
     totalFinalValue,
     bonusReleased: false,
-    paymentProvider: 'Razorpay',
+    paymentProvider: provider || 'PayMe_UPI',
     orderId,
     paymentId,
     signature,

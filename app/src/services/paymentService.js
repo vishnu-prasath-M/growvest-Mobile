@@ -18,11 +18,20 @@ export const paymentService = {
   },
 
   /**
-   * Verify Razorpay payment signature & execute backend business logic
+   * Verify payment & execute backend business logic
    * @param {object} verificationData
    */
   verifyPayment: async (verificationData) => {
     const response = await api.post(API_ENDPOINTS.PAYMENT_VERIFY, verificationData);
+    return response.data;
+  },
+
+  /**
+   * Check order status with payment gateway
+   * @param {string} orderId
+   */
+  checkOrderStatus: async (orderId) => {
+    const response = await api.post('/payment/check-order-status', { order_id: orderId });
     return response.data;
   },
 };

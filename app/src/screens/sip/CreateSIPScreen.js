@@ -206,11 +206,12 @@ const CreateSIPScreen = ({ navigation, route }) => {
         throw new Error(res?.message || 'Failed to initialize SIP');
       }
 
-      const { sip, firstContribution, orderId, amount, keyId, isSimulated } = res.data;
+      const { sip, firstContribution, orderId, paymentUrl, amount, keyId, isSimulated } = res.data;
 
-      // 2. Launch Razorpay Checkout
+      // 2. Launch Checkout
       await openRazorpayCheckout({
         orderId,
+        paymentUrl,
         amount,
         keyId,
         name: 'Growvest SIP',

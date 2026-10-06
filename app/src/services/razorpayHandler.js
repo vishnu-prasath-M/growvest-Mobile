@@ -1,12 +1,11 @@
-import { NativeModules } from 'react-native';
+import { NativeModules, Linking } from 'react-native';
 import { paymentService } from './paymentService';
 import { customAlert } from '../context/AlertContext';
 
-/**
- * Dynamically resolves Razorpay native checkout if native module is available
- * (present in standalone APK, local Android run, or custom EAS dev client).
- * Prevents Expo Go crashes by only importing when RNRazorpayCheckout is linked.
- */
+// ============================================================================
+// === PREVIOUS RAZORPAY NATIVE CHECKOUT (COMMENTED OUT AS REQUESTED) =========
+// ============================================================================
+/*
 const getRazorpayCheckout = () => {
   try {
     const isNativeModuleAvailable = !!(
@@ -25,18 +24,19 @@ const getRazorpayCheckout = () => {
     return null;
   }
 };
+*/
 
 /**
- * Reusable Razorpay Payment Handler
+ * Reusable Custom UPI Payment Handler (replaces Razorpay)
  * 
- * 1. Calls backend createOrder()
- * 2. Opens official native Razorpay Checkout with UPI / Cards / Netbanking (on APK/dev client)
- * 3. Sends payment credentials to backend verifyPayment()
- * 4. Backend automatically auto-approves investment, updates balance, creates transaction, sends push notification
+ * 1. Calls backend createOrder() (which generates order with Custom UPI / PayMe gateway)
+ * 2. Launches the official payment URL in the browser / UPI app chooser via Linking.openURL
+ * 3. Prompts user to confirm payment once completed
+ * 4. Calls backend verifyPayment() to check gateway status, auto-approve, update balances & notify
  */
 export const executeRazorpayPayment = async ({
   amount,
-  paymentType, // 'investment', 'chit_join', 'chit_payment'
+  paymentType, // 'investment', 'chit_join', 'chit_payment', 'pocket_money'
   payloadData,  // metadata
   user,
   onSuccess,
@@ -46,15 +46,16 @@ export const executeRazorpayPayment = async ({
   if (setLoading) setLoading(true);
 
   try {
-    // Step 1: Create Razorpay order on backend
+    // Step 1: Create payment order on backend
     const orderData = await paymentService.createOrder(amount, paymentType, payloadData);
-    const { orderId, keyId, currency } = orderData;
+    const { orderId, paymentUrl, isSimulated } = orderData;
 
-    // Step 2: Prepare Razorpay Options
+    /*
+    // === PREVIOUS RAZORPAY OPTIONS & CHECKOUT (COMMENTED OUT) ===
     const options = {
       description: `Growvest ${paymentType.replace('_', ' ').toUpperCase()}`,
       image: 'https://growvest-mobile.onrender.com/logo.png',
-      currency: currency || 'INR',
+      currency: 'INR',
       key: keyId || 'rzp_test_xxxxxxxxx',
       amount: Math.round(amount * 100),
       name: 'Growvest',
@@ -66,42 +67,77 @@ export const executeRazorpayPayment = async ({
       },
       theme: { color: '#0E3D23' },
     };
-
-    // Safe native check
     const RazorpayCheckout = getRazorpayCheckout();
-
     if (RazorpayCheckout && typeof RazorpayCheckout.open === 'function') {
-      try {
-        const response = await RazorpayCheckout.open(options);
-        // Step 3: Send Razorpay signature to backend for verification
-        const verification = await paymentService.verifyPayment({
-          razorpay_order_id: response.razorpay_order_id,
-          razorpay_payment_id: response.razorpay_payment_id,
-          razorpay_signature: response.razorpay_signature,
-          paymentType,
-          payloadData,
-        });
+      const response = await RazorpayCheckout.open(options);
+      ...
+    }
+    */
 
-        if (setLoading) setLoading(false);
-        if (onSuccess) onSuccess(verification);
-      } catch (error) {
-        if (setLoading) setLoading(false);
-        console.log('[Razorpay] Payment cancelled or dismissed:', error?.description || error?.message);
-        if (onFailure) {
-          onFailure(error);
-        } else {
-          customAlert.warning(
-            'Payment Incomplete',
-            error.description || error.message || 'Payment was cancelled or could not be processed.'
-          );
-        }
+    // Step 2: Handle live UPI Payment URL or Test Simulator
+    const isLiveUrl = Boolean(
+      paymentUrl &&
+      (paymentUrl.startsWith('http://') || paymentUrl.startsWith('https://')) &&
+      !paymentUrl.includes('simulated')
+    );
+
+    if (isLiveUrl && !isSimulated) {
+      // Live Gateway Flow: Open UPI / Instant Pay checkout
+      try {
+        await Linking.openURL(paymentUrl);
+      } catch (linkErr) {
+        console.warn('[PaymentHandler] Could not open URL automatically:', linkErr.message);
       }
-    } else {
-      // Test Mode Simulation fallback when running in Expo Go without native build
+
+      if (setLoading) setLoading(false);
+
+      // Prompt user to verify once payment is completed in UPI app / browser
       customAlert.confirm({
         type: 'payout',
-        title: 'Razorpay Native Mode',
-        message: `Official Razorpay checkout with UPI & Cards opens natively in the Standalone APK / Dev Client build.\n\nRunning in Expo Go currently. Simulate test payment of ₹${amount} for Order ${orderId}?`,
+        title: 'UPI Payment Initiated',
+        message: `Your payment link of ₹${Number(amount).toLocaleString('en-IN')} has been opened.\n\nAfter completing the payment in your UPI app or browser, tap "Verify Payment" below.`,
+        cancelText: 'Cancel Payment',
+        confirmText: 'Verify Payment',
+        onCancel: () => {
+          if (setLoading) setLoading(false);
+          if (onFailure) onFailure(new Error('User cancelled payment'));
+        },
+        onConfirm: async () => {
+          try {
+            if (setLoading) setLoading(true);
+            const verification = await paymentService.verifyPayment({
+              order_id: orderId,
+              paymentType,
+              payloadData,
+            });
+
+            if (verification?.isPending) {
+              if (setLoading) setLoading(false);
+              customAlert.warning(
+                'Payment Pending',
+                verification.message || 'Payment is still being processed. Please wait a few moments and tap verify again.'
+              );
+              return;
+            }
+
+            if (setLoading) setLoading(false);
+            if (onSuccess) onSuccess(verification);
+          } catch (verifyErr) {
+            if (setLoading) setLoading(false);
+            const msg = verifyErr.response?.data?.message || verifyErr.message || 'Verification failed';
+            customAlert.error('Payment Verification Failed', msg);
+            if (onFailure) onFailure(verifyErr);
+          }
+        },
+      });
+    } else {
+      // Test Mode Simulation Fallback (for development / local testing)
+      if (setLoading) setLoading(false);
+
+      customAlert.confirm({
+        type: 'payout',
+        title: 'UPI Gateway (Test Mode)',
+        message: `Gateway is running in simulation mode.\n\nSimulate successful payment of ₹${Number(amount).toLocaleString('en-IN')} for Order ${orderId}?`,
         cancelText: 'Cancel Payment',
         confirmText: 'Simulate Pay',
         onCancel: () => {
@@ -110,14 +146,13 @@ export const executeRazorpayPayment = async ({
         },
         onConfirm: async () => {
           try {
-            const mockPaymentId = `pay_${Date.now()}`;
-            // Signature simulation token sent to backend for test verify
-            const signature = `simulated_signature_${orderId}_${mockPaymentId}`;
+            if (setLoading) setLoading(true);
+            const mockUtr = `UTR_SIM_${Date.now()}`;
 
             const verification = await paymentService.verifyPayment({
-              razorpay_order_id: orderId,
-              razorpay_payment_id: mockPaymentId,
-              razorpay_signature: signature,
+              order_id: orderId,
+              utr: mockUtr,
+              isSimulated: true,
               paymentType,
               payloadData,
             });
@@ -135,18 +170,19 @@ export const executeRazorpayPayment = async ({
     }
   } catch (error) {
     if (setLoading) setLoading(false);
-    console.error('[Razorpay] Order creation error:', error);
-    const msg = error.response?.data?.message || error.message || 'Failed to initiate Razorpay payment';
+    console.error('[PaymentHandler] Order initiation error:', error);
+    const msg = error.response?.data?.message || error.message || 'Failed to initiate payment';
     customAlert.error('Error', msg);
     if (onFailure) onFailure(error);
   }
 };
 
 /**
- * Open Razorpay Checkout for already-created orders (used by SIP, Chits, etc.)
+ * Open Checkout for already-created orders (used by SIP, etc.)
  */
 export const openRazorpayCheckout = async ({
   orderId,
+  paymentUrl,
   amount,
   keyId,
   name = 'Growvest',
@@ -156,45 +192,50 @@ export const openRazorpayCheckout = async ({
   onSuccess,
   onError,
 }) => {
-  const options = {
-    description,
-    image: 'https://growvest-mobile.onrender.com/logo.png',
-    currency: 'INR',
-    key: keyId || 'rzp_test_xxxxxxxxx',
-    amount: typeof amount === 'number' ? Math.round(amount) : Math.round(Number(amount)),
-    name,
-    order_id: orderId,
-    prefill: {
-      email: user?.email || '',
-      contact: user?.mobileNumber || '',
-      name: user?.name || user?.username || 'User',
-    },
-    theme: { color: '#085428' },
-  };
+  const displayAmount = typeof amount === 'number' && amount > 10000 && Number.isInteger(amount) && amount % 100 === 0
+    ? Math.round(amount / 100)
+    : Math.round(Number(amount));
 
-  const RazorpayCheckout = getRazorpayCheckout();
+  const isLiveUrl = Boolean(
+    paymentUrl &&
+    (paymentUrl.startsWith('http://') || paymentUrl.startsWith('https://')) &&
+    !paymentUrl.includes('simulated')
+  );
 
-  if (!isSimulated && RazorpayCheckout && typeof RazorpayCheckout.open === 'function') {
+  if (isLiveUrl && !isSimulated) {
     try {
-      const response = await RazorpayCheckout.open(options);
-      if (onSuccess) {
-        onSuccess({
-          razorpay_order_id: response.razorpay_order_id || orderId,
-          razorpay_payment_id: response.razorpay_payment_id,
-          razorpay_signature: response.razorpay_signature,
-        });
-      }
-    } catch (error) {
-      console.log('[Razorpay] Checkout cancelled:', error);
-      if (onError) onError(error);
+      await Linking.openURL(paymentUrl);
+    } catch (e) {
+      console.warn('[PaymentHandler] Could not open URL:', e.message);
     }
-  } else {
-    // Simulator fallback for Expo Go
-    const displayAmount = Math.round(amount / 100);
+
     customAlert.confirm({
       type: 'payout',
-      title: 'Razorpay Native Mode',
-      message: `Official Razorpay checkout with UPI & Cards opens natively in the Standalone APK / Dev Client build.\n\nSimulate test payment of ₹${displayAmount.toLocaleString('en-IN')} for ${description}?`,
+      title: 'Complete UPI Payment',
+      message: `Payment page opened for ₹${displayAmount.toLocaleString('en-IN')}.\n\nComplete the transaction in your UPI app or browser, then tap "I Have Paid" below.`,
+      cancelText: 'Cancel',
+      confirmText: 'I Have Paid',
+      onCancel: () => {
+        if (onError) onError(new Error('User cancelled payment'));
+      },
+      onConfirm: () => {
+        if (onSuccess) {
+          onSuccess({
+            order_id: orderId,
+            razorpay_order_id: orderId,
+            utr: `UTR_${Date.now()}`,
+            razorpay_payment_id: `PAY_${Date.now()}`,
+            razorpay_signature: `VERIFIED_${orderId}`,
+          });
+        }
+      },
+    });
+  } else {
+    // Test simulator fallback
+    customAlert.confirm({
+      type: 'payout',
+      title: 'UPI Gateway (Test Mode)',
+      message: `Simulate test payment of ₹${displayAmount.toLocaleString('en-IN')} for ${description}?`,
       cancelText: 'Cancel',
       confirmText: 'Simulate Pay',
       onCancel: () => {
@@ -205,9 +246,12 @@ export const openRazorpayCheckout = async ({
         const signature = `simulated_signature_${orderId}_${mockPaymentId}`;
         if (onSuccess) {
           onSuccess({
+            order_id: orderId,
             razorpay_order_id: orderId,
+            utr: `UTR_SIM_${Date.now()}`,
             razorpay_payment_id: mockPaymentId,
             razorpay_signature: signature,
+            isSimulated: true,
           });
         }
       },
