@@ -213,14 +213,14 @@ const InvestmentPaymentScreen = ({ navigation, route }) => {
             </View>
           </View>
         ) : (
-          /* Razorpay Secure Checkout Card (Untouched for standard investments) */
+          /* UPI Secure Checkout Card */
           <View style={styles.razorpayCard}>
             <View style={styles.razorpayHeader}>
               <MaterialCommunityIcons name="shield-check" size={24} color={colors.primary} />
-              <Text style={styles.razorpayTitle}>Razorpay Secure Checkout</Text>
+              <Text style={styles.razorpayTitle}>UPI Instant Checkout</Text>
             </View>
             <Text style={styles.razorpayDesc}>
-              Instant payment processing via UPI, Credit/Debit Card, Netbanking & Wallets. Your deposit will be automatically verified and credited to your account.
+              Instant payment processing via UPI apps (GPay, PhonePe, Paytm, BHIM). Your deposit will be automatically verified and credited to your account.
             </Text>
 
             <View style={styles.featureList}>
@@ -259,7 +259,7 @@ const InvestmentPaymentScreen = ({ navigation, route }) => {
               <>
                 <MaterialCommunityIcons name={isReinvestment ? 'refresh-circle' : 'lock-check'} size={22} color={colors.white} />
                 <Text style={styles.payBtnText}>
-                  {isReinvestment ? `Confirm Reinvestment (${formatCurrency(amount)})` : `Pay ${formatCurrency(amount)} with Razorpay`}
+                  {isReinvestment ? `Confirm Reinvestment (${formatCurrency(amount)})` : `Pay ${formatCurrency(amount)} via UPI`}
                 </Text>
               </>
             )}
