@@ -21,8 +21,8 @@ const getRazorpayInstance = () => {
 
 // Gateway helpers
 const getGatewayConfig = () => {
-  const baseUrl = (process.env.PG_URL || process.env.PAYME_BASE_URL || process.env.PG_BASE_URL || '').trim().replace(/\/+$/, '');
-  const apiKey = (process.env.PG_API_KEY || process.env.PAYME_API_KEY || '').trim();
+  const baseUrl = (process.env.STARPE_BASE_URL || process.env.PG_URL || process.env.PAYME_BASE_URL || process.env.PG_BASE_URL || 'https://starpe.online').trim().replace(/\/+$/, '');
+  const apiKey = (process.env.STARPE_API_KEY || process.env.PG_API_KEY || process.env.PAYME_API_KEY || '6056931258240a48113ca977a656211c').trim();
   const isConfigured = Boolean(
     baseUrl &&
     apiKey &&

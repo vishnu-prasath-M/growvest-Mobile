@@ -127,16 +127,16 @@ const ChitPaymentScreen = ({ navigation, route }) => {
           </LinearGradient>
         </View>
 
-        {/* Razorpay Section */}
+        {/* UPI Gateway Section */}
         <View style={styles.razorpayCard}>
           <View style={styles.razorpayHeader}>
             <MaterialCommunityIcons name="shield-check" size={24} color={colors.primary} />
-            <Text style={styles.razorpayTitle}>Razorpay Secure Gateway</Text>
+            <Text style={styles.razorpayTitle}>UPI Instant Gateway</Text>
           </View>
           <Text style={styles.razorpayDesc}>
             {type === 'join'
-              ? 'Pay securely using UPI, Credit/Debit Card, Netbanking or Wallets. After payment, your join request will be reviewed by admin. You will receive a notification once approved.'
-              : 'Pay securely using UPI, Credit/Debit Card, Netbanking or Wallets. Your installment will be automatically verified and updated.'}
+              ? 'Pay securely using UPI apps (GPay, PhonePe, Paytm, BHIM). After payment, your join request will be reviewed by admin. You will receive a notification once approved.'
+              : 'Pay securely using UPI apps (GPay, PhonePe, Paytm, BHIM). Your installment will be automatically verified and updated.'}
           </Text>
 
           <View style={styles.featureList}>
@@ -144,7 +144,7 @@ const ChitPaymentScreen = ({ navigation, route }) => {
               <>
                 <View style={styles.featureRow}>
                   <MaterialCommunityIcons name="check-circle" size={16} color={colors.success} />
-                  <Text style={styles.featureText}>Secure payment via Razorpay</Text>
+                  <Text style={styles.featureText}>Secure payment via UPI</Text>
                 </View>
                 <View style={styles.featureRow}>
                   <MaterialCommunityIcons name="clock-outline" size={16} color={colors.warning || '#d97706'} />
@@ -184,7 +184,7 @@ const ChitPaymentScreen = ({ navigation, route }) => {
             ) : (
               <>
                 <MaterialCommunityIcons name="lock-check" size={20} color={colors.white} />
-                <Text style={styles.payBtnText}>Pay {formatCurrency(totalAmount)} with Razorpay</Text>
+                <Text style={styles.payBtnText}>Pay {formatCurrency(totalAmount)} via UPI</Text>
               </>
             )}
           </LinearGradient>
