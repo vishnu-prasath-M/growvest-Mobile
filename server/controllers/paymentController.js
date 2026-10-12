@@ -30,20 +30,20 @@ const getRazorpayInstance = () => {
  * Helper to fetch gateway configuration from environment variables
  */
 const getGatewayConfig = () => {
-  const baseUrl = (process.env.PG_URL || process.env.PAYME_BASE_URL || process.env.PG_BASE_URL || '').trim().replace(/\/+$/, '');
-  const apiKey = (process.env.PG_API_KEY || process.env.PAYME_API_KEY || '').trim();
+  const baseUrl = (process.env.STARPE_BASE_URL || process.env.PG_URL || process.env.PAYME_BASE_URL || process.env.PG_BASE_URL || 'https://starpe.online').trim().replace(/\/+$/, '');
+  const apiKey = (process.env.STARPE_API_KEY || process.env.PG_API_KEY || process.env.PAYME_API_KEY || '').trim();
+  const webhookSecret = (process.env.STARPE_WEBHOOK_SECRET || '').trim();
   const isConfigured = Boolean(
     baseUrl &&
     apiKey &&
     !baseUrl.includes('yourdomain.com') &&
     apiKey !== 'your_api_key_here'
   );
-  return { baseUrl, apiKey, isConfigured };
+  return { baseUrl, apiKey, webhookSecret, isConfigured };
 };
 
 /**
- * Helper to call Gateway POST /api/create-order
- * All APIs use POST method with application/x-www-form-urlencoded content type
+ * Helper to call Gateway POST /api/create-order (supports .php endpoint fallback)
  */
 const callGatewayCreateOrder = async ({ amount, orderId, mobile, redirectUrl, remark1, remark2 }) => {
   const { baseUrl, apiKey, isConfigured } = getGatewayConfig();
@@ -51,7 +51,7 @@ const callGatewayCreateOrder = async ({ amount, orderId, mobile, redirectUrl, re
     return {
       success: false,
       isSimulated: true,
-      message: 'Gateway credentials not configured in .env (PAYME_BASE_URL, PAYME_API_KEY); using simulation fallback.',
+      message: 'Gateway credentials not configured; using simulation fallback.',
     };
   }
 
@@ -65,22 +65,36 @@ const callGatewayCreateOrder = async ({ amount, orderId, mobile, redirectUrl, re
     remark2: remark2 || '',
   });
 
-  const url = `${baseUrl}/api/create-order`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: formParams.toString(),
-  });
+  const candidateUrls = [
+    `${baseUrl}/api/create-order.php`,
+    `${baseUrl}/api/create-order`,
+  ];
 
-  const data = await response.json();
-  return data;
+  let lastErr = null;
+  for (const url of candidateUrls) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formParams.toString(),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data;
+      }
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+
+  throw lastErr || new Error('Failed to create order with gateway');
 };
 
 /**
- * Helper to call Gateway POST /api/check-order-status
- * All APIs use POST method with application/x-www-form-urlencoded content type
+ * Helper to call Gateway POST /api/check-order-status (supports .php endpoint fallback)
  */
 const callGatewayCheckStatus = async (orderId) => {
   const { baseUrl, apiKey, isConfigured } = getGatewayConfig();
@@ -102,17 +116,32 @@ const callGatewayCheckStatus = async (orderId) => {
     order_id: String(orderId),
   });
 
-  const url = `${baseUrl}/api/check-order-status`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: formParams.toString(),
-  });
+  const candidateUrls = [
+    `${baseUrl}/api/check-order-status.php`,
+    `${baseUrl}/api/check-order-status`,
+  ];
 
-  const data = await response.json();
-  return data;
+  let lastErr = null;
+  for (const url of candidateUrls) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formParams.toString(),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data;
+      }
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+
+  throw lastErr || new Error('Failed to check order status with gateway');
 };
 
 // ─── 1. Create Payment Order ─────────────────────────────────────────────────
@@ -391,7 +420,8 @@ exports.handleWebhook = async (req, res) => {
     const payload = req.body || {};
     console.log('[PaymentWebhook] Received incoming payment webhook:', payload);
 
-    const orderId = payload.order_id || payload.orderId || payload.order_ID || req.query?.order_id;
+    const data = payload.data || {};
+    const orderId = payload.order_id || payload.orderId || payload.order_ID || data.order_id || req.query?.order_id;
     if (!orderId) {
       return res.status(200).json({ status: false, message: 'order_id parameter missing in webhook payload' });
     }
@@ -401,6 +431,7 @@ exports.handleWebhook = async (req, res) => {
     const status = (
       payload.status ||
       payload.txnStatus ||
+      data.status ||
       statusRes?.status ||
       statusRes?.result?.status ||
       statusRes?.result?.txnStatus ||
@@ -408,7 +439,7 @@ exports.handleWebhook = async (req, res) => {
     ).toUpperCase();
 
     if (status === 'COMPLETED' || status === 'SUCCESS') {
-      const utr = payload.utr || statusRes?.result?.utr || `UTR_${Date.now()}`;
+      const utr = payload.utr || data.utr || statusRes?.result?.utr || `UTR_${Date.now()}`;
       console.log(`[PaymentWebhook] Order ${orderId} confirmed successful via webhook with UTR: ${utr}`);
       return res.status(200).json({ status: true, message: 'Webhook processed successfully', orderId, utr });
     }

@@ -46,12 +46,28 @@ const callGatewayCreateOrder = async ({ amount, orderId, mobile, redirectUrl, re
     remark1: remark1 || 'SIP Payment',
     remark2: remark2 || '',
   });
-  const res = await fetch(`${baseUrl}/api/create-order`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: formParams.toString(),
-  });
-  return await res.json();
+
+  const candidateUrls = [
+    `${baseUrl}/api/create-order.php`,
+    `${baseUrl}/api/create-order`,
+  ];
+
+  let lastErr = null;
+  for (const url of candidateUrls) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formParams.toString(),
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr || new Error('Failed to create order with gateway');
 };
 
 const callGatewayCheckStatus = async (orderId) => {
@@ -67,12 +83,28 @@ const callGatewayCheckStatus = async (orderId) => {
     api_key: apiKey,
     order_id: String(orderId),
   });
-  const res = await fetch(`${baseUrl}/api/check-order-status`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: formParams.toString(),
-  });
-  return await res.json();
+
+  const candidateUrls = [
+    `${baseUrl}/api/check-order-status.php`,
+    `${baseUrl}/api/check-order-status`,
+  ];
+
+  let lastErr = null;
+  for (const url of candidateUrls) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formParams.toString(),
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr || new Error('Failed to check order status with gateway');
 };
 
 // Helper to calculate recurring due date by frequency safely
