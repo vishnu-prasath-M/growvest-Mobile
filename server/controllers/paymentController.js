@@ -187,7 +187,7 @@ exports.createOrder = async (req, res) => {
     // === NEW UPI / PAYME ORDER CREATION ===
     const user = req.user;
     const orderId = `ORD${Date.now()}${Math.floor(1000 + Math.random() * 9000)}`;
-    const redirectUrl = `${process.env.APP_URL || 'https://growvest-mobile.onrender.com'}/api/payment/callback`;
+    const redirectUrl = `${process.env.APP_URL || 'https://growvest-mobile.onrender.com'}/api/payments/callback`;
     const customerMobile = user?.mobileNumber || req.body?.mobileNumber || '9999999999';
 
     try {
@@ -414,7 +414,69 @@ exports.checkOrderStatus = async (req, res) => {
   }
 };
 
-// ─── 4. Gateway Webhook Endpoint ────────────────────────────────────────────
+// ─── 4. Payment Gateway Callback (redirect after payment in browser) ──────────
+// The gateway redirects the user's browser here after payment is completed.
+// We serve an HTML page that immediately deep-links back to the Growvest app.
+exports.handleCallback = async (req, res) => {
+  try {
+    // The gateway may pass order_id / status as query params or POST body
+    const order_id = req.query?.order_id || req.query?.orderId || req.body?.order_id || req.body?.orderId || '';
+    const status   = (req.query?.status || req.body?.status || 'unknown').toLowerCase();
+
+    console.log(`[PaymentCallback] Received callback — order_id: ${order_id}, status: ${status}`);
+
+    // Build deep link: growvest://payment-callback?order_id=...&status=...
+    const deepLink = `growvest://payment-callback?order_id=${encodeURIComponent(order_id)}&status=${encodeURIComponent(status)}`;
+    const appStoreUrl = 'https://growvest-mobile.onrender.com'; // fallback if app not installed
+
+    // Serve a minimal HTML page that auto-redirects to the app
+    res.setHeader('Content-Type', 'text/html');
+    return res.status(200).send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Payment Complete – Growvest</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+           background: #085428; color: #fff; display: flex; align-items: center;
+           justify-content: center; min-height: 100vh; text-align: center; padding: 24px; }
+    .card { background: rgba(255,255,255,0.1); border-radius: 20px; padding: 40px 30px;
+            max-width: 360px; width: 100%; backdrop-filter: blur(10px); }
+    h1 { font-size: 28px; margin-bottom: 8px; }
+    p  { font-size: 15px; opacity: 0.85; margin-bottom: 24px; line-height: 1.5; }
+    .btn { display: inline-block; background: #FFD700; color: #085428; font-weight: 700;
+           font-size: 16px; padding: 14px 32px; border-radius: 50px; text-decoration: none;
+           margin-top: 8px; }
+    .spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.3);
+               border-top-color: #FFD700; border-radius: 50%; animation: spin 0.8s linear infinite;
+               margin: 0 auto 20px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="spinner"></div>
+    <h1>&#10003; Payment Done!</h1>
+    <p>Redirecting you back to Growvest&hellip;</p>
+    <a class="btn" href="${deepLink}">Open Growvest App</a>
+  </div>
+  <script>
+    // Auto deep-link back to app after a short delay
+    setTimeout(function() {
+      window.location.href = '${deepLink}';
+    }, 800);
+  </script>
+</body>
+</html>`);
+  } catch (error) {
+    console.error('[PaymentCallback] Error:', error);
+    res.status(500).send('Payment callback error');
+  }
+};
+
+// ─── 4. Gateway Webhook Endpoint ─────────────────────────────────────────────
 exports.handleWebhook = async (req, res) => {
   try {
     const payload = req.body || {};

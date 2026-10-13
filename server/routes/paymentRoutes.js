@@ -11,4 +11,10 @@ router.post('/check-order-status', protect, paymentController.checkOrderStatus);
 router.post('/webhook', paymentController.handleWebhook);
 router.get('/webhook', paymentController.handleWebhook);
 
+// ─── Payment Gateway Callback (after user completes payment in browser) ───────
+// The gateway redirects to this URL after payment. We redirect back to the app
+// via deep link so the user is returned to Growvest automatically.
+router.get('/callback', paymentController.handleCallback);
+router.post('/callback', paymentController.handleCallback);
+
 module.exports = router;
