@@ -5,6 +5,7 @@ const ChitMember = require('../models/ChitMember');
 const ChitPayment = require('../models/ChitPayment');
 const Transaction = require('../models/Transaction');
 const User = require('../models/User');
+const PendingPayment = require('../models/PendingPayment');
 const { triggerReferralRewardOnInvestment } = require('../utils/referralHelper');
 const { sendNotification } = require('../services/notificationHelper');
 const PocketMoney = require('../models/PocketMoney');
@@ -59,11 +60,13 @@ const callGatewayCreateOrder = async ({ amount, orderId, mobile, customerName, r
     api_key: apiKey,
     customer_mobile: String(mobile || '9999999999'),
     customer_name: String(customerName || 'Growvest User'),
+    name: String(customerName || 'Growvest User'),
+    customerName: String(customerName || 'Growvest User'),
     amount: String(amount),
     order_id: String(orderId),
     redirect_url: redirectUrl || '',
-    remark1: remark1 || 'Growvest Payment',
-    remark2: remark2 || '',
+    remark1: String(customerName || remark1 || 'Growvest Payment'),
+    remark2: String(remark2 || ''),
   });
 
   const candidateUrls = [
@@ -188,11 +191,11 @@ exports.createOrder = async (req, res) => {
     // === NEW UPI / PAYME ORDER CREATION ===
     const user = req.user;
     const orderId = `ORD${Date.now()}${Math.floor(1000 + Math.random() * 9000)}`;
-    const redirectUrl = `${process.env.APP_URL || 'https://growvest-mobile.onrender.com'}/api/payments/callback`;
+    const redirectUrl = `${process.env.APP_URL || 'https://growvest-mobile.onrender.com'}/api/payment/callback`;
     const customerMobile = user?.mobileNumber || req.body?.mobileNumber || '9999999999';
 
     try {
-      const customerName = user?.name || user?.username || 'Growvest User';
+      const customerName = (user?.name && user.name.trim()) || user?.username || req.body?.customerName || 'Growvest User';
       const gwRes = await callGatewayCreateOrder({
         amount: Math.round(amount),
         orderId,
@@ -204,9 +207,44 @@ exports.createOrder = async (req, res) => {
       });
 
       if (gwRes && (gwRes.status === true || gwRes.result?.payment_url)) {
+        const finalOrderId = gwRes.result?.orderId || gwRes.result?.order_id || gwRes.order_id || gwRes.orderId || orderId;
+
+        // ─── Save PendingPayment so webhook/callback can auto-complete business logic ───
+        try {
+          await PendingPayment.findOneAndUpdate(
+            { orderId: finalOrderId },
+            {
+              orderId:     finalOrderId,
+              userId:      user._id,
+              paymentType: purpose || notes?.paymentType || 'investment',
+              payloadData: notes || req.body?.payloadData || {},
+              amount:      Math.round(amount),
+              status:      'pending',
+            },
+            { upsert: true, new: true }
+          );
+          if (orderId && orderId !== finalOrderId) {
+            await PendingPayment.findOneAndUpdate(
+              { orderId: orderId },
+              {
+                orderId:     orderId,
+                userId:      user._id,
+                paymentType: purpose || notes?.paymentType || 'investment',
+                payloadData: notes || req.body?.payloadData || {},
+                amount:      Math.round(amount),
+                status:      'pending',
+              },
+              { upsert: true, new: true }
+            );
+          }
+          console.log(`[PaymentController] PendingPayment saved for order: ${finalOrderId}`);
+        } catch (ppErr) {
+          console.warn('[PaymentController] PendingPayment save warning:', ppErr.message);
+        }
+
         return res.status(200).json({
           success: true,
-          orderId: gwRes.result?.orderId || orderId,
+          orderId: finalOrderId,
           paymentUrl: gwRes.result?.payment_url,
           amount: Math.round(amount),
           currency: 'INR',
@@ -290,6 +328,18 @@ exports.verifyPayment = async (req, res) => {
     }
     */
 
+    // Check if order was already completed by Webhook or Callback
+    const existingPending = await PendingPayment.findOne({ orderId: effectiveOrderId });
+    if (existingPending && existingPending.status === 'completed') {
+      console.log(`[PaymentController] Order ${effectiveOrderId} already processed via webhook/callback.`);
+      return res.status(200).json({
+        success: true,
+        message: 'Payment verified and approved automatically.',
+        orderId: effectiveOrderId,
+        alreadyProcessed: true,
+      });
+    }
+
     // === NEW UPI / PAYME VERIFICATION ===
     let verifiedUtr = utr || razorpay_payment_id || `UTR_${Date.now()}`;
     const isSimulated =
@@ -324,7 +374,6 @@ exports.verifyPayment = async (req, res) => {
           message: statusRes?.message || 'Payment failed or expired.',
         });
       } else if (statusRes?.isSimulated) {
-        // Unconfigured gateway test fallback
         verifiedUtr = statusRes?.result?.utr || `SIM_UTR_${Date.now()}`;
       } else {
         return res.status(400).json({
@@ -339,59 +388,25 @@ exports.verifyPayment = async (req, res) => {
       utr: verifiedUtr,
     });
 
-    // Payment Verified! Now complete the requested business operation automatically.
-    const user = await User.findById(req.user._id);
-    if (!user) {
-      console.error('[CHIT_PAYMENT_ERROR] User not found:', req.user._id);
-      return res.status(404).json({ message: 'User record not found' });
+    // Execute business logic through centralized processor
+    const processRes = await processSuccessfulOrder(
+      effectiveOrderId,
+      verifiedUtr,
+      req.user,
+      paymentType,
+      payloadData
+    );
+
+    if (!processRes.success) {
+      return res.status(500).json({ message: processRes.message || 'Failed to complete transaction' });
     }
 
-    const paymentId = verifiedUtr;
-    const signature = `VERIFIED_UPI_${effectiveOrderId}`;
-
-    if (paymentType === 'investment') {
-      const result = await completeInvestment(user, payloadData, effectiveOrderId, paymentId, signature, 'PayMe_UPI');
-      await triggerReferralRewardOnInvestment(user._id, result?._id);
-      console.log('[CHIT_PAYMENT] completed investment payout activation');
-      return res.status(200).json({ success: true, message: 'Investment payment verified & approved automatically.', data: result, utr: verifiedUtr });
-    } else if (paymentType === 'chit_join') {
-      const result = await completeChitJoin(user, payloadData, effectiveOrderId, paymentId, signature, 'PayMe_UPI');
-      await triggerReferralRewardOnInvestment(user._id, result?._id);
-      console.log('[CHIT_PAYMENT] completed chit join membership activation');
-      return res.status(200).json({ success: true, message: 'Chit join payment verified & membership activated.', data: result, utr: verifiedUtr });
-    } else if (paymentType === 'chit_payment') {
-      const result = await completeMonthlyDue(user, payloadData, effectiveOrderId, paymentId, signature, 'PayMe_UPI');
-      await triggerReferralRewardOnInvestment(user._id, result?._id);
-      console.log('[CHIT_PAYMENT] completed chit monthly/weekly due payment');
-      return res.status(200).json({ success: true, message: 'Chit due payment verified & recorded successfully.', data: result, utr: verifiedUtr });
-    } else if (paymentType === 'pocket_money') {
-      const result = await completePocketMoney(user, payloadData, effectiveOrderId, paymentId, signature, 'PayMe_UPI');
-      await triggerReferralRewardOnInvestment(user._id, result?._id);
-      console.log('[CHIT_PAYMENT] completed pocket money activation');
-      return res.status(200).json({ success: true, message: 'Pocket Money payment verified & activated.', data: result, utr: verifiedUtr });
-    } else if (paymentType === 'sip_initial' || paymentType === 'sip_installment') {
-      const sipController = require('./sipController');
-      return await sipController.verifyPayment(
-        {
-          body: {
-            order_id: effectiveOrderId,
-            razorpay_order_id: effectiveOrderId,
-            razorpay_payment_id: paymentId,
-            razorpay_signature: signature,
-            utr: verifiedUtr,
-            isSimulated,
-            sipId: payloadData?.sipId,
-            contributionId: payloadData?.contributionId,
-            installmentNumber: payloadData?.installmentNumber,
-          },
-          user: req.user,
-        },
-        res
-      );
-    } else {
-      console.warn('[CHIT_PAYMENT_ERROR] Unknown payment type:', paymentType);
-      return res.status(400).json({ message: 'Unknown payment type' });
-    }
+    return res.status(200).json({
+      success: true,
+      message: 'Payment verified & approved successfully.',
+      data: processRes.data,
+      utr: verifiedUtr,
+    });
   } catch (error) {
     console.error('[CHIT_PAYMENT_ERROR] Payment verification error:', error);
     res.status(500).json({ message: 'Payment verification failed', error: error.message });
@@ -419,20 +434,39 @@ exports.checkOrderStatus = async (req, res) => {
 
 // ─── 4. Payment Gateway Callback (redirect after payment in browser) ──────────
 // The gateway redirects the user's browser here after payment is completed.
-// We serve an HTML page that immediately deep-links back to the Growvest app.
+// We verify gateway status, auto-process the order in MongoDB immediately,
+// and deep-link back to the Growvest mobile app.
 exports.handleCallback = async (req, res) => {
   try {
-    // The gateway may pass order_id / status as query params or POST body
-    const order_id = req.query?.order_id || req.query?.orderId || req.body?.order_id || req.body?.orderId || '';
+    const order_id = req.query?.order_id || req.query?.orderId || req.query?.order_ID ||
+                     req.body?.order_id  || req.body?.orderId  || '';
     const status   = (req.query?.status || req.body?.status || 'unknown').toLowerCase();
 
     console.log(`[PaymentCallback] Received callback — order_id: ${order_id}, status: ${status}`);
 
-    // Build deep link: growvest://payment-callback?order_id=...&status=...
-    const deepLink = `growvest://payment-callback?order_id=${encodeURIComponent(order_id)}&status=${encodeURIComponent(status)}`;
-    const appStoreUrl = 'https://growvest-mobile.onrender.com'; // fallback if app not installed
+    if (order_id) {
+      try {
+        const statusRes = await callGatewayCheckStatus(order_id);
+        const gwStatus = (
+          statusRes?.status ||
+          statusRes?.result?.status ||
+          statusRes?.result?.txnStatus ||
+          status ||
+          ''
+        ).toUpperCase();
 
-    // Serve a minimal HTML page that auto-redirects to the app
+        if (gwStatus === 'COMPLETED' || gwStatus === 'SUCCESS') {
+          const utr = statusRes?.result?.utr || `UTR_CB_${Date.now()}`;
+          await processSuccessfulOrder(order_id, utr);
+          console.log(`[PaymentCallback] Order ${order_id} verified & processed into DB via callback!`);
+        }
+      } catch (cbErr) {
+        console.warn('[PaymentCallback] Background verify warning:', cbErr.message);
+      }
+    }
+
+    const deepLink = `growvest://payment-callback?order_id=${encodeURIComponent(order_id)}&status=${encodeURIComponent(status)}`;
+
     res.setHeader('Content-Type', 'text/html');
     return res.status(200).send(`<!DOCTYPE html>
 <html lang="en">
@@ -442,34 +476,36 @@ exports.handleCallback = async (req, res) => {
   <title>Payment Complete – Growvest</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
            background: #085428; color: #fff; display: flex; align-items: center;
            justify-content: center; min-height: 100vh; text-align: center; padding: 24px; }
-    .card { background: rgba(255,255,255,0.1); border-radius: 20px; padding: 40px 30px;
-            max-width: 360px; width: 100%; backdrop-filter: blur(10px); }
-    h1 { font-size: 28px; margin-bottom: 8px; }
-    p  { font-size: 15px; opacity: 0.85; margin-bottom: 24px; line-height: 1.5; }
-    .btn { display: inline-block; background: #FFD700; color: #085428; font-weight: 700;
-           font-size: 16px; padding: 14px 32px; border-radius: 50px; text-decoration: none;
-           margin-top: 8px; }
-    .spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.3);
+    .card { background: rgba(255,255,255,0.12); border-radius: 24px; padding: 40px 28px;
+            max-width: 380px; width: 100%; backdrop-filter: blur(12px); box-shadow: 0 20px 40px rgba(0,0,0,0.25); }
+    .icon { width: 72px; height: 72px; background: #FFD700; border-radius: 50%; display: flex;
+            align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 38px; color: #085428; font-weight: bold; }
+    h1 { font-size: 26px; font-weight: 700; margin-bottom: 8px; }
+    p  { font-size: 15px; opacity: 0.9; margin-bottom: 28px; line-height: 1.5; }
+    .btn { display: block; background: #FFD700; color: #085428; font-weight: 700;
+           font-size: 16px; padding: 15px 32px; border-radius: 50px; text-decoration: none;
+           box-shadow: 0 4px 15px rgba(255,215,0,0.4); }
+    .spinner { width: 32px; height: 32px; border: 3px solid rgba(255,255,255,0.3);
                border-top-color: #FFD700; border-radius: 50%; animation: spin 0.8s linear infinite;
-               margin: 0 auto 20px; }
+               margin: 16px auto 0; }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
   <div class="card">
+    <div class="icon">&#10003;</div>
+    <h1>Payment Successful!</h1>
+    <p>Your payment has been received and verified. Returning to Growvest&hellip;</p>
+    <a class="btn" href="${deepLink}">Return to App</a>
     <div class="spinner"></div>
-    <h1>&#10003; Payment Done!</h1>
-    <p>Redirecting you back to Growvest&hellip;</p>
-    <a class="btn" href="${deepLink}">Open Growvest App</a>
   </div>
   <script>
-    // Auto deep-link back to app after a short delay
     setTimeout(function() {
       window.location.href = '${deepLink}';
-    }, 800);
+    }, 400);
   </script>
 </body>
 </html>`);
@@ -479,47 +515,122 @@ exports.handleCallback = async (req, res) => {
   }
 };
 
-// ─── 4. Gateway Webhook Endpoint ─────────────────────────────────────────────
+// ─── 5. Gateway Webhook Endpoint ─────────────────────────────────────────────
+// This is called by Starpe gateway automatically when a payment succeeds.
+// It looks up the PendingPayment record (saved at order creation) and
+// runs the full business logic automatically.
 exports.handleWebhook = async (req, res) => {
   try {
     const payload = req.body || {};
-    console.log('[PaymentWebhook] Received incoming payment webhook:', payload);
+    console.log('[PaymentWebhook] Received:', JSON.stringify(payload));
 
-    const data = payload.data || {};
-    const orderId = payload.order_id || payload.orderId || payload.order_ID || data.order_id || req.query?.order_id;
+    const data    = payload.data || {};
+    const orderId = payload.order_id || payload.orderId || payload.order_ID ||
+                    data.order_id   || data.orderId   || req.query?.order_id;
+
     if (!orderId) {
-      return res.status(200).json({ status: false, message: 'order_id parameter missing in webhook payload' });
+      return res.status(200).json({ status: false, message: 'order_id missing in webhook payload' });
     }
 
-    // Query gateway to authenticate status
+    // Confirm payment status with gateway
     const statusRes = await callGatewayCheckStatus(orderId);
     const status = (
-      payload.status ||
-      payload.txnStatus ||
-      data.status ||
       statusRes?.status ||
       statusRes?.result?.status ||
       statusRes?.result?.txnStatus ||
+      payload.status ||
+      payload.txnStatus ||
+      data.status ||
       ''
     ).toUpperCase();
 
-    if (status === 'COMPLETED' || status === 'SUCCESS') {
-      const utr = payload.utr || data.utr || statusRes?.result?.utr || `UTR_${Date.now()}`;
-      console.log(`[PaymentWebhook] Order ${orderId} confirmed successful via webhook with UTR: ${utr}`);
-      return res.status(200).json({ status: true, message: 'Webhook processed successfully', orderId, utr });
+    console.log(`[PaymentWebhook] Order ${orderId} — status from gateway: ${status}`);
+
+    if (status !== 'COMPLETED' && status !== 'SUCCESS') {
+      return res.status(200).json({ status: true, message: `Webhook received with status: ${status}`, orderId });
     }
 
-    return res.status(200).json({ status: true, message: `Webhook received with status: ${status}`, orderId });
+    const utr = statusRes?.result?.utr || payload.utr || data.utr || `UTR_WH_${Date.now()}`;
+    await processSuccessfulOrder(orderId, utr);
+
+    return res.status(200).json({ status: true, message: 'Webhook processed successfully and payment completed', orderId, utr });
   } catch (error) {
     console.error('[PaymentWebhook] Webhook error:', error);
     res.status(500).json({ status: false, message: 'Webhook error', error: error.message });
   }
 };
 
+// ─── Centralized Business Logic Execution Helper ────────────────────────────
+async function processSuccessfulOrder(orderId, utr, fallbackUser = null, fallbackPaymentType = null, fallbackPayloadData = null) {
+  let pending = await PendingPayment.findOne({ orderId });
+  if (pending && pending.status === 'completed') {
+    console.log(`[PaymentProcess] Order ${orderId} already completed.`);
+    return { success: true, alreadyCompleted: true };
+  }
+
+  const userId = pending?.userId || fallbackUser?._id;
+  const user = fallbackUser || (userId ? await User.findById(userId) : null);
+  if (!user) {
+    console.error(`[PaymentProcess] User not found for order ${orderId}`);
+    return { success: false, message: 'User not found' };
+  }
+
+  const paymentType = pending?.paymentType || fallbackPaymentType || 'investment';
+  const payloadData = pending?.payloadData || fallbackPayloadData || {};
+  const paymentId = utr || `UTR_${Date.now()}`;
+  const signature = `VERIFIED_UPI_${orderId}`;
+
+  console.log(`[PaymentProcess] Completing: order=${orderId}, type=${paymentType}, user=${user._id}`);
+
+  if (pending) {
+    pending.status = 'completed';
+    pending.completedAt = new Date();
+    await pending.save().catch(() => {});
+  }
+
+  let result = null;
+  if (paymentType === 'investment') {
+    result = await completeInvestment(user, payloadData, orderId, paymentId, signature, 'PayMe_UPI');
+    await triggerReferralRewardOnInvestment(user._id, result?._id).catch(() => {});
+  } else if (paymentType === 'chit_join') {
+    result = await completeChitJoin(user, payloadData, orderId, paymentId, signature, 'PayMe_UPI');
+    await triggerReferralRewardOnInvestment(user._id, result?.member?._id || result?._id).catch(() => {});
+  } else if (paymentType === 'chit_payment') {
+    result = await completeMonthlyDue(user, payloadData, orderId, paymentId, signature, 'PayMe_UPI');
+    await triggerReferralRewardOnInvestment(user._id, result?._id).catch(() => {});
+  } else if (paymentType === 'pocket_money') {
+    result = await completePocketMoney(user, payloadData, orderId, paymentId, signature, 'PayMe_UPI');
+    await triggerReferralRewardOnInvestment(user._id, result?._id).catch(() => {});
+  } else if (paymentType === 'sip_initial' || paymentType === 'sip_installment') {
+    const sipController = require('./sipController');
+    const fakeReq = {
+      body: {
+        order_id: orderId,
+        razorpay_order_id: orderId,
+        razorpay_payment_id: paymentId,
+        razorpay_signature: signature,
+        utr: paymentId,
+        isSimulated: false,
+        sipId: payloadData?.sipId,
+        contributionId: payloadData?.contributionId,
+        installmentNumber: payloadData?.installmentNumber,
+      },
+      user,
+    };
+    const fakeRes = {
+      status: () => fakeRes,
+      json: (d) => { console.log('[PaymentProcess] SIP verify result:', d); },
+    };
+    await sipController.verifyPayment(fakeReq, fakeRes);
+  }
+
+  return { success: true, data: result, utr: paymentId };
+}
+
 // ─── Business Logic Helper Functions ─────────────────────────────────────────
 
 // Complete Investment
-const completeInvestment = async (user, data, orderId, paymentId, signature, provider = 'PayMe_UPI') => {
+async function completeInvestment(user, data, orderId, paymentId, signature, provider = 'PayMe_UPI') {
   const { amount, type } = data;
 
   // Idempotency check: if investment already processed for this paymentId/orderId, return existing
@@ -655,7 +766,7 @@ const completeInvestment = async (user, data, orderId, paymentId, signature, pro
 };
 
 // Complete Chit Join
-const completeChitJoin = async (user, data, orderId, paymentId, signature, provider = 'PayMe_UPI') => {
+async function completeChitJoin(user, data, orderId, paymentId, signature, provider = 'PayMe_UPI') {
   const { chitId, amount } = data;
   const Chit = require('../models/Chit');
 
@@ -806,7 +917,7 @@ const completeChitJoin = async (user, data, orderId, paymentId, signature, provi
 };
 
 // Complete Monthly Due
-const completeMonthlyDue = async (user, data, orderId, paymentId, signature, provider = 'PayMe_UPI') => {
+async function completeMonthlyDue(user, data, orderId, paymentId, signature, provider = 'PayMe_UPI') {
   const { chitId, month, amount, lateFee = 0 } = data;
   let { memberId } = data;
   const totalPaidAmt = Number(amount) + Number(lateFee);
@@ -890,7 +1001,7 @@ const completeMonthlyDue = async (user, data, orderId, paymentId, signature, pro
 // IMPORTANT: This ONLY creates the investment record.
 // NO payout is created here. Payout flow is:
 //   User requests via requestPayout → Admin approves via confirmReleasePayout → ONLY THEN payout is released.
-const completePocketMoney = async (user, data, orderId, paymentId, signature, provider = 'PayMe_UPI') => {
+async function completePocketMoney(user, data, orderId, paymentId, signature, provider = 'PayMe_UPI') {
   const { amount, frequency } = data;
 
   // Idempotency check: if already processed for this paymentId, return existing
