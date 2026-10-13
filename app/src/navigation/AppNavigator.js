@@ -1,5 +1,5 @@
 import React, { useRef, useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Dimensions, ActivityIndicator, Image, Keyboard, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Dimensions, ActivityIndicator, Image, Keyboard, Platform, Alert } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -487,6 +487,65 @@ const AppNavigator = () => {
     const handleDeepLink = async (url) => {
       if (!url) return;
       try {
+        // ── Handle payment callback deep link (auto-verify) ──────────────────
+        // URL: growvest://payment-callback?order_id=ORD...&status=success
+        if (url.includes('payment-callback')) {
+          const urlObj = new URL(url);
+          const order_id = urlObj.searchParams.get('order_id') || '';
+          const status   = urlObj.searchParams.get('status') || '';
+
+          console.log('[DeepLink] Payment callback received:', { order_id, status });
+
+          if (!order_id) return;
+
+          // Read pending payment context saved before opening the payment URL
+          const pendingRaw = await AsyncStorage.getItem('pendingPaymentContext');
+          if (!pendingRaw) {
+            console.warn('[DeepLink] No pending payment context found for auto-verify');
+            return;
+          }
+          const pendingCtx = JSON.parse(pendingRaw);
+          await AsyncStorage.removeItem('pendingPaymentContext');
+
+          // Auto-verify: call backend silently
+          try {
+            const { paymentService } = require('../services/paymentService');
+            const verification = await paymentService.verifyPayment({
+              order_id,
+              paymentType: pendingCtx.paymentType,
+              payloadData: pendingCtx.payloadData,
+            });
+
+            if (verification?.isPending) {
+              Alert.alert(
+                '⏳ Payment Pending',
+                'Your payment is still being processed. It will be credited shortly.',
+                [{ text: 'OK' }]
+              );
+              return;
+            }
+
+            // Trigger the stored onSuccess callback if available
+            const { customAlert } = require('../context/AlertContext');
+            customAlert.success(
+              'Payment Successful! ✅',
+              'Your payment has been verified and your account has been updated.'
+            );
+
+            // Call the stored success handler
+            if (pendingCtx.onSuccess && global._paymentSuccessHandlers?.[order_id]) {
+              global._paymentSuccessHandlers[order_id](verification);
+              delete global._paymentSuccessHandlers[order_id];
+            }
+          } catch (verifyErr) {
+            console.error('[DeepLink] Auto-verify error:', verifyErr);
+            const msg = verifyErr?.response?.data?.message || verifyErr?.message || 'Please try again.';
+            Alert.alert('Payment Verification Failed', msg, [{ text: 'OK' }]);
+          }
+          return;
+        }
+
+        // ── Handle referral deep link ─────────────────────────────────────────
         const match = url.match(/\/ref\/([A-Za-z0-9]+)/);
         if (match && match[1]) {
           const code = match[1].toUpperCase();
