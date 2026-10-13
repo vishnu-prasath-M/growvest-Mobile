@@ -45,7 +45,7 @@ const getGatewayConfig = () => {
 /**
  * Helper to call Gateway POST /api/create-order (supports .php endpoint fallback)
  */
-const callGatewayCreateOrder = async ({ amount, orderId, mobile, redirectUrl, remark1, remark2 }) => {
+const callGatewayCreateOrder = async ({ amount, orderId, mobile, customerName, redirectUrl, remark1, remark2 }) => {
   const { baseUrl, apiKey, isConfigured } = getGatewayConfig();
   if (!isConfigured) {
     return {
@@ -58,6 +58,7 @@ const callGatewayCreateOrder = async ({ amount, orderId, mobile, redirectUrl, re
   const formParams = new URLSearchParams({
     api_key: apiKey,
     customer_mobile: String(mobile || '9999999999'),
+    customer_name: String(customerName || 'Growvest User'),
     amount: String(amount),
     order_id: String(orderId),
     redirect_url: redirectUrl || '',
@@ -191,10 +192,12 @@ exports.createOrder = async (req, res) => {
     const customerMobile = user?.mobileNumber || req.body?.mobileNumber || '9999999999';
 
     try {
+      const customerName = user?.name || user?.username || 'Growvest User';
       const gwRes = await callGatewayCreateOrder({
         amount: Math.round(amount),
         orderId,
         mobile: customerMobile,
+        customerName,
         redirectUrl,
         remark1: purpose || 'Growvest',
         remark2: user?._id?.toString() || '',

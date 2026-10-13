@@ -1,4 +1,5 @@
 import { NativeModules, Linking } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { paymentService } from './paymentService';
 import { customAlert } from '../context/AlertContext';
 
@@ -82,7 +83,21 @@ export const executeRazorpayPayment = async ({
     );
 
     if (isLiveUrl && !isSimulated) {
-      // Live Gateway Flow: Open UPI / Instant Pay checkout
+      // Live Gateway Flow: Save context for auto-verify on deep-link return
+      try {
+        await AsyncStorage.setItem('pendingPaymentContext', JSON.stringify({
+          orderId,
+          paymentType,
+          payloadData,
+        }));
+        // Register success handler so AppNavigator can trigger it after auto-verify
+        if (!global._paymentSuccessHandlers) global._paymentSuccessHandlers = {};
+        global._paymentSuccessHandlers[orderId] = onSuccess;
+      } catch (e) {
+        console.warn('[PaymentHandler] Could not save payment context:', e.message);
+      }
+
+      // Open the UPI payment URL — gateway will redirect back to app via deep link
       try {
         await Linking.openURL(paymentUrl);
       } catch (linkErr) {
@@ -90,46 +105,7 @@ export const executeRazorpayPayment = async ({
       }
 
       if (setLoading) setLoading(false);
-
-      // Prompt user to verify once payment is completed in UPI app / browser
-      customAlert.confirm({
-        type: 'payout',
-        title: 'UPI Payment Initiated',
-        message: `Your payment link of ₹${Number(amount).toLocaleString('en-IN')} has been opened.\n\nAfter completing the payment in your UPI app or browser, tap "Verify Payment" below.`,
-        cancelText: 'Cancel Payment',
-        confirmText: 'Verify Payment',
-        onCancel: () => {
-          if (setLoading) setLoading(false);
-          if (onFailure) onFailure(new Error('User cancelled payment'));
-        },
-        onConfirm: async () => {
-          try {
-            if (setLoading) setLoading(true);
-            const verification = await paymentService.verifyPayment({
-              order_id: orderId,
-              paymentType,
-              payloadData,
-            });
-
-            if (verification?.isPending) {
-              if (setLoading) setLoading(false);
-              customAlert.warning(
-                'Payment Pending',
-                verification.message || 'Payment is still being processed. Please wait a few moments and tap verify again.'
-              );
-              return;
-            }
-
-            if (setLoading) setLoading(false);
-            if (onSuccess) onSuccess(verification);
-          } catch (verifyErr) {
-            if (setLoading) setLoading(false);
-            const msg = verifyErr.response?.data?.message || verifyErr.message || 'Verification failed';
-            customAlert.error('Payment Verification Failed', msg);
-            if (onFailure) onFailure(verifyErr);
-          }
-        },
-      });
+      // No manual popup needed — AppNavigator handles auto-verify on deep-link return
     } else {
       // Test Mode Simulation Fallback (for development / local testing)
       if (setLoading) setLoading(false);
