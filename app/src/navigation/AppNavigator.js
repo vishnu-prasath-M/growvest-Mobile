@@ -484,63 +484,55 @@ const AppNavigator = () => {
   useEffect(() => {
     notificationService.requestPermission();
 
+    const verifyPendingPayment = async (orderId) => {
+      if (!orderId || global._isVerifyingPayment) return;
+      global._isVerifyingPayment = true;
+
+      try {
+        const pendingRaw = await AsyncStorage.getItem('pendingPaymentContext');
+        if (!pendingRaw) return;
+        const pendingCtx = JSON.parse(pendingRaw);
+
+        const { paymentService } = require('../services/paymentService');
+        const verification = await paymentService.verifyPayment({
+          order_id: orderId,
+          paymentType: pendingCtx.paymentType,
+          payloadData: pendingCtx.payloadData,
+        });
+
+        if (verification?.success) {
+          await AsyncStorage.removeItem('pendingPaymentContext');
+          const { customAlert } = require('../context/AlertContext');
+          customAlert.success(
+            'Payment Successful! ✅',
+            'Your payment has been verified and your account has been updated.'
+          );
+          if (global._paymentSuccessHandlers?.[orderId]) {
+            global._paymentSuccessHandlers[orderId](verification);
+            delete global._paymentSuccessHandlers[orderId];
+          }
+        } else if (verification?.isPending) {
+          console.log('[AutoVerify] Payment still pending at gateway...');
+        }
+      } catch (verifyErr) {
+        console.warn('[AutoVerify] Error verifying payment:', verifyErr.message);
+      } finally {
+        global._isVerifyingPayment = false;
+      }
+    };
+
     const handleDeepLink = async (url) => {
       if (!url) return;
       try {
         // ── Handle payment callback deep link (auto-verify) ──────────────────
         // URL: growvest://payment-callback?order_id=ORD...&status=success
         if (url.includes('payment-callback')) {
-          const urlObj = new URL(url);
-          const order_id = urlObj.searchParams.get('order_id') || '';
-          const status   = urlObj.searchParams.get('status') || '';
+          const matchOrder = url.match(/[?&]order_id=([^&#]+)/i);
+          const order_id = matchOrder ? decodeURIComponent(matchOrder[1]) : '';
+          console.log('[DeepLink] Payment callback received:', { order_id });
 
-          console.log('[DeepLink] Payment callback received:', { order_id, status });
-
-          if (!order_id) return;
-
-          // Read pending payment context saved before opening the payment URL
-          const pendingRaw = await AsyncStorage.getItem('pendingPaymentContext');
-          if (!pendingRaw) {
-            console.warn('[DeepLink] No pending payment context found for auto-verify');
-            return;
-          }
-          const pendingCtx = JSON.parse(pendingRaw);
-          await AsyncStorage.removeItem('pendingPaymentContext');
-
-          // Auto-verify: call backend silently
-          try {
-            const { paymentService } = require('../services/paymentService');
-            const verification = await paymentService.verifyPayment({
-              order_id,
-              paymentType: pendingCtx.paymentType,
-              payloadData: pendingCtx.payloadData,
-            });
-
-            if (verification?.isPending) {
-              Alert.alert(
-                '⏳ Payment Pending',
-                'Your payment is still being processed. It will be credited shortly.',
-                [{ text: 'OK' }]
-              );
-              return;
-            }
-
-            // Trigger the stored onSuccess callback if available
-            const { customAlert } = require('../context/AlertContext');
-            customAlert.success(
-              'Payment Successful! ✅',
-              'Your payment has been verified and your account has been updated.'
-            );
-
-            // Call the stored success handler
-            if (pendingCtx.onSuccess && global._paymentSuccessHandlers?.[order_id]) {
-              global._paymentSuccessHandlers[order_id](verification);
-              delete global._paymentSuccessHandlers[order_id];
-            }
-          } catch (verifyErr) {
-            console.error('[DeepLink] Auto-verify error:', verifyErr);
-            const msg = verifyErr?.response?.data?.message || verifyErr?.message || 'Please try again.';
-            Alert.alert('Payment Verification Failed', msg, [{ text: 'OK' }]);
+          if (order_id) {
+            await verifyPendingPayment(order_id);
           }
           return;
         }
@@ -558,10 +550,31 @@ const AppNavigator = () => {
     };
 
     const Linking = require('react-native').Linking;
+    const { AppState } = require('react-native');
+
     Linking.getInitialURL().then(handleDeepLink);
-    const subscription = Linking.addEventListener('url', (event) => handleDeepLink(event.url));
+    const linkingSub = Linking.addEventListener('url', (event) => handleDeepLink(event.url));
+
+    // Listen to AppState (when user returns from browser or UPI app to Growvest)
+    const appStateSub = AppState.addEventListener('change', async (nextState) => {
+      if (nextState === 'active') {
+        const pendingRaw = await AsyncStorage.getItem('pendingPaymentContext');
+        if (pendingRaw) {
+          try {
+            const pendingCtx = JSON.parse(pendingRaw);
+            if (pendingCtx?.orderId) {
+              await verifyPendingPayment(pendingCtx.orderId);
+            }
+          } catch (e) {
+            console.warn('[AppState] Parse error:', e.message);
+          }
+        }
+      }
+    });
+
     return () => {
-      if (subscription && subscription.remove) subscription.remove();
+      if (linkingSub && linkingSub.remove) linkingSub.remove();
+      if (appStateSub && appStateSub.remove) appStateSub.remove();
     };
   }, []);
 

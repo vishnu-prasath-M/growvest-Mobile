@@ -1,4 +1,4 @@
-import { NativeModules, Linking } from 'react-native';
+import { NativeModules, Linking, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { paymentService } from './paymentService';
 import { customAlert } from '../context/AlertContext';
@@ -105,7 +105,43 @@ export const executeRazorpayPayment = async ({
       }
 
       if (setLoading) setLoading(false);
-      // No manual popup needed — AppNavigator handles auto-verify on deep-link return
+
+      // Auto-verify when user returns from UPI app / browser
+      let isVerified = false;
+      const attemptAutoVerify = async (retriesLeft = 3) => {
+        if (isVerified) return;
+        try {
+          const verification = await paymentService.verifyPayment({
+            order_id: orderId,
+            paymentType,
+            payloadData,
+          });
+
+          if (verification?.success) {
+            isVerified = true;
+            if (appStateSub && appStateSub.remove) appStateSub.remove();
+            await AsyncStorage.removeItem('pendingPaymentContext');
+            customAlert.success(
+              'Payment Successful! ✅',
+              'Your payment has been verified and your account has been updated.'
+            );
+            if (onSuccess) onSuccess(verification);
+            return;
+          }
+
+          if (verification?.isPending && retriesLeft > 0) {
+            setTimeout(() => attemptAutoVerify(retriesLeft - 1), 2500);
+          }
+        } catch (e) {
+          console.warn('[PaymentHandler] Auto-verify attempt error:', e.message);
+        }
+      };
+
+      const appStateSub = AppState.addEventListener('change', (nextState) => {
+        if (nextState === 'active') {
+          attemptAutoVerify(3);
+        }
+      });
     } else {
       // Test Mode Simulation Fallback (for development / local testing)
       if (setLoading) setLoading(false);

@@ -408,6 +408,7 @@ app.use('/api/chits', chitAdminRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/kyc', kycRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/payment', paymentRoutes);
 app.use('/api/pocket-money', pocketMoneyRoutes);
 app.use('/api/referral', referralRoutes);
 app.use('/api/wallet', referralRoutes);
