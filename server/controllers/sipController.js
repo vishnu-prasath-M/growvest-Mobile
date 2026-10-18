@@ -858,6 +858,92 @@ exports.cancelSIP = async (req, res) => {
   }
 };
 
+// ─── 7B. Request Withdrawal from Specific SIP ────────────────────────────────
+exports.withdrawSIP = async (req, res) => {
+  try {
+    const sipId = req.params.id;
+    const { amount, upiId } = req.body;
+    const userId = req.user._id;
+
+    const sip = await SIP.findOne({ _id: sipId, userId });
+    if (!sip) {
+      return res.status(404).json({ message: 'SIP not found' });
+    }
+
+    const withdrawAmt = Number(amount);
+    if (!withdrawAmt || withdrawAmt <= 0) {
+      return res.status(400).json({ message: 'Invalid withdrawal amount' });
+    }
+
+    const availableToWithdraw = Math.max(
+      0,
+      (sip.totalPaidAmount || 0) + (sip.status === 'completed' ? (sip.expectedInterest || 0) : 0) - (sip.withdrawnAmount || 0)
+    );
+
+    if (withdrawAmt > availableToWithdraw) {
+      return res.status(400).json({
+        message: `Requested amount ₹${withdrawAmt} exceeds available SIP balance of ₹${availableToWithdraw}`
+      });
+    }
+
+    const resolvedUPI = upiId || req.user.upiId || 'user@upi';
+    const withdrawalRecord = new Withdrawal({
+      userId,
+      userEmail: req.user.email || req.user.username || 'user@growvest.in',
+      userName: req.user.name || req.user.username || 'User',
+      amount: withdrawAmt,
+      upiId: resolvedUPI,
+      date: new Date().toLocaleDateString('en-IN'),
+      status: 'pending',
+      withdrawType: 'sip',
+      investmentId: sip._id,
+      processed: false,
+    });
+    await withdrawalRecord.save();
+
+    sip.withdrawnAmount = (sip.withdrawnAmount || 0) + withdrawAmt;
+    if (sip.withdrawnAmount >= (sip.totalPaidAmount || 0)) {
+      sip.status = 'completed';
+    }
+    await sip.save();
+
+    const transaction = new Transaction({
+      userId,
+      userEmail: req.user.email || 'user@growvest.in',
+      type: 'withdrawal',
+      amount: withdrawAmt,
+      status: 'requested',
+      referenceId: withdrawalRecord._id,
+      referenceType: 'Withdrawal',
+      description: `SIP Withdrawal Request - ${sip.sipId}`,
+    });
+    await transaction.save();
+
+    try {
+      await sendNotification({
+        userId,
+        title: '⏳ SIP Withdrawal Requested',
+        description: `Your SIP withdrawal request for ₹${withdrawAmt.toLocaleString('en-IN')} has been submitted for admin verification.`,
+        type: 'general',
+      });
+      await notifyAdmins({
+        title: '💸 SIP Withdrawal Request',
+        description: `${req.user.name || req.user.email} requested to withdraw ₹${withdrawAmt.toLocaleString('en-IN')} from SIP ${sip.sipId}.`,
+        type: 'general',
+      });
+    } catch (e) {}
+
+    res.status(200).json({
+      success: true,
+      message: `SIP withdrawal request for ₹${withdrawAmt.toLocaleString('en-IN')} submitted successfully.`,
+      withdrawal: withdrawalRecord,
+    });
+  } catch (error) {
+    console.error('[SIPController] Withdraw error:', error);
+    res.status(500).json({ message: 'Failed to process SIP withdrawal', error: error.message });
+  }
+};
+
 // ─── 8. Admin Overview & Management ─────────────────────────────────────────
 exports.getAdminSIPs = async (req, res) => {
   try {
