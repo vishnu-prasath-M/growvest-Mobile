@@ -3,6 +3,7 @@ const ChitMember = require('../models/ChitMember');
 const ChitPayment = require('../models/ChitPayment');
 const Transaction = require('../models/Transaction');
 const User = require('../models/User');
+const Withdrawal = require('../models/Withdrawal');
 const { sendNotification } = require('../services/notificationHelper');
 
 // @desc    Get pending chit payments for admin approval
@@ -566,13 +567,15 @@ const declareAuctionWinner = async (req, res) => {
 // @desc    Get chit dashboard overview for admin
 // @route   GET /api/chits/overview
 // @access  Private/Admin
-const getOverview = async (req, res) => {  try {
+const getOverview = async (req, res) => {
+  try {
     const pendingJoins = await Transaction.countDocuments({
       referenceType: 'ChitMember',
       status: 'pending',
     });
     const pendingPayments = await ChitPayment.countDocuments({ status: 'pending' });
     const approvedMembers = await ChitMember.countDocuments({ status: 'active' });
+    const totalMembersCount = await ChitMember.countDocuments({ status: { $ne: 'cancelled' } });
     const rejectedJoins = await Transaction.countDocuments({
       referenceType: 'ChitMember',
       status: 'rejected',
@@ -586,22 +589,48 @@ const getOverview = async (req, res) => {  try {
     const completedChits = await Chit.countDocuments({ status: 'completed' });
     const totalMembers = approvedMembers;
 
-    const totalCollected = await ChitPayment.aggregate([
+    // Total invested (collected from paid chit payments)
+    const paidPaymentsAgg = await ChitPayment.aggregate([
       { $match: { status: 'paid' } },
-      { $group: { _id: null, total: { $sum: '$amount' } } },
+      { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } },
     ]);
+    const totalInvested = paidPaymentsAgg[0]?.total || 0;
+    const totalPaymentsCount = paidPaymentsAgg[0]?.count || 0;
+
+    // Total released (paid out to winners / withdrawals completed)
+    const releasedWithdrawalsAgg = await Withdrawal.aggregate([
+      { $match: { withdrawType: 'chit', status: { $in: ['paid', 'approved', 'completed'] } } },
+      { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } },
+    ]);
+    const memberWithdrawnAgg = await ChitMember.aggregate([
+      { $match: { withdrawalStatus: { $in: ['completed', 'withdrawn', 'approved'] } } },
+      { $group: { _id: null, total: { $sum: '$withdrawalAmount' } } },
+    ]);
+    const withdrawalReleased = releasedWithdrawalsAgg[0]?.total || 0;
+    const memberReleased = memberWithdrawnAgg[0]?.total || 0;
+    const totalReleased = Math.max(withdrawalReleased, memberReleased);
+
+    const remainingPool = Math.max(0, totalInvested - totalReleased);
 
     res.json({
       totalChits,
       activeChits,
+      activeCount: activeChits,
       closedChits,
       completedChits,
+      completedCount: completedChits,
       totalMembers,
+      totalMembersCount,
       approvedMembers,
       pendingPayments,
       pendingJoins,
       rejectedRequests,
-      totalCollected: totalCollected[0]?.total || 0,
+      totalCollected: totalInvested,
+      totalInvested,
+      totalReleased,
+      remainingPool,
+      remainingAmount: remainingPool,
+      totalPaymentsCount,
     });
   } catch (error) {
     console.error('Error fetching chit overview:', error);
