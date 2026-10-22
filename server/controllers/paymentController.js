@@ -459,6 +459,114 @@ exports.handleCallback = async (req, res) => {
   }
 };
 
+// ─── 4b. Cashfree Hosted Web Checkout Page ──────────────────────────────────
+// Serves the Cashfree official JS SDK v3 checkout interface using payment_session_id.
+// Cashfree automatically mounts UPI, Cards, NetBanking, Wallets and handles return_url.
+exports.renderCashfreeCheckout = async (req, res) => {
+  try {
+    const session_id = req.query?.session_id || req.query?.sessionId || '';
+    const order_id = req.query?.order_id || req.query?.orderId || '';
+
+    if (!session_id) {
+      return res.status(400).send('Missing session_id for Cashfree checkout');
+    }
+
+    const { env } = cashfreeService.getCashfreeConfig();
+    const mode = (env === 'PRODUCTION') ? 'production' : 'sandbox';
+
+    res.setHeader('Content-Type', 'text/html');
+    return res.status(200).send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Cashfree Secure Checkout – Growvest</title>
+  <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #085428;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      text-align: center;
+      padding: 24px;
+    }
+    .card {
+      background: rgba(255,255,255,0.12);
+      border-radius: 24px;
+      padding: 36px 24px;
+      max-width: 380px;
+      width: 100%;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+    }
+    .spinner {
+      width: 44px;
+      height: 44px;
+      border: 4px solid rgba(255,255,255,0.2);
+      border-top-color: #FFD700;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 16px auto 20px;
+    }
+    h2 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+    p { font-size: 14px; opacity: 0.85; line-height: 1.4; margin-bottom: 20px; }
+    .btn {
+      display: inline-block;
+      background: #FFD700;
+      color: #085428;
+      font-weight: 700;
+      padding: 12px 28px;
+      border-radius: 50px;
+      border: none;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="spinner"></div>
+    <h2>Opening Cashfree Payment...</h2>
+    <p>Connecting to secure payment gateway. Please wait a moment&hellip;</p>
+    <button id="retryBtn" class="btn" style="display:none;" onclick="triggerCheckout()">Click to Pay</button>
+  </div>
+  <script>
+    function triggerCheckout() {
+      try {
+        const cashfree = Cashfree({ mode: "${mode}" });
+        cashfree.checkout({
+          paymentSessionId: "${session_id}",
+          redirectTarget: "_self"
+        }).then(function(res) {
+          if (res && res.error) {
+            console.error("Cashfree checkout error:", res.error);
+            document.getElementById("retryBtn").style.display = "inline-block";
+          }
+        });
+      } catch (err) {
+        console.error("Cashfree initialization error:", err);
+        document.getElementById("retryBtn").style.display = "inline-block";
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", function() {
+      setTimeout(triggerCheckout, 200);
+    });
+  </script>
+</body>
+</html>`);
+  } catch (error) {
+    console.error('[RenderCashfreeCheckout] Error:', error);
+    res.status(500).send('Failed to initialize Cashfree checkout');
+  }
+};
+
 // ─── 5. Gateway Webhook Endpoint ─────────────────────────────────────────────
 // Called by Cashfree asynchronously when payment succeeds or changes status.
 // Verifies HMAC-SHA256 signature using req.rawBody and timestamp.

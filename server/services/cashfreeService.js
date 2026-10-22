@@ -85,6 +85,7 @@ const createOrder = async ({
   amount,
   user,
   customerMobile,
+  customerPhone,
   customerName: custNameInput,
   customerEmail: custEmailInput,
   purpose = 'Growvest Payment',
@@ -107,14 +108,15 @@ const createOrder = async ({
     .replace(/[^a-zA-Z0-9_\-]/g, '_')
     .slice(0, 45);
 
+  const effectivePhone = customerPhone || customerMobile || user?.mobileNumber;
   const customer = sanitizeCustomer(
     {
       ...user,
       name: custNameInput || user?.name,
       email: custEmailInput || user?.email,
-      mobileNumber: customerMobile || user?.mobileNumber,
+      mobileNumber: effectivePhone,
     },
-    customerMobile
+    effectivePhone
   );
 
   const serverBase = (process.env.APP_URL || 'https://growvest-mobile.onrender.com').replace(/\/+$/, '');
