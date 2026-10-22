@@ -58,19 +58,22 @@ async function getUserPortfolioSummary(userIdInput) {
     status: { $in: ['pending', 'approved', 'paid'] },
   });
 
-  const paidOrApprovedInvIds = new Set();
-  const pendingInvIds = new Set();
+  const invWithdrawnMap = new Map();
+  const invPendingMap = new Map();
   let generalPendingAmount = 0;
 
   userWithdrawals.forEach(w => {
     const invId = w.investmentId ? w.investmentId.toString() : null;
+    const wAmount = Number(w.amount) || 0;
     if (w.status === 'paid' || w.status === 'approved') {
-      if (invId) paidOrApprovedInvIds.add(invId);
+      if (invId) {
+        invWithdrawnMap.set(invId, (invWithdrawnMap.get(invId) || 0) + wAmount);
+      }
     } else if (w.status === 'pending') {
       if (invId) {
-        pendingInvIds.add(invId);
+        invPendingMap.set(invId, (invPendingMap.get(invId) || 0) + wAmount);
       } else {
-        generalPendingAmount += Number(w.amount) || 0;
+        generalPendingAmount += wAmount;
       }
     }
   });
@@ -87,11 +90,11 @@ async function getUserPortfolioSummary(userIdInput) {
   const enrichedInvestments = investments.map(inv => {
     const principal = Number(inv.amount) || 0;
     const invIdStr = inv._id ? inv._id.toString() : '';
-    const isPaidOut = paidOrApprovedInvIds.has(invIdStr);
-    const hasPendingWithdrawal = pendingInvIds.has(invIdStr) || inv.withdrawalStatus === 'pending';
-    const isWithdrawn = inv.status === 'withdrawn' || inv.withdrawalStatus === 'withdrawn' || isPaidOut;
+    const invWithdrawnAmount = Math.max(Number(inv.withdrawnAmount) || 0, invWithdrawnMap.get(invIdStr) || 0);
+    const invPendingAmount = invPendingMap.get(invIdStr) || 0;
+    const totalDeductedFromInv = invWithdrawnAmount + invPendingAmount;
+
     const isReinvested = inv.status === 'reinvested' || inv.withdrawalStatus === 'reinvested';
-    const isClosed = isWithdrawn || isReinvested;
     const isRejected = inv.status === 'rejected';
     const isPending = inv.status === 'pending';
 
@@ -144,12 +147,12 @@ async function getUserPortfolioSummary(userIdInput) {
 
     // Maturity Lock Guard: CANNOT mature on the same day as startDate or before minimum 2 days
     const unlockDate = intendedWithdrawalDate < maturityDate ? intendedWithdrawalDate : maturityDate;
-    const isMatured = !isPending && !isClosed && !isSameDay && (nowDate >= unlockDate);
+    const isMatured = !isPending && !isSameDay && (nowDate >= unlockDate);
     const isUnlocked = isMatured;
 
-    // Accrue interest from startDate to today (strictly starts after first midnight / next day; 0 on same day)
+    // Accrue interest from startDate to today
     let accruedInterest = 0;
-    if (inv.startDate && !isClosed && !isPending && !isSameDay) {
+    if (inv.startDate && !isPending && !isSameDay) {
       const elapsedDays = Math.max(0, Math.min(durationDays, Math.floor((nowMidnight - startDay) / 86400000)));
       accruedInterest = elapsedDays * dailyInterest;
       accruedInterest = Math.max(accruedInterest, Number(inv.interestEarned) || 0);
@@ -162,33 +165,43 @@ async function getUserPortfolioSummary(userIdInput) {
     const fullBenefitAmount = principal + (isMatured ? totalInterestForDuration : accruedInterest) + extraBenefits;
     const earlyPrincipalOnlyAmount = principal;
 
+    // Partial withdrawal calculation
+    const eligibleBase = isMatured ? fullBenefitAmount : (isUnlocked ? earlyPrincipalOnlyAmount : 0);
+    const remainingEligible = Math.max(0, eligibleBase - totalDeductedFromInv);
+    const isFullyWithdrawn = inv.status === 'withdrawn' || inv.withdrawalStatus === 'withdrawn' || (fullBenefitAmount > 0 && totalDeductedFromInv >= fullBenefitAmount - 1);
+
     let availableToWithdraw = 0;
     let withdrawalStatus = 'locked';
 
-    if (isWithdrawn) {
+    if (isFullyWithdrawn) {
       withdrawalStatus = 'withdrawn';
       availableToWithdraw = 0;
     } else if (isReinvested) {
       withdrawalStatus = 'reinvested';
       availableToWithdraw = 0;
-    } else if (hasPendingWithdrawal) {
-      withdrawalStatus = 'pending';
-      availableToWithdraw = 0;
-      totalDurationInvested += principal;
-      totalAccruedInterest += totalInterestForDuration;
     } else if (isMatured) {
-      // MATURITY REACHED: Principal + Interest + Benefits available
-      withdrawalStatus = 'available_full';
-      availableToWithdraw = fullBenefitAmount;
-      maturedWithdrawalAvailable += fullBenefitAmount;
-      totalDurationInvested += principal;
+      if (remainingEligible > 0) {
+        withdrawalStatus = invPendingAmount > 0 ? 'partially_pending' : 'available_full';
+        availableToWithdraw = remainingEligible;
+        maturedWithdrawalAvailable += remainingEligible;
+      } else {
+        withdrawalStatus = invPendingAmount > 0 ? 'pending' : 'withdrawn';
+        availableToWithdraw = 0;
+      }
+      totalDurationInvested += Math.max(0, principal - invWithdrawnAmount);
       totalAccruedInterest += totalInterestForDuration;
+    } else if (isUnlocked && remainingEligible > 0) {
+      withdrawalStatus = invPendingAmount > 0 ? 'partially_pending' : 'available';
+      availableToWithdraw = remainingEligible;
+      maturedWithdrawalAvailable += remainingEligible;
+      totalDurationInvested += Math.max(0, principal - invWithdrawnAmount);
+      totalAccruedInterest += accruedInterest;
     } else {
-      // LOCKED until chosen intended withdrawal date / maturity date
+      // LOCKED
       withdrawalStatus = 'locked';
       availableToWithdraw = 0;
-      totalDurationInvested += principal;
-      totalDurationLocked += principal;
+      totalDurationInvested += Math.max(0, principal - invWithdrawnAmount);
+      totalDurationLocked += Math.max(0, principal - invWithdrawnAmount);
       totalDailyInterest += dailyInterest;
       totalAccruedInterest += accruedInterest;
     }
@@ -212,7 +225,7 @@ async function getUserPortfolioSummary(userIdInput) {
       withdrawalStatus,
       isMatured,
       isUnlocked,
-      isLocked: !isWithdrawn && !isPending && !isUnlocked,
+      isLocked: !isFullyWithdrawn && !isPending && !isUnlocked,
       lockUnlockDate: intendedWithdrawalDate.toISOString(),
     };
   });
@@ -266,15 +279,16 @@ async function getUserPortfolioSummary(userIdInput) {
         totalChitLocked += paidAmt;
       }
 
+      const chitTargetAmount = cm.hasWon ? (Number(cm.winningAmount) || priceAmount) : (isUnlocked ? priceAmount : 0);
       if (cm.hasWon) {
-        const winning = Number(cm.winningAmount) || priceAmount;
-        totalChitWinningAmount += winning;
-        if (!isWithdrawn && !isRequested) {
-          chitWithdrawalAvailable += winning;
-        }
-      } else if (isUnlocked && !isWithdrawn && !isRequested) {
-        // Price amount ONLY (before chit completes, strictly price amount without dividend)
-        chitWithdrawalAvailable += priceAmount;
+        totalChitWinningAmount += chitTargetAmount;
+      }
+
+      const chitAlreadyDeducted = isWithdrawn ? chitTargetAmount : (Number(cm.withdrawnAmount) || 0);
+      const chitRemaining = Math.max(0, chitTargetAmount - chitAlreadyDeducted);
+
+      if (!isRequested && !isWithdrawn && chitRemaining > 0) {
+        chitWithdrawalAvailable += chitRemaining;
       }
     }
   });

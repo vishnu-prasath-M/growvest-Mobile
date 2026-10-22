@@ -90,12 +90,12 @@ exports.submitKYC = async (req, res) => {
       ifscCode: req.body.ifscCode || '',
       branchName: req.body.branchName || '',
       upiId: req.body.upiId || '',
-      // Store base64 images directly (they are already base64 strings from the app)
-      aadhaarFrontImage: req.body.aadhaarFrontImage || '',
-      aadhaarBackImage: req.body.aadhaarBackImage || '',
-      panImage: req.body.panImage || '',
-      profilePhoto: req.body.profilePhoto || '',
+      aadhaarFrontImage: (req.body.aadhaarFrontImage && req.body.aadhaarFrontImage.trim() !== '') ? req.body.aadhaarFrontImage : (existingKYC?.aadhaarFrontImage || ''),
+      aadhaarBackImage: (req.body.aadhaarBackImage && req.body.aadhaarBackImage.trim() !== '') ? req.body.aadhaarBackImage : (existingKYC?.aadhaarBackImage || ''),
+      panImage: (req.body.panImage && req.body.panImage.trim() !== '') ? req.body.panImage : (existingKYC?.panImage || ''),
+      profilePhoto: (req.body.profilePhoto && req.body.profilePhoto.trim() !== '') ? req.body.profilePhoto : (existingKYC?.profilePhoto || ''),
       status: 'pending',
+      rejectionReason: '',
       submittedAt: new Date(),
     };
     
@@ -293,7 +293,9 @@ exports.getKYCDocument = async (req, res) => {
 
     res.setHeader('Content-Type', mimeType);
     res.setHeader('Content-Length', imgBuffer.length);
-    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     return res.send(imgBuffer);
   } catch (error) {
     console.error('Error serving KYC document image:', error.message);

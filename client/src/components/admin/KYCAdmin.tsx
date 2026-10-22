@@ -470,7 +470,8 @@ const ImageViewer = ({
     if (data.startsWith("data:image/")) return data;
     // If we have token & kycId, try authenticated backend streaming route
     if (kycId && token) {
-      return `${API_URL}/api/kyc/document/${kycId}/${docType}?token=${token}`;
+      const cacheBuster = data ? Math.abs(data.length) : Date.now();
+      return `${API_URL}/api/kyc/document/${kycId}/${docType}?token=${token}&_t=${cacheBuster}`;
     }
     // Clean raw base64 string
     const cleanBase64 = data.replace(/^data:image\/[a-z]+;base64,/, "").trim();

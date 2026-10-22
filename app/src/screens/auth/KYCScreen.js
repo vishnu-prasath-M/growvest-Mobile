@@ -144,6 +144,10 @@ const KYCScreen = ({ navigation }) => {
             ifscCode: d.ifscCode || prev.ifscCode,
             branchName: d.branchName || prev.branchName,
             upiId: d.upiId || prev.upiId,
+            aadhaarFrontImage: d.aadhaarFrontImage || prev.aadhaarFrontImage || '',
+            aadhaarBackImage: d.aadhaarBackImage || prev.aadhaarBackImage || '',
+            panImage: d.panImage || prev.panImage || '',
+            profilePhoto: d.profilePhoto || prev.profilePhoto || '',
           }));
         }
       }
@@ -677,6 +681,9 @@ const KYCScreen = ({ navigation }) => {
 
   const renderDocUpload = (field, title, subtitle) => {
     const hasImage = !!form[field];
+    const imgVal = form[field];
+    const imageUri = !imgVal ? null : (imgVal.startsWith('data:') || imgVal.startsWith('http') ? imgVal : `data:image/jpeg;base64,${imgVal}`);
+
     return (
       <View key={field} style={styles.docUploadContainer}>
         <Text style={styles.docTitle}>
@@ -688,8 +695,8 @@ const KYCScreen = ({ navigation }) => {
           activeOpacity={0.8}
           onPress={() => showImagePicker(field)}
         >
-          {hasImage ? (
-            <Image source={{ uri: `data:image/jpeg;base64,${form[field]}` }} style={styles.imagePreview} />
+          {hasImage && imageUri ? (
+            <Image source={{ uri: imageUri }} style={styles.imagePreview} />
           ) : (
             <>
               <MaterialCommunityIcons name="cloud-upload-outline" size={32} color={colors.primary} />
