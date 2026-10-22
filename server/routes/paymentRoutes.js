@@ -17,4 +17,8 @@ router.get('/webhook', paymentController.handleWebhook);
 router.get('/callback', paymentController.handleCallback);
 router.post('/callback', paymentController.handleCallback);
 
+// ─── Cashfree Web Checkout Page ─────────────────────────────────────────────
+// Hosted checkout interface using Cashfree JS SDK v3
+router.get('/cashfree-checkout', paymentController.renderCashfreeCheckout);
+
 module.exports = router;
