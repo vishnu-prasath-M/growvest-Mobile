@@ -305,21 +305,22 @@ const WithdrawScreen = ({ navigation }) => {
   const investmentEarnings = validInvestmentsOnly.reduce((sum, inv) => {
     const isMatured = inv.maturityDate && new Date() >= new Date(inv.maturityDate);
     const isWithdrawn = inv.status === 'withdrawn' || inv.withdrawalStatus === 'withdrawn';
+    const totalDeducted = Number(inv.withdrawnAmount) || 0;
     if (isMatured && !isWithdrawn && inv.status === 'approved') {
-      return sum + (Number(inv.maturityAmount) || (Number(inv.amount) + (Number(inv.totalInterest) || 0)));
+      const full = Number(inv.maturityAmount) || (Number(inv.amount) + (Number(inv.totalInterest) || 0));
+      return sum + Math.max(0, full - totalDeducted);
     }
     const intendedDate = inv.intendedWithdrawalDate || inv.selectedWithdrawalDate;
     const isEarlyUnlocked = intendedDate && new Date() >= new Date(intendedDate) && !isWithdrawn && inv.status === 'approved';
     if (isEarlyUnlocked && !isMatured) {
-      return sum + (Number(inv.earlyPrincipalOnlyAmount) || Number(inv.amount) || 0);
+      const principal = Number(inv.earlyPrincipalOnlyAmount) || Number(inv.amount) || 0;
+      return sum + Math.max(0, principal - totalDeducted);
     }
     return sum;
   }, 0);
 
-  const investmentAvailable = Math.max(
-    investmentEarnings,
-    Number(dashboardData?.balances?.savingsBalance || userData?.savingsBalance || 0)
-  );
+  const serverAvailable = Number(dashboardData?.balances?.availableToWithdraw ?? userData?.availableToWithdraw ?? userData?.savingBalance ?? 0);
+  const investmentAvailable = serverAvailable > 0 ? serverAvailable : investmentEarnings;
   const activeInvestmentsCount = validInvestmentsOnly.filter(inv => inv.status !== 'withdrawn' && inv.status !== 'rejected').length;
 
   // 2. Chit Fund
@@ -513,7 +514,10 @@ const WithdrawScreen = ({ navigation }) => {
       if (activeCategory === 'chit') {
         const eligibleChit = activeChitItems.find(c => (c.isUnlocked || c.hasWon) && !c.isWithdrawn && !c.isRequested) || activeChitItems[0];
         if (eligibleChit) {
-          await chitFundService.withdrawChitPayout(eligibleChit._id);
+          await chitFundService.withdrawChitPayout(eligibleChit._id, {
+            amount: numAmt,
+            upiId: upiId.trim(),
+          });
         } else {
           await withdrawalService.createWithdrawal({
             amount: numAmt,
@@ -530,9 +534,25 @@ const WithdrawScreen = ({ navigation }) => {
           'Got It'
         );
       } else if (activeCategory === 'sip') {
-        const eligibleSIP = activeSIPItems.find(s => s.availableToWithdraw > 0) || activeSIPItems[0];
-        if (eligibleSIP) {
-          await sipService.withdrawSIP(eligibleSIP._id, numAmt, upiId.trim());
+        // Find single SIP that can cover the full requested amount first
+        const sortedSIPs = [...activeSIPItems]
+          .filter(s => (s.availableToWithdraw || 0) > 0)
+          .sort((a, b) => (b.availableToWithdraw || 0) - (a.availableToWithdraw || 0));
+
+        const singleFitSIP = sortedSIPs.find(s => s.availableToWithdraw >= numAmt);
+        if (singleFitSIP) {
+          await sipService.withdrawSIP(singleFitSIP._id, numAmt, upiId.trim());
+        } else if (sortedSIPs.length > 0) {
+          // If no single SIP covers total, deduct across available SIPs
+          let remainingToWithdraw = numAmt;
+          for (const s of sortedSIPs) {
+            if (remainingToWithdraw <= 0) break;
+            const deduct = Math.min(remainingToWithdraw, s.availableToWithdraw);
+            if (deduct > 0) {
+              await sipService.withdrawSIP(s._id, deduct, upiId.trim());
+              remainingToWithdraw -= deduct;
+            }
+          }
         } else {
           await withdrawalService.createWithdrawal({
             amount: numAmt,
@@ -568,12 +588,13 @@ const WithdrawScreen = ({ navigation }) => {
           'Got It'
         );
       } else {
+        const effectiveWithdrawType = (withdrawType && withdrawType !== 'investment' && withdrawType !== 'all') ? withdrawType : 'saving';
         await withdrawalService.createWithdrawal({
           amount: numAmt,
           upiId: upiId.trim(),
           userName: userData?.name || userData?.username || 'User',
           userEmail: userData?.email || userData?.mobileNumber || '',
-          withdrawType: 'saving',
+          withdrawType: effectiveWithdrawType,
         });
         showAlert(
           'payout',
@@ -1091,7 +1112,7 @@ const WithdrawScreen = ({ navigation }) => {
                   style={styles.submitBtnGradient}
                 >
                   {!withdrawing && <MaterialCommunityIcons name="check-circle" size={18} color="#FFFFFF" />}
-                  <Text style={styles.submitBtnText}>{withdrawing ? 'Processing...' : `Submit ${currentCategoryConfig.name} Request`}</Text>
+                  <Text style={styles.submitBtnText}>{withdrawing ? 'Processing...' : 'Confirm Withdrawal'}</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -1580,21 +1601,21 @@ const getStyles = (themeColors, isDarkMode) => StyleSheet.create({
     borderWidth: 1.5, borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#ECEFE6', gap: 8,
   },
   upiInput: { flex: 1, fontSize: 14, color: themeColors.text, padding: 0 },
-  modalActions: { flexDirection: 'row', gap: 12, marginTop: 20 },
+  modalActions: { flexDirection: 'row', gap: 12, marginTop: 22 },
   cancelBtn: {
-    flex: 1, height: 48, borderRadius: 14,
+    flex: 1, height: 50, borderRadius: 14,
     borderWidth: 1.5, borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#ECEFE6',
     justifyContent: 'center', alignItems: 'center',
   },
   cancelBtnText: { fontSize: 15, fontWeight: '600', color: themeColors.textSecondary },
-  submitBtnOuter: { flex: 1.5 },
+  submitBtnOuter: { flex: 2 },
   submitBtnGradient: {
-    height: 48, borderRadius: 14,
+    height: 50, borderRadius: 14,
     justifyContent: 'center', alignItems: 'center',
-    flexDirection: 'row', gap: 6,
+    flexDirection: 'row', gap: 8, paddingHorizontal: 16,
   },
   submitBtnDisabled: { opacity: 0.6 },
-  submitBtnText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
+  submitBtnText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF', textAlign: 'center' },
 });
 
 export default WithdrawScreen;

@@ -296,14 +296,17 @@ exports.verifyPayment = async (req, res) => {
       const statusRes = await cashfreeService.checkOrderStatus(effectiveOrderId);
       console.log('[PaymentController] Cashfree status check result:', statusRes);
 
-      const status = (statusRes?.orderStatus || '').toUpperCase();
+      const status = (statusRes?.orderStatus || statusRes?.status || '').toUpperCase();
+      const isPaid = statusRes?.isPaid || status === 'PAID' || status === 'SUCCESS';
+      const isPending = statusRes?.isPending || status === 'ACTIVE' || status === 'PENDING';
 
-      if (status === 'PAID') {
+      if (isPaid) {
         verifiedUtr =
           statusRes.paymentDetails?.bankReference ||
           statusRes.paymentDetails?.cfPaymentId ||
+          statusRes.utr ||
           verifiedUtr;
-      } else if (status === 'ACTIVE') {
+      } else if (isPending) {
         return res.status(200).json({
           success: false,
           isPending: true,
@@ -389,17 +392,20 @@ exports.handleCallback = async (req, res) => {
     if (order_id) {
       try {
         const statusRes = await cashfreeService.checkOrderStatus(order_id);
-        const orderStatus = (statusRes?.orderStatus || '').toUpperCase();
+        const status = (statusRes?.orderStatus || statusRes?.status || '').toUpperCase();
+        const isPaid = statusRes?.isPaid || status === 'PAID' || status === 'SUCCESS';
+        const isPending = statusRes?.isPending || status === 'ACTIVE' || status === 'PENDING';
 
-        if (orderStatus === 'PAID') {
+        if (isPaid) {
           finalStatus = 'success';
           const utr =
             statusRes.paymentDetails?.bankReference ||
             statusRes.paymentDetails?.cfPaymentId ||
+            statusRes.utr ||
             `UTR_CF_${Date.now()}`;
           await processSuccessfulOrder(order_id, utr);
           console.log(`[PaymentCallback] Order ${order_id} verified & processed into DB via Cashfree callback!`);
-        } else if (orderStatus === 'ACTIVE') {
+        } else if (isPending) {
           finalStatus = 'pending';
         } else {
           finalStatus = 'failed';
@@ -577,7 +583,7 @@ exports.handleWebhook = async (req, res) => {
     const rawBody = req.rawBody;
 
     // Verify signature with Cashfree secret
-    const isSigValid = cashfreeService.verifyWebhookSignature(signature, rawBody, timestamp);
+    const isSigValid = cashfreeService.verifyWebhookSignature(signature, timestamp, rawBody);
     if (!isSigValid) {
       console.warn('[PaymentWebhook] Invalid Cashfree webhook signature');
       return res.status(400).json({ status: false, message: 'Invalid webhook signature' });
@@ -614,10 +620,12 @@ exports.handleWebhook = async (req, res) => {
 
     // Secondary fallback: verify live status with Cashfree
     const statusRes = await cashfreeService.checkOrderStatus(orderId);
-    if (statusRes.orderStatus === 'PAID') {
+    const isLivePaid = statusRes?.isPaid || statusRes?.status === 'SUCCESS' || (statusRes?.orderStatus || '').toUpperCase() === 'PAID';
+    if (isLivePaid) {
       const utr =
         statusRes.paymentDetails?.bankReference ||
         statusRes.paymentDetails?.cfPaymentId ||
+        statusRes.utr ||
         `UTR_WH_${Date.now()}`;
       await processSuccessfulOrder(orderId, utr);
       return res.status(200).json({ status: true, message: 'Verified and processed successfully', orderId, utr });

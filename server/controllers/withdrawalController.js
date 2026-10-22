@@ -374,18 +374,21 @@ exports.updateWithdrawalStatus = async (req, res) => {
           const targetInv = await Investment.findById(targetInvId);
           if (targetInv) {
             const fullAmt = targetInv.expectedPayout || targetInv.maturityAmount || targetInv.amount || 0;
-            if (updatedWithdrawal.amount >= fullAmt - 1) {
+            const newWithdrawnAmount = (Number(targetInv.withdrawnAmount) || 0) + Number(updatedWithdrawal.amount);
+            if (fullAmt > 0 && newWithdrawnAmount >= fullAmt - 1) {
               await Investment.findByIdAndUpdate(targetInvId, {
                 status: 'withdrawn',
                 withdrawalStatus: 'withdrawn',
                 eligibilityStatus: 'withdrawn',
+                withdrawnAmount: newWithdrawnAmount,
               });
               console.log(`[withdrawalController] Investment ${targetInvId} marked as fully withdrawn.`);
             } else {
-              // Partial withdrawal - unlock / keep approved so remaining amount is available
+              // Partial withdrawal - keep remaining balance available
               await Investment.findByIdAndUpdate(targetInvId, {
                 withdrawalStatus: 'available',
                 withdrawalRequestId: null,
+                withdrawnAmount: newWithdrawnAmount,
               });
               console.log(`[withdrawalController] Investment ${targetInvId} partial withdrawal processed; remaining balance stays available.`);
             }
@@ -393,13 +396,19 @@ exports.updateWithdrawalStatus = async (req, res) => {
             const ChitMember = require('../models/ChitMember');
             const member = await ChitMember.findById(targetInvId);
             if (member) {
-              member.withdrawalStatus = 'completed';
+              const currentTotalWithdrawn = (Number(member.withdrawnAmount) || 0) + Number(updatedWithdrawal.amount);
+              const maxTarget = Number(member.finalWithdrawalAmount) || Number(member.priceAmount) || 0;
+              if (maxTarget > 0 && currentTotalWithdrawn >= maxTarget - 1) {
+                member.withdrawalStatus = 'completed';
+              } else {
+                member.withdrawalStatus = 'partially_withdrawn';
+              }
+              member.withdrawnAmount = currentTotalWithdrawn;
               member.hasWon = true;
-              member.winningDate = new Date();
-              member.winningAmount = updatedWithdrawal.amount;
+              member.winningDate = member.winningDate || new Date();
               member.withdrawnAt = new Date();
               await member.save();
-              console.log(`[withdrawalController] ChitMember ${targetInvId} marked as completed / paid.`);
+              console.log(`[withdrawalController] ChitMember ${targetInvId} updated. Withdrawn: ₹${currentTotalWithdrawn}`);
             }
           }
         } catch (invErr) {

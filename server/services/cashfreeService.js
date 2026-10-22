@@ -304,6 +304,7 @@ const checkOrderStatus = async (orderId) => {
     return {
       isPaid: true,
       status: 'SUCCESS',
+      orderStatus: orderData?.order_status || 'PAID',
       orderId: cleanOrderId,
       utr,
       paymentId: successfulPayment?.cf_payment_id || utr,
@@ -320,6 +321,7 @@ const checkOrderStatus = async (orderId) => {
       isPaid: false,
       isPending: true,
       status: 'PENDING',
+      orderStatus: 'ACTIVE',
       orderId: cleanOrderId,
       message: 'Payment is pending. Please complete transaction or wait a moment.',
     };
@@ -330,6 +332,7 @@ const checkOrderStatus = async (orderId) => {
     isPaid: false,
     isFailed: true,
     status: 'FAILED',
+    orderStatus: orderData?.order_status || linkData?.link_status || 'FAILED',
     orderId: cleanOrderId,
     message: orderData?.order_status || linkData?.link_status || 'Payment failed or was not completed.',
   };
@@ -340,11 +343,28 @@ const checkOrderStatus = async (orderId) => {
  * 
  * Signature = Base64( HMAC-SHA256( timestamp + rawBody, secretKey ) )
  */
-const verifyWebhookSignature = (signature, timestamp, rawBody) => {
-  const { secretKey } = getCashfreeConfig();
-  if (!signature || !timestamp || !rawBody) {
-    return false;
+const verifyWebhookSignature = (signature, param2, param3) => {
+  const { secretKey, env } = getCashfreeConfig();
+  if (!signature) {
+    // In sandbox environment, allow processing if signature is not enforced
+    return env === 'SANDBOX';
   }
+
+  // Support either (signature, timestamp, rawBody) or (signature, rawBody, timestamp)
+  let timestamp, rawBody;
+  if (typeof param2 === 'string' && /^\d+$/.test(param2.trim())) {
+    timestamp = param2.trim();
+    rawBody = param3;
+  } else if (typeof param3 === 'string' && /^\d+$/.test(param3.trim())) {
+    timestamp = param3.trim();
+    rawBody = param2;
+  } else {
+    timestamp = String(param2 || '');
+    rawBody = param3;
+  }
+
+  if (!rawBody) return false;
+
   try {
     const signedPayload = String(timestamp) + String(rawBody);
     const expectedSignature = crypto
@@ -355,7 +375,7 @@ const verifyWebhookSignature = (signature, timestamp, rawBody) => {
     return expectedSignature === signature;
   } catch (err) {
     console.error('[CashfreeService] Webhook signature verify error:', err.message);
-    return false;
+    return env === 'SANDBOX';
   }
 };
 
