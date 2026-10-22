@@ -3,36 +3,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { paymentService } from './paymentService';
 import { customAlert } from '../context/AlertContext';
 
-// ============================================================================
-// === PREVIOUS RAZORPAY NATIVE CHECKOUT (COMMENTED OUT AS REQUESTED) =========
-// ============================================================================
-/*
-const getRazorpayCheckout = () => {
-  try {
-    const isNativeModuleAvailable = !!(
-      NativeModules.RNRazorpayCheckout ||
-      (typeof global !== 'undefined' && global.__turboModuleProxy?.('RNRazorpayCheckout'))
-    );
-
-    if (!isNativeModuleAvailable) {
-      return null;
-    }
-
-    const RazorpayCheckout = require('react-native-razorpay');
-    return RazorpayCheckout.default || RazorpayCheckout;
-  } catch (err) {
-    console.warn('[Razorpay] Native module resolution failed:', err?.message);
-    return null;
-  }
-};
-*/
-
 /**
- * Reusable Custom UPI Payment Handler (replaces Razorpay)
+ * Reusable Cashfree Payment Handler
  * 
- * 1. Calls backend createOrder() (which generates order with Custom UPI / PayMe gateway)
- * 2. Launches the official payment URL in the browser / UPI app chooser via Linking.openURL
- * 3. Prompts user to confirm payment once completed
+ * 1. Calls backend createOrder() (which generates order with Cashfree Payment Gateway)
+ * 2. Launches the official Cashfree hosted checkout URL via Linking.openURL
+ * 3. Supports auto-verification on browser redirect & deep link return
  * 4. Calls backend verifyPayment() to check gateway status, auto-approve, update balances & notify
  */
 export const executeRazorpayPayment = async ({
@@ -148,7 +124,7 @@ export const executeRazorpayPayment = async ({
 
       customAlert.confirm({
         type: 'payout',
-        title: 'UPI Gateway (Test Mode)',
+        title: 'Cashfree Gateway (Test Mode)',
         message: `Gateway is running in simulation mode.\n\nSimulate successful payment of ₹${Number(amount).toLocaleString('en-IN')} for Order ${orderId}?`,
         cancelText: 'Cancel Payment',
         confirmText: 'Simulate Pay',
