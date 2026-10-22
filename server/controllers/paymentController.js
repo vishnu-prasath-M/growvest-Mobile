@@ -1,4 +1,3 @@
-const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const Investment = require('../models/Investment');
 const ChitMember = require('../models/ChitMember');
@@ -11,25 +10,12 @@ const { sendNotification } = require('../services/notificationHelper');
 const PocketMoney = require('../models/PocketMoney');
 const PocketMoneyPayout = require('../models/PocketMoneyPayout');
 const { calculateInvestmentTier } = require('../services/investmentTierService');
+const cashfreeService = require('../services/cashfreeService');
 
 // ============================================================================
-// === PREVIOUS RAZORPAY GATEWAY (COMMENTED OUT AS REQUESTED) =================
+// === PREVIOUS STARPE PAYMENT GATEWAY (COMMENTED OUT AS REQUESTED) ===========
 // ============================================================================
 /*
-const getRazorpayInstance = () => {
-  const key_id = process.env.RAZORPAY_KEY_ID || 'rzp_test_xxxxxxxxx';
-  const key_secret = process.env.RAZORPAY_KEY_SECRET || 'xxxxxxxxxxxx';
-  return new Razorpay({ key_id, key_secret });
-};
-*/
-
-// ============================================================================
-// === NEW CUSTOM UPI / PAYME PAYMENT GATEWAY INTEGRATION =====================
-// ============================================================================
-
-/**
- * Helper to fetch gateway configuration from environment variables
- */
 const getGatewayConfig = () => {
   const baseUrl = (process.env.STARPE_BASE_URL || process.env.PG_URL || process.env.PAYME_BASE_URL || process.env.PG_BASE_URL || 'https://starpe.online').trim().replace(/\/+$/, '');
   const apiKey = (process.env.STARPE_API_KEY || process.env.PG_API_KEY || process.env.PAYME_API_KEY || '6056931258240a48113ca977a656211c').trim();
@@ -43,9 +29,6 @@ const getGatewayConfig = () => {
   return { baseUrl, apiKey, webhookSecret, isConfigured };
 };
 
-/**
- * Helper to call Gateway POST /api/create-order (supports .php endpoint fallback)
- */
 const callGatewayCreateOrder = async ({ amount, orderId, mobile, customerName, redirectUrl, remark1, remark2 }) => {
   const { baseUrl, apiKey, isConfigured } = getGatewayConfig();
   if (!isConfigured) {
@@ -97,9 +80,6 @@ const callGatewayCreateOrder = async ({ amount, orderId, mobile, customerName, r
   throw lastErr || new Error('Failed to create order with gateway');
 };
 
-/**
- * Helper to call Gateway POST /api/check-order-status (supports .php endpoint fallback)
- */
 const callGatewayCheckStatus = async (orderId) => {
   const { baseUrl, apiKey, isConfigured } = getGatewayConfig();
   if (!isConfigured) {
@@ -147,6 +127,7 @@ const callGatewayCheckStatus = async (orderId) => {
 
   throw lastErr || new Error('Failed to check order status with gateway');
 };
+*/
 
 // ─── 1. Create Payment Order ─────────────────────────────────────────────────
 exports.createOrder = async (req, res) => {
@@ -165,49 +146,26 @@ exports.createOrder = async (req, res) => {
       }
     }
 
-    /*
-    // === PREVIOUS RAZORPAY CREATE ORDER (COMMENTED OUT) ===
-    const instance = getRazorpayInstance();
-    const options = {
-      amount: Math.round(amount * 100), // amount in paise
-      currency: 'INR',
-      receipt: `rcpt_${Date.now()}`,
-      notes: {
-        userId: req.user._id.toString(),
-        purpose: purpose || 'investment',
-        ...notes,
-      },
-    };
-    const order = await instance.orders.create(options);
-    return res.status(200).json({
-      success: true,
-      orderId: order.id,
-      amount: order.amount,
-      currency: order.currency,
-      keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_xxxxxxxxx',
-    });
-    */
-
-    // === NEW UPI / PAYME ORDER CREATION ===
+    // === CASHFREE ORDER CREATION ===
     const user = req.user;
-    const orderId = `ORD${Date.now()}${Math.floor(1000 + Math.random() * 9000)}`;
-    const redirectUrl = `${process.env.APP_URL || 'https://growvest-mobile.onrender.com'}/api/payment/callback`;
+    const orderId = `ORD_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+    const returnUrl = `${process.env.APP_URL || 'https://growvest-mobile.onrender.com'}/api/payment/callback?order_id=${orderId}`;
     const customerMobile = user?.mobileNumber || req.body?.mobileNumber || '9999999999';
+    const customerName = (user?.name && user.name.trim()) || user?.username || req.body?.customerName || 'Growvest User';
+    const customerEmail = user?.email || `${customerMobile}@growvest.com`;
 
     try {
-      const customerName = (user?.name && user.name.trim()) || user?.username || req.body?.customerName || 'Growvest User';
-      const gwRes = await callGatewayCreateOrder({
-        amount: Math.round(amount),
+      const cfRes = await cashfreeService.createOrder({
         orderId,
-        mobile: customerMobile,
+        amount: Math.round(amount),
+        customerPhone: customerMobile,
         customerName,
-        redirectUrl,
-        remark1: purpose || 'Growvest',
-        remark2: user?._id?.toString() || '',
+        customerEmail,
+        returnUrl,
       });
 
-      if (gwRes && (gwRes.status === true || gwRes.result?.payment_url)) {
-        const finalOrderId = gwRes.result?.orderId || gwRes.result?.order_id || gwRes.order_id || gwRes.orderId || orderId;
+      if (cfRes && cfRes.success && (cfRes.paymentUrl || cfRes.paymentSessionId)) {
+        const finalOrderId = cfRes.orderId || orderId;
 
         // ─── Save PendingPayment so webhook/callback can auto-complete business logic ───
         try {
@@ -237,7 +195,7 @@ exports.createOrder = async (req, res) => {
               { upsert: true, new: true }
             );
           }
-          console.log(`[PaymentController] PendingPayment saved for order: ${finalOrderId}`);
+          console.log(`[PaymentController] PendingPayment saved for Cashfree order: ${finalOrderId}`);
         } catch (ppErr) {
           console.warn('[PaymentController] PendingPayment save warning:', ppErr.message);
         }
@@ -245,37 +203,37 @@ exports.createOrder = async (req, res) => {
         return res.status(200).json({
           success: true,
           orderId: finalOrderId,
-          paymentUrl: gwRes.result?.payment_url,
+          paymentSessionId: cfRes.paymentSessionId,
+          paymentUrl: cfRes.paymentUrl,
           amount: Math.round(amount),
           currency: 'INR',
-          gateway: 'custom_upi',
+          gateway: 'cashfree',
           isSimulated: false,
         });
       }
 
-      console.warn('[PaymentController] Gateway returned non-success response:', gwRes);
-      // If credentials not configured or live gateway not ready, provide simulated order fallback
+      console.warn('[PaymentController] Cashfree returned non-success response:', cfRes);
       return res.status(200).json({
         success: true,
         orderId,
         paymentUrl: `simulated_pay_${orderId}`,
         amount: Math.round(amount),
         currency: 'INR',
-        gateway: 'custom_upi',
+        gateway: 'cashfree',
         isSimulated: true,
-        message: gwRes?.message || 'Gateway running in test simulation mode',
+        message: cfRes?.message || 'Cashfree running in test simulation mode',
       });
-    } catch (gwErr) {
-      console.warn('[PaymentController] Gateway API call error, using test order fallback:', gwErr.message);
+    } catch (cfErr) {
+      console.warn('[PaymentController] Cashfree API call error, using test fallback:', cfErr.message);
       return res.status(200).json({
         success: true,
         orderId,
         paymentUrl: `simulated_pay_${orderId}`,
         amount: Math.round(amount),
         currency: 'INR',
-        gateway: 'custom_upi',
+        gateway: 'cashfree',
         isSimulated: true,
-        message: 'Gateway offline or unreachable. Test simulation fallback enabled.',
+        message: 'Cashfree offline or unreachable. Test simulation fallback enabled.',
       });
     }
   } catch (error) {
@@ -314,20 +272,6 @@ exports.verifyPayment = async (req, res) => {
       userId: req.user?._id,
     });
 
-    /*
-    // === PREVIOUS RAZORPAY SIGNATURE VERIFICATION (COMMENTED OUT) ===
-    const key_secret = process.env.RAZORPAY_KEY_SECRET || 'xxxxxxxxxxxx';
-    const body = razorpay_order_id + '|' + razorpay_payment_id;
-    const expectedSignature = crypto
-      .createHmac('sha256', key_secret)
-      .update(body.toString())
-      .digest('hex');
-    const isValid = expectedSignature === razorpay_signature || razorpay_signature.startsWith('simulated_signature_');
-    if (!isValid) {
-      return res.status(400).json({ success: false, message: 'Invalid payment signature. Verification failed.' });
-    }
-    */
-
     // Check if order was already completed by Webhook or Callback
     const existingPending = await PendingPayment.findOne({ orderId: effectiveOrderId });
     if (existingPending && existingPending.status === 'completed') {
@@ -340,7 +284,7 @@ exports.verifyPayment = async (req, res) => {
       });
     }
 
-    // === NEW UPI / PAYME VERIFICATION ===
+    // === CASHFREE VERIFICATION ===
     let verifiedUtr = utr || razorpay_payment_id || `UTR_${Date.now()}`;
     const isSimulated =
       clientIsSimulated ||
@@ -349,36 +293,34 @@ exports.verifyPayment = async (req, res) => {
       (razorpay_signature && razorpay_signature.startsWith('simulated_'));
 
     if (!isSimulated) {
-      const statusRes = await callGatewayCheckStatus(effectiveOrderId);
-      console.log('[PaymentController] Gateway status check result:', statusRes);
+      const statusRes = await cashfreeService.checkOrderStatus(effectiveOrderId);
+      console.log('[PaymentController] Cashfree status check result:', statusRes);
 
-      const status = (
-        statusRes?.status ||
-        statusRes?.result?.status ||
-        statusRes?.result?.txnStatus ||
-        ''
-      ).toUpperCase();
+      const status = (statusRes?.orderStatus || '').toUpperCase();
 
-      if (status === 'COMPLETED' || status === 'SUCCESS') {
-        verifiedUtr = statusRes?.result?.utr || verifiedUtr;
-      } else if (status === 'PENDING') {
+      if (status === 'PAID') {
+        verifiedUtr =
+          statusRes.paymentDetails?.bankReference ||
+          statusRes.paymentDetails?.cfPaymentId ||
+          verifiedUtr;
+      } else if (status === 'ACTIVE') {
         return res.status(200).json({
           success: false,
           isPending: true,
-          message: 'Payment is still pending. If you just completed the payment, please wait a few seconds and tap verify again.',
+          message: 'Payment is still processing with Cashfree. If you just completed the payment, please wait a few seconds and tap verify again.',
         });
-      } else if (status === 'FAILED') {
+      } else if (status === 'EXPIRED' || status === 'TERMINATED') {
         return res.status(400).json({
           success: false,
           isFailed: true,
-          message: statusRes?.message || 'Payment failed or expired.',
+          message: `Payment ${status.toLowerCase()}. Please initiate a new payment.`,
         });
       } else if (statusRes?.isSimulated) {
-        verifiedUtr = statusRes?.result?.utr || `SIM_UTR_${Date.now()}`;
+        verifiedUtr = `SIM_UTR_${Date.now()}`;
       } else {
         return res.status(400).json({
           success: false,
-          message: statusRes?.message || 'Order verification returned unexpected status.',
+          message: statusRes?.message || `Cashfree returned order status: ${status}`,
         });
       }
     }
@@ -421,7 +363,7 @@ exports.checkOrderStatus = async (req, res) => {
       return res.status(400).json({ success: false, message: 'order_id is required' });
     }
 
-    const statusData = await callGatewayCheckStatus(order_id);
+    const statusData = await cashfreeService.checkOrderStatus(order_id);
     return res.status(200).json({
       success: true,
       data: statusData,
@@ -433,39 +375,41 @@ exports.checkOrderStatus = async (req, res) => {
 };
 
 // ─── 4. Payment Gateway Callback (redirect after payment in browser) ──────────
-// The gateway redirects the user's browser here after payment is completed.
-// We verify gateway status, auto-process the order in MongoDB immediately,
+// Cashfree redirects the user's browser here after payment is completed.
+// We verify Cashfree status, auto-process the order in MongoDB immediately,
 // and deep-link back to the Growvest mobile app.
 exports.handleCallback = async (req, res) => {
   try {
     const order_id = req.query?.order_id || req.query?.orderId || req.query?.order_ID ||
                      req.body?.order_id  || req.body?.orderId  || '';
-    const status   = (req.query?.status || req.body?.status || 'unknown').toLowerCase();
+    let finalStatus = 'pending';
 
-    console.log(`[PaymentCallback] Received callback — order_id: ${order_id}, status: ${status}`);
+    console.log(`[PaymentCallback] Received Cashfree callback — order_id: ${order_id}`);
 
     if (order_id) {
       try {
-        const statusRes = await callGatewayCheckStatus(order_id);
-        const gwStatus = (
-          statusRes?.status ||
-          statusRes?.result?.status ||
-          statusRes?.result?.txnStatus ||
-          status ||
-          ''
-        ).toUpperCase();
+        const statusRes = await cashfreeService.checkOrderStatus(order_id);
+        const orderStatus = (statusRes?.orderStatus || '').toUpperCase();
 
-        if (gwStatus === 'COMPLETED' || gwStatus === 'SUCCESS') {
-          const utr = statusRes?.result?.utr || `UTR_CB_${Date.now()}`;
+        if (orderStatus === 'PAID') {
+          finalStatus = 'success';
+          const utr =
+            statusRes.paymentDetails?.bankReference ||
+            statusRes.paymentDetails?.cfPaymentId ||
+            `UTR_CF_${Date.now()}`;
           await processSuccessfulOrder(order_id, utr);
-          console.log(`[PaymentCallback] Order ${order_id} verified & processed into DB via callback!`);
+          console.log(`[PaymentCallback] Order ${order_id} verified & processed into DB via Cashfree callback!`);
+        } else if (orderStatus === 'ACTIVE') {
+          finalStatus = 'pending';
+        } else {
+          finalStatus = 'failed';
         }
       } catch (cbErr) {
         console.warn('[PaymentCallback] Background verify warning:', cbErr.message);
       }
     }
 
-    const deepLink = `growvest://payment-callback?order_id=${encodeURIComponent(order_id)}&status=${encodeURIComponent(status)}`;
+    const deepLink = `growvest://payment-callback?order_id=${encodeURIComponent(order_id)}&status=${encodeURIComponent(finalStatus)}`;
 
     res.setHeader('Content-Type', 'text/html');
     return res.status(200).send(`<!DOCTYPE html>
@@ -516,44 +460,66 @@ exports.handleCallback = async (req, res) => {
 };
 
 // ─── 5. Gateway Webhook Endpoint ─────────────────────────────────────────────
-// This is called by Starpe gateway automatically when a payment succeeds.
-// It looks up the PendingPayment record (saved at order creation) and
-// runs the full business logic automatically.
+// Called by Cashfree asynchronously when payment succeeds or changes status.
+// Verifies HMAC-SHA256 signature using req.rawBody and timestamp.
 exports.handleWebhook = async (req, res) => {
   try {
-    const payload = req.body || {};
-    console.log('[PaymentWebhook] Received:', JSON.stringify(payload));
+    const signature = req.headers['x-webhook-signature'];
+    const timestamp = req.headers['x-webhook-timestamp'];
+    const rawBody = req.rawBody;
 
-    const data    = payload.data || {};
-    const orderId = payload.order_id || payload.orderId || payload.order_ID ||
-                    data.order_id   || data.orderId   || req.query?.order_id;
+    // Verify signature with Cashfree secret
+    const isSigValid = cashfreeService.verifyWebhookSignature(signature, rawBody, timestamp);
+    if (!isSigValid) {
+      console.warn('[PaymentWebhook] Invalid Cashfree webhook signature');
+      return res.status(400).json({ status: false, message: 'Invalid webhook signature' });
+    }
+
+    const payload = req.body || {};
+    console.log('[PaymentWebhook] Received Cashfree webhook:', JSON.stringify(payload));
+
+    const data = payload.data || {};
+    const orderData = data.order || {};
+    const paymentData = data.payment || {};
+
+    const orderId =
+      orderData.order_id ||
+      data.order_id ||
+      payload.order_id ||
+      payload.orderId ||
+      req.query?.order_id;
 
     if (!orderId) {
       return res.status(200).json({ status: false, message: 'order_id missing in webhook payload' });
     }
 
-    // Confirm payment status with gateway
-    const statusRes = await callGatewayCheckStatus(orderId);
-    const status = (
-      statusRes?.status ||
-      statusRes?.result?.status ||
-      statusRes?.result?.txnStatus ||
-      payload.status ||
-      payload.txnStatus ||
-      data.status ||
-      ''
-    ).toUpperCase();
+    const orderStatus = (orderData.order_status || payload.order_status || '').toUpperCase();
+    const paymentStatus = (paymentData.payment_status || '').toUpperCase();
+    const eventType = (payload.type || '').toUpperCase();
 
-    console.log(`[PaymentWebhook] Order ${orderId} — status from gateway: ${status}`);
-
-    if (status !== 'COMPLETED' && status !== 'SUCCESS') {
-      return res.status(200).json({ status: true, message: `Webhook received with status: ${status}`, orderId });
+    if (orderStatus === 'PAID' || paymentStatus === 'SUCCESS' || eventType === 'PAYMENT_SUCCESS_WEBHOOK') {
+      const utr = paymentData.bank_reference || paymentData.cf_payment_id || `UTR_WH_${Date.now()}`;
+      await processSuccessfulOrder(orderId, utr);
+      console.log(`[PaymentWebhook] Cashfree order ${orderId} completed successfully!`);
+      return res.status(200).json({ status: true, message: 'Webhook processed successfully', orderId, utr });
     }
 
-    const utr = statusRes?.result?.utr || payload.utr || data.utr || `UTR_WH_${Date.now()}`;
-    await processSuccessfulOrder(orderId, utr);
+    // Secondary fallback: verify live status with Cashfree
+    const statusRes = await cashfreeService.checkOrderStatus(orderId);
+    if (statusRes.orderStatus === 'PAID') {
+      const utr =
+        statusRes.paymentDetails?.bankReference ||
+        statusRes.paymentDetails?.cfPaymentId ||
+        `UTR_WH_${Date.now()}`;
+      await processSuccessfulOrder(orderId, utr);
+      return res.status(200).json({ status: true, message: 'Verified and processed successfully', orderId, utr });
+    }
 
-    return res.status(200).json({ status: true, message: 'Webhook processed successfully and payment completed', orderId, utr });
+    return res.status(200).json({
+      status: true,
+      message: `Webhook received with order_status: ${orderStatus || statusRes.orderStatus}`,
+      orderId,
+    });
   } catch (error) {
     console.error('[PaymentWebhook] Webhook error:', error);
     res.status(500).json({ status: false, message: 'Webhook error', error: error.message });
@@ -578,7 +544,7 @@ async function processSuccessfulOrder(orderId, utr, fallbackUser = null, fallbac
   const paymentType = pending?.paymentType || fallbackPaymentType || 'investment';
   const payloadData = pending?.payloadData || fallbackPayloadData || {};
   const paymentId = utr || `UTR_${Date.now()}`;
-  const signature = `VERIFIED_UPI_${orderId}`;
+  const signature = `VERIFIED_CASHFREE_${orderId}`;
 
   console.log(`[PaymentProcess] Completing: order=${orderId}, type=${paymentType}, user=${user._id}`);
 
@@ -590,16 +556,16 @@ async function processSuccessfulOrder(orderId, utr, fallbackUser = null, fallbac
 
   let result = null;
   if (paymentType === 'investment') {
-    result = await completeInvestment(user, payloadData, orderId, paymentId, signature, 'PayMe_UPI');
+    result = await completeInvestment(user, payloadData, orderId, paymentId, signature, 'Cashfree');
     await triggerReferralRewardOnInvestment(user._id, result?._id).catch(() => {});
   } else if (paymentType === 'chit_join') {
-    result = await completeChitJoin(user, payloadData, orderId, paymentId, signature, 'PayMe_UPI');
+    result = await completeChitJoin(user, payloadData, orderId, paymentId, signature, 'Cashfree');
     await triggerReferralRewardOnInvestment(user._id, result?.member?._id || result?._id).catch(() => {});
   } else if (paymentType === 'chit_payment') {
-    result = await completeMonthlyDue(user, payloadData, orderId, paymentId, signature, 'PayMe_UPI');
+    result = await completeMonthlyDue(user, payloadData, orderId, paymentId, signature, 'Cashfree');
     await triggerReferralRewardOnInvestment(user._id, result?._id).catch(() => {});
   } else if (paymentType === 'pocket_money') {
-    result = await completePocketMoney(user, payloadData, orderId, paymentId, signature, 'PayMe_UPI');
+    result = await completePocketMoney(user, payloadData, orderId, paymentId, signature, 'Cashfree');
     await triggerReferralRewardOnInvestment(user._id, result?._id).catch(() => {});
   } else if (paymentType === 'sip_initial' || paymentType === 'sip_installment') {
     const sipController = require('./sipController');
