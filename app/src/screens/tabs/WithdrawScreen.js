@@ -231,8 +231,9 @@ const WithdrawScreen = ({ navigation }) => {
       const sipItems = sipPlans.map(s => {
         const totalPaid = Number(s.totalPaidAmount) || 0;
         const withdrawn = Number(s.withdrawnAmount) || 0;
-        const interest = s.status === 'completed' ? (Number(s.expectedInterest) || 0) : 0;
-        const available = Math.max(0, totalPaid + interest - withdrawn);
+        const available = s.availableToWithdraw !== undefined
+          ? Math.max(0, Number(s.availableToWithdraw))
+          : Math.max(0, totalPaid + (s.status === 'completed' && s.contributionsCompleted >= s.totalContributions ? (Number(s.expectedInterest) || 0) : 0) - withdrawn);
         return {
           _id: s._id,
           sipId: s.sipId,
@@ -243,12 +244,13 @@ const WithdrawScreen = ({ navigation }) => {
           totalPaidAmount: totalPaid,
           withdrawnAmount: withdrawn,
           availableToWithdraw: available,
+          interestEarned: s.interestEarned || 0,
           status: s.status,
           contributionsCompleted: s.contributionsCompleted,
           totalContributions: s.totalContributions,
           frequency: s.frequency,
           startDate: s.createdAt,
-          interestRate: s.interestRate || 14,
+          interestRate: s.interestRate || 26,
         };
       });
 

@@ -544,6 +544,45 @@ exports.cancelPendingSIP = async (req, res) => {
   }
 };
 
+// Helper to calculate real-time accrued interest at 26% p.a. based on contribution paid dates
+const calculateSIPInterest = (sip, contributions = []) => {
+  const now = Date.now();
+  const annualRate = (Number(sip.interestRate) || 26) / 100;
+  const dailyRate = annualRate / 365;
+
+  let accruedInterest = 0;
+  const paidContributions = contributions.filter(c => c.paymentStatus === 'paid');
+
+  for (const c of paidContributions) {
+    const paidDate = c.paidAt ? new Date(c.paidAt) : new Date(c.createdAt || sip.createdAt);
+    const daysElapsed = Math.max(0, Math.floor((now - paidDate.getTime()) / (1000 * 60 * 60 * 24)));
+    const itemInterest = (Number(c.amount) || 0) * dailyRate * daysElapsed;
+    accruedInterest += itemInterest;
+  }
+
+  const isFullMaturity = sip.status === 'completed' && (sip.contributionsCompleted >= sip.totalContributions);
+  const interestEarned = isFullMaturity
+    ? Math.max(Number(accruedInterest.toFixed(2)), Number(sip.expectedInterest) || 0)
+    : Number(accruedInterest.toFixed(2));
+
+  const totalPaid = Number(sip.totalPaidAmount) || 0;
+  const withdrawn = Number(sip.withdrawnAmount) || 0;
+
+  // If cancelled/closed before maturity, do not grant bonus expected interest
+  const withdrawableInterest = (sip.status === 'cancelled' && sip.contributionsCompleted < sip.totalContributions)
+    ? 0
+    : interestEarned;
+  const availableToWithdraw = Math.max(0, Number((totalPaid + withdrawableInterest - withdrawn).toFixed(2)));
+  const currentValue = Math.max(0, Number((totalPaid + interestEarned - withdrawn).toFixed(2)));
+
+  return {
+    interestEarned,
+    accruedInterest: Number(accruedInterest.toFixed(2)),
+    availableToWithdraw,
+    currentValue,
+  };
+};
+
 // ─── 4. Get All SIPs for Authenticated User ─────────────────────────────────
 exports.getMySIPs = async (req, res) => {
   try {
@@ -569,9 +608,40 @@ exports.getMySIPs = async (req, res) => {
       contributionsCompleted: { $gt: 0 },
     }).sort({ createdAt: -1 }).lean();
 
+    const sipIds = sips.map((s) => s._id);
+    const paidContributions = await SIPContribution.find({
+      sipId: { $in: sipIds },
+      paymentStatus: 'paid',
+    }).lean();
+
+    const contribsBySip = {};
+    for (const c of paidContributions) {
+      const sId = c.sipId.toString();
+      if (!contribsBySip[sId]) contribsBySip[sId] = [];
+      contribsBySip[sId].push(c);
+    }
+
+    let totalInterestEarned = 0;
+    const enrichedSips = sips.map((s) => {
+      const sId = s._id.toString();
+      const myPaid = contribsBySip[sId] || [];
+      const stats = calculateSIPInterest(s, myPaid);
+
+      if (s.status !== 'cancelled' || s.contributionsCompleted >= s.totalContributions) {
+        totalInterestEarned += stats.interestEarned;
+      }
+
+      return {
+        ...s,
+        ...stats,
+      };
+    });
+
     const totalSIPInvested = sips.reduce((sum, s) => sum + (s.totalPaidAmount || 0), 0);
     const activeSIPCount = sips.filter((s) => s.status === 'active').length;
     const totalContributionsPaid = sips.reduce((sum, s) => sum + (s.contributionsCompleted || 0), 0);
+    totalInterestEarned = Number(totalInterestEarned.toFixed(2));
+    const totalCurrentValue = Number((totalSIPInvested + totalInterestEarned).toFixed(2));
 
     // Find nearest upcoming due date among active SIPs
     const activeNextDates = sips
@@ -583,11 +653,13 @@ exports.getMySIPs = async (req, res) => {
       success: true,
       summary: {
         totalSIPInvested,
+        totalInterestEarned,
+        totalCurrentValue,
         activeSIPCount,
         totalContributionsPaid,
         nextUpcomingDate,
       },
-      sips,
+      sips: enrichedSips,
     });
   } catch (error) {
     console.error('[SIPController] Get my SIPs error:', error);
@@ -633,6 +705,8 @@ exports.getSIPById = async (req, res) => {
     const pendingWithdrawalAmount = pendingWithdrawal ? Number(pendingWithdrawal.amount || 0) : 0;
     const hasPendingWithdrawal = Boolean(pendingWithdrawal);
 
+    const stats = calculateSIPInterest(sip, contributions);
+
     // Calculate withdrawable principal for this SIP only
     const availablePrincipal = Math.max(0, (sip.totalPaidAmount || 0) - (sip.withdrawnAmount || 0) - pendingWithdrawalAmount);
     const isFullyWithdrawn = (sip.totalPaidAmount || 0) > 0 && availablePrincipal <= 0 && (sip.withdrawnAmount || 0) >= (sip.totalPaidAmount || 0);
@@ -641,6 +715,7 @@ exports.getSIPById = async (req, res) => {
       success: true,
       data: {
         ...sip,
+        ...stats,
         availablePrincipal,
         pendingWithdrawalAmount,
         hasPendingWithdrawal,
@@ -907,10 +982,9 @@ exports.withdrawSIP = async (req, res) => {
       return res.status(400).json({ message: 'Invalid withdrawal amount' });
     }
 
-    const availableToWithdraw = Math.max(
-      0,
-      (sip.totalPaidAmount || 0) + (sip.status === 'completed' ? (sip.expectedInterest || 0) : 0) - (sip.withdrawnAmount || 0)
-    );
+    const contribs = await SIPContribution.find({ sipId: sip._id }).lean();
+    const stats = calculateSIPInterest(sip, contribs);
+    const availableToWithdraw = stats.availableToWithdraw;
 
     if (withdrawAmt > availableToWithdraw) {
       return res.status(400).json({
@@ -935,7 +1009,11 @@ exports.withdrawSIP = async (req, res) => {
 
     sip.withdrawnAmount = (sip.withdrawnAmount || 0) + withdrawAmt;
     if (sip.withdrawnAmount >= (sip.totalPaidAmount || 0)) {
-      sip.status = 'completed';
+      if (sip.contributionsCompleted >= sip.totalContributions) {
+        sip.status = 'completed';
+      } else {
+        sip.status = 'cancelled';
+      }
     }
     await sip.save();
 

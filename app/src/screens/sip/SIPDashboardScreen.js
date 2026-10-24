@@ -154,6 +154,12 @@ const SIPDashboardScreen = ({ navigation }) => {
             <View style={{ flex: 1 }}>
               <Text style={styles.heroLabel}>TOTAL SIP INVESTED</Text>
               <Text style={styles.heroAmount}>{formatCurrency(summary.totalSIPInvested)}</Text>
+              <View style={styles.returnsPill}>
+                <MaterialCommunityIcons name="trending-up" size={13} color="#4ADE80" />
+                <Text style={styles.returnsPillText}>
+                  +{formatCurrency(summary.totalInterestEarned || 0)} Returns (26% p.a.)
+                </Text>
+              </View>
             </View>
             <View style={styles.heroBadge}>
               <MaterialCommunityIcons name="chart-line" size={20} color="#E8D083" />
@@ -165,18 +171,24 @@ const SIPDashboardScreen = ({ navigation }) => {
 
           <View style={styles.heroStatsRow}>
             <View style={styles.heroStatItem}>
-              <Text style={styles.heroStatLabel}>Total Contributions</Text>
-              <Text style={styles.heroStatValue}>{summary.totalContributionsPaid}</Text>
+              <Text style={styles.heroStatLabel}>Total Paid</Text>
+              <Text style={styles.heroStatValue}>{formatCurrency(summary.totalSIPInvested)}</Text>
             </View>
             <View style={styles.heroStatItem}>
-              <Text style={styles.heroStatLabel}>Next SIP Date</Text>
-              <Text style={styles.heroStatValue}>
-                {summary.nextUpcomingDate ? formatDate(summary.nextUpcomingDate) : 'No due'}
+              <Text style={styles.heroStatLabel}>Total Returns</Text>
+              <Text style={[styles.heroStatValue, { color: '#4ADE80' }]}>
+                +{formatCurrency(summary.totalInterestEarned || 0)}
               </Text>
             </View>
             <View style={styles.heroStatItem}>
-              <Text style={styles.heroStatLabel}>Status</Text>
-              <Text style={styles.heroStatValue}>{summary.activeSIPCount > 0 ? 'Active' : 'Idle'}</Text>
+              <Text style={styles.heroStatLabel}>Contributions</Text>
+              <Text style={styles.heroStatValue}>{summary.totalContributionsPaid}</Text>
+            </View>
+            <View style={styles.heroStatItem}>
+              <Text style={styles.heroStatLabel}>Next SIP</Text>
+              <Text style={styles.heroStatValue} numberOfLines={1}>
+                {summary.nextUpcomingDate ? formatDate(summary.nextUpcomingDate) : 'No due'}
+              </Text>
             </View>
           </View>
         </LinearGradient>
@@ -282,8 +294,10 @@ const SIPDashboardScreen = ({ navigation }) => {
                     <Text style={styles.cardDetailValue}>{formatCurrency(item.totalPaidAmount)}</Text>
                   </View>
                   <View style={styles.cardDetailItem}>
-                    <Text style={styles.cardDetailLabel}>PLANNED TOTAL</Text>
-                    <Text style={styles.cardDetailValue}>{formatCurrency(item.totalPlannedAmount)}</Text>
+                    <Text style={styles.cardDetailLabel}>RETURNS (26%)</Text>
+                    <Text style={[styles.cardDetailValue, { color: '#10B981', fontWeight: '800' }]}>
+                      +{formatCurrency(item.interestEarned || 0)}
+                    </Text>
                   </View>
                   <View style={styles.cardDetailItem}>
                     <Text style={styles.cardDetailLabel}>NEXT DUE</Text>
@@ -398,6 +412,24 @@ const getStyles = (themeColors, isDark) =>
       fontSize: 28,
       fontWeight: '800',
       color: '#FFFFFF',
+    },
+    returnsPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(34, 197, 94, 0.25)',
+      alignSelf: 'flex-start',
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 12,
+      marginTop: 6,
+      gap: 4,
+      borderWidth: 1,
+      borderColor: 'rgba(74, 222, 128, 0.4)',
+    },
+    returnsPillText: {
+      color: '#4ADE80',
+      fontSize: 12,
+      fontWeight: '700',
     },
     heroBadge: {
       flexDirection: 'row',
