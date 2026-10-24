@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   CheckCircle, XCircle, Clock, AlertCircle, RefreshCw, Trash2, Edit, 
   Pause, Play, Eye, Plus, Search, Filter, Archive, X, Save, 
-  BarChart3, Users, DollarSign, TrendingUp, Activity, FileText
+  BarChart3, Users, DollarSign, TrendingUp, Activity, FileText, Wallet
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -378,42 +378,47 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
       {subTab === "dashboard" && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="card-premium p-4 flex items-center gap-3">
-              <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
-                <Users className="w-5 h-5" />
+            {[
+              {
+                label: "Total Invested",
+                val: `₹${(Number(overview.totalInvested || overview.totalCollected || 0)).toLocaleString('en-IN')}`,
+                desc: `${joins.length || overview.totalMembersCount || overview.totalMembers || 0} Total Enrolled`,
+                icon: DollarSign,
+                color: "text-primary bg-primary/10",
+              },
+              {
+                label: "Total Released",
+                val: `₹${(Number(overview.totalReleased || 0)).toLocaleString('en-IN')}`,
+                desc: "Paid Out to Winners",
+                icon: CheckCircle,
+                color: "text-emerald-600 bg-emerald-50",
+              },
+              {
+                label: "Remaining Pool",
+                val: `₹${(Number(overview.remainingPool ?? overview.remainingAmount ?? ((overview.totalInvested || overview.totalCollected || 0) - (overview.totalReleased || 0)))).toLocaleString('en-IN')}`,
+                desc: "Active Chit Pool Balance",
+                icon: Wallet,
+                color: "text-amber-600 bg-amber-50",
+              },
+              {
+                label: "Active / Completed",
+                val: `${overview.activeCount ?? overview.activeChits ?? chits.filter(c => c.status === 'active').length} / ${overview.completedCount ?? overview.completedChits ?? chits.filter(c => c.status === 'completed').length}`,
+                desc: `${payments.filter((p: any) => p.status === 'pending').length || overview.pendingPayments || 0} Pending Payments`,
+                icon: Clock,
+                color: "text-blue-600 bg-blue-50",
+              },
+            ].map((card, i) => (
+              <div key={i} className="bg-card border border-border rounded-2xl p-5 flex items-center gap-4">
+                <div className={`p-3 rounded-xl ${card.color}`}>
+                  <card.icon className="h-6 w-6" />
+                </div>
+                <div>
+                  <p className="text-xs font-body font-semibold text-muted-foreground uppercase tracking-wider">{card.label}</p>
+                  <h3 className="text-xl font-heading font-bold text-foreground mt-1">{card.val}</h3>
+                  <p className="text-xs font-body text-muted-foreground mt-0.5">{card.desc}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Total Enrolled</p>
-                <p className="text-xl font-bold">{joins.length || overview.totalMembers || 0}</p>
-              </div>
-            </div>
-            <div className="card-premium p-4 flex items-center gap-3">
-              <div className="p-3 bg-green-50 text-green-600 rounded-xl">
-                <TrendingUp className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Active Chits</p>
-                <p className="text-xl font-bold">{overview.activeChits || chits.filter(c => c.status === 'active').length || 0}</p>
-              </div>
-            </div>
-            <div className="card-premium p-4 flex items-center gap-3">
-              <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
-                <Clock className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Pending Payments</p>
-                <p className="text-xl font-bold">{payments.filter((p: any) => p.status === 'pending').length || overview.pendingPayments || 0}</p>
-              </div>
-            </div>
-            <div className="card-premium p-4 flex items-center gap-3">
-              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
-                <DollarSign className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Total Collected</p>
-                <p className="text-xl font-bold">₹{(overview.totalCollected || 0).toLocaleString('en-IN')}</p>
-              </div>
-            </div>
+            ))}
           </div>
 
           <div className="flex gap-3">

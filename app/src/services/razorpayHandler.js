@@ -1,37 +1,14 @@
-import { NativeModules, Linking } from 'react-native';
+import { NativeModules, Linking, AppState } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { paymentService } from './paymentService';
 import { customAlert } from '../context/AlertContext';
 
-// ============================================================================
-// === PREVIOUS RAZORPAY NATIVE CHECKOUT (COMMENTED OUT AS REQUESTED) =========
-// ============================================================================
-/*
-const getRazorpayCheckout = () => {
-  try {
-    const isNativeModuleAvailable = !!(
-      NativeModules.RNRazorpayCheckout ||
-      (typeof global !== 'undefined' && global.__turboModuleProxy?.('RNRazorpayCheckout'))
-    );
-
-    if (!isNativeModuleAvailable) {
-      return null;
-    }
-
-    const RazorpayCheckout = require('react-native-razorpay');
-    return RazorpayCheckout.default || RazorpayCheckout;
-  } catch (err) {
-    console.warn('[Razorpay] Native module resolution failed:', err?.message);
-    return null;
-  }
-};
-*/
-
 /**
- * Reusable Custom UPI Payment Handler (replaces Razorpay)
+ * Reusable Cashfree Payment Handler
  * 
- * 1. Calls backend createOrder() (which generates order with Custom UPI / PayMe gateway)
- * 2. Launches the official payment URL in the browser / UPI app chooser via Linking.openURL
- * 3. Prompts user to confirm payment once completed
+ * 1. Calls backend createOrder() (which generates order with Cashfree Payment Gateway)
+ * 2. Launches the official Cashfree hosted checkout URL via Linking.openURL
+ * 3. Supports auto-verification on browser redirect & deep link return
  * 4. Calls backend verifyPayment() to check gateway status, auto-approve, update balances & notify
  */
 export const executeRazorpayPayment = async ({
@@ -82,7 +59,21 @@ export const executeRazorpayPayment = async ({
     );
 
     if (isLiveUrl && !isSimulated) {
-      // Live Gateway Flow: Open UPI / Instant Pay checkout
+      // Live Gateway Flow: Save context for auto-verify on deep-link return
+      try {
+        await AsyncStorage.setItem('pendingPaymentContext', JSON.stringify({
+          orderId,
+          paymentType,
+          payloadData,
+        }));
+        // Register success handler so AppNavigator can trigger it after auto-verify
+        if (!global._paymentSuccessHandlers) global._paymentSuccessHandlers = {};
+        global._paymentSuccessHandlers[orderId] = onSuccess;
+      } catch (e) {
+        console.warn('[PaymentHandler] Could not save payment context:', e.message);
+      }
+
+      // Open the UPI payment URL — gateway will redirect back to app via deep link
       try {
         await Linking.openURL(paymentUrl);
       } catch (linkErr) {
@@ -91,44 +82,41 @@ export const executeRazorpayPayment = async ({
 
       if (setLoading) setLoading(false);
 
-      // Prompt user to verify once payment is completed in UPI app / browser
-      customAlert.confirm({
-        type: 'payout',
-        title: 'UPI Payment Initiated',
-        message: `Your payment link of ₹${Number(amount).toLocaleString('en-IN')} has been opened.\n\nAfter completing the payment in your UPI app or browser, tap "Verify Payment" below.`,
-        cancelText: 'Cancel Payment',
-        confirmText: 'Verify Payment',
-        onCancel: () => {
-          if (setLoading) setLoading(false);
-          if (onFailure) onFailure(new Error('User cancelled payment'));
-        },
-        onConfirm: async () => {
-          try {
-            if (setLoading) setLoading(true);
-            const verification = await paymentService.verifyPayment({
-              order_id: orderId,
-              paymentType,
-              payloadData,
-            });
+      // Auto-verify when user returns from UPI app / browser
+      let isVerified = false;
+      const attemptAutoVerify = async (retriesLeft = 3) => {
+        if (isVerified) return;
+        try {
+          const verification = await paymentService.verifyPayment({
+            order_id: orderId,
+            paymentType,
+            payloadData,
+          });
 
-            if (verification?.isPending) {
-              if (setLoading) setLoading(false);
-              customAlert.warning(
-                'Payment Pending',
-                verification.message || 'Payment is still being processed. Please wait a few moments and tap verify again.'
-              );
-              return;
-            }
-
-            if (setLoading) setLoading(false);
+          if (verification?.success) {
+            isVerified = true;
+            if (appStateSub && appStateSub.remove) appStateSub.remove();
+            await AsyncStorage.removeItem('pendingPaymentContext');
+            customAlert.success(
+              'Payment Successful! ✅',
+              'Your payment has been verified and your account has been updated.'
+            );
             if (onSuccess) onSuccess(verification);
-          } catch (verifyErr) {
-            if (setLoading) setLoading(false);
-            const msg = verifyErr.response?.data?.message || verifyErr.message || 'Verification failed';
-            customAlert.error('Payment Verification Failed', msg);
-            if (onFailure) onFailure(verifyErr);
+            return;
           }
-        },
+
+          if (verification?.isPending && retriesLeft > 0) {
+            setTimeout(() => attemptAutoVerify(retriesLeft - 1), 2500);
+          }
+        } catch (e) {
+          console.warn('[PaymentHandler] Auto-verify attempt error:', e.message);
+        }
+      };
+
+      const appStateSub = AppState.addEventListener('change', (nextState) => {
+        if (nextState === 'active') {
+          attemptAutoVerify(3);
+        }
       });
     } else {
       // Test Mode Simulation Fallback (for development / local testing)
@@ -136,7 +124,7 @@ export const executeRazorpayPayment = async ({
 
       customAlert.confirm({
         type: 'payout',
-        title: 'UPI Gateway (Test Mode)',
+        title: 'Cashfree Gateway (Test Mode)',
         message: `Gateway is running in simulation mode.\n\nSimulate successful payment of ₹${Number(amount).toLocaleString('en-IN')} for Order ${orderId}?`,
         cancelText: 'Cancel Payment',
         confirmText: 'Simulate Pay',

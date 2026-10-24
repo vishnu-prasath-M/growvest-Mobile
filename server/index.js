@@ -215,7 +215,13 @@ app.use(cors());
 // Serve static files (web reset-password page)
 app.use(express.static(require('path').join(__dirname, 'public')));
 // Increase JSON and urlencoded body limit to 150mb for APK uploads and image data
-app.use(express.json({ limit: '150mb' }));
+// verify callback preserves rawBody buffer as string for webhook HMAC-SHA256 signature verification (e.g. Cashfree)
+app.use(express.json({
+  limit: '150mb',
+  verify: (req, res, buf) => {
+    req.rawBody = buf ? buf.toString() : '';
+  }
+}));
 app.use(express.urlencoded({ limit: '150mb', extended: true }));
 
 // Health Check & Render Keep-Alive Endpoint
@@ -408,6 +414,7 @@ app.use('/api/chits', chitAdminRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/kyc', kycRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/payment', paymentRoutes);
 app.use('/api/pocket-money', pocketMoneyRoutes);
 app.use('/api/referral', referralRoutes);
 app.use('/api/wallet', referralRoutes);

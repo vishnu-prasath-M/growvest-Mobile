@@ -764,6 +764,10 @@ const withdrawChitPayout = async (req, res) => {
       finalWithdrawalAmount = priceAmount;
     }
 
+    const requestedAmount = req.body?.amount
+      ? Math.min(finalWithdrawalAmount, Math.max(1, Number(req.body.amount)))
+      : finalWithdrawalAmount;
+
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -773,9 +777,13 @@ const withdrawChitPayout = async (req, res) => {
     session.startTransaction();
 
     try {
-      member.withdrawalStatus = 'requested';
+      const totalAccumulatedWithdrawn = (member.withdrawnAmount || 0) + requestedAmount;
+      const isFullyWithdrawnOrRequested = totalAccumulatedWithdrawn >= (finalWithdrawalAmount - 1);
+
+      member.withdrawalStatus = isFullyWithdrawnOrRequested ? 'requested' : 'partially_requested';
       member.withdrawalWeek = currentUnit;
-      member.withdrawalAmount = finalWithdrawalAmount;
+      member.withdrawnAmount = totalAccumulatedWithdrawn;
+      member.withdrawalAmount = totalAccumulatedWithdrawn;
       member.actionPercentage = actionPercentage;
       member.priceAmount = priceAmount;
       member.accumulatedDividend = accumulatedDividend;
@@ -785,7 +793,7 @@ const withdrawChitPayout = async (req, res) => {
       member.winningDate = new Date();
       member.winningAmount = finalWithdrawalAmount;
       
-      if (isSettlement) {
+      if (isSettlement && isFullyWithdrawnOrRequested) {
         member.status = 'completed'; // Safe completion on settlement
       }
 
@@ -797,7 +805,7 @@ const withdrawChitPayout = async (req, res) => {
         userId: user._id,
         userEmail: user.email || 'user@growvest.in',
         userName: user.name || user.username || 'User',
-        amount: finalWithdrawalAmount,
+        amount: requestedAmount,
         upiId: resolvedUPI,
         date: new Date().toLocaleDateString('en-IN'),
         status: 'pending', // Pending admin approval and payment

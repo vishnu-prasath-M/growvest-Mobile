@@ -5,21 +5,14 @@ const User = require('../models/User');
 const Transaction = require('../models/Transaction');
 const Withdrawal = require('../models/Withdrawal');
 const { sendNotification, notifyAdmins } = require('../services/notificationHelper');
-const Razorpay = require('razorpay');
 const crypto = require('crypto');
+const cashfreeService = require('../services/cashfreeService');
+const PendingPayment = require('../models/PendingPayment');
 
 // ============================================================================
-// === PREVIOUS RAZORPAY GATEWAY (COMMENTED OUT AS REQUESTED) =================
+// === PREVIOUS STARPE PAYMENT GATEWAY (COMMENTED OUT AS REQUESTED) ===========
 // ============================================================================
 /*
-const getRazorpayInstance = () => {
-  const key_id = process.env.RAZORPAY_KEY_ID || 'rzp_test_xxxxxxxxx';
-  const key_secret = process.env.RAZORPAY_KEY_SECRET || 'xxxxxxxxxxxx';
-  return new Razorpay({ key_id, key_secret });
-};
-*/
-
-// Gateway helpers
 const getGatewayConfig = () => {
   const baseUrl = (process.env.STARPE_BASE_URL || process.env.PG_URL || process.env.PAYME_BASE_URL || process.env.PG_BASE_URL || 'https://starpe.online').trim().replace(/\/+$/, '');
   const apiKey = (process.env.STARPE_API_KEY || process.env.PG_API_KEY || process.env.PAYME_API_KEY || '6056931258240a48113ca977a656211c').trim();
@@ -106,6 +99,7 @@ const callGatewayCheckStatus = async (orderId) => {
   }
   throw lastErr || new Error('Failed to check order status with gateway');
 };
+*/
 
 // Helper to calculate recurring due date by frequency safely
 const calculateDueDate = (startDate, installmentIndex, frequency = 'monthly', sipDate = 10, sipDayName = 'Monday') => {
@@ -260,45 +254,58 @@ exports.createSIP = async (req, res) => {
     }
     await SIPContribution.insertMany(contributions);
 
-    // 3. Create Order for Contribution #1 with new Gateway
+    // 3. Create Order for Contribution #1 with Cashfree
     const orderId = `ORD_SIP_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+    const returnUrl = `${process.env.APP_URL || 'https://growvest-mobile.onrender.com'}/api/payment/callback?order_id=${orderId}`;
     let paymentUrl = `simulated_pay_${orderId}`;
+    let paymentSessionId = null;
     let isSimulated = false;
 
-    /*
-    // === PREVIOUS RAZORPAY ORDER FOR CONTRIBUTION #1 (COMMENTED OUT) ===
-    const instance = getRazorpayInstance();
-    const rzpOrder = await instance.orders.create({
-      amount: Math.round(numAmount * 100),
-      currency: 'INR',
-      receipt: `sip_${sipIdStr}_1`,
-      notes: {
-        userId: user._id.toString(),
-        sipId: sip._id.toString(),
-        sipRefId: sipIdStr,
-        installmentNumber: 1,
-        purpose: 'sip_initial',
-      },
-    });
-    const orderId = rzpOrder.id;
-    */
-
     try {
-      const gwRes = await callGatewayCreateOrder({
-        amount: Math.round(numAmount),
+      const customerMobile = user.mobileNumber || '9999999999';
+      const customerName = user.name || user.username || 'Growvest User';
+      const customerEmail = user.email || `${customerMobile}@growvest.com`;
+
+      const cfRes = await cashfreeService.createOrder({
         orderId,
-        mobile: user.mobileNumber || '9999999999',
-        redirectUrl: `${process.env.APP_URL || 'https://growvest-mobile.onrender.com'}/api/payment/callback`,
-        remark1: `SIP Initial - ${sipIdStr}`,
-        remark2: user._id.toString(),
+        amount: Math.round(numAmount),
+        customerPhone: customerMobile,
+        customerName,
+        customerEmail,
+        returnUrl,
       });
-      if (gwRes && (gwRes.status === true || gwRes.result?.payment_url)) {
-        paymentUrl = gwRes.result?.payment_url;
+
+      if (cfRes && cfRes.success && (cfRes.paymentUrl || cfRes.paymentSessionId)) {
+        paymentUrl = cfRes.paymentUrl;
+        paymentSessionId = cfRes.paymentSessionId;
+
+        // Save PendingPayment so Cashfree callback/webhook can auto-complete SIP activation
+        try {
+          await PendingPayment.findOneAndUpdate(
+            { orderId },
+            {
+              orderId,
+              userId: user._id,
+              paymentType: 'sip_initial',
+              payloadData: {
+                sipId: sip._id,
+                contributionId: contributions[0]._id,
+                installmentNumber: 1,
+              },
+              amount: Math.round(numAmount),
+              status: 'pending',
+            },
+            { upsert: true, new: true }
+          );
+          console.log(`[SIPController] PendingPayment saved for Cashfree SIP order: ${orderId}`);
+        } catch (ppErr) {
+          console.warn('[SIPController] PendingPayment save warning:', ppErr.message);
+        }
       } else {
         isSimulated = true;
       }
-    } catch (gwErr) {
-      console.warn('[SIPController] Gateway order fallback:', gwErr.message);
+    } catch (cfErr) {
+      console.warn('[SIPController] Cashfree order fallback:', cfErr.message);
       isSimulated = true;
     }
 
@@ -309,10 +316,11 @@ exports.createSIP = async (req, res) => {
         sip,
         firstContribution: contributions[0],
         orderId,
+        paymentSessionId,
         paymentUrl,
         amount: Math.round(numAmount),
         currency: 'INR',
-        gateway: 'custom_upi',
+        gateway: 'cashfree',
         isSimulated,
       },
     });
@@ -344,17 +352,13 @@ exports.verifyPayment = async (req, res) => {
       return res.status(400).json({ message: 'Missing order ID for payment verification' });
     }
 
-    /*
-    // === PREVIOUS RAZORPAY SIGNATURE CHECK (COMMENTED OUT) ===
-    const key_secret = process.env.RAZORPAY_KEY_SECRET || 'xxxxxxxxxxxx';
-    const body = razorpay_order_id + '|' + razorpay_payment_id;
-    const expectedSignature = crypto.createHmac('sha256', key_secret).update(body).digest('hex');
-    const isValid = expectedSignature === razorpay_signature || razorpay_signature.startsWith('simulated_signature_');
-    if (!isValid) {
-      return res.status(400).json({ message: 'Invalid payment signature. Verification failed.' });
+    // Check if order was already completed by Webhook or Callback
+    const existingPending = await PendingPayment.findOne({ orderId: effectiveOrderId });
+    if (existingPending && existingPending.status === 'completed') {
+      console.log(`[SIPController] Order ${effectiveOrderId} already processed via webhook/callback.`);
     }
-    */
 
+    // === CASHFREE VERIFICATION ===
     let verifiedUtr = utr || razorpay_payment_id || `UTR_${Date.now()}`;
     const isSimulated =
       clientIsSimulated ||
@@ -363,27 +367,34 @@ exports.verifyPayment = async (req, res) => {
       (razorpay_signature && razorpay_signature.startsWith('simulated_'));
 
     if (!isSimulated) {
-      const statusRes = await callGatewayCheckStatus(effectiveOrderId);
-      const status = (
-        statusRes?.status ||
-        statusRes?.result?.status ||
-        statusRes?.result?.txnStatus ||
-        ''
-      ).toUpperCase();
+      const statusRes = await cashfreeService.checkOrderStatus(effectiveOrderId);
+      console.log('[SIPController] Cashfree status check result:', statusRes);
 
-      if (status === 'COMPLETED' || status === 'SUCCESS') {
-        verifiedUtr = statusRes?.result?.utr || verifiedUtr;
-      } else if (status === 'PENDING') {
+      const status = (statusRes?.orderStatus || '').toUpperCase();
+
+      if (status === 'PAID') {
+        verifiedUtr =
+          statusRes.paymentDetails?.bankReference ||
+          statusRes.paymentDetails?.cfPaymentId ||
+          verifiedUtr;
+      } else if (status === 'ACTIVE') {
         return res.status(200).json({
           success: false,
           isPending: true,
-          message: 'Payment is still pending. If you just paid, please wait a few seconds and tap verify again.',
+          message: 'Payment is still processing with Cashfree. If you just paid, please wait a few seconds and tap verify again.',
         });
-      } else if (status === 'FAILED') {
+      } else if (status === 'EXPIRED' || status === 'TERMINATED') {
         return res.status(400).json({
           success: false,
           isFailed: true,
-          message: statusRes?.message || 'Payment failed or expired.',
+          message: `Payment ${status.toLowerCase()}. Please initiate a new payment.`,
+        });
+      } else if (statusRes?.isSimulated) {
+        verifiedUtr = `SIM_UTR_${Date.now()}`;
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: statusRes?.message || `Cashfree returned order status: ${status}`,
         });
       }
     }
@@ -421,10 +432,18 @@ exports.verifyPayment = async (req, res) => {
     contribution.paidAt = new Date();
     contribution.orderId = effectiveOrderId;
     contribution.paymentId = verifiedUtr;
-    contribution.signature = `VERIFIED_UPI_${effectiveOrderId}`;
+    contribution.signature = `VERIFIED_CASHFREE_${effectiveOrderId}`;
     contribution.receiptId = receiptId;
     contribution.withdrawableAmount = contribution.amount;
     await contribution.save();
+
+    // Mark PendingPayment as completed if exists
+    try {
+      await PendingPayment.findOneAndUpdate(
+        { orderId: effectiveOrderId },
+        { status: 'completed', completedAt: new Date() }
+      );
+    } catch (e) {}
 
     // Update parent SIP totals
     sip.totalPaidAmount = (sip.totalPaidAmount || 0) + contribution.amount;
@@ -525,6 +544,45 @@ exports.cancelPendingSIP = async (req, res) => {
   }
 };
 
+// Helper to calculate real-time accrued interest at 26% p.a. based on contribution paid dates
+const calculateSIPInterest = (sip, contributions = []) => {
+  const now = Date.now();
+  const annualRate = (Number(sip.interestRate) || 26) / 100;
+  const dailyRate = annualRate / 365;
+
+  let accruedInterest = 0;
+  const paidContributions = contributions.filter(c => c.paymentStatus === 'paid');
+
+  for (const c of paidContributions) {
+    const paidDate = c.paidAt ? new Date(c.paidAt) : new Date(c.createdAt || sip.createdAt);
+    const daysElapsed = Math.max(0, Math.floor((now - paidDate.getTime()) / (1000 * 60 * 60 * 24)));
+    const itemInterest = (Number(c.amount) || 0) * dailyRate * daysElapsed;
+    accruedInterest += itemInterest;
+  }
+
+  const isFullMaturity = sip.status === 'completed' && (sip.contributionsCompleted >= sip.totalContributions);
+  const interestEarned = isFullMaturity
+    ? Math.max(Number(accruedInterest.toFixed(2)), Number(sip.expectedInterest) || 0)
+    : Number(accruedInterest.toFixed(2));
+
+  const totalPaid = Number(sip.totalPaidAmount) || 0;
+  const withdrawn = Number(sip.withdrawnAmount) || 0;
+
+  // If cancelled/closed before maturity, do not grant bonus expected interest
+  const withdrawableInterest = (sip.status === 'cancelled' && sip.contributionsCompleted < sip.totalContributions)
+    ? 0
+    : interestEarned;
+  const availableToWithdraw = Math.max(0, Number((totalPaid + withdrawableInterest - withdrawn).toFixed(2)));
+  const currentValue = Math.max(0, Number((totalPaid + interestEarned - withdrawn).toFixed(2)));
+
+  return {
+    interestEarned,
+    accruedInterest: Number(accruedInterest.toFixed(2)),
+    availableToWithdraw,
+    currentValue,
+  };
+};
+
 // ─── 4. Get All SIPs for Authenticated User ─────────────────────────────────
 exports.getMySIPs = async (req, res) => {
   try {
@@ -550,9 +608,40 @@ exports.getMySIPs = async (req, res) => {
       contributionsCompleted: { $gt: 0 },
     }).sort({ createdAt: -1 }).lean();
 
+    const sipIds = sips.map((s) => s._id);
+    const paidContributions = await SIPContribution.find({
+      sipId: { $in: sipIds },
+      paymentStatus: 'paid',
+    }).lean();
+
+    const contribsBySip = {};
+    for (const c of paidContributions) {
+      const sId = c.sipId.toString();
+      if (!contribsBySip[sId]) contribsBySip[sId] = [];
+      contribsBySip[sId].push(c);
+    }
+
+    let totalInterestEarned = 0;
+    const enrichedSips = sips.map((s) => {
+      const sId = s._id.toString();
+      const myPaid = contribsBySip[sId] || [];
+      const stats = calculateSIPInterest(s, myPaid);
+
+      if (s.status !== 'cancelled' || s.contributionsCompleted >= s.totalContributions) {
+        totalInterestEarned += stats.interestEarned;
+      }
+
+      return {
+        ...s,
+        ...stats,
+      };
+    });
+
     const totalSIPInvested = sips.reduce((sum, s) => sum + (s.totalPaidAmount || 0), 0);
     const activeSIPCount = sips.filter((s) => s.status === 'active').length;
     const totalContributionsPaid = sips.reduce((sum, s) => sum + (s.contributionsCompleted || 0), 0);
+    totalInterestEarned = Number(totalInterestEarned.toFixed(2));
+    const totalCurrentValue = Number((totalSIPInvested + totalInterestEarned).toFixed(2));
 
     // Find nearest upcoming due date among active SIPs
     const activeNextDates = sips
@@ -564,11 +653,13 @@ exports.getMySIPs = async (req, res) => {
       success: true,
       summary: {
         totalSIPInvested,
+        totalInterestEarned,
+        totalCurrentValue,
         activeSIPCount,
         totalContributionsPaid,
         nextUpcomingDate,
       },
-      sips,
+      sips: enrichedSips,
     });
   } catch (error) {
     console.error('[SIPController] Get my SIPs error:', error);
@@ -614,6 +705,8 @@ exports.getSIPById = async (req, res) => {
     const pendingWithdrawalAmount = pendingWithdrawal ? Number(pendingWithdrawal.amount || 0) : 0;
     const hasPendingWithdrawal = Boolean(pendingWithdrawal);
 
+    const stats = calculateSIPInterest(sip, contributions);
+
     // Calculate withdrawable principal for this SIP only
     const availablePrincipal = Math.max(0, (sip.totalPaidAmount || 0) - (sip.withdrawnAmount || 0) - pendingWithdrawalAmount);
     const isFullyWithdrawn = (sip.totalPaidAmount || 0) > 0 && availablePrincipal <= 0 && (sip.withdrawnAmount || 0) >= (sip.totalPaidAmount || 0);
@@ -622,6 +715,7 @@ exports.getSIPById = async (req, res) => {
       success: true,
       data: {
         ...sip,
+        ...stats,
         availablePrincipal,
         pendingWithdrawalAmount,
         hasPendingWithdrawal,
@@ -660,54 +754,67 @@ exports.payInstallment = async (req, res) => {
     }
 
     const orderId = `ORD_SIP_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+    const returnUrl = `${process.env.APP_URL || 'https://growvest-mobile.onrender.com'}/api/payment/callback?order_id=${orderId}`;
     let paymentUrl = `simulated_pay_${orderId}`;
+    let paymentSessionId = null;
     let isSimulated = false;
 
-    /*
-    // === PREVIOUS RAZORPAY ORDER FOR INSTALLMENT (COMMENTED OUT) ===
-    const instance = getRazorpayInstance();
-    const rzpOrder = await instance.orders.create({
-      amount: Math.round(contribution.amount * 100),
-      currency: 'INR',
-      receipt: `sip_${sip.sipId}_${contribution.installmentNumber}`,
-      notes: {
-        userId: userId.toString(),
-        sipId: sip._id.toString(),
-        sipRefId: sip.sipId,
-        contributionId: contribution._id.toString(),
-        installmentNumber: contribution.installmentNumber,
-        purpose: 'sip_installment',
-      },
-    });
-    const orderId = rzpOrder.id;
-    */
-
     try {
-      const gwRes = await callGatewayCreateOrder({
-        amount: Math.round(contribution.amount),
+      const customerMobile = req.user?.mobileNumber || '9999999999';
+      const customerName = req.user?.name || req.user?.username || 'Growvest User';
+      const customerEmail = req.user?.email || `${customerMobile}@growvest.com`;
+
+      const cfRes = await cashfreeService.createOrder({
         orderId,
-        mobile: req.user?.mobileNumber || '9999999999',
-        redirectUrl: `${process.env.APP_URL || 'https://growvest-mobile.onrender.com'}/api/payment/callback`,
-        remark1: `SIP #${contribution.installmentNumber} - ${sip.sipId}`,
-        remark2: userId.toString(),
+        amount: Math.round(contribution.amount),
+        customerPhone: customerMobile,
+        customerName,
+        customerEmail,
+        returnUrl,
       });
-      if (gwRes && (gwRes.status === true || gwRes.result?.payment_url)) {
-        paymentUrl = gwRes.result?.payment_url;
+
+      if (cfRes && cfRes.success && (cfRes.paymentUrl || cfRes.paymentSessionId)) {
+        paymentUrl = cfRes.paymentUrl;
+        paymentSessionId = cfRes.paymentSessionId;
+
+        // Save PendingPayment so Cashfree callback/webhook can auto-complete installment payment
+        try {
+          await PendingPayment.findOneAndUpdate(
+            { orderId },
+            {
+              orderId,
+              userId,
+              paymentType: 'sip_installment',
+              payloadData: {
+                sipId: sip._id,
+                contributionId: contribution._id,
+                installmentNumber: contribution.installmentNumber,
+              },
+              amount: Math.round(contribution.amount),
+              status: 'pending',
+            },
+            { upsert: true, new: true }
+          );
+          console.log(`[SIPController] PendingPayment saved for Cashfree installment order: ${orderId}`);
+        } catch (ppErr) {
+          console.warn('[SIPController] PendingPayment save warning:', ppErr.message);
+        }
       } else {
         isSimulated = true;
       }
-    } catch (gwErr) {
-      console.warn('[SIPController] Installment Gateway fallback:', gwErr.message);
+    } catch (cfErr) {
+      console.warn('[SIPController] Installment Cashfree fallback:', cfErr.message);
       isSimulated = true;
     }
 
     res.status(200).json({
       success: true,
       orderId,
+      paymentSessionId,
       paymentUrl,
       amount: Math.round(contribution.amount),
       currency: 'INR',
-      gateway: 'custom_upi',
+      gateway: 'cashfree',
       isSimulated,
       contribution,
     });
@@ -855,6 +962,95 @@ exports.cancelSIP = async (req, res) => {
   } catch (error) {
     console.error('[SIPController] Cancel SIP error:', error);
     res.status(500).json({ message: 'Failed to cancel SIP', error: error.message });
+  }
+};
+
+// ─── 7B. Request Withdrawal from Specific SIP ────────────────────────────────
+exports.withdrawSIP = async (req, res) => {
+  try {
+    const sipId = req.params.id;
+    const { amount, upiId } = req.body;
+    const userId = req.user._id;
+
+    const sip = await SIP.findOne({ _id: sipId, userId });
+    if (!sip) {
+      return res.status(404).json({ message: 'SIP not found' });
+    }
+
+    const withdrawAmt = Number(amount);
+    if (!withdrawAmt || withdrawAmt <= 0) {
+      return res.status(400).json({ message: 'Invalid withdrawal amount' });
+    }
+
+    const contribs = await SIPContribution.find({ sipId: sip._id }).lean();
+    const stats = calculateSIPInterest(sip, contribs);
+    const availableToWithdraw = stats.availableToWithdraw;
+
+    if (withdrawAmt > availableToWithdraw) {
+      return res.status(400).json({
+        message: `Requested amount ₹${withdrawAmt} exceeds available SIP balance of ₹${availableToWithdraw}`
+      });
+    }
+
+    const resolvedUPI = upiId || req.user.upiId || 'user@upi';
+    const withdrawalRecord = new Withdrawal({
+      userId,
+      userEmail: req.user.email || req.user.username || 'user@growvest.in',
+      userName: req.user.name || req.user.username || 'User',
+      amount: withdrawAmt,
+      upiId: resolvedUPI,
+      date: new Date().toLocaleDateString('en-IN'),
+      status: 'pending',
+      withdrawType: 'sip',
+      investmentId: sip._id,
+      processed: false,
+    });
+    await withdrawalRecord.save();
+
+    sip.withdrawnAmount = (sip.withdrawnAmount || 0) + withdrawAmt;
+    if (sip.withdrawnAmount >= (sip.totalPaidAmount || 0)) {
+      if (sip.contributionsCompleted >= sip.totalContributions) {
+        sip.status = 'completed';
+      } else {
+        sip.status = 'cancelled';
+      }
+    }
+    await sip.save();
+
+    const transaction = new Transaction({
+      userId,
+      userEmail: req.user.email || 'user@growvest.in',
+      type: 'withdrawal',
+      amount: withdrawAmt,
+      status: 'requested',
+      referenceId: withdrawalRecord._id,
+      referenceType: 'Withdrawal',
+      description: `SIP Withdrawal Request - ${sip.sipId}`,
+    });
+    await transaction.save();
+
+    try {
+      await sendNotification({
+        userId,
+        title: '⏳ SIP Withdrawal Requested',
+        description: `Your SIP withdrawal request for ₹${withdrawAmt.toLocaleString('en-IN')} has been submitted for admin verification.`,
+        type: 'general',
+      });
+      await notifyAdmins({
+        title: '💸 SIP Withdrawal Request',
+        description: `${req.user.name || req.user.email} requested to withdraw ₹${withdrawAmt.toLocaleString('en-IN')} from SIP ${sip.sipId}.`,
+        type: 'general',
+      });
+    } catch (e) {}
+
+    res.status(200).json({
+      success: true,
+      message: `SIP withdrawal request for ₹${withdrawAmt.toLocaleString('en-IN')} submitted successfully.`,
+      withdrawal: withdrawalRecord,
+    });
+  } catch (error) {
+    console.error('[SIPController] Withdraw error:', error);
+    res.status(500).json({ message: 'Failed to process SIP withdrawal', error: error.message });
   }
 };
 

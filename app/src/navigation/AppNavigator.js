@@ -1,5 +1,5 @@
 import React, { useRef, useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Dimensions, ActivityIndicator, Image, Keyboard, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Dimensions, ActivityIndicator, Image, Keyboard, Platform, Alert } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -484,9 +484,60 @@ const AppNavigator = () => {
   useEffect(() => {
     notificationService.requestPermission();
 
+    const verifyPendingPayment = async (orderId) => {
+      if (!orderId || global._isVerifyingPayment) return;
+      global._isVerifyingPayment = true;
+
+      try {
+        const pendingRaw = await AsyncStorage.getItem('pendingPaymentContext');
+        if (!pendingRaw) return;
+        const pendingCtx = JSON.parse(pendingRaw);
+
+        const { paymentService } = require('../services/paymentService');
+        const verification = await paymentService.verifyPayment({
+          order_id: orderId,
+          paymentType: pendingCtx.paymentType,
+          payloadData: pendingCtx.payloadData,
+        });
+
+        if (verification?.success) {
+          await AsyncStorage.removeItem('pendingPaymentContext');
+          const { customAlert } = require('../context/AlertContext');
+          customAlert.success(
+            'Payment Successful! ✅',
+            'Your payment has been verified and your account has been updated.'
+          );
+          if (global._paymentSuccessHandlers?.[orderId]) {
+            global._paymentSuccessHandlers[orderId](verification);
+            delete global._paymentSuccessHandlers[orderId];
+          }
+        } else if (verification?.isPending) {
+          console.log('[AutoVerify] Payment still pending at gateway...');
+        }
+      } catch (verifyErr) {
+        console.warn('[AutoVerify] Error verifying payment:', verifyErr.message);
+      } finally {
+        global._isVerifyingPayment = false;
+      }
+    };
+
     const handleDeepLink = async (url) => {
       if (!url) return;
       try {
+        // ── Handle payment callback deep link (auto-verify) ──────────────────
+        // URL: growvest://payment-callback?order_id=ORD...&status=success
+        if (url.includes('payment-callback')) {
+          const matchOrder = url.match(/[?&]order_id=([^&#]+)/i);
+          const order_id = matchOrder ? decodeURIComponent(matchOrder[1]) : '';
+          console.log('[DeepLink] Payment callback received:', { order_id });
+
+          if (order_id) {
+            await verifyPendingPayment(order_id);
+          }
+          return;
+        }
+
+        // ── Handle referral deep link ─────────────────────────────────────────
         const match = url.match(/\/ref\/([A-Za-z0-9]+)/);
         if (match && match[1]) {
           const code = match[1].toUpperCase();
@@ -499,10 +550,31 @@ const AppNavigator = () => {
     };
 
     const Linking = require('react-native').Linking;
+    const { AppState } = require('react-native');
+
     Linking.getInitialURL().then(handleDeepLink);
-    const subscription = Linking.addEventListener('url', (event) => handleDeepLink(event.url));
+    const linkingSub = Linking.addEventListener('url', (event) => handleDeepLink(event.url));
+
+    // Listen to AppState (when user returns from browser or UPI app to Growvest)
+    const appStateSub = AppState.addEventListener('change', async (nextState) => {
+      if (nextState === 'active') {
+        const pendingRaw = await AsyncStorage.getItem('pendingPaymentContext');
+        if (pendingRaw) {
+          try {
+            const pendingCtx = JSON.parse(pendingRaw);
+            if (pendingCtx?.orderId) {
+              await verifyPendingPayment(pendingCtx.orderId);
+            }
+          } catch (e) {
+            console.warn('[AppState] Parse error:', e.message);
+          }
+        }
+      }
+    });
+
     return () => {
-      if (subscription && subscription.remove) subscription.remove();
+      if (linkingSub && linkingSub.remove) linkingSub.remove();
+      if (appStateSub && appStateSub.remove) appStateSub.remove();
     };
   }, []);
 

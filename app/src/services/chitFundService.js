@@ -144,8 +144,8 @@ export const chitFundService = {
    * @param {string} memberId - Chit member ID
    * @returns {Promise<Object>} Withdrawal response
    */
-  withdrawChitPayout: async (memberId) => {
-    const response = await api.post(`/chits/${memberId}/withdraw`);
+  withdrawChitPayout: async (memberId, payload = {}) => {
+    const response = await api.post(`/chits/${memberId}/withdraw`, payload);
     return response.data;
   },
 };
