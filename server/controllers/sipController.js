@@ -544,32 +544,45 @@ exports.cancelPendingSIP = async (req, res) => {
   }
 };
 
-// Helper to calculate real-time accrued interest at 26% p.a. based on contribution paid dates
+// Helper to calculate real-time accrued interest at 26% p.a. based on contribution periods
 const calculateSIPInterest = (sip, contributions = []) => {
-  const now = Date.now();
   const annualRate = (Number(sip.interestRate) || 26) / 100;
-  const dailyRate = annualRate / 365;
+  const frequency = sip.frequency || 'monthly';
+  const periodicRate = frequency === 'daily'
+    ? (annualRate / 365)
+    : frequency === 'weekly'
+    ? ((annualRate * 7) / 365)
+    : (annualRate / 12);
 
+  const paidContributions = contributions
+    .filter((c) => c.paymentStatus === 'paid')
+    .sort((a, b) => (a.installmentNumber || 0) - (b.installmentNumber || 0));
+
+  const k = paidContributions.length;
   let accruedInterest = 0;
-  const paidContributions = contributions.filter(c => c.paymentStatus === 'paid');
 
-  for (const c of paidContributions) {
-    const paidDate = c.paidAt ? new Date(c.paidAt) : new Date(c.createdAt || sip.createdAt);
-    const daysElapsed = Math.max(0, Math.floor((now - paidDate.getTime()) / (1000 * 60 * 60 * 24)));
-    const itemInterest = (Number(c.amount) || 0) * dailyRate * daysElapsed;
+  for (let idx = 0; idx < k; idx++) {
+    const c = paidContributions[idx];
+    const amount = Number(c.amount) || 0;
+    // Contribution at idx has accrued interest for (k - idx) completed contribution periods
+    const periodsActive = Math.max(1, k - idx);
+    const itemInterest = amount * periodicRate * periodsActive;
     accruedInterest += itemInterest;
   }
 
-  const isFullMaturity = sip.status === 'completed' && (sip.contributionsCompleted >= sip.totalContributions);
+  const isFullMaturity =
+    (sip.status === 'completed' && (sip.contributionsCompleted >= sip.totalContributions)) ||
+    (sip.totalContributions > 0 && k >= sip.totalContributions);
+
   const interestEarned = isFullMaturity
     ? Math.max(Number(accruedInterest.toFixed(2)), Number(sip.expectedInterest) || 0)
     : Number(accruedInterest.toFixed(2));
 
-  const totalPaid = Number(sip.totalPaidAmount) || 0;
+  const totalPaid = Number(sip.totalPaidAmount) || (k * (Number(sip.amount) || 0));
   const withdrawn = Number(sip.withdrawnAmount) || 0;
 
-  // If cancelled/closed before maturity, do not grant bonus expected interest
-  const withdrawableInterest = (sip.status === 'cancelled' && sip.contributionsCompleted < sip.totalContributions)
+  // If cancelled/closed before maturity, do not grant maturity interest
+  const withdrawableInterest = (sip.status === 'cancelled' && k < sip.totalContributions)
     ? 0
     : interestEarned;
   const availableToWithdraw = Math.max(0, Number((totalPaid + withdrawableInterest - withdrawn).toFixed(2)));

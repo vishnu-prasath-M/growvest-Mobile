@@ -58,7 +58,13 @@ const SIPDashboardScreen = ({ navigation }) => {
     loadSIPData();
   };
 
-  const formatCurrency = (amount) => `₹${Number(amount || 0).toLocaleString('en-IN')}`;
+  const formatCurrency = (amount) => {
+    const num = Number(amount || 0);
+    if (num > 0 && num < 10) {
+      return `₹${num.toFixed(2)}`;
+    }
+    return `₹${num.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+  };
 
   const formatDate = (dateStr) => {
     if (!dateStr) return 'N/A';
@@ -294,7 +300,7 @@ const SIPDashboardScreen = ({ navigation }) => {
                     <Text style={styles.cardDetailValue}>{formatCurrency(item.totalPaidAmount)}</Text>
                   </View>
                   <View style={styles.cardDetailItem}>
-                    <Text style={styles.cardDetailLabel}>RETURNS (26%)</Text>
+                    <Text style={styles.cardDetailLabel}>RETURNS (26% p.a.)</Text>
                     <Text style={[styles.cardDetailValue, { color: '#10B981', fontWeight: '800' }]}>
                       +{formatCurrency(item.interestEarned || 0)}
                     </Text>

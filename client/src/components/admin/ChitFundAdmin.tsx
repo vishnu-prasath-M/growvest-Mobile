@@ -352,7 +352,7 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
           { key: "chits", label: `All Chits (${chits.length || overview.totalChits || 0})` },
           { key: "create", label: editingChit ? "Edit Chit" : "Create Chit" },
           { key: "joins", label: `Enrolled Members (${joins.length || overview.totalMembers || 0})` },
-          { key: "payments", label: `Pending Payments (${payments.filter((p: any) => p.status === 'pending').length || overview.pendingPayments || 0})` },
+          { key: "payments", label: `Pending Dues (${payments.filter((p: any) => p.status === 'pending').length || overview.pendingPayments || 0})` },
           { key: "analytics", label: "Analytics" },
         ].map(tab => (
           <Button 
@@ -836,9 +836,16 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
         </div>
       )}
 
-      {/* ─── PENDING PAYMENTS ───────────────────────────────────────── */}
+      {/* ─── PENDING DUES & PAYMENTS ───────────────────────────────── */}
       {subTab === "payments" && (
         <div>
+          <div className="bg-emerald-50/80 border border-emerald-200 text-emerald-900 rounded-xl p-3.5 mb-4 text-xs flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>
+              <strong>Auto-Approval Active:</strong> User installment payments made through Cashfree payment gateway are automatically verified & marked as Paid in real-time. Entries below are weekly dues awaiting user online payment, or can be marked as received if collected offline via cash.
+            </span>
+          </div>
+
           <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
@@ -856,8 +863,8 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-1">
                       <h3 className="font-bold">{p.userName}</h3>
-                      <span className={`text-[10px] font-bold px-2 py-1 rounded-full border ${statusStyle[p.status] || ''}`}>
-                        {p.status}
+                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full border bg-amber-50 text-amber-700 border-amber-200">
+                        Pending User Payment (Due)
                       </span>
                     </div>
                     <p className="text-sm text-muted-foreground">{p.userEmail}</p>
@@ -866,20 +873,20 @@ export default function ChitFundAdmin({ token }: ChitFundAdminProps) {
                     </p>
                     <p className="text-sm">Amount: ₹{p.amount?.toLocaleString('en-IN')}</p>
                     {p.lateFee > 0 && <p className="text-xs text-amber-600">Late Fee: ₹{p.lateFee}</p>}
-                    <p className="text-xs text-muted-foreground mt-1">Submitted: {new Date(p.createdAt).toLocaleDateString()}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Generated / Due: {new Date(p.createdAt).toLocaleDateString()}</p>
                   </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" className="text-red-600 border-red-200" onClick={() => handleAction('payment', p._id, 'rejected')} disabled={loading}>
-                      <XCircle className="w-4 h-4 mr-1" /> Reject
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Button size="sm" variant="outline" className="text-muted-foreground hover:text-red-600 border-border text-xs" onClick={() => handleAction('payment', p._id, 'rejected')} disabled={loading}>
+                      <XCircle className="w-3.5 h-3.5 mr-1" /> Waive / Dismiss
                     </Button>
-                    <Button size="sm" onClick={() => handleAction('payment', p._id, 'paid')} disabled={loading}>
-                      <CheckCircle className="w-4 h-4 mr-1" /> Approve
+                    <Button size="sm" className="text-xs" onClick={() => handleAction('payment', p._id, 'paid')} disabled={loading}>
+                      <CheckCircle className="w-3.5 h-3.5 mr-1" /> Mark Paid (Cash)
                     </Button>
                   </div>
                 </div>
               </div>
             ))}
-            {filteredPayments.length === 0 && <p className="text-muted-foreground p-4">No pending payments.</p>}
+            {filteredPayments.length === 0 && <p className="text-muted-foreground p-4">No pending dues or payments.</p>}
           </div>
         </div>
       )}

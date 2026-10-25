@@ -295,12 +295,25 @@ const getMyChits = async (req, res) => {
       const isWeekly = chit?.isWeekly || false;
       const paidUnits = paidMonthsByMember[m._id.toString()] || new Set();
       const paidCount = paidUnits.size;
-      const currentUnit = m.status === 'active' ? Math.max(1, isWeekly ? (m.currentWeek || 0) : (m.currentMonth || 0), paidCount) : 0;
       const durationUnits = isWeekly ? (chit?.totalWeeks || 0) : (chit?.duration || 0);
-
-      const progress = durationUnits
-        ? Math.round((currentUnit / durationUnits) * 100)
+      const rawUnit = (m.status === 'active' || m.status === 'completed' || m.status === 'approved')
+        ? Math.max(1, isWeekly ? (m.currentWeek || 0) : (m.currentMonth || 0), paidCount)
         : 0;
+
+      const baseAmount = isWeekly ? (chit?.weeklyAmount || 0) : (chit?.monthlyAmount || 0);
+      const totalContribution = chit?.totalContribution || chit?.totalPot || (baseAmount * durationUnits);
+      const totalPaid = (m.status === 'active' || m.status === 'completed' || m.status === 'approved')
+        ? Math.max(baseAmount, m.totalPaid || 0, paidCount * baseAmount)
+        : 0;
+      const remainingAmount = Math.max(0, totalContribution - totalPaid);
+
+      // Check if chit membership is fully completed
+      const isCompleted = m.status === 'completed' || remainingAmount <= 0 || (durationUnits > 0 && paidCount >= durationUnits) || (durationUnits > 0 && rawUnit >= durationUnits && remainingAmount <= 0);
+
+      const currentUnit = durationUnits > 0 ? Math.min(rawUnit, durationUnits) : rawUnit;
+      const progress = isCompleted
+        ? 100
+        : (durationUnits ? Math.min(100, Math.round((currentUnit / durationUnits) * 100)) : 0);
 
       const joinedDate = new Date(m.joinedAt || m.createdAt || Date.now());
       const currentDate = new Date();
@@ -318,27 +331,25 @@ const getMyChits = async (req, res) => {
       }
       
       let pendingInstallments = 0;
-      for (let i = currentUnit + 1; i <= Math.min(expectedUnits, durationUnits); i++) {
-        if (!paidUnits.has(i)) {
-          pendingInstallments++;
+      if (!isCompleted) {
+        for (let i = currentUnit + 1; i <= Math.min(expectedUnits, durationUnits); i++) {
+          if (!paidUnits.has(i)) {
+            pendingInstallments++;
+          }
         }
       }
 
-      const nextDueDate = currentUnit < durationUnits
+      const nextDueDate = (!isCompleted && currentUnit < durationUnits)
         ? (isWeekly ? calcNextWeeklyDueDate(m.joinedAt, currentUnit) : calcNextDueDate(m.joinedAt, currentUnit))
         : null;
 
-      const baseAmount = isWeekly ? (chit?.weeklyAmount || 0) : (chit?.monthlyAmount || 0);
       const amountWithFee = baseAmount; // NO processing fee!
-      const nextDueAmount = pendingInstallments > 0 ? amountWithFee * pendingInstallments : amountWithFee;
+      const nextDueAmount = isCompleted ? 0 : (pendingInstallments > 0 ? amountWithFee * pendingInstallments : amountWithFee);
 
       const totalMembers = chit?.totalMembers || 0;
       const availableSlots = chit?.availableSlots || 0;
       const filledMembers = Math.max(0, totalMembers - availableSlots);
       const remainingInstallments = Math.max(0, durationUnits - currentUnit);
-      const totalContribution = chit?.totalContribution || chit?.totalPot || (baseAmount * durationUnits);
-      const totalPaid = (m.status === 'active' || m.status === 'completed' || m.status === 'approved') ? Math.max(baseAmount, m.totalPaid || 0, paidCount * baseAmount) : 0;
-      const remainingAmount = Math.max(0, totalContribution - totalPaid);
       const lockedCount = Math.floor((durationUnits - 1) / 2);
       const isUnlocked = currentUnit > lockedCount;
       const isSettlement = currentUnit >= durationUnits;
@@ -393,6 +404,7 @@ const getMyChits = async (req, res) => {
         nextDueAmount,
         pendingInstallments,
         progress,
+        isCompleted,
         joinedAt: m.joinedAt,
       };
     });

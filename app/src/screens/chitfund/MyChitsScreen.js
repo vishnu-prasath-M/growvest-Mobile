@@ -88,7 +88,15 @@ const MyChitsScreen = ({ navigation }) => {
           chits.map((chit) => {
             const isPending = chit.status === 'pending';
             const isRejected = chit.status === 'rejected';
-            const progressColor = getProgressColor(chit.progress);
+            const isCompletedChit = Boolean(
+              chit.isCompleted ||
+              (chit.remainingAmount !== undefined && Number(chit.remainingAmount) <= 0) ||
+              (chit.duration > 0 && (chit.totalWeeks > 0 ? chit.currentWeek : chit.currentMonth) >= chit.duration && Number(chit.remainingAmount || 0) <= 0) ||
+              chit.status === 'completed'
+            );
+            const displayProgress = isCompletedChit ? 100 : Math.min(100, Math.max(0, chit.progress || 0));
+            const progressColor = getProgressColor(displayProgress);
+            const currentUnitDisplay = Math.min(chit.duration || 1, chit.totalWeeks > 0 ? Math.max(1, chit.currentWeek || 1) : Math.max(1, chit.currentMonth || 1));
             return (
               <TouchableOpacity
                 key={chit._id}
@@ -162,10 +170,10 @@ const MyChitsScreen = ({ navigation }) => {
                     <View style={styles.progressSection}>
                       <View style={styles.progressRow}>
                         <Text style={styles.progressLabel}>Payment Progress</Text>
-                        <Text style={[styles.progressVal, { color: progressColor }]}>{chit.progress}%</Text>
+                        <Text style={[styles.progressVal, { color: progressColor }]}>{displayProgress}%</Text>
                       </View>
                       <View style={styles.progressBarBg}>
-                        <View style={[styles.progressBarFill, { width: `${chit.progress}%`, backgroundColor: progressColor }]} />
+                        <View style={[styles.progressBarFill, { width: `${displayProgress}%`, backgroundColor: progressColor }]} />
                       </View>
                     </View>
 
@@ -173,7 +181,7 @@ const MyChitsScreen = ({ navigation }) => {
                       <View style={styles.chitDetailItem}>
                         <Text style={styles.chitDetailLabel}>{chit.totalWeeks > 0 ? 'Week' : 'Month'}</Text>
                         <Text style={styles.chitDetailValue}>
-                          {chit.totalWeeks > 0 ? Math.max(1, chit.currentWeek || 1) : Math.max(1, chit.currentMonth || 1)}/{chit.duration}
+                          {currentUnitDisplay}/{chit.duration}
                         </Text>
                       </View>
                       <View style={styles.chitDetailItem}>
@@ -182,17 +190,26 @@ const MyChitsScreen = ({ navigation }) => {
                       </View>
                       <View style={styles.chitDetailItem}>
                         <Text style={styles.chitDetailLabel}>Remaining</Text>
-                        <Text style={styles.chitDetailValue}>{formatCurrency(chit.remainingAmount)}</Text>
+                        <Text style={styles.chitDetailValue}>{formatCurrency(isCompletedChit ? 0 : chit.remainingAmount)}</Text>
                       </View>
                     </View>
 
                     <View style={styles.chitDivider} />
 
                     <View style={styles.chitFooter}>
-                      <View style={styles.chitDueInfo}>
-                        <MaterialCommunityIcons name="calendar-alert" size={16} color={colors.gold} />
-                        <Text style={styles.chitDueText}>Due {chit.nextDueDate}: {formatCurrency(chit.nextDueAmount)}</Text>
-                      </View>
+                      {isCompletedChit ? (
+                        <View style={styles.chitCompletedInfo}>
+                          <MaterialCommunityIcons name="calendar-check" size={16} color="#10B981" />
+                          <Text style={styles.chitCompletedText}>
+                            🎉 Completed • Payout will be provided on Sunday
+                          </Text>
+                        </View>
+                      ) : (
+                        <View style={styles.chitDueInfo}>
+                          <MaterialCommunityIcons name="calendar-alert" size={16} color={colors.gold} />
+                          <Text style={styles.chitDueText}>Due {chit.nextDueDate ? chit.nextDueDate : ''}: {formatCurrency(chit.nextDueAmount)}</Text>
+                        </View>
+                      )}
                       <View style={[styles.winBadge, chit.hasWon ? styles.wonBadge : styles.notWonBadge]}>
                         <MaterialCommunityIcons
                           name={chit.hasWon ? 'trophy' : 'clock-outline'}
@@ -268,6 +285,8 @@ const getStyles = (colors) => StyleSheet.create({
   chitFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   chitDueInfo: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 },
   chitDueText: { fontSize: 13, color: colors.textSecondary, fontWeight: '500' },
+  chitCompletedInfo: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 },
+  chitCompletedText: { fontSize: 12, color: '#10B981', fontWeight: '700', flexShrink: 1 },
   winBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, gap: 4 },
   wonBadge: { backgroundColor: colors.successLight },
   notWonBadge: { backgroundColor: colors.background },
