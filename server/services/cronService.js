@@ -172,13 +172,24 @@ const sendMorningFinancialTip = async () => {
 
     console.log(`[CronService] Broadcasting morning tip to ${users.length} users: "${tip.title}"`);
 
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
     let count = 0;
     for (const user of users) {
+      // De-duplication: Prevent sending the same morning tip more than once per day
+      const alreadySent = await Notification.findOne({
+        userId: user._id,
+        title: tip.title,
+        createdAt: { $gte: todayStart },
+      });
+      if (alreadySent) continue;
+
       await sendUserNotification(
         user._id,
         tip.title,
         tip.body,
-        'general',
+        'morning_tip',
         { screen: 'Home' }
       );
       count++;
@@ -207,13 +218,24 @@ const sendEveningEngagementNotification = async () => {
 
     console.log(`[CronService] Broadcasting evening promo to ${users.length} users: "${promo.title}"`);
 
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
     let count = 0;
     for (const user of users) {
+      // De-duplication: Prevent sending the same evening promo more than once per day
+      const alreadySent = await Notification.findOne({
+        userId: user._id,
+        title: promo.title,
+        createdAt: { $gte: todayStart },
+      });
+      if (alreadySent) continue;
+
       await sendUserNotification(
         user._id,
         promo.title,
         promo.body,
-        'general',
+        'evening_promo',
         { screen: 'Home' }
       );
       count++;

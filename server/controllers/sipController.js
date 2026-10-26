@@ -547,9 +547,10 @@ exports.cancelPendingSIP = async (req, res) => {
 // Helper to calculate real-time accrued interest at 26% p.a. based on contribution periods
 const calculateSIPInterest = (sip, contributions = []) => {
   const annualRate = (Number(sip.interestRate) || 26) / 100;
+  const dailyRate = annualRate / 365;
   const frequency = sip.frequency || 'monthly';
   const periodicRate = frequency === 'daily'
-    ? (annualRate / 365)
+    ? dailyRate
     : frequency === 'weekly'
     ? ((annualRate * 7) / 365)
     : (annualRate / 12);
@@ -580,6 +581,12 @@ const calculateSIPInterest = (sip, contributions = []) => {
 
   const totalPaid = Number(sip.totalPaidAmount) || (k * (Number(sip.amount) || 0));
   const withdrawn = Number(sip.withdrawnAmount) || 0;
+  const activePrincipal = Math.max(0, totalPaid - withdrawn);
+
+  // Exact interest earned per day on active principal (26% p.a. / 365)
+  const dailyInterest = (sip.status === 'cancelled' || activePrincipal <= 0)
+    ? 0
+    : Number((activePrincipal * dailyRate).toFixed(2));
 
   // If cancelled/closed before maturity, do not grant maturity interest
   const withdrawableInterest = (sip.status === 'cancelled' && k < sip.totalContributions)
@@ -590,6 +597,7 @@ const calculateSIPInterest = (sip, contributions = []) => {
 
   return {
     interestEarned,
+    dailyInterest,
     accruedInterest: Number(accruedInterest.toFixed(2)),
     availableToWithdraw,
     currentValue,
@@ -635,6 +643,7 @@ exports.getMySIPs = async (req, res) => {
     }
 
     let totalInterestEarned = 0;
+    let totalDailyInterest = 0;
     const enrichedSips = sips.map((s) => {
       const sId = s._id.toString();
       const myPaid = contribsBySip[sId] || [];
@@ -642,6 +651,7 @@ exports.getMySIPs = async (req, res) => {
 
       if (s.status !== 'cancelled' || s.contributionsCompleted >= s.totalContributions) {
         totalInterestEarned += stats.interestEarned;
+        totalDailyInterest += stats.dailyInterest;
       }
 
       return {
@@ -654,6 +664,7 @@ exports.getMySIPs = async (req, res) => {
     const activeSIPCount = sips.filter((s) => s.status === 'active').length;
     const totalContributionsPaid = sips.reduce((sum, s) => sum + (s.contributionsCompleted || 0), 0);
     totalInterestEarned = Number(totalInterestEarned.toFixed(2));
+    totalDailyInterest = Number(totalDailyInterest.toFixed(2));
     const totalCurrentValue = Number((totalSIPInvested + totalInterestEarned).toFixed(2));
 
     // Find nearest upcoming due date among active SIPs
@@ -667,6 +678,7 @@ exports.getMySIPs = async (req, res) => {
       summary: {
         totalSIPInvested,
         totalInterestEarned,
+        totalDailyInterest,
         totalCurrentValue,
         activeSIPCount,
         totalContributionsPaid,

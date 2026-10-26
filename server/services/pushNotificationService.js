@@ -219,8 +219,73 @@ const sendToUser = async (userId, payload) => {
   }
 };
 
+/**
+ * Broadcast push notification to all users who have registered push tokens.
+ */
+const sendToAllUsers = async (payload) => {
+  console.log('[PushService] sendToAllUsers broadcast initiated...');
+  try {
+    const users = await User.find({
+      'fcmTokens.0': { $exists: true },
+    }).select('fcmTokens email username');
+
+    if (!users.length) {
+      console.warn('[PushService] sendToAllUsers: No users found with registered tokens.');
+      return { success: false, reason: 'no_tokens', count: 0 };
+    }
+
+    const allExpoTokens = [];
+    const allFcmTokens = [];
+
+    for (const u of users) {
+      const tokens = (u.fcmTokens || []).map((t) => t.token).filter(Boolean);
+      for (const tok of tokens) {
+        if (tok.startsWith('ExponentPushToken') || tok.startsWith('ExpoPushToken')) {
+          allExpoTokens.push(tok);
+        } else {
+          allFcmTokens.push(tok);
+        }
+      }
+    }
+
+    const uniqueExpoTokens = [...new Set(allExpoTokens)];
+    const uniqueFcmTokens = [...new Set(allFcmTokens)];
+
+    console.log(
+      `[PushService] Broadcasting to ${users.length} users: ${uniqueExpoTokens.length} Expo tokens, ${uniqueFcmTokens.length} FCM tokens.`
+    );
+
+    let expoSuccess = false;
+    // Expo allows up to 100 messages per HTTP batch
+    if (uniqueExpoTokens.length > 0) {
+      const chunkSize = 100;
+      for (let i = 0; i < uniqueExpoTokens.length; i += chunkSize) {
+        const chunk = uniqueExpoTokens.slice(i, i + chunkSize);
+        const res = await sendToTokens(chunk, payload);
+        if (res.success) expoSuccess = true;
+      }
+    }
+
+    if (uniqueFcmTokens.length > 0) {
+      for (const tok of uniqueFcmTokens) {
+        await sendWebFCMNotification(tok, payload);
+      }
+    }
+
+    return {
+      success: true,
+      userCount: users.length,
+      tokenCount: uniqueExpoTokens.length + uniqueFcmTokens.length,
+    };
+  } catch (error) {
+    console.error('[PushService] Error in sendToAllUsers:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 module.exports = {
   isPushConfigured: () => true,
   sendToUser,
   sendToTokens,
+  sendToAllUsers,
 };

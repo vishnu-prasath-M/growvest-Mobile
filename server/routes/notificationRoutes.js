@@ -25,17 +25,34 @@ router.post('/', protect, admin, createNotification);
 router.post('/test-push', protect, admin, async (req, res) => {
   try {
     const { targetUserId, title, body } = req.body;
-    const userId = targetUserId || req.user._id || req.user.id;
-
-    if (!userId) {
-      return res.status(400).json({ success: false, message: 'targetUserId or authenticated user required' });
-    }
 
     const payload = {
       title: title || 'Test from Admin',
       body: body || 'Push notification is working!',
       data: { type: 'admin_test', sentAt: new Date().toISOString() },
     };
+
+    // Broadcast to all users
+    if (targetUserId === 'ALL' || targetUserId === 'all') {
+      console.log(`[TestPush] Admin ${req.user._id} broadcasting test push to ALL users...`);
+      const result = await pushNotificationService.sendToAllUsers(payload);
+      if (result.success) {
+        return res.json({
+          success: true,
+          message: `Broadcast sent to ${result.userCount} active users (${result.tokenCount} registered devices)!`,
+        });
+      } else {
+        const reason = result.reason === 'no_tokens'
+          ? 'No users have registered device tokens. Ask users to open the app and log in first.'
+          : result.error || 'Failed to dispatch broadcast';
+        return res.status(400).json({ success: false, message: reason });
+      }
+    }
+
+    const userId = targetUserId || req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'targetUserId or authenticated user required' });
+    }
 
     console.log('[TestPush] Admin ' + req.user._id + ' sending test push to user ' + userId);
     const result = await pushNotificationService.sendToUser(userId, payload);

@@ -1,15 +1,8 @@
 name: Daily Push Notifications & Cron Trigger
 
+# Automated schedules are handled exclusively by cronjob.org to avoid duplicate pushes.
+# Manual trigger remains available via workflow_dispatch.
 on:
-  schedule:
-    # === MORNING POCKET MONEY CHECK: 3:00 AM UTC = 8:30 AM IST ===
-    - cron: '0 3 * * *'
-    # === CHIT DUE REMINDERS (4-DAY WINDOW): 4:30 AM UTC = 10:00 AM IST ===
-    - cron: '30 4 * * *'
-    # === AFTERNOON FINANCIAL TIP: 8:30 AM UTC = 2:00 PM IST ===
-    - cron: '30 8 * * *'
-    # === EVENING ENGAGEMENT: 1:00 PM UTC = 6:30 PM IST ===
-    - cron: '0 13 * * *'
   workflow_dispatch:
     inputs:
       type:

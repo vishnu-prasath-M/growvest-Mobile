@@ -163,7 +163,7 @@ const SIPDashboardScreen = ({ navigation }) => {
               <View style={styles.returnsPill}>
                 <MaterialCommunityIcons name="trending-up" size={13} color="#4ADE80" />
                 <Text style={styles.returnsPillText}>
-                  +{formatCurrency(summary.totalInterestEarned || 0)} Returns (26% p.a.)
+                  +{formatCurrency(summary.totalDailyInterest || 0)}/day (26% p.a.)
                 </Text>
               </View>
             </View>
@@ -181,9 +181,9 @@ const SIPDashboardScreen = ({ navigation }) => {
               <Text style={styles.heroStatValue}>{formatCurrency(summary.totalSIPInvested)}</Text>
             </View>
             <View style={styles.heroStatItem}>
-              <Text style={styles.heroStatLabel}>Total Returns</Text>
+              <Text style={styles.heroStatLabel}>Daily Return</Text>
               <Text style={[styles.heroStatValue, { color: '#4ADE80' }]}>
-                +{formatCurrency(summary.totalInterestEarned || 0)}
+                +{formatCurrency(summary.totalDailyInterest || 0)}/day
               </Text>
             </View>
             <View style={styles.heroStatItem}>
@@ -300,9 +300,9 @@ const SIPDashboardScreen = ({ navigation }) => {
                     <Text style={styles.cardDetailValue}>{formatCurrency(item.totalPaidAmount)}</Text>
                   </View>
                   <View style={styles.cardDetailItem}>
-                    <Text style={styles.cardDetailLabel}>RETURNS (26% p.a.)</Text>
+                    <Text style={styles.cardDetailLabel}>DAILY RETURN</Text>
                     <Text style={[styles.cardDetailValue, { color: '#10B981', fontWeight: '800' }]}>
-                      +{formatCurrency(item.interestEarned || 0)}
+                      +{formatCurrency(item.dailyInterest || 0)}/day
                     </Text>
                   </View>
                   <View style={styles.cardDetailItem}>

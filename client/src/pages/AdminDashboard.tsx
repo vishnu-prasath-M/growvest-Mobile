@@ -209,8 +209,8 @@ const AdminDashboard = () => {
       }
 
       if (res.ok && data.success) {
-        setTestPushResult({ success: true, message: "Push dispatched! Check the target device." });
-        toast.success("Push notification sent!");
+        setTestPushResult({ success: true, message: data.message || "Push dispatched! Check the target device." });
+        toast.success(data.message || "Push notification sent!");
       } else {
         setTestPushResult({ success: false, message: data.message || "Failed to dispatch push notification" });
         toast.error(data.message || "Push notification failed");
@@ -1825,6 +1825,7 @@ const AdminDashboard = () => {
                       onChange={(e) => setTestPushTargetUserId(e.target.value)}
                     >
                       <option value="">— Me (Admin) —</option>
+                      <option value="ALL">📢 All Logged In Users (Broadcast to Everyone)</option>
                       {allUsers.map((u: any) => (
                         <option key={u._id} value={u._id}>{u.username} ({u.email || u.mobileNumber})</option>
                       ))}
