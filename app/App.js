@@ -21,6 +21,8 @@ import { AppLockOverlay } from './src/components/AppLockOverlay';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { FeedbackProvider } from './src/context/FeedbackContext';
 import { AlertProvider } from './src/context/AlertContext';
+import { AppUpdateProvider } from './src/context/AppUpdateContext';
+import { AppUpdateModal } from './src/components/AppUpdateModal';
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -88,47 +90,50 @@ function AppContent() {
         <AuthProvider>
           <DailyRewardProvider>
             <AppLockProvider>
-              <NavigationContainer
-                ref={navigationRef}
-                linking={{
-                  prefixes: [
-                    'growvest://',
-                    'https://growvest-mobile.onrender.com',
-                  ],
-                  config: {
-                    screens: {
-                      // Deep link: growvest://reset-password?token=XXX
-                      // or https://growvest-mobile.onrender.com/reset-password?token=XXX
-                      ResetPassword: {
-                        path: 'reset-password',
-                        parse: { token: (token) => token },
+              <AppUpdateProvider>
+                <NavigationContainer
+                  ref={navigationRef}
+                  linking={{
+                    prefixes: [
+                      'growvest://',
+                      'https://growvest-mobile.onrender.com',
+                    ],
+                    config: {
+                      screens: {
+                        // Deep link: growvest://reset-password?token=XXX
+                        // or https://growvest-mobile.onrender.com/reset-password?token=XXX
+                        ResetPassword: {
+                          path: 'reset-password',
+                          parse: { token: (token) => token },
+                        },
+                        ForgotPassword: 'forgot-password',
+                        Login: 'login',
+                        Signup: 'signup',
                       },
-                      ForgotPassword: 'forgot-password',
-                      Login: 'login',
-                      Signup: 'signup',
                     },
-                  },
-                }}
-                theme={{
-                  colors: {
-                    primary: activeTheme.colors.primary,
-                    background: activeTheme.colors.background,
-                    card: activeTheme.colors.surface,
-                    text: activeTheme.colors.text,
-                    border: activeTheme.colors.border,
-                    notification: activeTheme.colors.primary,
-                  },
-                  dark: isDarkMode,
-                }}
-              >
-                <StatusBar
-                  style={isDarkMode ? 'light' : 'dark'}
-                  translucent
-                  backgroundColor="transparent"
-                />
-                <AppNavigator />
-              </NavigationContainer>
-              <AppLockOverlay />
+                  }}
+                  theme={{
+                    colors: {
+                      primary: activeTheme.colors.primary,
+                      background: activeTheme.colors.background,
+                      card: activeTheme.colors.surface,
+                      text: activeTheme.colors.text,
+                      border: activeTheme.colors.border,
+                      notification: activeTheme.colors.primary,
+                    },
+                    dark: isDarkMode,
+                  }}
+                >
+                  <StatusBar
+                    style={isDarkMode ? 'light' : 'dark'}
+                    translucent
+                    backgroundColor="transparent"
+                  />
+                  <AppNavigator />
+                </NavigationContainer>
+                <AppLockOverlay />
+                <AppUpdateModal />
+              </AppUpdateProvider>
             </AppLockProvider>
           </DailyRewardProvider>
         </AuthProvider>

@@ -211,13 +211,14 @@ exports.syncApkFromGridFSToDisk = syncApkFromGridFSToDisk;
 exports.setExternalApkUrl = async (req, res) => {
   try {
     const adminId = req.user._id || req.user.id;
-    const { externalUrl, fileName, version } = req.body;
+    const { externalUrl, fileName, version, releaseNotes } = req.body;
 
     if (!externalUrl || !externalUrl.trim().startsWith('http')) {
       return res.status(400).json({ message: 'Valid external HTTP/HTTPS download URL is required' });
     }
 
-    const name = (fileName || 'Growvest.apk').trim();
+    const cleanVer = (version || '1.0.0').toString().trim().replace(/^v/i, '');
+    const name = (fileName || `Growvest v${cleanVer}.apk`).trim();
 
     await APKRelease.updateMany({}, { status: 'inactive' });
 
@@ -226,7 +227,8 @@ exports.setExternalApkUrl = async (req, res) => {
       fileSize: 0,
       storagePath: '/downloads/growvest-latest.apk',
       externalUrl: externalUrl.trim(),
-      version: version || '1.0.0',
+      version: cleanVer,
+      releaseNotes: (releaseNotes || '').toString().trim(),
       uploadedBy: adminId,
       status: 'active',
       downloadCount: 0,
@@ -260,6 +262,7 @@ exports.getActiveAPK = async (req, res) => {
       fileName: activeApk.fileName,
       fileSize: activeApk.fileSize,
       version: activeApk.version,
+      releaseNotes: activeApk.releaseNotes || '',
       externalUrl: activeApk.externalUrl || '',
       uploadedAt: activeApk.uploadedAt,
       downloadCount: activeApk.downloadCount,

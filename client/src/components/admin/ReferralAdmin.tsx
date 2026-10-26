@@ -61,6 +61,8 @@ const ReferralAdmin = ({ token }: ReferralAdminProps) => {
   const [uploadError, setUploadError] = useState("");
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [externalUrlInput, setExternalUrlInput] = useState("");
+  const [externalVersionInput, setExternalVersionInput] = useState("");
+  const [releaseNotesInput, setReleaseNotesInput] = useState("");
   const [savingExternalUrl, setSavingExternalUrl] = useState(false);
   const [externalUrlMsg, setExternalUrlMsg] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -226,6 +228,7 @@ const ReferralAdmin = ({ token }: ReferralAdminProps) => {
     setSavingExternalUrl(true);
     setExternalUrlMsg("");
     try {
+      const cleanVer = externalVersionInput.trim().replace(/^v/i, '') || "1.0.1";
       const res = await fetch(`${API_URL}/api/referral/admin/apk/url`, {
         method: "POST",
         headers: {
@@ -234,13 +237,16 @@ const ReferralAdmin = ({ token }: ReferralAdminProps) => {
         },
         body: JSON.stringify({
           externalUrl: externalUrlInput.trim(),
-          fileName: "Growvest v1.2.apk",
-          version: `v1.0.${Date.now().toString().slice(-3)}`,
+          fileName: `Growvest v${cleanVer}.apk`,
+          version: cleanVer,
+          releaseNotes: releaseNotesInput.trim(),
         }),
       });
       if (res.ok) {
-        setExternalUrlMsg("External APK download URL configured successfully!");
+        setExternalUrlMsg(`External APK configured for v${cleanVer}! Users can now update in-app.`);
         setExternalUrlInput("");
+        setExternalVersionInput("");
+        setReleaseNotesInput("");
         fetchApkDetails();
         fetchReferralOverview();
       } else {
@@ -649,24 +655,42 @@ const ReferralAdmin = ({ token }: ReferralAdminProps) => {
             {/* Optional: External Download URL */}
             <div className="mt-6 pt-6 border-t border-border">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs font-heading font-bold text-foreground">OR Configure External Download URL</span>
-                <span className="text-[10px] text-muted-foreground">(Google Drive, Cloudinary, AWS S3, GitHub Release)</span>
+                <span className="text-xs font-heading font-bold text-foreground">OR Configure External Download URL (GitHub Release / CDN)</span>
+                <span className="text-[10px] text-muted-foreground">(Powers in-app updates & web referral downloads)</span>
               </div>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <input
-                  type="url"
-                  placeholder="https://github.com/.../growvest.apk or https://drive.google.com/..."
-                  value={externalUrlInput}
-                  onChange={(e) => setExternalUrlInput(e.target.value)}
-                  className="flex-1 px-4 py-2.5 rounded-xl border border-border bg-background text-xs font-body focus:outline-none focus:border-primary"
-                />
-                <Button
-                  onClick={handleSaveExternalUrl}
-                  disabled={savingExternalUrl || !externalUrlInput.trim()}
-                  className="rounded-xl font-body text-xs h-10 px-5"
-                >
-                  {savingExternalUrl ? "Saving..." : "Save External Link"}
-                </Button>
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <input
+                    type="url"
+                    placeholder="https://github.com/.../releases/download/.../app-release.apk"
+                    value={externalUrlInput}
+                    onChange={(e) => setExternalUrlInput(e.target.value)}
+                    className="flex-1 px-4 py-2.5 rounded-xl border border-border bg-background text-xs font-body focus:outline-none focus:border-primary"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Version (e.g. 1.0.1)"
+                    value={externalVersionInput}
+                    onChange={(e) => setExternalVersionInput(e.target.value)}
+                    className="w-full sm:w-36 px-4 py-2.5 rounded-xl border border-border bg-background text-xs font-body focus:outline-none focus:border-primary font-mono"
+                  />
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <input
+                    type="text"
+                    placeholder="Release Notes / What's new (e.g. Added in-app updater, bug fixes)"
+                    value={releaseNotesInput}
+                    onChange={(e) => setReleaseNotesInput(e.target.value)}
+                    className="flex-1 px-4 py-2.5 rounded-xl border border-border bg-background text-xs font-body focus:outline-none focus:border-primary"
+                  />
+                  <Button
+                    onClick={handleSaveExternalUrl}
+                    disabled={savingExternalUrl || !externalUrlInput.trim()}
+                    className="rounded-xl font-body text-xs h-10 px-5 shrink-0"
+                  >
+                    {savingExternalUrl ? "Publishing..." : "Publish In-App Update"}
+                  </Button>
+                </div>
               </div>
               {externalUrlMsg && (
                 <p className="text-xs text-green-600 font-semibold mt-2">✓ {externalUrlMsg}</p>

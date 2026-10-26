@@ -30,10 +30,12 @@
     "scheme": "growvest",
     "android": {
       "package": "com.growvest.mobile",
+      "versionCode": 1,
       "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "REQUEST_INSTALL_PACKAGES"
       ],
       "intentFilters": [
         {

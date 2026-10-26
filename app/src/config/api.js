@@ -82,4 +82,8 @@ export const API_ENDPOINTS = {
   PAYMENT_VERIFY: '/payments/verify',
 
   CHIT_AUCTION: (id) => `/chits/${id}/auction`,
+
+  // APK & App Updates
+  APK_INFO: '/referral/apk',
+  APK_DOWNLOAD: '/referral/apk/download',
 };

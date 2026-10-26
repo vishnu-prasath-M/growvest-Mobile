@@ -8,6 +8,7 @@ const apkReleaseSchema = new mongoose.Schema({
   gridFsFileId: { type: mongoose.Schema.Types.ObjectId, default: null }, // GridFS reference for unlimited APK file size in MongoDB
   apkData: { type: Buffer, select: false }, // Persistent binary storage in MongoDB
   version: { type: String, default: '1.0.0' },
+  releaseNotes: { type: String, default: '' },
   uploadedAt: { type: Date, default: Date.now },
   uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   status: { type: String, enum: ['active', 'inactive'], default: 'active' },

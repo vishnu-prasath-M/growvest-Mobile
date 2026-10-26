@@ -15,6 +15,7 @@ import {
   Animated,
   Pressable,
   Easing,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -28,12 +29,14 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAppLock } from '../../context/AppLockContext';
 import { appLockService } from '../../services/appLockService';
 import { useAlert } from '../../context/AlertContext';
+import { useAppUpdate } from '../../context/AppUpdateContext';
 import SmoothToggle from '../../components/SmoothToggle';
 
 const ProfileScreen = ({ navigation }) => {
   const { isDarkMode, toggleTheme, colors: themeColors } = useTheme();
   const { isAppLockEnabled, isBiometricEnabled, refreshLockPreferences, activeUserId } = useAppLock();
   const { showConfirm, showSuccess, showError } = useAlert();
+  const { checkForUpdates, isChecking, updateInfo, currentVersion } = useAppUpdate();
   const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
   const [isScrolled, setIsScrolled] = useState(false);
@@ -456,6 +459,36 @@ const ProfileScreen = ({ navigation }) => {
                 <Text style={styles.menuLabel}>Contact Support</Text>
                 <MaterialCommunityIcons name="chevron-right" size={20} color={styles.chevronColor.color} />
               </TouchableOpacity>
+
+              <View style={styles.menuDivider} />
+
+              {/* Check for Updates */}
+              <TouchableOpacity
+                style={styles.menuRow}
+                activeOpacity={0.7}
+                onPress={() => checkForUpdates(true)}
+              >
+                <View style={styles.mintIconBox}>
+                  <MaterialCommunityIcons name="cellphone-arrow-down" size={20} color={styles.mintIconColor.color} />
+                </View>
+                <Text style={styles.menuLabel}>App Updates</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  {updateInfo?.isUpdateAvailable ? (
+                    <View style={styles.updateBadge}>
+                      <Text style={styles.updateBadgeText}>Update Available</Text>
+                    </View>
+                  ) : (
+                    <Text style={[styles.menuSubLabel, { color: themeColors.textMuted, fontSize: 12 }]}>
+                      v{currentVersion}
+                    </Text>
+                  )}
+                  {isChecking ? (
+                    <ActivityIndicator size="small" color="#10B981" />
+                  ) : (
+                    <MaterialCommunityIcons name="chevron-right" size={20} color={styles.chevronColor.color} />
+                  )}
+                </View>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -491,7 +524,9 @@ const ProfileScreen = ({ navigation }) => {
             <Text style={styles.logoutText}>Log out</Text>
           </TouchableOpacity>
 
-          <Text style={styles.versionText}>Growvest v1.0.0</Text>
+          <TouchableOpacity activeOpacity={0.7} onPress={() => checkForUpdates(true)}>
+            <Text style={styles.versionText}>Growvest v{currentVersion} • Tap to check updates</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={{ height: 110 }} />
@@ -901,6 +936,17 @@ const getStyles = (themeColors, isDarkMode, insets = { top: 0 }) => StyleSheet.c
   },
   logoutText: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.error },
   versionText: { textAlign: 'center', fontSize: 12, color: themeColors.textMuted, marginTop: 8 },
+  updateBadge: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  updateBadgeText: {
+    color: '#059669',
+    fontSize: 11,
+    fontWeight: '700',
+  },
 
   // Personal Info Modal
   personalInfoModalContent: {
