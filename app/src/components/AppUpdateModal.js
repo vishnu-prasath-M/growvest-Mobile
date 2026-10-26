@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   ScrollView,
   Platform,
+  Pressable,
+  useWindowDimensions,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -33,7 +35,8 @@ export const AppUpdateModal = () => {
     dismissModal,
   } = useAppUpdate();
 
-  const { isDarkMode, colors: themeColors } = useTheme();
+  const { isDarkMode } = useTheme();
+  const { width, height } = useWindowDimensions();
 
   if (!updateInfo || !isModalVisible) return null;
 
@@ -44,12 +47,28 @@ export const AppUpdateModal = () => {
   return (
     <Modal
       visible={isModalVisible}
-      transparent
+      transparent={true}
       animationType="fade"
+      statusBarTranslucent={true}
       onRequestClose={dismissModal}
     >
-      <View style={styles.overlay}>
-        <View style={[styles.dialogCard, { backgroundColor: isDarkMode ? '#141E18' : '#FFFFFF', borderColor: isDarkMode ? '#224231' : '#E2E8F0' }]}>
+      <View style={[styles.modalRoot, { width, height }]}>
+        {/* Dimmed Backdrop */}
+        <Pressable
+          style={styles.backdrop}
+          onPress={isDownloading ? undefined : dismissModal}
+        />
+
+        {/* Centered Modal Card */}
+        <View
+          style={[
+            styles.dialogCard,
+            {
+              backgroundColor: isDarkMode ? '#141E18' : '#FFFFFF',
+              borderColor: isDarkMode ? '#224231' : '#E2E8F0',
+            },
+          ]}
+        >
           {/* Header Icon */}
           <View style={styles.headerRow}>
             <LinearGradient
@@ -71,15 +90,29 @@ export const AppUpdateModal = () => {
           </View>
 
           {/* Version Pills */}
-          <View style={[styles.versionBanner, { backgroundColor: isDarkMode ? '#0A2B1A' : '#ECFDF5', borderColor: isDarkMode ? '#134E2E' : '#A7F3D0' }]}>
+          <View
+            style={[
+              styles.versionBanner,
+              {
+                backgroundColor: isDarkMode ? '#0A2B1A' : '#ECFDF5',
+                borderColor: isDarkMode ? '#134E2E' : '#A7F3D0',
+              },
+            ]}
+          >
             <View style={styles.verCol}>
-              <Text style={[styles.verLabel, { color: isDarkMode ? '#94A3B8' : '#64748B' }]}>Current</Text>
-              <Text style={[styles.verVal, { color: isDarkMode ? '#CBD5E1' : '#334155' }]}>v{currentVer}</Text>
+              <Text style={[styles.verLabel, { color: isDarkMode ? '#94A3B8' : '#64748B' }]}>
+                Current
+              </Text>
+              <Text style={[styles.verVal, { color: isDarkMode ? '#CBD5E1' : '#334155' }]}>
+                v{currentVer}
+              </Text>
             </View>
             <MaterialCommunityIcons name="arrow-right-bold" size={20} color="#10B981" />
             <View style={styles.verCol}>
               <Text style={[styles.verLabel, { color: '#059669' }]}>New Version</Text>
-              <Text style={[styles.verVal, { color: '#10B981', fontWeight: '800' }]}>v{latestVer}</Text>
+              <Text style={[styles.verVal, { color: '#10B981', fontWeight: '800' }]}>
+                v{latestVer}
+              </Text>
             </View>
           </View>
 
@@ -203,24 +236,34 @@ export const AppUpdateModal = () => {
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+  modalRoot: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    zIndex: 999999,
+    elevation: 999999,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.72)',
   },
   dialogCard: {
-    width: '100%',
-    maxWidth: 380,
+    width: '90%',
+    maxWidth: 360,
     borderRadius: 24,
     borderWidth: 1,
     padding: 22,
+    alignSelf: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.35,
     shadowRadius: 20,
-    elevation: 12,
+    elevation: 24,
+    zIndex: 1000000,
   },
   headerRow: {
     flexDirection: 'row',

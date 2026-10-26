@@ -29,6 +29,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
 import KycRequiredModal from '../../components/KycRequiredModal';
 import { notificationService } from '../../services/notificationService';
+import AdBannerCarousel from '../../components/AdBannerCarousel';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const INSIGHT_CARD_WIDTH = Math.min(SCREEN_WIDTH * 0.78, 300);
@@ -1158,141 +1159,8 @@ const HomeScreen = ({ navigation }) => {
             </View>
           )}
 
-          {/* ── Market Radar (Modern Snapping Reel with Sparklines & Radar Pulse) ── */}
-          <View style={{ marginTop: 24 }}>
-            <View style={styles.radarHeaderContainer}>
-              <View>
-                <View style={styles.radarHeaderRow}>
-                  <Text style={styles.sectionTitle}>Market Radar</Text>
-                  <View style={styles.liveRadarContainer}>
-                    <Animated.View
-                      style={[
-                        styles.liveRadarPulse,
-                        {
-                          transform: [
-                            {
-                              scale: radarAnim.interpolate({
-                                inputRange: [0, 1],
-                                outputRange: [1, 2.8],
-                              }),
-                            },
-                          ],
-                          opacity: radarAnim.interpolate({
-                            inputRange: [0, 0.6, 1],
-                            outputRange: [0.8, 0.3, 0],
-                          }),
-                        },
-                      ]}
-                    />
-                    <View style={styles.liveRadarDot} />
-                  </View>
-                </View>
-                <Text style={styles.sectionSubtitle}>Live macroeconomic benchmarks</Text>
-              </View>
-              <View style={styles.swipeBadge}>
-                <MaterialCommunityIcons name="gesture-swipe-horizontal" size={13} color={themeColors.textMuted} />
-                <Text style={styles.swipeBadgeText}>Live Reel</Text>
-              </View>
-            </View>
-
-            {/* Horizontal Snapping Reel */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              decelerationRate="fast"
-              snapToInterval={INSIGHT_CARD_WIDTH + INSIGHT_CARD_GAP}
-              snapToAlignment="start"
-              onScroll={onInsightScroll}
-              scrollEventThrottle={16}
-              contentContainerStyle={styles.insightScrollContent}
-            >
-              {MARKET_INSIGHTS.map((item, idx) => (
-                <View key={item.id || idx} style={styles.insightCardContainer}>
-                  <LinearGradient
-                    colors={item.gradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={[styles.insightCardGradient, { borderColor: item.accentColor + '40' }]}
-                  >
-                    {/* Top Row: Pill Tag + Trend Pill */}
-                    <View style={styles.insightCardHeader}>
-                      <View style={[styles.insightCategoryPill, { backgroundColor: item.accentColor + '20', borderColor: item.accentColor + '45' }]}>
-                        <MaterialCommunityIcons name={item.icon} size={11} color={item.accentColor} style={{ marginRight: 4 }} />
-                        <Text style={[styles.insightCategoryText, { color: item.accentColor }]}>{item.category}</Text>
-                      </View>
-
-                      <View style={[styles.insightTrendPill, { backgroundColor: item.accentColor + '22', borderColor: item.accentColor + '45' }]}>
-                        <MaterialCommunityIcons
-                          name={item.trendType === 'up' ? 'arrow-top-right' : item.trendType === 'down' ? 'arrow-bottom-right' : 'swap-horizontal'}
-                          size={12}
-                          color={item.accentColor}
-                        />
-                        <Text style={[styles.insightTrendPillText, { color: item.accentColor }]}>{item.trend}</Text>
-                      </View>
-                    </View>
-
-                    {/* Middle: Title, Hero Value & Candlestick Sparklines */}
-                    <View style={styles.insightCardMiddle}>
-                      <View style={styles.insightCardDataCol}>
-                        <Text style={styles.insightCardTitle}>{item.title}</Text>
-                        <View style={styles.insightCardValueRow}>
-                          <Text style={styles.insightCardHeroValue}>{item.value}</Text>
-                          <Text style={[styles.insightCardUnit, { color: item.accentColor }]}> {item.unit}</Text>
-                        </View>
-                        <Text style={styles.insightCardSubtext} numberOfLines={1}>{item.subtext}</Text>
-                      </View>
-
-                      {/* Momentum Sparklines */}
-                      <View style={styles.sparklineContainer}>
-                        {item.bars.map((barH, bIdx) => (
-                          <View key={bIdx} style={styles.sparklineCol}>
-                            <View
-                              style={[
-                                styles.sparklineBar,
-                                {
-                                  height: `${barH}%`,
-                                  backgroundColor: bIdx === item.bars.length - 1 ? item.accentColor : item.accentColor + '45',
-                                },
-                              ]}
-                            />
-                          </View>
-                        ))}
-                      </View>
-                    </View>
-
-                    {/* Divider */}
-                    <View style={[styles.insightCardDivider, { backgroundColor: item.accentColor + '25' }]} />
-
-                    {/* Footer Row */}
-                    <View style={styles.insightCardFooter}>
-                      <View style={styles.insightFooterLeft}>
-                        <View style={[styles.insightFooterDot, { backgroundColor: item.accentColor }]} />
-                        <Text style={styles.insightFooterText} numberOfLines={1}>{item.highlight}</Text>
-                      </View>
-                      <View style={[styles.insightBadgeTag, { backgroundColor: item.accentColor + '20' }]}>
-                        <Text style={[styles.insightBadgeTagText, { color: item.accentColor }]}>{item.badgeText}</Text>
-                      </View>
-                    </View>
-                  </LinearGradient>
-                </View>
-              ))}
-            </ScrollView>
-
-            {/* Pagination Indicators */}
-            <View style={styles.paginationRow}>
-              {MARKET_INSIGHTS.map((item, idx) => (
-                <View
-                  key={idx}
-                  style={[
-                    styles.paginationDot,
-                    activeInsightIndex === idx
-                      ? [styles.paginationDotActive, { backgroundColor: item.accentColor }]
-                      : { backgroundColor: themeColors.border || 'rgba(0,0,0,0.1)' },
-                  ]}
-                />
-              ))}
-            </View>
-          </View>
+          {/* ── Flipkart-Style Auto-Scrolling Ad Banner Carousel ── */}
+          <AdBannerCarousel />
 
           {/* ── Tip Card ── */}
           <View style={[styles.section, { marginTop: 24 }]}>
