@@ -231,9 +231,12 @@ const WithdrawScreen = ({ navigation }) => {
       const sipItems = sipPlans.map(s => {
         const totalPaid = Number(s.totalPaidAmount) || 0;
         const withdrawn = Number(s.withdrawnAmount) || 0;
-        const available = s.availableToWithdraw !== undefined
-          ? Math.max(0, Number(s.availableToWithdraw))
-          : Math.max(0, totalPaid + (s.status === 'completed' && s.contributionsCompleted >= s.totalContributions ? (Number(s.expectedInterest) || 0) : 0) - withdrawn);
+        const isPlanCompleted = s.status === 'completed' || (s.totalContributions && Number(s.contributionsCompleted) >= Number(s.totalContributions));
+        const available = isPlanCompleted
+          ? (s.availableToWithdraw !== undefined
+              ? Math.max(0, Number(s.availableToWithdraw))
+              : Math.max(0, totalPaid + (Number(s.expectedInterest) || 0) - withdrawn))
+          : 0;
         return {
           _id: s._id,
           sipId: s.sipId,
@@ -251,6 +254,7 @@ const WithdrawScreen = ({ navigation }) => {
           frequency: s.frequency,
           startDate: s.createdAt,
           interestRate: s.interestRate || 26,
+          isPlanCompleted,
         };
       });
 
@@ -399,7 +403,12 @@ const WithdrawScreen = ({ navigation }) => {
 
   const selectCategory = (catId, idx) => {
     setActiveCategory(catId);
-    setAmount('');
+    if (catId === 'chit') {
+      const chitAvail = categoryBalances.chit?.available || 0;
+      setAmount(chitAvail > 0 ? String(chitAvail) : '');
+    } else {
+      setAmount('');
+    }
     carouselRef.current?.scrollTo({ x: idx * (CARD_WIDTH + 14), animated: true });
   };
 
@@ -451,23 +460,29 @@ const WithdrawScreen = ({ navigation }) => {
   };
 
   const handleMainWithdrawRequest = () => {
-    const numAmt = parseFloat(amount);
-    if (!amount || isNaN(numAmt) || numAmt <= 0) {
-      showAlert('warning', 'Enter Amount', `Please enter a valid amount to withdraw from ${currentCategoryConfig.name}.`);
-      return;
-    }
     if (currentCategoryAvailable <= 0) {
       showAlert('warning', 'No Available Balance', `You currently do not have any available balance to withdraw in ${currentCategoryConfig.name}.`);
       return;
     }
-    if (numAmt > currentCategoryAvailable) {
-      showAlert(
-        'warning',
-        'Exceeds Category Balance',
-        `The entered amount (₹${numAmt}) exceeds your available ${currentCategoryConfig.name} balance of ${formatCurrency(currentCategoryAvailable)}. You can only withdraw up to ${formatCurrency(currentCategoryAvailable)} from ${currentCategoryConfig.name}.`
-      );
-      return;
+
+    if (activeCategory === 'chit') {
+      setAmount(String(currentCategoryAvailable));
+    } else {
+      const numAmt = parseFloat(amount);
+      if (!amount || isNaN(numAmt) || numAmt <= 0) {
+        showAlert('warning', 'Enter Amount', `Please enter a valid amount to withdraw from ${currentCategoryConfig.name}.`);
+        return;
+      }
+      if (numAmt > currentCategoryAvailable) {
+        showAlert(
+          'warning',
+          'Exceeds Category Balance',
+          `The entered amount (₹${numAmt}) exceeds your available ${currentCategoryConfig.name} balance of ${formatCurrency(currentCategoryAvailable)}. You can only withdraw up to ${formatCurrency(currentCategoryAvailable)} from ${currentCategoryConfig.name}.`
+        );
+        return;
+      }
     }
+
     if (!bankInfo?.accountNumber && !bankInfo?.upiId && !userData?.upiId) {
       showAlert(
         'warning',
@@ -486,8 +501,9 @@ const WithdrawScreen = ({ navigation }) => {
   };
 
   const handleWithdraw = async () => {
-    const numAmt = parseFloat(amount);
-    if (!amount || isNaN(numAmt) || numAmt <= 0) {
+    const isChitCategory = activeCategory === 'chit' || withdrawType === 'chit';
+    const numAmt = isChitCategory ? currentCategoryAvailable : parseFloat(amount);
+    if (!isChitCategory && (!amount || isNaN(numAmt) || numAmt <= 0)) {
       showAlert('warning', 'Invalid Amount', 'Please enter a valid amount to withdraw.');
       return;
     }
@@ -513,11 +529,12 @@ const WithdrawScreen = ({ navigation }) => {
     
     setWithdrawing(true);
     try {
-      if (activeCategory === 'chit') {
+      if (isChitCategory) {
         const eligibleChit = activeChitItems.find(c => (c.isUnlocked || c.hasWon) && !c.isWithdrawn && !c.isRequested) || activeChitItems[0];
         if (eligibleChit) {
+          const payoutAmt = Number(eligibleChit.priceAmount) || Number(eligibleChit.amount) || numAmt;
           await chitFundService.withdrawChitPayout(eligibleChit._id, {
-            amount: numAmt,
+            amount: payoutAmt,
             upiId: upiId.trim(),
           });
         } else {
@@ -532,7 +549,7 @@ const WithdrawScreen = ({ navigation }) => {
         showAlert(
           'payout',
           'Chit Payout Requested ⌛',
-          `Your Chit payout withdrawal request of ${formatCurrency(numAmt)} has been submitted successfully and is pending admin approval.`,
+          `Your full Chit payout withdrawal request of ${formatCurrency(numAmt)} has been submitted successfully and is pending admin approval. Once approved, this chit cycle will be completed.`,
           'Got It'
         );
       } else if (activeCategory === 'sip') {
@@ -789,30 +806,49 @@ const WithdrawScreen = ({ navigation }) => {
           </View>
 
           {/* Amount Input Card */}
-          <View style={styles.amountInputCard}>
-            <View style={styles.amountLeft}>
-              <Text style={styles.currencyPrefix}>₹</Text>
-              <TextInput
-                style={styles.amountTextInput}
-                value={amount}
-                onChangeText={setAmount}
-                keyboardType="numeric"
-                placeholder="0"
-                placeholderTextColor={isDarkMode ? '#6B7280' : '#9CA3AF'}
-              />
-            </View>
-
-            <TouchableOpacity
-              style={styles.availableBadge}
-              activeOpacity={0.7}
-              onPress={() => setAmount(String(currentCategoryAvailable > 0 ? currentCategoryAvailable : ''))}
-            >
-              <Text style={styles.availableBadgeLabel}>Available</Text>
-              <Text style={[styles.availableBadgeValue, { color: currentCategoryConfig.accent }]}>
-                {formatCurrencyNoDecimals(currentCategoryAvailable)}
+          {activeCategory === 'chit' ? (
+            <View style={[styles.amountInputCard, { flexDirection: 'column', alignItems: 'stretch', paddingVertical: 14 }]}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View>
+                  <Text style={[styles.heroStatLabel, { color: isDarkMode ? '#94A3B8' : '#64748B' }]}>Full Chit Payout Amount</Text>
+                  <Text style={[styles.amountTextInput, { fontSize: 24, fontWeight: '800', color: currentCategoryConfig.accent }]}>
+                    {formatCurrency(currentCategoryAvailable)}
+                  </Text>
+                </View>
+                <View style={[styles.primaryBadge, { backgroundColor: isDarkMode ? 'rgba(52, 211, 153, 0.15)' : '#DCFCE7', borderWidth: 1, borderColor: '#34D399', paddingHorizontal: 10, paddingVertical: 5 }]}>
+                  <Text style={[styles.primaryBadgeText, { color: isDarkMode ? '#34D399' : '#059669', fontWeight: '700' }]}>Full Payout Only</Text>
+                </View>
+              </View>
+              <Text style={{ fontSize: 11, color: isDarkMode ? '#94A3B8' : '#64748B', marginTop: 8, lineHeight: 16 }}>
+                💡 Chit fund rule: You must withdraw the full available payout. Once claimed, this chit cycle will be completed and further weekly earnings will conclude.
               </Text>
-            </TouchableOpacity>
-          </View>
+            </View>
+          ) : (
+            <View style={styles.amountInputCard}>
+              <View style={styles.amountLeft}>
+                <Text style={styles.currencyPrefix}>₹</Text>
+                <TextInput
+                  style={styles.amountTextInput}
+                  value={amount}
+                  onChangeText={setAmount}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor={isDarkMode ? '#6B7280' : '#9CA3AF'}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={styles.availableBadge}
+                activeOpacity={0.7}
+                onPress={() => setAmount(String(currentCategoryAvailable > 0 ? currentCategoryAvailable : ''))}
+              >
+                <Text style={styles.availableBadgeLabel}>Available</Text>
+                <Text style={[styles.availableBadgeValue, { color: currentCategoryConfig.accent }]}>
+                  {formatCurrencyNoDecimals(currentCategoryAvailable)}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Bank Account / UPI Card */}
           <TouchableOpacity
@@ -948,12 +984,15 @@ const WithdrawScreen = ({ navigation }) => {
                   let badgeColor = isWithdrawn ? (isDarkMode ? '#9CA3AF' : '#64748B') : isReinvested ? (isDarkMode ? '#60A5FA' : '#2563EB') : isFullEligible ? '#059669' : '#D97706';
 
                   if (isSIP) {
+                    const isCompleted = inv.status === 'completed' || (inv.totalContributions && Number(inv.contributionsCompleted) >= Number(inv.totalContributions));
                     planTitle = `SIP Plan (${inv.sipId || 'SIP'})`;
-                    planSubtitle = `Accumulated: ${formatCurrency(inv.totalPaidAmount || inv.amount)} • ${inv.frequency || 'Monthly'}`;
+                    planSubtitle = isCompleted
+                      ? `Matured: ${formatCurrency(inv.availableToWithdraw || inv.totalPaidAmount)} • All ${inv.totalContributions} Paid`
+                      : `Progress: ${inv.contributionsCompleted || 0}/${inv.totalContributions || 0} • Unlocks on Completion`;
                     iconName = 'calendar-clock';
-                    badgeLabel = inv.status === 'completed' ? 'COMPLETED' : inv.status === 'cancelled' ? 'CANCELLED' : 'ACTIVE';
-                    badgeBg = inv.status === 'completed' ? '#DCFCE7' : inv.status === 'cancelled' ? (isDarkMode ? 'rgba(255,255,255,0.06)' : '#F1F5F9') : '#EDE9FE';
-                    badgeColor = inv.status === 'completed' ? '#059669' : inv.status === 'cancelled' ? (isDarkMode ? '#9CA3AF' : '#64748B') : '#7C3AED';
+                    badgeLabel = isCompleted ? 'COMPLETED' : inv.status === 'cancelled' ? 'CANCELLED' : 'IN PROGRESS';
+                    badgeBg = isCompleted ? '#DCFCE7' : inv.status === 'cancelled' ? (isDarkMode ? 'rgba(255,255,255,0.06)' : '#F1F5F9') : '#FEF3C7';
+                    badgeColor = isCompleted ? '#059669' : inv.status === 'cancelled' ? (isDarkMode ? '#9CA3AF' : '#64748B') : '#D97706';
                   } else if (isPocketMoney) {
                     planTitle = 'Pocket Money Plan';
                     planSubtitle = `Invested: ${formatCurrency(inv.investedAmount)} • ${inv.frequency || 'Daily'}`;
@@ -996,6 +1035,14 @@ const WithdrawScreen = ({ navigation }) => {
                         activeOpacity={0.7}
                         onPress={() => {
                           if (isSIP) {
+                            if (!inv.isPlanCompleted && (Number(inv.availableToWithdraw) || 0) <= 0) {
+                              showAlert(
+                                'warning',
+                                'SIP Plan In Progress',
+                                `This SIP plan is currently in progress (${inv.contributionsCompleted || 0}/${inv.totalContributions || 0} contributions). As per SIP rules, funds can only be withdrawn once the entire plan is completed.`
+                              );
+                              return;
+                            }
                             setActiveCategory('sip');
                             setAmount(String(inv.availableToWithdraw || ''));
                             setWithdrawType(inv._id);
@@ -1054,27 +1101,41 @@ const WithdrawScreen = ({ navigation }) => {
               </TouchableOpacity>
             </View>
 
-            {/* Balance Box */}
-            <View style={[styles.modalBalanceBox, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#F0FDF4' }]}>
-              <Text style={styles.modalBalanceLabel}>Eligible {currentCategoryConfig.name} Available</Text>
-              <Text style={[styles.modalBalanceAmount, { color: isDarkMode ? '#34D399' : '#0E3D23' }]}>
-                {formatCurrency(currentCategoryAvailable)}
-              </Text>
-            </View>
+            {/* Amount Section */}
+            {activeCategory === 'chit' || withdrawType === 'chit' ? (
+              <View style={[styles.modalBalanceBox, { backgroundColor: isDarkMode ? 'rgba(52, 211, 153, 0.1)' : '#F0FDF4', marginVertical: 8, borderColor: 'rgba(52, 211, 153, 0.3)', borderWidth: 1 }]}>
+                <Text style={styles.modalBalanceLabel}>Full Chit Payout (Non-partial)</Text>
+                <Text style={[styles.modalBalanceAmount, { color: isDarkMode ? '#34D399' : '#0E3D23', fontSize: 24 }]}>
+                  {formatCurrency(currentCategoryAvailable)}
+                </Text>
+                <Text style={{ fontSize: 11, color: isDarkMode ? '#94A3B8' : '#64748B', marginTop: 6, lineHeight: 16 }}>
+                  ⚠️ Chit rule: Partial withdrawals are not permitted. Withdrawing this payout will complete your chit plan.
+                </Text>
+              </View>
+            ) : (
+              <>
+                <View style={[styles.modalBalanceBox, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#F0FDF4' }]}>
+                  <Text style={styles.modalBalanceLabel}>Eligible {currentCategoryConfig.name} Available</Text>
+                  <Text style={[styles.modalBalanceAmount, { color: isDarkMode ? '#34D399' : '#0E3D23' }]}>
+                    {formatCurrency(currentCategoryAvailable)}
+                  </Text>
+                </View>
 
-            {/* Amount Input */}
-            <Text style={styles.inputLabel}>Withdrawal Amount</Text>
-            <View style={styles.amountInputRow}>
-              <Text style={styles.currencySymbol}>₹</Text>
-              <TextInput
-                style={styles.amountInput}
-                value={amount}
-                onChangeText={setAmount}
-                keyboardType="numeric"
-                placeholder="0"
-                placeholderTextColor={themeColors.textMuted}
-              />
-            </View>
+                {/* Amount Input */}
+                <Text style={styles.inputLabel}>Withdrawal Amount</Text>
+                <View style={styles.amountInputRow}>
+                  <Text style={styles.currencySymbol}>₹</Text>
+                  <TextInput
+                    style={styles.amountInput}
+                    value={amount}
+                    onChangeText={setAmount}
+                    keyboardType="numeric"
+                    placeholder="0"
+                    placeholderTextColor={themeColors.textMuted}
+                  />
+                </View>
+              </>
+            )}
 
             {/* UPI / Bank Input */}
             <Text style={[styles.inputLabel, { marginTop: 14 }]}>Payout UPI ID</Text>

@@ -588,11 +588,14 @@ const calculateSIPInterest = (sip, contributions = []) => {
     ? 0
     : Number((activePrincipal * dailyRate).toFixed(2));
 
-  // If cancelled/closed before maturity, do not grant maturity interest
-  const withdrawableInterest = (sip.status === 'cancelled' && k < sip.totalContributions)
+  // Available to withdraw: strictly allowed only after the SIP plan is fully completed
+  const isPlanCompleted = sip.status === 'completed' || k >= sip.totalContributions;
+  const withdrawableInterest = (sip.status === 'cancelled' && !isPlanCompleted)
     ? 0
     : interestEarned;
-  const availableToWithdraw = Math.max(0, Number((totalPaid + withdrawableInterest - withdrawn).toFixed(2)));
+  const availableToWithdraw = isPlanCompleted
+    ? Math.max(0, Number((totalPaid + withdrawableInterest - withdrawn).toFixed(2)))
+    : 0;
   const currentValue = Math.max(0, Number((totalPaid + interestEarned - withdrawn).toFixed(2)));
 
   return {
@@ -1010,6 +1013,13 @@ exports.withdrawSIP = async (req, res) => {
     const contribs = await SIPContribution.find({ sipId: sip._id }).lean();
     const stats = calculateSIPInterest(sip, contribs);
     const availableToWithdraw = stats.availableToWithdraw;
+
+    const isPlanCompleted = sip.status === 'completed' || (sip.contributionsCompleted >= sip.totalContributions);
+    if (!isPlanCompleted) {
+      return res.status(400).json({
+        message: `SIP withdrawal is only allowed after the plan is fully completed (${sip.contributionsCompleted}/${sip.totalContributions} contributions made).`
+      });
+    }
 
     if (withdrawAmt > availableToWithdraw) {
       return res.status(400).json({

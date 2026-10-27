@@ -22,8 +22,7 @@ const ChitDetailsScreen = ({ navigation, route }) => {
   const { showConfirm, showSuccess, showError, showWarning } = useAlert();
   const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const insets = useScreenInsets(8);
-  const { chitId } = route.params || {};
-  const { memberId } = route.params || {};
+  const { chitId, memberId, isMyChit: isMyChitParam, chitMembership } = route.params || {};
   const [activeTab, setActiveTab] = useState('overview');
 
   const [chit, setChit] = useState(null);
@@ -98,6 +97,71 @@ const ChitDetailsScreen = ({ navigation, route }) => {
       }
     }
     return sum;
+  };
+
+  const myMembership = myChits.find(
+    (m) => String(m._id) === String(memberId) || String(m.chitId?._id || m.chitId) === String(chitId)
+  ) || chitMembership;
+  const isMyChit = Boolean(isMyChitParam || memberId || myMembership);
+
+  const isWeekly = chit?.isWeekly || false;
+  const totalUnits = isWeekly
+    ? (myMembership?.totalWeeks || chit?.totalWeeks || chit?.duration || 10)
+    : (chit?.duration || chit?.totalWeeks || 12);
+  const currentUnit = isWeekly ? (myMembership?.currentWeek || 1) : (myMembership?.currentMonth || 1);
+  const lockedCount = Math.floor((totalUnits - 1) / 2);
+  const isUnlocked = currentUnit > lockedCount;
+  const isSettlement = currentUnit >= totalUnits;
+  const isCompleted = myMembership?.status === 'completed';
+  const isWithdrawn = myMembership?.withdrawalStatus === 'completed' || myMembership?.withdrawalStatus === 'withdrawn';
+  const isRequested = myMembership?.withdrawalStatus === 'requested';
+
+  const installmentAmount = isWeekly
+    ? (myMembership?.weeklyAmount || chit?.weeklyAmount || chit?.monthlyAmount || 200)
+    : (chit?.monthlyAmount || chit?.weeklyAmount || myMembership?.monthlyAmount || 1000);
+  const totalPot = Number(myMembership?.totalContribution) || (installmentAmount * totalUnits);
+
+  let payoutAmount = Number(myMembership?.priceAmount) || 0;
+  if (!payoutAmount) {
+    if (isSettlement || isCompleted) {
+      payoutAmount = totalPot + getTotalDividend(installmentAmount, totalUnits);
+    } else if (isUnlocked) {
+      const baseEndPct = totalUnits >= 20 ? 8 : 6;
+      const actionPct = baseEndPct + 2 * (totalUnits - currentUnit);
+      payoutAmount = totalPot - (totalPot * actionPct / 100);
+    } else {
+      payoutAmount = Number(myMembership?.totalPaid) || (installmentAmount * currentUnit);
+    }
+  }
+
+  const isMaturedOrEligible = (isUnlocked || isSettlement || isCompleted || myMembership?.hasWon) && !isWithdrawn && !isRequested;
+
+  const handleWithdrawChit = () => {
+    if (!myMembership) return;
+    const payoutAmt = Number(payoutAmount) || Number(myMembership.priceAmount) || Number(myMembership.amount) || 0;
+    showConfirm({
+      type: 'confirm',
+      title: 'Withdraw Chit Payout',
+      message: `Are you sure you want to withdraw your Chit payout of ${formatCurrency(payoutAmt)}? Full withdrawal is required, and claiming this payout completes your chit plan.`,
+      confirmText: 'Withdraw Full Payout',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          const res = await chitFundService.withdrawChitPayout(myMembership._id);
+          showSuccess(
+            'Withdrawal Requested ⌛',
+            res?.message || `Your Chit payout request of ${formatCurrency(payoutAmt)} has been submitted successfully and is pending admin approval.`
+          );
+          fetchData();
+        } catch (err) {
+          const errMsg = err?.response?.data?.message || err?.message || 'Could not process chit withdrawal.';
+          showError('Withdrawal Failed', errMsg);
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
   };
 
   const getWeeklyRowData = (weeklyAmount, totalWeeks, w) => {
@@ -635,6 +699,72 @@ const ChitDetailsScreen = ({ navigation, route }) => {
         )}
 
         {(() => {
+          if (isMyChit && myMembership) {
+            return (
+              <View style={{ marginTop: 8 }}>
+                {/* 1. If Matured / Eligible for Withdrawal */}
+                {isMaturedOrEligible && (
+                  <TouchableOpacity
+                    style={styles.withdrawBtnOuter}
+                    activeOpacity={0.85}
+                    onPress={handleWithdrawChit}
+                  >
+                    <LinearGradient
+                      colors={['#0E3D23', '#1A5C39']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.withdrawBtnGradient}
+                    >
+                      <MaterialCommunityIcons name="arrow-top-right" size={20} color="#FFFFFF" />
+                      <Text style={styles.withdrawBtnText}>
+                        Withdraw Payout ({formatCurrency(payoutAmount)})
+                      </Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                )}
+
+                {/* 2. If Withdrawal Already Requested */}
+                {isRequested && (
+                  <View style={styles.statusBoxWarning}>
+                    <MaterialCommunityIcons name="clock-outline" size={18} color="#D97706" />
+                    <Text style={styles.statusBoxTextWarning}>
+                      Payout Withdrawal of {formatCurrency(myMembership?.withdrawalAmount || payoutAmount)} is Pending Admin Approval ⌛
+                    </Text>
+                  </View>
+                )}
+
+                {/* 3. If Already Withdrawn */}
+                {isWithdrawn && (
+                  <View style={styles.statusBoxSuccess}>
+                    <MaterialCommunityIcons name="check-circle" size={18} color="#059669" />
+                    <Text style={styles.statusBoxTextSuccess}>
+                      Chit Payout of {formatCurrency(myMembership?.withdrawalAmount || payoutAmount)} Successfully Withdrawn ✓
+                    </Text>
+                  </View>
+                )}
+
+                {/* 4. Join Again (New Slot) Button */}
+                <TouchableOpacity
+                  style={styles.joinAgainBtn}
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    if (chit.availableSlots <= 0) {
+                      showWarning('Slot Full', 'This Chit is already full.');
+                    } else if (chit.status === 'closed' || chit.status === 'archived') {
+                      showWarning('Chit Closed', 'This Chit is no longer accepting new slots.');
+                    } else {
+                      navigation.navigate('JoinChit', { chitId: chit._id, isJoinAgain: true });
+                    }
+                  }}
+                >
+                  <MaterialCommunityIcons name="plus-circle-outline" size={18} color={colors.primary} />
+                  <Text style={styles.joinAgainBtnText}>Join Again (Take New Slot)</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          }
+
+          // Explore Page: Standard "Join This Chit" Button
           const isFull = chit.availableSlots <= 0;
           const isClosed = chit.status === 'closed' || chit.status === 'completed' || chit.status === 'archived';
           const isDisabled = isFull || isClosed;
@@ -1058,15 +1188,74 @@ const getStyles = (colors) => StyleSheet.create({
     color: colors.textTertiary || '#64748B',
     letterSpacing: 0.8,
   },
-  withdrawBtn: {
+  withdrawBtnOuter: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 12,
+    elevation: 3,
+  },
+  withdrawBtnGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primary,
-    paddingVertical: 14,
-    borderRadius: 14,
+    paddingVertical: 16,
     gap: 8,
-    ...colors.shadow.button
+  },
+  withdrawBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  joinAgainBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+    paddingVertical: 15,
+    borderRadius: 16,
+    gap: 8,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    marginBottom: 16,
+  },
+  joinAgainBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  statusBoxWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    padding: 14,
+    borderRadius: 14,
+    gap: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  statusBoxTextWarning: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#B45309',
+    flex: 1,
+  },
+  statusBoxSuccess: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#DCFCE7',
+    padding: 14,
+    borderRadius: 14,
+    gap: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#10B981',
+  },
+  statusBoxTextSuccess: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#047857',
+    flex: 1,
   },
   penaltyAlertCard: {
     backgroundColor: colors.errorLight,

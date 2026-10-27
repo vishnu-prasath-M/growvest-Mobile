@@ -776,9 +776,9 @@ const withdrawChitPayout = async (req, res) => {
       finalWithdrawalAmount = priceAmount;
     }
 
-    const requestedAmount = req.body?.amount
-      ? Math.min(finalWithdrawalAmount, Math.max(1, Number(req.body.amount)))
-      : finalWithdrawalAmount;
+    // Chit Fund Rule: Full amount must be withdrawn upon claim. No partial withdrawals.
+    // Claiming payout concludes the chit cycle for this membership and marks status as completed.
+    const requestedAmount = finalWithdrawalAmount;
 
     const user = await User.findById(userId);
     if (!user) {
@@ -789,13 +789,10 @@ const withdrawChitPayout = async (req, res) => {
     session.startTransaction();
 
     try {
-      const totalAccumulatedWithdrawn = (member.withdrawnAmount || 0) + requestedAmount;
-      const isFullyWithdrawnOrRequested = totalAccumulatedWithdrawn >= (finalWithdrawalAmount - 1);
-
-      member.withdrawalStatus = isFullyWithdrawnOrRequested ? 'requested' : 'partially_requested';
+      member.withdrawalStatus = 'requested';
       member.withdrawalWeek = currentUnit;
-      member.withdrawnAmount = totalAccumulatedWithdrawn;
-      member.withdrawalAmount = totalAccumulatedWithdrawn;
+      member.withdrawnAmount = finalWithdrawalAmount;
+      member.withdrawalAmount = finalWithdrawalAmount;
       member.actionPercentage = actionPercentage;
       member.priceAmount = priceAmount;
       member.accumulatedDividend = accumulatedDividend;
@@ -804,10 +801,7 @@ const withdrawChitPayout = async (req, res) => {
       member.hasWon = true;
       member.winningDate = new Date();
       member.winningAmount = finalWithdrawalAmount;
-      
-      if (isSettlement && isFullyWithdrawnOrRequested) {
-        member.status = 'completed'; // Safe completion on settlement
-      }
+      member.status = 'completed'; // Chit membership completes upon withdrawal claim
 
       await member.save({ session });
 

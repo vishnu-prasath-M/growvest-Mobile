@@ -106,7 +106,7 @@ const MyChitsScreen = ({ navigation }) => {
                   isRejected && { borderLeftWidth: 4, borderLeftColor: themeColors.error || '#ef4444' },
                 ]}
                 activeOpacity={0.85}
-                onPress={() => navigation.navigate('ChitDetails', { chitId: chit.chitId, memberId: chit._id, memberStatus: chit.status })}
+                onPress={() => navigation.navigate('ChitDetails', { chitId: chit.chitId, memberId: chit._id, memberStatus: chit.status, isMyChit: true, chitMembership: chit })}
               >
                 <View style={styles.chitCardHeader}>
                   <View style={[

@@ -176,23 +176,25 @@ const SIPDashboardScreen = ({ navigation }) => {
           <View style={styles.heroDivider} />
 
           <View style={styles.heroStatsRow}>
-            <View style={styles.heroStatItem}>
-              <Text style={styles.heroStatLabel}>Total Paid</Text>
-              <Text style={styles.heroStatValue}>{formatCurrency(summary.totalSIPInvested)}</Text>
+            <View style={[styles.heroStatItem, { flex: 1.15 }]}>
+              <Text style={styles.heroStatLabel}>Total Returns</Text>
+              <Text style={[styles.heroStatValue, { color: '#4ADE80' }]} numberOfLines={1}>
+                +{formatCurrency(summary.totalInterestEarned || 0)}
+              </Text>
             </View>
-            <View style={styles.heroStatItem}>
+            <View style={[styles.heroStatItem, { flex: 1.1 }]}>
               <Text style={styles.heroStatLabel}>Daily Return</Text>
-              <Text style={[styles.heroStatValue, { color: '#4ADE80' }]}>
+              <Text style={[styles.heroStatValue, { color: '#4ADE80' }]} numberOfLines={1}>
                 +{formatCurrency(summary.totalDailyInterest || 0)}/day
               </Text>
             </View>
-            <View style={styles.heroStatItem}>
-              <Text style={styles.heroStatLabel}>Contributions</Text>
-              <Text style={styles.heroStatValue}>{summary.totalContributionsPaid}</Text>
+            <View style={[styles.heroStatItem, { flex: 0.95, alignItems: 'center' }]}>
+              <Text style={[styles.heroStatLabel, { textAlign: 'center' }]}>Contributions</Text>
+              <Text style={[styles.heroStatValue, { textAlign: 'center' }]}>{summary.totalContributionsPaid}</Text>
             </View>
-            <View style={styles.heroStatItem}>
-              <Text style={styles.heroStatLabel}>Next SIP</Text>
-              <Text style={styles.heroStatValue} numberOfLines={1}>
+            <View style={[styles.heroStatItem, { flex: 1, alignItems: 'flex-end' }]}>
+              <Text style={[styles.heroStatLabel, { textAlign: 'right' }]}>Next SIP</Text>
+              <Text style={[styles.heroStatValue, { textAlign: 'right' }]} numberOfLines={1}>
                 {summary.nextUpcomingDate ? formatDate(summary.nextUpcomingDate) : 'No due'}
               </Text>
             </View>
