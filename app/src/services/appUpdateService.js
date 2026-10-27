@@ -1,11 +1,13 @@
 import { Platform, Linking } from 'react-native';
 import * as FileSystem from 'expo-file-system';
+import * as Application from 'expo-application';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import api from './apiService';
 import { API_ENDPOINTS, API_BASE_URL } from '../config/api';
 
 /**
- * Compare two semver strings: v1 and v2.
+ * Compare two semver/version strings: v1 (server) and v2 (current).
  * Returns:
  *   1 if v1 > v2 (v1 is newer)
  *  -1 if v1 < v2 (v2 is newer)
@@ -28,8 +30,7 @@ export function compareVersions(v1, v2) {
     if (num1 < num2) return -1;
   }
 
-  // If numbers match but string differs (e.g., build timestamps)
-  if (clean1 !== clean2) return 1;
+  // If all numeric components match (e.g., "8" vs "8.0.0"), they are equal
   return 0;
 }
 
@@ -38,7 +39,22 @@ export const appUpdateService = {
    * Get currently installed app version
    */
   getCurrentVersion() {
-    return Constants.expoConfig?.version || '1.0.0';
+    return (
+      Application.nativeApplicationVersion ||
+      Constants.expoConfig?.version ||
+      '8.0.0'
+    );
+  },
+
+  /**
+   * Get currently installed app build/version code
+   */
+  getVersionCode() {
+    return (
+      Application.nativeBuildVersion ||
+      Constants.expoConfig?.android?.versionCode ||
+      8
+    );
   },
 
   /**
@@ -59,7 +75,22 @@ export const appUpdateService = {
         };
       }
 
-      const serverVersion = (data.version || '1.0.0').toString().trim().replace(/^v/i, '');
+      const serverVersion = (data.version || '8.0.0').toString().trim().replace(/^v/i, '');
+
+      // Check if user has already installed this version recently
+      try {
+        const lastInstalled = await AsyncStorage.getItem('LAST_INSTALLED_APK_VERSION');
+        if (lastInstalled && compareVersions(serverVersion, lastInstalled) <= 0) {
+          return {
+            isUpdateAvailable: false,
+            currentVersion: serverVersion,
+            message: 'Your app is up to date!',
+          };
+        }
+      } catch (storageErr) {
+        console.warn('[AppUpdateService] AsyncStorage read error:', storageErr);
+      }
+
       const isNewer = compareVersions(serverVersion, currentVersion) > 0;
 
       // Ensure download URL is full URL
@@ -92,8 +123,12 @@ export const appUpdateService = {
   /**
    * Download APK with real-time progress and trigger native Android installer
    */
-  async downloadAndInstall(downloadUrl, onProgress = () => {}) {
+  async downloadAndInstall(downloadUrl, version = null, onProgress = () => {}) {
     if (!downloadUrl) throw new Error('Download URL is required');
+    if (typeof version === 'function') {
+      onProgress = version;
+      version = null;
+    }
 
     const fileName = 'Growvest_Update.apk';
     const localUri = `${FileSystem.cacheDirectory}${fileName}`;
@@ -146,13 +181,28 @@ export const appUpdateService = {
             type: 'application/vnd.android.package-archive',
           });
 
+          if (version) {
+            try {
+              await AsyncStorage.setItem('LAST_INSTALLED_APK_VERSION', String(version));
+            } catch (_) {}
+          }
           return { success: true, method: 'intent' };
         } catch (intentErr) {
           console.warn('[AppUpdateService] Native installer launch failed, opening via browser fallback:', intentErr);
+          if (version) {
+            try {
+              await AsyncStorage.setItem('LAST_INSTALLED_APK_VERSION', String(version));
+            } catch (_) {}
+          }
           await Linking.openURL(downloadUrl);
           return { success: true, method: 'browser_fallback' };
         }
       } else {
+        if (version) {
+          try {
+            await AsyncStorage.setItem('LAST_INSTALLED_APK_VERSION', String(version));
+          } catch (_) {}
+        }
         await Linking.openURL(downloadUrl);
         return { success: true, method: 'browser' };
       }

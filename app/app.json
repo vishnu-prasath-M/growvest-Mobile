@@ -2,7 +2,7 @@
   "expo": {
     "name": "Growvest",
     "slug": "zenvest",
-    "version": "1.0.0",
+    "version": "8.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/growvest-logo.png",
@@ -30,7 +30,7 @@
     "scheme": "growvest",
     "android": {
       "package": "com.growvest.mobile",
-      "versionCode": 1,
+      "versionCode": 8,
       "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [

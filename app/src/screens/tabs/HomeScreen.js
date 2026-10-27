@@ -30,6 +30,7 @@ import { SkeletonLoader } from '../../components/SkeletonLoader';
 import KycRequiredModal from '../../components/KycRequiredModal';
 import { notificationService } from '../../services/notificationService';
 import AdBannerCarousel from '../../components/AdBannerCarousel';
+import PromotionalMarketingBanner from '../../components/PromotionalMarketingBanner';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const INSIGHT_CARD_WIDTH = Math.min(SCREEN_WIDTH * 0.78, 300);
@@ -1101,63 +1102,8 @@ const HomeScreen = ({ navigation }) => {
           )}
 
 
-          {/* ── Active Investments ── */}
-          {activeInvestments.length > 0 && (
-            <View style={[styles.section, { marginTop: 24 }]}>
-              <View style={styles.sectionHeader}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={styles.sectionTitle}>Active Plans</Text>
-                  {activeInvestments.length > 1 && (
-                    <View style={styles.deckCountBadge}>
-                      <Text style={styles.deckCountText}>
-                        {activeInvestments.length} plans
-                      </Text>
-                    </View>
-                  )}
-                </View>
-                <TouchableOpacity style={styles.viewAllBtn} onPress={() => navigation.navigate('Investments')}>
-                  <Text style={styles.viewAllText}>View All</Text>
-                  <MaterialCommunityIcons name="chevron-right" size={14} color={themeColors.primary} />
-                </TouchableOpacity>
-              </View>
-
-              <ActivePlansCardDeck
-                investments={activeInvestments}
-                navigation={navigation}
-                hideBalance={hideBalance}
-                formatCurrency={formatCurrency}
-                themeColors={themeColors}
-                isDarkMode={isDarkMode}
-                styles={styles}
-              />
-            </View>
-          )}
-
-          {/* ── Empty state if no investments yet ── */}
-          {activeInvestments.length === 0 && recentTransactions.length === 0 && (
-            <View style={[styles.section, { marginTop: 24 }]}>
-              <TouchableOpacity
-                style={styles.emptyStartCard}
-                activeOpacity={0.85}
-                onPress={() => navigation.navigate('InvestmentDashboard')}
-              >
-                <LinearGradient
-                  colors={['#0E3D23', '#1A5C39', '#2E8B5A']}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                  style={styles.emptyStartGradient}
-                >
-                  <MaterialCommunityIcons name="sprout-outline" size={42} color="rgba(255,255,255,0.9)" />
-                  <Text style={styles.emptyStartTitle}>Start Your Investment Journey</Text>
-                  <Text style={styles.emptyStartBody}>
-                    Invest as little as ₹500 and watch your money grow every day.
-                  </Text>
-                  <View style={styles.emptyStartBtn}>
-                    <Text style={styles.emptyStartBtnText}>Invest Now →</Text>
-                  </View>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          )}
+          {/* ── High-Impact Promotional & Emotional Marketing Banner ── */}
+          <PromotionalMarketingBanner navigation={navigation} isDarkMode={isDarkMode} />
 
           {/* ── Flipkart-Style Auto-Scrolling Ad Banner Carousel ── */}
           <AdBannerCarousel />

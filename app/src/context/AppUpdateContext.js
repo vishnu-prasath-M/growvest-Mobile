@@ -66,7 +66,7 @@ export const AppUpdateProvider = ({ children }) => {
     setDownloadError(null);
 
     try {
-      await appUpdateService.downloadAndInstall(updateInfo.downloadUrl, (progressData) => {
+      await appUpdateService.downloadAndInstall(updateInfo.downloadUrl, updateInfo.latestVersion, (progressData) => {
         setDownloadProgress(progressData.progress);
         setDownloadStats({
           bytesWritten: progressData.bytesWritten,

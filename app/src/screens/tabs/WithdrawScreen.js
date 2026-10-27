@@ -325,9 +325,13 @@ const WithdrawScreen = ({ navigation }) => {
     return sum;
   }, 0);
 
-  const serverAvailable = Number(dashboardData?.balances?.availableToWithdraw ?? userData?.availableToWithdraw ?? userData?.savingBalance ?? 0);
-  const investmentAvailable = serverAvailable > 0 ? serverAvailable : investmentEarnings;
-  const activeInvestmentsCount = validInvestmentsOnly.filter(inv => inv.status !== 'withdrawn' && inv.status !== 'rejected').length;
+  // For Fixed & Savings investments, only matured/unlocked fixed deposit funds belong here
+  const serverMaturedAvailable = Number(dashboardData?.balances?.maturedAvailableOnly ?? userData?.maturedAvailableOnly ?? 0);
+  const investmentAvailable = serverMaturedAvailable > 0 ? serverMaturedAvailable : investmentEarnings;
+  const activeInvestmentsCount = validInvestmentsOnly.filter(inv => {
+    const isMatured = inv.maturityDate && new Date() >= new Date(inv.maturityDate);
+    return (inv.status === 'approved' || inv.status === 'active') && !isMatured && inv.status !== 'withdrawn' && inv.status !== 'rejected';
+  }).length;
 
   // 2. Chit Fund
   const activeChitItems = investments.filter(inv => inv.isChit);
@@ -372,8 +376,8 @@ const WithdrawScreen = ({ navigation }) => {
       available: investmentAvailable,
       stat1Label: 'Active Deposits',
       stat1Val: activeInvestmentsCount,
-      stat2Label: 'Investment Earnings',
-      stat2Val: formatCurrencyNoDecimals(investmentEarnings),
+      stat2Label: 'Matured Returns',
+      stat2Val: formatCurrency(investmentAvailable),
     },
     chit: {
       available: chitAvailable,
@@ -801,7 +805,7 @@ const WithdrawScreen = ({ navigation }) => {
           <View style={styles.formSectionHeader}>
             <Text style={styles.formSectionLabel}>Withdraw from {currentCategoryConfig.name}</Text>
             {currentCategoryAvailable > 0 && (
-              <Text style={styles.formSectionSub}>Limit: {formatCurrencyNoDecimals(currentCategoryAvailable)}</Text>
+              <Text style={styles.formSectionSub}>Limit: {formatCurrency(currentCategoryAvailable)}</Text>
             )}
           </View>
 
@@ -844,7 +848,7 @@ const WithdrawScreen = ({ navigation }) => {
               >
                 <Text style={styles.availableBadgeLabel}>Available</Text>
                 <Text style={[styles.availableBadgeValue, { color: currentCategoryConfig.accent }]}>
-                  {formatCurrencyNoDecimals(currentCategoryAvailable)}
+                  {formatCurrency(currentCategoryAvailable)}
                 </Text>
               </TouchableOpacity>
             </View>
