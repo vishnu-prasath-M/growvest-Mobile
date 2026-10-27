@@ -938,7 +938,6 @@ const ChitDetailsScreen = ({ navigation, route }) => {
     </View>
   );
 
-  const myMembership = myChits.find(m => m.chitId === chitId);
   const isPendingApproval = myMembership?.status === 'pending';
 
   const visibleTabs = isPendingApproval
