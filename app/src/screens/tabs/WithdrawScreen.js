@@ -92,6 +92,7 @@ const WithdrawScreen = ({ navigation }) => {
   const [amount, setAmount] = useState('');
   const [upiId, setUpiId] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
+  const [selectedChitId, setSelectedChitId] = useState(null);
   const [emailRequiredModalVisible, setEmailRequiredModalVisible] = useState(false);
   const [investments, setInvestments] = useState([]);
   const carouselRef = useRef(null);
@@ -335,6 +336,19 @@ const WithdrawScreen = ({ navigation }) => {
 
   // 2. Chit Fund
   const activeChitItems = investments.filter(inv => inv.isChit);
+  const eligibleMaturedChits = activeChitItems.filter(inv => {
+    if (inv.isWithdrawn || inv.withdrawalStatus === 'completed' || inv.withdrawalStatus === 'withdrawn' || inv.withdrawalStatus === 'approved') {
+      return false;
+    }
+    if (inv.isRequested || inv.withdrawalStatus === 'requested') {
+      return false;
+    }
+    return inv.isUnlocked || inv.hasWon;
+  });
+
+  const selectedChit = (selectedChitId ? eligibleMaturedChits.find(c => String(c._id) === String(selectedChitId)) : null) || eligibleMaturedChits[0] || null;
+  const selectedChitPayout = selectedChit ? (Number(selectedChit.priceAmount) || Number(selectedChit.winningAmount) || Number(selectedChit.amount) || 0) : 0;
+
   const chitAvailable = activeChitItems.reduce((sum, inv) => {
     if (inv.isWithdrawn || inv.withdrawalStatus === 'completed' || inv.withdrawalStatus === 'withdrawn' || inv.withdrawalStatus === 'approved') {
       return sum;
@@ -408,8 +422,7 @@ const WithdrawScreen = ({ navigation }) => {
   const selectCategory = (catId, idx) => {
     setActiveCategory(catId);
     if (catId === 'chit') {
-      const chitAvail = categoryBalances.chit?.available || 0;
-      setAmount(chitAvail > 0 ? String(chitAvail) : '');
+      setAmount(selectedChitPayout > 0 ? String(selectedChitPayout) : '');
     } else {
       setAmount('');
     }
@@ -464,14 +477,17 @@ const WithdrawScreen = ({ navigation }) => {
   };
 
   const handleMainWithdrawRequest = () => {
-    if (currentCategoryAvailable <= 0) {
-      showAlert('warning', 'No Available Balance', `You currently do not have any available balance to withdraw in ${currentCategoryConfig.name}.`);
-      return;
-    }
-
     if (activeCategory === 'chit') {
-      setAmount(String(currentCategoryAvailable));
+      if (!selectedChit || selectedChitPayout <= 0) {
+        showAlert('warning', 'No Eligible Chit', 'You currently do not have any matured or unlocked Chit Fund eligible for withdrawal.');
+        return;
+      }
+      setAmount(String(selectedChitPayout));
     } else {
+      if (currentCategoryAvailable <= 0) {
+        showAlert('warning', 'No Available Balance', `You currently do not have any available balance to withdraw in ${currentCategoryConfig.name}.`);
+        return;
+      }
       const numAmt = parseFloat(amount);
       if (!amount || isNaN(numAmt) || numAmt <= 0) {
         showAlert('warning', 'Enter Amount', `Please enter a valid amount to withdraw from ${currentCategoryConfig.name}.`);
@@ -506,13 +522,13 @@ const WithdrawScreen = ({ navigation }) => {
 
   const handleWithdraw = async () => {
     const isChitCategory = activeCategory === 'chit' || withdrawType === 'chit';
-    const numAmt = isChitCategory ? currentCategoryAvailable : parseFloat(amount);
+    const numAmt = isChitCategory ? selectedChitPayout : parseFloat(amount);
     if (!isChitCategory && (!amount || isNaN(numAmt) || numAmt <= 0)) {
       showAlert('warning', 'Invalid Amount', 'Please enter a valid amount to withdraw.');
       return;
     }
 
-    if (numAmt > currentCategoryAvailable) {
+    if (!isChitCategory && numAmt > currentCategoryAvailable) {
       showAlert(
         'warning',
         'Exceeds Balance',
@@ -534,26 +550,18 @@ const WithdrawScreen = ({ navigation }) => {
     setWithdrawing(true);
     try {
       if (isChitCategory) {
-        const eligibleChit = activeChitItems.find(c => (c.isUnlocked || c.hasWon) && !c.isWithdrawn && !c.isRequested) || activeChitItems[0];
-        if (eligibleChit) {
-          const payoutAmt = Number(eligibleChit.priceAmount) || Number(eligibleChit.amount) || numAmt;
-          await chitFundService.withdrawChitPayout(eligibleChit._id, {
-            amount: payoutAmt,
-            upiId: upiId.trim(),
-          });
-        } else {
-          await withdrawalService.createWithdrawal({
-            amount: numAmt,
-            upiId: upiId.trim(),
-            userName: userData?.name || userData?.username || 'User',
-            userEmail: userData?.email || userData?.mobileNumber || '',
-            withdrawType: 'chit',
-          });
+        if (!selectedChit) {
+          showAlert('warning', 'No Chit Selected', 'Please select a matured Chit Fund to withdraw.');
+          return;
         }
+        await chitFundService.withdrawChitPayout(selectedChit._id, {
+          amount: selectedChitPayout,
+          upiId: upiId.trim(),
+        });
         showAlert(
           'payout',
           'Chit Payout Requested ⌛',
-          `Your full Chit payout withdrawal request of ${formatCurrency(numAmt)} has been submitted successfully and is pending admin approval. Once approved, this chit cycle will be completed.`,
+          `Your Chit payout withdrawal request of ${formatCurrency(selectedChitPayout)} for ${selectedChit.chitName || 'Chit Fund'} has been submitted successfully and is pending admin approval. Once approved, this chit cycle will be completed.`,
           'Got It'
         );
       } else if (activeCategory === 'sip') {
@@ -811,21 +819,91 @@ const WithdrawScreen = ({ navigation }) => {
 
           {/* Amount Input Card */}
           {activeCategory === 'chit' ? (
-            <View style={[styles.amountInputCard, { flexDirection: 'column', alignItems: 'stretch', paddingVertical: 14 }]}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <View>
-                  <Text style={[styles.heroStatLabel, { color: isDarkMode ? '#94A3B8' : '#64748B' }]}>Full Chit Payout Amount</Text>
-                  <Text style={[styles.amountTextInput, { fontSize: 24, fontWeight: '800', color: currentCategoryConfig.accent }]}>
-                    {formatCurrency(currentCategoryAvailable)}
+            <View>
+              {/* Interactive Chit Selector if user has multiple matured chits */}
+              {eligibleMaturedChits.length > 1 && (
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: isDarkMode ? '#94A3B8' : '#64748B', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Select Matured Chit Fund to Withdraw ({eligibleMaturedChits.length} Available)
+                  </Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
+                    {eligibleMaturedChits.map((c) => {
+                      const isSelected = selectedChit?._id === c._id;
+                      const cPayout = Number(c.priceAmount) || Number(c.winningAmount) || Number(c.amount) || 0;
+                      return (
+                        <TouchableOpacity
+                          key={c._id}
+                          activeOpacity={0.8}
+                          onPress={() => {
+                            setSelectedChitId(c._id);
+                            setAmount(String(cPayout));
+                          }}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 8,
+                            paddingHorizontal: 14,
+                            paddingVertical: 10,
+                            borderRadius: 14,
+                            backgroundColor: isSelected
+                              ? (isDarkMode ? 'rgba(52, 211, 153, 0.2)' : '#DCFCE7')
+                              : (isDarkMode ? '#1E293B' : '#F1F5F9'),
+                            borderWidth: 1.5,
+                            borderColor: isSelected ? '#34D399' : (isDarkMode ? '#334155' : '#E2E8F0'),
+                          }}
+                        >
+                          <MaterialCommunityIcons
+                            name={isSelected ? 'check-circle' : 'circle-outline'}
+                            size={18}
+                            color={isSelected ? '#059669' : (isDarkMode ? '#94A3B8' : '#64748B')}
+                          />
+                          <View>
+                            <Text style={{ fontSize: 12.5, fontWeight: '800', color: isSelected ? (isDarkMode ? '#34D399' : '#059669') : (isDarkMode ? '#F8FAFC' : '#0F172A') }}>
+                              {c.chitName || 'Chit Fund'}
+                            </Text>
+                            <Text style={{ fontSize: 11, fontWeight: '600', color: isDarkMode ? '#94A3B8' : '#64748B' }}>
+                              Payout: {formatCurrency(cPayout)}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              )}
+
+              {eligibleMaturedChits.length === 0 ? (
+                <View style={[styles.amountInputCard, { flexDirection: 'column', alignItems: 'stretch', paddingVertical: 14 }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <MaterialCommunityIcons name="lock-outline" size={20} color={isDarkMode ? '#F59E0B' : '#D97706'} />
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? '#FBBF24' : '#D97706' }}>
+                      No Matured Chit Fund Available Yet
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 12, color: isDarkMode ? '#94A3B8' : '#64748B', marginTop: 6, lineHeight: 17 }}>
+                    Your Chit Funds will become eligible for withdrawal once their cycle reaches the designated unlock week or settlement.
                   </Text>
                 </View>
-                <View style={[styles.primaryBadge, { backgroundColor: isDarkMode ? 'rgba(52, 211, 153, 0.15)' : '#DCFCE7', borderWidth: 1, borderColor: '#34D399', paddingHorizontal: 10, paddingVertical: 5 }]}>
-                  <Text style={[styles.primaryBadgeText, { color: isDarkMode ? '#34D399' : '#059669', fontWeight: '700' }]}>Full Payout Only</Text>
+              ) : (
+                <View style={[styles.amountInputCard, { flexDirection: 'column', alignItems: 'stretch', paddingVertical: 14 }]}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View>
+                      <Text style={[styles.heroStatLabel, { color: isDarkMode ? '#94A3B8' : '#64748B' }]}>
+                        {selectedChit?.chitName ? `${selectedChit.chitName} Payout` : 'Full Chit Payout Amount'}
+                      </Text>
+                      <Text style={[styles.amountTextInput, { fontSize: 24, fontWeight: '800', color: currentCategoryConfig.accent }]}>
+                        {formatCurrency(selectedChitPayout)}
+                      </Text>
+                    </View>
+                    <View style={[styles.primaryBadge, { backgroundColor: isDarkMode ? 'rgba(52, 211, 153, 0.15)' : '#DCFCE7', borderWidth: 1, borderColor: '#34D399', paddingHorizontal: 10, paddingVertical: 5 }]}>
+                      <Text style={[styles.primaryBadgeText, { color: isDarkMode ? '#34D399' : '#059669', fontWeight: '700' }]}>Single Chit Payout</Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 11, color: isDarkMode ? '#94A3B8' : '#64748B', marginTop: 8, lineHeight: 16 }}>
+                    💡 Chit fund rule: You are withdrawing {formatCurrency(selectedChitPayout)} specifically from {selectedChit?.chitName || 'this chit fund'}. Your other chit funds remain active and untouched.
+                  </Text>
                 </View>
-              </View>
-              <Text style={{ fontSize: 11, color: isDarkMode ? '#94A3B8' : '#64748B', marginTop: 8, lineHeight: 16 }}>
-                💡 Chit fund rule: You must withdraw the full available payout. Once claimed, this chit cycle will be completed and further weekly earnings will conclude.
-              </Text>
+              )}
             </View>
           ) : (
             <View style={styles.amountInputCard}>
@@ -891,7 +969,11 @@ const WithdrawScreen = ({ navigation }) => {
                   style={styles.requestBtnGradient}
                 >
                   <MaterialCommunityIcons name="arrow-top-right" size={18} color="#FFFFFF" />
-                  <Text style={styles.requestBtnText}>Request {currentCategoryConfig.name} Withdrawal</Text>
+                  <Text style={styles.requestBtnText}>
+                    {activeCategory === 'chit' && selectedChit?.chitName
+                      ? `Request ${selectedChit.chitName} Withdrawal (${formatCurrency(selectedChitPayout)})`
+                      : `Request ${currentCategoryConfig.name} Withdrawal`}
+                  </Text>
                 </LinearGradient>
               </TouchableOpacity>
 
@@ -994,7 +1076,7 @@ const WithdrawScreen = ({ navigation }) => {
                       ? `Matured: ${formatCurrency(inv.availableToWithdraw || inv.totalPaidAmount)} • All ${inv.totalContributions} Paid`
                       : `Progress: ${inv.contributionsCompleted || 0}/${inv.totalContributions || 0} • Unlocks on Completion`;
                     iconName = 'calendar-clock';
-                    badgeLabel = isCompleted ? 'COMPLETED' : inv.status === 'cancelled' ? 'CANCELLED' : 'IN PROGRESS';
+                    badgeLabel = isCompleted ? 'COMPLETED' : inv.status === 'cancelled' ? 'CANCELLED' : 'ACTIVE';
                     badgeBg = isCompleted ? '#DCFCE7' : inv.status === 'cancelled' ? (isDarkMode ? 'rgba(255,255,255,0.06)' : '#F1F5F9') : '#FEF3C7';
                     badgeColor = isCompleted ? '#059669' : inv.status === 'cancelled' ? (isDarkMode ? '#9CA3AF' : '#64748B') : '#D97706';
                   } else if (isPocketMoney) {
@@ -1052,6 +1134,16 @@ const WithdrawScreen = ({ navigation }) => {
                             setWithdrawType(inv._id);
                             if (bankInfo?.upiId) setUpiId(bankInfo.upiId);
                             setWithdrawModalVisible(true);
+                          } else if (isChit) {
+                            if (inv.isUnlocked || inv.hasWon) {
+                              setActiveCategory('chit');
+                              setSelectedChitId(inv._id);
+                              const cPayout = Number(inv.priceAmount) || Number(inv.winningAmount) || Number(inv.amount) || 0;
+                              setAmount(String(cPayout));
+                              carouselRef.current?.scrollTo({ x: 1 * (CARD_WIDTH + 14), animated: true });
+                            } else {
+                              setSelectedDeposit(inv);
+                            }
                           } else {
                             setSelectedDeposit(inv);
                           }
@@ -1685,4 +1777,4 @@ const getStyles = (themeColors, isDarkMode) => StyleSheet.create({
   submitBtnText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF', textAlign: 'center' },
 });
 
-export default WithdrawScreen;
+export default WithdrawScreen;

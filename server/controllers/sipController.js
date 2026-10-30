@@ -561,13 +561,21 @@ const calculateSIPInterest = (sip, contributions = []) => {
 
   const k = paidContributions.length;
   let accruedInterest = 0;
+  const nowMidnight = new Date();
+  nowMidnight.setHours(0, 0, 0, 0);
 
   for (let idx = 0; idx < k; idx++) {
     const c = paidContributions[idx];
     const amount = Number(c.amount) || 0;
-    // Contribution at idx has accrued interest for (k - idx) completed contribution periods
-    const periodsActive = Math.max(1, k - idx);
-    const itemInterest = amount * periodicRate * periodsActive;
+    
+    // Check when this contribution was paid
+    const paidAt = c.paidDate ? new Date(c.paidDate) : (c.createdAt ? new Date(c.createdAt) : new Date(sip.startDate || sip.createdAt || Date.now()));
+    const paidMidnight = new Date(paidAt);
+    paidMidnight.setHours(0, 0, 0, 0);
+
+    // Rule: Same calendar day of payment has 0 interest. Interest accrues after 12 AM next day.
+    const elapsedDays = Math.max(0, Math.floor((nowMidnight.getTime() - paidMidnight.getTime()) / 86400000));
+    const itemInterest = amount * dailyRate * elapsedDays;
     accruedInterest += itemInterest;
   }
 

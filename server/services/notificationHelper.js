@@ -12,6 +12,9 @@
 const Notification = require('../models/Notification');
 const { sendToUser } = require('./pushNotificationService');
 
+// In-memory notification de-duplication cache (userId + title + description) -> timestamp
+const recentNotificationCache = new Map();
+
 /**
  * Send a notification to a user.
  * 
@@ -29,6 +32,25 @@ async function sendNotification({ userId, title, description, type, icon, metada
   if (!userId || !title || !description || !type) {
     console.warn('[NotificationHelper] Missing required fields:', { userId, title, description, type });
     return { success: false, reason: 'missing_required_fields' };
+  }
+
+  // Deduplication check: suppress identical notifications within 30 seconds
+  const dedupeKey = `${userId.toString()}:${String(title).trim()}:${String(description).trim()}`;
+  const now = Date.now();
+  if (recentNotificationCache.has(dedupeKey)) {
+    const lastSent = recentNotificationCache.get(dedupeKey);
+    if (now - lastSent < 30000) {
+      console.log(`[NotificationHelper] Suppressing duplicate notification for user ${userId}: "${title}" within 30s.`);
+      return { success: true, deduplicated: true };
+    }
+  }
+  recentNotificationCache.set(dedupeKey, now);
+
+  // Periodic cache cleanup
+  if (recentNotificationCache.size > 500) {
+    for (const [key, ts] of recentNotificationCache.entries()) {
+      if (now - ts > 60000) recentNotificationCache.delete(key);
+    }
   }
 
   const results = { db: false, push: false };

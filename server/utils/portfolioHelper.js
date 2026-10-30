@@ -151,11 +151,14 @@ async function getUserPortfolioSummary(userIdInput) {
     const isUnlocked = isMatured;
 
     // Accrue interest from startDate to today
+    // Rule: If invested today, 0 interest accrued today; starts showing tomorrow (after 12 AM).
     let accruedInterest = 0;
     if (inv.startDate && !isPending && !isSameDay) {
-      const elapsedDays = Math.max(0, Math.min(durationDays, Math.floor((nowMidnight - startDay) / 86400000)));
+      const elapsedDays = Math.max(0, Math.min(durationDays, Math.floor((nowMidnight.getTime() - startDay.getTime()) / 86400000)));
       accruedInterest = elapsedDays * dailyInterest;
       accruedInterest = Math.max(accruedInterest, Number(inv.interestEarned) || 0);
+    } else {
+      accruedInterest = 0;
     }
     if (isMatured) {
       accruedInterest = Math.max(accruedInterest, totalInterestForDuration);

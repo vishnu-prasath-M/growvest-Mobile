@@ -28,7 +28,8 @@ const BANNERS = [
     icon: 'account-group-outline',
     colors: ['#064e3b', '#047857', '#059669'],
     accent: '#34D399',
-    route: 'ChitFunds',
+    textColor: '#064E3B',
+    route: 'ExploreChits',
   },
   {
     id: 'sip',
@@ -43,6 +44,7 @@ const BANNERS = [
     icon: 'rocket-launch-outline',
     colors: ['#2e1065', '#581c87', '#7c3aed'],
     accent: '#C084FC',
+    textColor: '#581C87',
     route: 'SIPDashboard',
   },
   {
@@ -58,6 +60,7 @@ const BANNERS = [
     icon: 'wallet-giftcard',
     colors: ['#78350f', '#9a3412', '#c2410c'],
     accent: '#FB923C',
+    textColor: '#9A3412',
     route: 'PocketMoney',
   },
   {
@@ -69,11 +72,12 @@ const BANNERS = [
     subtitle: 'Zero market risk. High-yield terms from 15 days to 1 year with bank-level reliability.',
     stat1: 'Up to 24% p.a.',
     stat2: '15d to 1yr Terms',
-    cta: 'Invest With Guarantee',
+    cta: 'Start New Investment',
     icon: 'shield-check-outline',
     colors: ['#0f172a', '#0e7490', '#047857'],
     accent: '#38BDF8',
-    route: 'Investments',
+    textColor: '#0F172A',
+    route: 'InvestmentAmount',
   },
 ];
 
@@ -143,7 +147,7 @@ export const PromotionalMarketingBanner = ({ navigation, isDarkMode }) => {
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (evt, gestureState) => {
-        return Math.abs(gestureState.dx) > 15 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+        return Math.abs(gestureState.dx) > 25 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 2;
       },
       onPanResponderGrant: () => {
         isInteracting.current = true;
@@ -205,7 +209,7 @@ export const PromotionalMarketingBanner = ({ navigation, isDarkMode }) => {
                 </Text>
               </View>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(255, 255, 255, 0.15)' }]}>
-                <MaterialCommunityIcons name={currentBanner.icon} size={22} color="#FFFFFF" />
+                <MaterialCommunityIcons name={currentBanner.icon} size={20} color="#FFFFFF" />
               </View>
             </View>
 
@@ -219,26 +223,29 @@ export const PromotionalMarketingBanner = ({ navigation, isDarkMode }) => {
               {currentBanner.subtitle}
             </Text>
 
-            {/* Bottom Row: Stats & CTA Button */}
-            <View style={styles.bottomRow}>
-              <View style={styles.statsContainer}>
-                <View style={styles.statPill}>
-                  <MaterialCommunityIcons name="check-decagram" size={13} color={currentBanner.accent} />
-                  <Text style={styles.statPillText}>{currentBanner.stat1}</Text>
-                </View>
-                <View style={styles.statPill}>
-                  <MaterialCommunityIcons name="clock-outline" size={13} color={currentBanner.accent} />
-                  <Text style={styles.statPillText}>{currentBanner.stat2}</Text>
-                </View>
+            {/* Middle Row: Stats Pills */}
+            <View style={styles.statsRow}>
+              <View style={styles.statPill}>
+                <MaterialCommunityIcons name="check-decagram" size={13} color={currentBanner.accent} />
+                <Text style={styles.statPillText} numberOfLines={1}>{currentBanner.stat1}</Text>
               </View>
+              <View style={styles.statPill}>
+                <MaterialCommunityIcons name="clock-outline" size={13} color={currentBanner.accent} />
+                <Text style={styles.statPillText} numberOfLines={1}>{currentBanner.stat2}</Text>
+              </View>
+            </View>
 
+            {/* Bottom Row: CTA Button */}
+            <View style={styles.actionRow}>
               <TouchableOpacity
                 activeOpacity={0.85}
                 onPress={handlePress}
                 style={[styles.ctaBtn, { shadowColor: currentBanner.accent }]}
               >
-                <Text style={styles.ctaText}>{currentBanner.cta}</Text>
-                <MaterialCommunityIcons name="arrow-right" size={14} color="#064E3B" />
+                <Text style={[styles.ctaText, { color: currentBanner.textColor || '#064E3B' }]}>
+                  {currentBanner.cta}
+                </Text>
+                <MaterialCommunityIcons name="arrow-right" size={15} color={currentBanner.textColor || '#064E3B'} />
               </TouchableOpacity>
             </View>
           </LinearGradient>
@@ -249,28 +256,28 @@ export const PromotionalMarketingBanner = ({ navigation, isDarkMode }) => {
       <View style={styles.paginationRow}>
         <TouchableOpacity
           onPress={handlePrev}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           style={styles.navArrow}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <MaterialCommunityIcons
             name="chevron-left"
             size={18}
-            color={isDarkMode ? 'rgba(255,255,255,0.6)' : '#64748B'}
+            color={isDarkMode ? '#9CA3AF' : '#64748B'}
           />
         </TouchableOpacity>
 
         <View style={styles.dotsWrap}>
-          {BANNERS.map((b, idx) => {
-            const isActive = idx === currentIndex;
+          {BANNERS.map((banner, index) => {
+            const isActive = index === currentIndex;
             return (
               <TouchableOpacity
-                key={b.id}
-                onPress={() => goToBanner(idx)}
+                key={banner.id}
+                onPress={() => goToBanner(index)}
                 style={[
                   styles.dot,
                   isActive
-                    ? [styles.dotActive, { backgroundColor: b.accent, width: 22 }]
-                    : [styles.dotInactive, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.18)' }],
+                    ? [styles.dotActive, { backgroundColor: currentBanner.accent }]
+                    : [styles.dotInactive, { backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.15)' }],
                 ]}
               />
             );
@@ -279,13 +286,13 @@ export const PromotionalMarketingBanner = ({ navigation, isDarkMode }) => {
 
         <TouchableOpacity
           onPress={handleNext}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           style={styles.navArrow}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <MaterialCommunityIcons
             name="chevron-right"
             size={18}
-            color={isDarkMode ? 'rgba(255,255,255,0.6)' : '#64748B'}
+            color={isDarkMode ? '#9CA3AF' : '#64748B'}
           />
         </TouchableOpacity>
       </View>
@@ -295,7 +302,9 @@ export const PromotionalMarketingBanner = ({ navigation, isDarkMode }) => {
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 14,
+    marginHorizontal: 16,
+    marginTop: 18,
+    marginBottom: 4,
     alignItems: 'center',
   },
   bannerCard: {
@@ -316,7 +325,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     position: 'relative',
     overflow: 'hidden',
-    minHeight: 188,
+    minHeight: 205,
     justifyContent: 'space-between',
   },
   decorCircle1: {
@@ -342,7 +351,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   tagBadge: {
     paddingHorizontal: 10,
@@ -357,71 +366,72 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   iconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   titleText: {
     color: '#FFFFFF',
-    fontSize: 17,
+    fontSize: 16.5,
     fontWeight: '800',
     lineHeight: 22,
     letterSpacing: -0.2,
     marginBottom: 4,
   },
   subText: {
-    color: 'rgba(255, 255, 255, 0.82)',
+    color: 'rgba(255, 255, 255, 0.85)',
     fontSize: 12,
     lineHeight: 17,
-    marginBottom: 12,
+    marginBottom: 10,
   },
-  bottomRow: {
+  statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 6,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.12)',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 8,
-    flexShrink: 1,
+    marginBottom: 12,
   },
   statPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.22)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    paddingHorizontal: 9,
+    paddingVertical: 4.5,
     borderRadius: 12,
-    gap: 4,
+    gap: 5,
   },
   statPillText: {
     color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.12)',
   },
   ctaBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 18,
-    gap: 4,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 5,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
   },
   ctaText: {
-    color: '#064E3B',
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: '800',
+    letterSpacing: 0.1,
   },
   paginationRow: {
     flexDirection: 'row',

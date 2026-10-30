@@ -644,10 +644,21 @@ exports.handleWebhook = async (req, res) => {
 
 // ─── Centralized Business Logic Execution Helper ────────────────────────────
 async function processSuccessfulOrder(orderId, utr, fallbackUser = null, fallbackPaymentType = null, fallbackPayloadData = null) {
-  let pending = await PendingPayment.findOne({ orderId });
-  if (pending && pending.status === 'completed') {
-    console.log(`[PaymentProcess] Order ${orderId} already completed.`);
-    return { success: true, alreadyCompleted: true };
+  let pending = null;
+  if (orderId && orderId !== 'simulated') {
+    pending = await PendingPayment.findOneAndUpdate(
+      { orderId, status: { $ne: 'completed' } },
+      { $set: { status: 'completed', completedAt: new Date() } },
+      { new: false }
+    );
+    // If pending payment exists and was ALREADY completed by another concurrent webhook/call, stop duplicate processing
+    if (!pending) {
+      const alreadyDone = await PendingPayment.findOne({ orderId, status: 'completed' });
+      if (alreadyDone) {
+        console.log(`[PaymentProcess] Order ${orderId} already completed (atomic lock).`);
+        return { success: true, alreadyCompleted: true };
+      }
+    }
   }
 
   const userId = pending?.userId || fallbackUser?._id;
@@ -663,12 +674,6 @@ async function processSuccessfulOrder(orderId, utr, fallbackUser = null, fallbac
   const signature = `VERIFIED_CASHFREE_${orderId}`;
 
   console.log(`[PaymentProcess] Completing: order=${orderId}, type=${paymentType}, user=${user._id}`);
-
-  if (pending) {
-    pending.status = 'completed';
-    pending.completedAt = new Date();
-    await pending.save().catch(() => {});
-  }
 
   let result = null;
   if (paymentType === 'investment') {
@@ -1003,6 +1008,20 @@ async function completeMonthlyDue(user, data, orderId, paymentId, signature, pro
   const { chitId, month, amount, lateFee = 0 } = data;
   let { memberId } = data;
   const totalPaidAmt = Number(amount) + Number(lateFee);
+
+  // Idempotency check: if payment already processed for this paymentId or orderId, return existing
+  if (paymentId || (orderId && orderId !== 'simulated')) {
+    const existingPayment = await ChitPayment.findOne({
+      $or: [
+        ...(paymentId ? [{ paymentId }] : []),
+        ...(orderId && orderId !== 'simulated' ? [{ orderId }] : [])
+      ]
+    });
+    if (existingPayment) {
+      console.log(`[PaymentController] Chit due payment ${paymentId} / ${orderId} already processed (idempotency check).`);
+      return existingPayment;
+    }
+  }
 
   // 1. Find member by memberId or chitId + userId
   let member = null;

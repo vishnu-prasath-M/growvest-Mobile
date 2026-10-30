@@ -379,13 +379,14 @@ const ChitDetailsScreen = ({ navigation, route }) => {
         </View>
 
         {(() => {
+          const isViewingMyChit = Boolean(isMyChitParam || memberId);
           const myMembership = (memberId ? myChits.find(m => m._id === memberId) : null) || myChits.find(m => (m.chitId?._id || m.chitId) === chit._id) || chit.myMembership;
           const totalMembers = chit.totalMembers || 0;
           const availableSlots = chit.availableSlots || 0;
           const filledMembers = Math.max(0, totalMembers - availableSlots);
           const remainingSlots = availableSlots;
 
-          if (myMembership) {
+          if (isViewingMyChit && myMembership) {
             // ── PENDING: awaiting admin approval ──────────────────────────
             if (myMembership.status === 'pending') {
               return (
@@ -455,7 +456,6 @@ const ChitDetailsScreen = ({ navigation, route }) => {
             const nextDueStr = myMembership.nextDueDate || 'N/A';
             const dueStatus = myMembership.pendingInstallments > 0 ? 'Pending' : 'Paid';
 
-
             const eligibleStart = Math.floor((totalUnits - 1) / 2) + 1;
             const isEligible = currentUnit >= eligibleStart;
             const isWithdrawn = myMembership.withdrawalStatus === 'completed' || myMembership.withdrawalStatus === 'withdrawn' || myMembership.withdrawalStatus === 'approved' || (myMembership.hasWon && myMembership.withdrawalStatus !== 'requested');
@@ -493,7 +493,7 @@ const ChitDetailsScreen = ({ navigation, route }) => {
                       </View>
                       <View style={styles.detailRow}>
                         <Text style={styles.detailLabel}>Withdrawn Amount</Text>
-                        <Text style={{ fontSize: 16, fontWeight: '800', color: themeColors.success }}>{formatCurrency(myMembership.withdrawalAmount)}</Text>
+                        <Text style={{ fontSize: 16, fontWeight: '800', color: themeColors.success }}>{formatCurrency(myMembership.withdrawalAmount || eligibleWithdrawalAmount)}</Text>
                       </View>
                       <Text style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 10, lineHeight: 18 }}>
                         Your payout has been credited to your Growvest balance. Please continue paying the remaining dues ({remainingInstallments} {isWeekly ? 'weeks' : 'months'} left).
@@ -507,25 +507,23 @@ const ChitDetailsScreen = ({ navigation, route }) => {
                       </View>
                       <View style={styles.detailRow}>
                         <Text style={styles.detailLabel}>Requested In {isWeekly ? 'Week' : 'Month'}</Text>
-                        <Text style={styles.detailValue}>{isWeekly ? 'Week' : 'Month'} {myMembership.withdrawalWeek}</Text>
+                        <Text style={styles.detailValue}>{isWeekly ? 'Week' : 'Month'} {myMembership.withdrawalWeek || currentUnit}</Text>
                       </View>
                       <View style={styles.detailRow}>
                         <Text style={styles.detailLabel}>Requested Amount</Text>
-                        <Text style={{ fontSize: 16, fontWeight: '800', color: themeColors.warning }}>{formatCurrency(myMembership.withdrawalAmount)}</Text>
+                        <Text style={{ fontSize: 16, fontWeight: '800', color: themeColors.warning }}>{formatCurrency(myMembership.withdrawalAmount || eligibleWithdrawalAmount)}</Text>
                       </View>
                       <Text style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 6, lineHeight: 18 }}>
-                        Your payout request of {formatCurrency(myMembership.withdrawalAmount)} has been submitted to the administrator. The funds will be transferred to your account upon verification.
+                        Your payout request of {formatCurrency(myMembership.withdrawalAmount || eligibleWithdrawalAmount)} has been submitted to the administrator. The funds will be transferred to your account upon verification.
                       </Text>
                     </View>
                   ) : isEligible ? (
                     <View>
-                      <View style={{ backgroundColor: themeColors.primaryLight, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: themeColors.primary, marginBottom: 16 }}>
+                      <View style={{ backgroundColor: themeColors.primaryLight, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: themeColors.primary }}>
                         <Text style={{ fontWeight: 'bold', color: themeColors.primary, fontSize: 14, marginBottom: 12 }}>Current Eligible Payout Breakdown ({isWeekly ? 'Week' : 'Month'} {currentUnit})</Text>
                         {(() => {
                           const row = getWeeklyRowData(baseAmount, totalUnits, currentUnit);
                           const totalDividend = getTotalDividend(baseAmount, totalUnits);
-                          const isSettlement = currentUnit >= totalUnits;
-                          const eligibleWithdrawalAmount = isSettlement ? row.totalValue : row.priceAmount;
                           return (
                             <>
                               <View style={styles.detailRow}>
@@ -551,19 +549,6 @@ const ChitDetailsScreen = ({ navigation, route }) => {
                           );
                         })()}
                       </View>
-                      <TouchableOpacity
-                        style={styles.withdrawBtn}
-                        activeOpacity={0.85}
-                        onPress={() => {
-                          const row = getWeeklyRowData(baseAmount, totalUnits, currentUnit);
-                          const isSettlement = currentUnit >= totalUnits;
-                          const eligibleWithdrawalAmount = isSettlement ? row.totalValue : row.priceAmount;
-                          handleWithdrawal(myMembership._id, eligibleWithdrawalAmount);
-                        }}
-                      >
-                        <MaterialCommunityIcons name="cash-fast" size={20} color={themeColors.white} />
-                        <Text style={styles.joinNowBtnText}>Withdraw Payout</Text>
-                      </TouchableOpacity>
                     </View>
                   ) : (
                     <View style={{ backgroundColor: themeColors.surface2, padding: 14, borderRadius: 12, alignItems: 'center' }}>
@@ -639,9 +624,70 @@ const ChitDetailsScreen = ({ navigation, route }) => {
                 </View>
 
                 {renderWeeklyTable()}
+
+                {/* Bottom Action Section for My Chit */}
+                <View style={{ marginTop: 14 }}>
+                  {isEligible && !isWithdrawn && !isRequested ? (
+                    <TouchableOpacity
+                      style={styles.sipStyleWithdrawBtn}
+                      activeOpacity={0.85}
+                      onPress={() => handleWithdrawal(myMembership._id, eligibleWithdrawalAmount)}
+                    >
+                      <MaterialCommunityIcons name="bank-transfer-out" size={20} color="#FFFFFF" />
+                      <Text style={styles.sipStyleWithdrawBtnText}>
+                        Withdraw {formatCurrency(eligibleWithdrawalAmount)}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : isRequested ? (
+                    <View style={styles.statusBoxWarning}>
+                      <MaterialCommunityIcons name="clock-outline" size={18} color="#D97706" />
+                      <Text style={styles.statusBoxTextWarning}>
+                        Payout Withdrawal of {formatCurrency(myMembership.withdrawalAmount || eligibleWithdrawalAmount)} is Pending Admin Approval ⌛
+                      </Text>
+                    </View>
+                  ) : isWithdrawn ? (
+                    <View style={styles.statusBoxSuccess}>
+                      <MaterialCommunityIcons name="check-circle" size={18} color="#059669" />
+                      <Text style={styles.statusBoxTextSuccess}>
+                        Chit Payout of {formatCurrency(myMembership.withdrawalAmount || eligibleWithdrawalAmount)} Successfully Withdrawn ✓
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={styles.lockedNoticeBox}>
+                      <MaterialCommunityIcons name="lock-outline" size={18} color={themeColors.textSecondary} />
+                      <Text style={styles.lockedNoticeText}>
+                        🔒 Payout locked until {isWeekly ? 'Week' : 'Month'} {eligibleStart}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Join Again (Take New Slot) Button */}
+                  <TouchableOpacity
+                    style={[styles.joinAgainBtn, { marginTop: 8, marginBottom: 20 }]}
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      if (chit.availableSlots <= 0) {
+                        showWarning('Slot Full', 'This Chit is already full.');
+                      } else if (chit.status === 'closed' || chit.status === 'archived') {
+                        showWarning('Chit Closed', 'This Chit is no longer accepting new slots.');
+                      } else {
+                        navigation.navigate('JoinChit', { chitId: chit._id, isJoinAgain: true });
+                      }
+                    }}
+                  >
+                    <MaterialCommunityIcons name="plus-circle-outline" size={18} color={themeColors.primary} />
+                    <Text style={styles.joinAgainBtnText}>Join Again (Take New Slot)</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             );
           }
+
+          // ── Explore View (when not viewing a personal membership) ──
+          const isFull = chit.availableSlots <= 0;
+          const isClosed = chit.status === 'closed' || chit.status === 'completed' || chit.status === 'archived';
+          const isDisabled = isFull || isClosed;
+          const hasJoinedBefore = Boolean(myChits.some(m => (m.chitId?._id || m.chitId) === chit._id));
 
           return (
             <View>
@@ -679,113 +725,40 @@ const ChitDetailsScreen = ({ navigation, route }) => {
                 </View>
               </View>
               
-              {renderWeeklyTable()}
-            </View>
-          );
-        })()}
-
-        {chit.features && (
-          <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>Features</Text>
-            <View style={styles.featureList}>
-              {chit.features.map((f, i) => (
-                <View key={i} style={styles.featureItem}>
-                  <MaterialCommunityIcons name="check-circle" size={18} color={colors.success} />
-                  <Text style={styles.featureItemText}>{f}</Text>
+              {chit.features && (
+                <View style={styles.sectionCard}>
+                  <Text style={styles.sectionTitle}>Features</Text>
+                  <View style={styles.featureList}>
+                    {chit.features.map((f, i) => (
+                      <View key={i} style={styles.featureItem}>
+                        <MaterialCommunityIcons name="check-circle" size={18} color={colors.success} />
+                        <Text style={styles.featureItemText}>{f}</Text>
+                      </View>
+                    ))}
+                  </View>
                 </View>
-              ))}
+              )}
+
+              {renderWeeklyTable()}
+
+              <TouchableOpacity
+                style={[styles.joinNowBtn, isDisabled && styles.joinNowBtnDisabled, { marginTop: 14, marginBottom: 20 }]}
+                activeOpacity={0.85}
+                onPress={() => {
+                  if (isFull) {
+                    showWarning('Slot Full', 'This Chit is already full.');
+                  } else if (!isClosed) {
+                    navigation.navigate('JoinChit', { chitId: chit._id, isJoinAgain: hasJoinedBefore });
+                  }
+                }}
+                disabled={isDisabled}
+              >
+                <Text style={[styles.joinNowBtnText, isDisabled && styles.joinNowBtnTextDisabled]}>
+                  {isFull ? 'Slot Full' : isClosed ? 'Closed' : hasJoinedBefore ? 'Join Again (Take New Slot)' : 'Join This Chit'}
+                </Text>
+                {!isDisabled && <MaterialCommunityIcons name="arrow-right" size={20} color={colors.white} />}
+              </TouchableOpacity>
             </View>
-          </View>
-        )}
-
-        {(() => {
-          if (isMyChit && myMembership) {
-            return (
-              <View style={{ marginTop: 8 }}>
-                {/* 1. If Matured / Eligible for Withdrawal */}
-                {isMaturedOrEligible && (
-                  <TouchableOpacity
-                    style={styles.withdrawBtnOuter}
-                    activeOpacity={0.85}
-                    onPress={handleWithdrawChit}
-                  >
-                    <LinearGradient
-                      colors={['#0E3D23', '#1A5C39']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={styles.withdrawBtnGradient}
-                    >
-                      <MaterialCommunityIcons name="arrow-top-right" size={20} color="#FFFFFF" />
-                      <Text style={styles.withdrawBtnText}>
-                        Withdraw Payout ({formatCurrency(payoutAmount)})
-                      </Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                )}
-
-                {/* 2. If Withdrawal Already Requested */}
-                {isRequested && (
-                  <View style={styles.statusBoxWarning}>
-                    <MaterialCommunityIcons name="clock-outline" size={18} color="#D97706" />
-                    <Text style={styles.statusBoxTextWarning}>
-                      Payout Withdrawal of {formatCurrency(myMembership?.withdrawalAmount || payoutAmount)} is Pending Admin Approval ⌛
-                    </Text>
-                  </View>
-                )}
-
-                {/* 3. If Already Withdrawn */}
-                {isWithdrawn && (
-                  <View style={styles.statusBoxSuccess}>
-                    <MaterialCommunityIcons name="check-circle" size={18} color="#059669" />
-                    <Text style={styles.statusBoxTextSuccess}>
-                      Chit Payout of {formatCurrency(myMembership?.withdrawalAmount || payoutAmount)} Successfully Withdrawn ✓
-                    </Text>
-                  </View>
-                )}
-
-                {/* 4. Join Again (New Slot) Button */}
-                <TouchableOpacity
-                  style={styles.joinAgainBtn}
-                  activeOpacity={0.85}
-                  onPress={() => {
-                    if (chit.availableSlots <= 0) {
-                      showWarning('Slot Full', 'This Chit is already full.');
-                    } else if (chit.status === 'closed' || chit.status === 'archived') {
-                      showWarning('Chit Closed', 'This Chit is no longer accepting new slots.');
-                    } else {
-                      navigation.navigate('JoinChit', { chitId: chit._id, isJoinAgain: true });
-                    }
-                  }}
-                >
-                  <MaterialCommunityIcons name="plus-circle-outline" size={18} color={colors.primary} />
-                  <Text style={styles.joinAgainBtnText}>Join Again (Take New Slot)</Text>
-                </TouchableOpacity>
-              </View>
-            );
-          }
-
-          // Explore Page: Standard "Join This Chit" Button
-          const isFull = chit.availableSlots <= 0;
-          const isClosed = chit.status === 'closed' || chit.status === 'completed' || chit.status === 'archived';
-          const isDisabled = isFull || isClosed;
-          return (
-            <TouchableOpacity
-              style={[styles.joinNowBtn, isDisabled && styles.joinNowBtnDisabled]}
-              activeOpacity={0.85}
-              onPress={() => {
-                if (isFull) {
-                  showWarning('Slot Full', 'This Chit is already full.');
-                } else if (!isClosed) {
-                  navigation.navigate('JoinChit', { chitId: chit._id });
-                }
-              }}
-              disabled={isDisabled}
-            >
-              <Text style={[styles.joinNowBtnText, isDisabled && styles.joinNowBtnTextDisabled]}>
-                {isFull ? 'Slot Full' : isClosed ? 'Closed' : 'Join This Chit'}
-              </Text>
-              {!isDisabled && <MaterialCommunityIcons name="arrow-right" size={20} color={colors.white} />}
-            </TouchableOpacity>
           );
         })()}
       </View>
@@ -1186,6 +1159,43 @@ const getStyles = (colors) => StyleSheet.create({
     fontWeight: '700',
     color: colors.textTertiary || '#64748B',
     letterSpacing: 0.8,
+  },
+  sipStyleWithdrawBtn: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#085428',
+    paddingVertical: 14,
+    borderRadius: 14,
+    gap: 8,
+    marginBottom: 12,
+    elevation: 3,
+    shadowColor: '#085428',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  sipStyleWithdrawBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  lockedNoticeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface2,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    gap: 8,
+    marginBottom: 12,
+  },
+  lockedNoticeText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textSecondary,
   },
   withdrawBtnOuter: {
     borderRadius: 16,

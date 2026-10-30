@@ -19,9 +19,20 @@ const syncInvestmentInterest = async (inv) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  // Rule: Same calendar day of investment has strictly 0 interest earned; starts tomorrow after 12 AM.
+  if (today.getTime() <= startDate.getTime()) {
+    await Investment.updateOne(
+      { _id: inv._id },
+      { $set: { interestEarned: 0, lastInterestCalculatedAt: today } }
+    );
+    inv.interestEarned = 0;
+    inv.lastInterestCalculatedAt = today;
+    return 0;
+  }
+
   // If this is a duration-based plan, calculate elapsed interest dynamically
   if (inv.durationDays && inv.dailyInterest) {
-    const totalElapsedDays = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
+    const totalElapsedDays = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
     const elapsedDays = Math.max(0, Math.min(inv.durationDays, totalElapsedDays));
     const interestEarned = elapsedDays * inv.dailyInterest;
     
