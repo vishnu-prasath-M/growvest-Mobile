@@ -170,7 +170,8 @@ const ReferralAdmin = ({ token }: ReferralAdminProps) => {
     const formData = new FormData();
     formData.append("apkFile", file);
     formData.append("fileName", file.name);
-    formData.append("version", `v1.0.${Date.now().toString().slice(-3)}`);
+    // Don't pass low hardcoded version; server automatically determines next higher version
+    formData.append("version", "");
 
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `${API_URL}/api/referral/admin/apk`);
@@ -228,7 +229,7 @@ const ReferralAdmin = ({ token }: ReferralAdminProps) => {
     setSavingExternalUrl(true);
     setExternalUrlMsg("");
     try {
-      const cleanVer = externalVersionInput.trim().replace(/^v/i, '') || "1.0.1";
+      const cleanVer = externalVersionInput.trim().replace(/^v/i, '');
       const res = await fetch(`${API_URL}/api/referral/admin/apk/url`, {
         method: "POST",
         headers: {
@@ -237,13 +238,15 @@ const ReferralAdmin = ({ token }: ReferralAdminProps) => {
         },
         body: JSON.stringify({
           externalUrl: externalUrlInput.trim(),
-          fileName: `Growvest v${cleanVer}.apk`,
+          fileName: cleanVer ? `Growvest v${cleanVer}.apk` : '',
           version: cleanVer,
           releaseNotes: releaseNotesInput.trim(),
         }),
       });
       if (res.ok) {
-        setExternalUrlMsg(`External APK configured for v${cleanVer}! Users can now update in-app.`);
+        const resData = await res.json();
+        const finalVer = resData.apk?.version || cleanVer || "updated";
+        setExternalUrlMsg(`External APK configured! Version auto-upgraded to v${finalVer}. Users can now update in-app.`);
         setExternalUrlInput("");
         setExternalVersionInput("");
         setReleaseNotesInput("");
@@ -669,10 +672,10 @@ const ReferralAdmin = ({ token }: ReferralAdminProps) => {
                   />
                   <input
                     type="text"
-                    placeholder="Version (e.g. 1.0.1)"
+                    placeholder="Version (Auto if blank)"
                     value={externalVersionInput}
                     onChange={(e) => setExternalVersionInput(e.target.value)}
-                    className="w-full sm:w-36 px-4 py-2.5 rounded-xl border border-border bg-background text-xs font-body focus:outline-none focus:border-primary font-mono"
+                    className="w-full sm:w-44 px-4 py-2.5 rounded-xl border border-border bg-background text-xs font-body focus:outline-none focus:border-primary font-mono"
                   />
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3">

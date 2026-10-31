@@ -22,14 +22,15 @@ export const AppUpdateProvider = ({ children }) => {
 
     try {
       const result = await appUpdateService.checkForUpdate();
+      setUpdateInfo(result);
 
       if (result.isUpdateAvailable) {
-        setUpdateInfo(result);
         setIsModalVisible(true);
       } else if (isManual) {
+        const realVer = appUpdateService.getCurrentVersion();
         Alert.alert(
           'Up to Date! 🎉',
-          `You are using the latest version of Growvest (v${result.currentVersion}).`,
+          `You are using the latest version of Growvest (v${realVer}).`,
           [{ text: 'Great' }]
         );
       }

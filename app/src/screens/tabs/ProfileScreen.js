@@ -86,7 +86,11 @@ const ProfileScreen = ({ navigation }) => {
     }
   };
 
-  useFocusEffect(useCallback(() => { fetchUserData(); fetchKYCStatus(); }, []));
+  useFocusEffect(useCallback(() => {
+    fetchUserData();
+    fetchKYCStatus();
+    checkForUpdates(false);
+  }, [checkForUpdates]));
 
   const handleLogout = () => {
     showConfirm({
@@ -473,18 +477,24 @@ const ProfileScreen = ({ navigation }) => {
                 </View>
                 <Text style={styles.menuLabel}>App Updates</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  {updateInfo?.isUpdateAvailable ? (
+                  {isChecking ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                      <ActivityIndicator size="small" color="#10B981" />
+                      <Text style={{ fontSize: 11, color: themeColors.textMuted }}>Checking...</Text>
+                    </View>
+                  ) : updateInfo?.isUpdateAvailable ? (
                     <View style={styles.updateBadge}>
-                      <Text style={styles.updateBadgeText}>Update Available</Text>
+                      <Text style={styles.updateBadgeText}>Update Available (v{updateInfo.latestVersion})</Text>
                     </View>
                   ) : (
-                    <Text style={[styles.menuSubLabel, { color: themeColors.textMuted, fontSize: 12 }]}>
-                      v{currentVersion}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#10B981' }} />
+                      <Text style={[styles.menuSubLabel, { color: themeColors.textMuted, fontSize: 12 }]}>
+                        v{currentVersion} • Up to date
+                      </Text>
+                    </View>
                   )}
-                  {isChecking ? (
-                    <ActivityIndicator size="small" color="#10B981" />
-                  ) : (
+                  {!isChecking && (
                     <MaterialCommunityIcons name="chevron-right" size={20} color={styles.chevronColor.color} />
                   )}
                 </View>

@@ -77,20 +77,6 @@ export const appUpdateService = {
 
       const serverVersion = (data.version || '8.0.0').toString().trim().replace(/^v/i, '');
 
-      // Check if user has already installed this version recently
-      try {
-        const lastInstalled = await AsyncStorage.getItem('LAST_INSTALLED_APK_VERSION');
-        if (lastInstalled && compareVersions(serverVersion, lastInstalled) <= 0) {
-          return {
-            isUpdateAvailable: false,
-            currentVersion: serverVersion,
-            message: 'Your app is up to date!',
-          };
-        }
-      } catch (storageErr) {
-        console.warn('[AppUpdateService] AsyncStorage read error:', storageErr);
-      }
-
       const isNewer = compareVersions(serverVersion, currentVersion) > 0;
 
       // Ensure download URL is full URL
@@ -175,34 +161,20 @@ export const appUpdateService = {
           const IntentLauncher = require('expo-intent-launcher');
           const contentUri = await FileSystem.getContentUriAsync(downloadResult.uri);
 
+          // FLAG_GRANT_READ_URI_PERMISSION (1) | FLAG_ACTIVITY_NEW_TASK (268435456)
           await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
             data: contentUri,
-            flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
+            flags: 1 | 268435456,
             type: 'application/vnd.android.package-archive',
           });
 
-          if (version) {
-            try {
-              await AsyncStorage.setItem('LAST_INSTALLED_APK_VERSION', String(version));
-            } catch (_) {}
-          }
           return { success: true, method: 'intent' };
         } catch (intentErr) {
           console.warn('[AppUpdateService] Native installer launch failed, opening via browser fallback:', intentErr);
-          if (version) {
-            try {
-              await AsyncStorage.setItem('LAST_INSTALLED_APK_VERSION', String(version));
-            } catch (_) {}
-          }
           await Linking.openURL(downloadUrl);
           return { success: true, method: 'browser_fallback' };
         }
       } else {
-        if (version) {
-          try {
-            await AsyncStorage.setItem('LAST_INSTALLED_APK_VERSION', String(version));
-          } catch (_) {}
-        }
         await Linking.openURL(downloadUrl);
         return { success: true, method: 'browser' };
       }

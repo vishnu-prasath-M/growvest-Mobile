@@ -16,6 +16,77 @@ function getGridFSBucket() {
   return null;
 }
 
+// ─── Version Helpers ────────────────────────────────────────────────────────
+function compareSemver(v1, v2) {
+  if (!v1 && !v2) return 0;
+  if (!v1) return -1;
+  if (!v2) return 1;
+
+  const clean1 = v1.toString().trim().replace(/^v/i, '');
+  const clean2 = v2.toString().trim().replace(/^v/i, '');
+
+  const parts1 = clean1.split('.').map((p) => parseInt(p, 10) || 0);
+  const parts2 = clean2.split('.').map((p) => parseInt(p, 10) || 0);
+
+  const maxLen = Math.max(parts1.length, parts2.length);
+  for (let i = 0; i < maxLen; i++) {
+    const num1 = parts1[i] || 0;
+    const num2 = parts2[i] || 0;
+    if (num1 > num2) return 1;
+    if (num1 < num2) return -1;
+  }
+  return 0;
+}
+
+function incrementVersion(versionStr) {
+  const clean = (versionStr || '8.0.0').toString().trim().replace(/^v/i, '');
+  const parts = clean.split('.').map((p) => parseInt(p, 10) || 0);
+  while (parts.length < 3) parts.push(0);
+  parts[2] += 1;
+  return parts.join('.');
+}
+
+function extractVersionFromText(text) {
+  if (!text) return null;
+  const match = text.match(/(?:[vV]|\/|-|_)?(\d+\.\d+(?:\.\d+)?)/);
+  if (match && match[1]) {
+    let ver = match[1];
+    if (ver.split('.').length === 2) ver = `${ver}.0`;
+    return ver;
+  }
+  return null;
+}
+
+async function resolveAutoVersion(providedVersion, extraText = '') {
+  const BASELINE_VERSION = '8.0.0';
+
+  let highestExisting = BASELINE_VERSION;
+  try {
+    const allReleases = await APKRelease.find({}).select('version');
+    for (const rel of allReleases) {
+      if (rel.version && compareSemver(rel.version, highestExisting) > 0) {
+        highestExisting = rel.version.replace(/^v/i, '');
+      }
+    }
+  } catch (_) {}
+
+  // 1. If explicit valid version provided and it's higher than highest existing, use it
+  const cleanProvided = (providedVersion || '').toString().trim().replace(/^v/i, '');
+  // Ignore auto-generated "1.0.xyz" timestamps or default "1.0.0"
+  if (cleanProvided && !cleanProvided.startsWith('1.0.') && compareSemver(cleanProvided, highestExisting) > 0) {
+    return cleanProvided;
+  }
+
+  // 2. Extract from URL or file name if it contains a higher version
+  const extracted = extractVersionFromText(extraText);
+  if (extracted && compareSemver(extracted, highestExisting) > 0) {
+    return extracted;
+  }
+
+  // 3. Otherwise automatically increment from highest version
+  return incrementVersion(highestExisting);
+}
+
 // ─── ADMIN: Upload APK ───────────────────────────────────────────────────────
 exports.uploadAPK = async (req, res) => {
   try {
@@ -23,16 +94,19 @@ exports.uploadAPK = async (req, res) => {
     const { fileName, base64Data, version } = req.body;
 
     const fileObj = req.file;
-    const name = (fileName || fileObj?.originalname || 'growvest.apk').toString().trim();
+    const rawName = (fileName || fileObj?.originalname || 'growvest.apk').toString().trim();
 
     if (!fileObj && !base64Data) {
       return res.status(400).json({ message: 'APK file data is required' });
     }
 
     // Validate extension
-    if (!name.toLowerCase().endsWith('.apk')) {
+    if (!rawName.toLowerCase().endsWith('.apk')) {
       return res.status(400).json({ message: 'Invalid file format. Only .apk files are allowed.' });
     }
+
+    const resolvedVersion = await resolveAutoVersion(version, rawName);
+    const name = rawName.includes('v') ? rawName : `Growvest v${resolvedVersion}.apk`;
 
     let fileSize = 0;
     let fileBuffer = null;
@@ -85,7 +159,7 @@ exports.uploadAPK = async (req, res) => {
 
       const uploadStream = gridFsBucket.openUploadStream(name, {
         contentType: 'application/vnd.android.package-archive',
-        metadata: { version: version || '1.0.0', uploadedBy: adminId },
+        metadata: { version: resolvedVersion, uploadedBy: adminId },
       });
 
       await new Promise((resolve, reject) => {
@@ -112,14 +186,14 @@ exports.uploadAPK = async (req, res) => {
       storagePath: '/downloads/growvest-latest.apk',
       gridFsFileId,
       apkData: safeBufferInDb,
-      version: version || '1.0.0',
+      version: resolvedVersion,
       uploadedBy: adminId,
       status: 'active',
       downloadCount: 0,
     });
 
     res.status(201).json({
-      message: 'APK uploaded successfully and saved persistently in database!',
+      message: `APK uploaded successfully and activated as version v${resolvedVersion}!`,
       apk: {
         _id: newAPK._id,
         fileName: newAPK.fileName,
@@ -217,8 +291,8 @@ exports.setExternalApkUrl = async (req, res) => {
       return res.status(400).json({ message: 'Valid external HTTP/HTTPS download URL is required' });
     }
 
-    const cleanVer = (version || '1.0.0').toString().trim().replace(/^v/i, '');
-    const name = (fileName || `Growvest v${cleanVer}.apk`).trim();
+    const resolvedVersion = await resolveAutoVersion(version, `${externalUrl} ${fileName || ''}`);
+    const name = (fileName && fileName.trim()) ? fileName.trim() : `Growvest v${resolvedVersion}.apk`;
 
     await APKRelease.updateMany({}, { status: 'inactive' });
 
@@ -227,7 +301,7 @@ exports.setExternalApkUrl = async (req, res) => {
       fileSize: 0,
       storagePath: '/downloads/growvest-latest.apk',
       externalUrl: externalUrl.trim(),
-      version: cleanVer,
+      version: resolvedVersion,
       releaseNotes: (releaseNotes || '').toString().trim(),
       uploadedBy: adminId,
       status: 'active',
@@ -235,7 +309,7 @@ exports.setExternalApkUrl = async (req, res) => {
     });
 
     res.status(201).json({
-      message: 'External APK URL configured successfully!',
+      message: `External APK URL configured successfully with auto-upgraded version v${resolvedVersion}!`,
       apk: newAPK,
     });
   } catch (error) {
