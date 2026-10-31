@@ -89,7 +89,7 @@ const ProfileScreen = ({ navigation }) => {
   useFocusEffect(useCallback(() => {
     fetchUserData();
     fetchKYCStatus();
-    checkForUpdates(false);
+    checkForUpdates(false, true);
   }, [checkForUpdates]));
 
   const handleLogout = () => {
@@ -470,7 +470,7 @@ const ProfileScreen = ({ navigation }) => {
               <TouchableOpacity
                 style={styles.menuRow}
                 activeOpacity={0.7}
-                onPress={() => checkForUpdates(true)}
+                onPress={() => checkForUpdates(true, false)}
               >
                 <View style={styles.mintIconBox}>
                   <MaterialCommunityIcons name="cellphone-arrow-down" size={20} color={styles.mintIconColor.color} />

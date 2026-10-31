@@ -42,7 +42,7 @@ export const appUpdateService = {
     return (
       Application.nativeApplicationVersion ||
       Constants.expoConfig?.version ||
-      '8.0.0'
+      '1.2.0'
     );
   },
 

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Growvest",
     "slug": "zenvest",
-    "version": "8.0.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/growvest-logo.png",

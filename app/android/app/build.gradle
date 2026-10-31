@@ -87,12 +87,17 @@ android {
     compileSdk rootProject.ext.compileSdkVersion
 
     namespace 'com.growvest.mobile'
+    def appJsonFile = file("../../app.json")
+    def appJson = appJsonFile.exists() ? new groovy.json.JsonSlurper().parseText(appJsonFile.text) : null
+    def appVersion = appJson?.expo?.version ?: "1.2.0"
+    def appVersionCode = (appJson?.expo?.android?.versionCode ?: 8) as Integer
+
     defaultConfig {
         applicationId 'com.growvest.mobile'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 8
-        versionName "8.0.0"
+        versionCode appVersionCode
+        versionName appVersion
     }
     signingConfigs {
         debug {

@@ -39,7 +39,7 @@ function compareSemver(v1, v2) {
 }
 
 function incrementVersion(versionStr) {
-  const clean = (versionStr || '8.0.0').toString().trim().replace(/^v/i, '');
+  const clean = (versionStr || '1.2.0').toString().trim().replace(/^v/i, '');
   const parts = clean.split('.').map((p) => parseInt(p, 10) || 0);
   while (parts.length < 3) parts.push(0);
   parts[2] += 1;
@@ -51,39 +51,41 @@ function extractVersionFromText(text) {
   const match = text.match(/(?:[vV]|\/|-|_)?(\d+\.\d+(?:\.\d+)?)/);
   if (match && match[1]) {
     let ver = match[1];
-    if (ver.split('.').length === 2) ver = `${ver}.0`;
+    if (ver.split('.').length === 2) ver = ver + '.0';
     return ver;
   }
   return null;
 }
 
 async function resolveAutoVersion(providedVersion, extraText = '') {
-  const BASELINE_VERSION = '8.0.0';
+  // 1. If explicit valid version provided by admin, ALWAYS RESPECT IT!
+  const cleanProvided = (providedVersion || '').toString().trim().replace(/^v/i, '');
+  if (cleanProvided && cleanProvided !== '1.0.0') {
+    return cleanProvided;
+  }
 
-  let highestExisting = BASELINE_VERSION;
+  // 2. Extract from URL or file name (e.g. '.../releases/download/v1.2.0/Growvest.apk' -> '1.2.0')
+  const extracted = extractVersionFromText(extraText);
+  if (extracted) {
+    return extracted;
+  }
+
+  // 3. Fallback: check active or highest release in DB and bump patch
+  let highestExisting = '1.2.0';
   try {
-    const allReleases = await APKRelease.find({}).select('version');
-    for (const rel of allReleases) {
-      if (rel.version && compareSemver(rel.version, highestExisting) > 0) {
-        highestExisting = rel.version.replace(/^v/i, '');
+    const active = await APKRelease.findOne({ status: 'active' }).select('version');
+    if (active && active.version) {
+      highestExisting = active.version.replace(/^v/i, '');
+    } else {
+      const allReleases = await APKRelease.find({}).select('version');
+      for (const rel of allReleases) {
+        if (rel.version && compareSemver(rel.version, highestExisting) > 0) {
+          highestExisting = rel.version.replace(/^v/i, '');
+        }
       }
     }
   } catch (_) {}
 
-  // 1. If explicit valid version provided and it's higher than highest existing, use it
-  const cleanProvided = (providedVersion || '').toString().trim().replace(/^v/i, '');
-  // Ignore auto-generated "1.0.xyz" timestamps or default "1.0.0"
-  if (cleanProvided && !cleanProvided.startsWith('1.0.') && compareSemver(cleanProvided, highestExisting) > 0) {
-    return cleanProvided;
-  }
-
-  // 2. Extract from URL or file name if it contains a higher version
-  const extracted = extractVersionFromText(extraText);
-  if (extracted && compareSemver(extracted, highestExisting) > 0) {
-    return extracted;
-  }
-
-  // 3. Otherwise automatically increment from highest version
   return incrementVersion(highestExisting);
 }
 
