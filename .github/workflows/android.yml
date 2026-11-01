@@ -38,12 +38,17 @@ jobs:
             const runNum = Math.max(9, parseInt(process.env.GITHUB_RUN_NUMBER || '9', 10));
             const appJson = JSON.parse(fs.readFileSync('app.json', 'utf8'));
 
-            let ver = appJson.expo.version || '1.2.0';
+            const [major, minor] = (appJson.expo.version || '1.2.0').split('.');
+            const basePrefix = (major || '1') + '.' + (minor || '2');
+
+            let ver = '';
             const ref = process.env.GITHUB_REF || '';
             if (ref.startsWith('refs/tags/v')) {
               ver = ref.replace('refs/tags/v', '');
             } else if (ref.startsWith('refs/tags/')) {
               ver = ref.replace('refs/tags/', '');
+            } else {
+              ver = basePrefix + '.' + runNum;
             }
 
             appJson.expo.version = ver;
@@ -57,6 +62,7 @@ jobs:
               fs.writeFileSync('package.json', JSON.stringify(pkgJson, null, 2));
             } catch (_) {}
 
+            fs.writeFileSync('build_version.txt', ver);
             console.log('Synchronized versionCode to ' + runNum + ', version to ' + ver);
           "
         env:
@@ -72,8 +78,16 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
 
+      - name: Name APK with Version
+        run: |
+          VER=$(cat build_version.txt 2>/dev/null || echo "1.2.1")
+          cp android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/Growvest-v${VER}.apk
+          echo "Created APK: Growvest-v${VER}.apk"
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Growvest-APK
-          path: app/android/app/build/outputs/apk/release/app-release.apk
+          path: |
+            app/android/app/build/outputs/apk/release/app-release.apk
+            app/android/app/build/outputs/apk/release/Growvest-v*.apk
