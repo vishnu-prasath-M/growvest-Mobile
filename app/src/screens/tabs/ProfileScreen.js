@@ -86,11 +86,12 @@ const ProfileScreen = ({ navigation }) => {
     }
   };
 
-  useFocusEffect(useCallback(() => {
-    fetchUserData();
-    fetchKYCStatus();
-    checkForUpdates(false, true);
-  }, [checkForUpdates]));
+  useFocusEffect(
+    useCallback(() => {
+      fetchUserData();
+      fetchKYCStatus();
+    }, [])
+  );
 
   const handleLogout = () => {
     showConfirm({

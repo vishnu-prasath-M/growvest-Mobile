@@ -13,10 +13,12 @@ export const AppUpdateProvider = ({ children }) => {
   const [downloadStats, setDownloadStats] = useState({ bytesWritten: 0, totalBytes: 0 });
   const [downloadError, setDownloadError] = useState(null);
   const hasAutoCheckedRef = useRef(false);
+  const isCheckingRef = useRef(false);
 
   // Check for updates
   const checkForUpdates = useCallback(async (isManual = false) => {
-    if (isChecking) return;
+    if (isCheckingRef.current) return;
+    isCheckingRef.current = true;
     setIsChecking(true);
     setDownloadError(null);
 
@@ -41,9 +43,10 @@ export const AppUpdateProvider = ({ children }) => {
         Alert.alert('Update Check Failed', 'Unable to check for updates. Please check your internet connection.');
       }
     } finally {
+      isCheckingRef.current = false;
       setIsChecking(false);
     }
-  }, [isChecking]);
+  }, []);
 
   // Auto check once on app launch after a 3-second gentle delay
   useEffect(() => {
