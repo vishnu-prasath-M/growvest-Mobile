@@ -42,7 +42,7 @@ export const appUpdateService = {
     return (
       Application.nativeApplicationVersion ||
       Constants.expoConfig?.version ||
-      '1.2.0'
+      '1.2.1'
     );
   },
 
@@ -53,7 +53,7 @@ export const appUpdateService = {
     return (
       Application.nativeBuildVersion ||
       Constants.expoConfig?.android?.versionCode ||
-      8
+      9
     );
   },
 

@@ -40,7 +40,7 @@ export const AppUpdateModal = () => {
 
   if (!updateInfo || !isModalVisible) return null;
 
-  const currentVer = updateInfo.currentVersion || '1.2.0';
+  const currentVer = updateInfo.currentVersion || '1.2.1';
   const latestVer = updateInfo.latestVersion || '1.2.1';
   const percentNumber = Math.round((downloadProgress || 0) * 100);
 
