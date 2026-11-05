@@ -45,7 +45,7 @@ const ChitPaymentScreen = ({ navigation, route }) => {
     `₹${value?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`;
 
   const handleRazorpayPay = async () => {
-    // KYC Check when clicking Pay with Razorpay button
+    // KYC Check
     const isSubmitted = await kycService.isKYCSubmittedForInvestment();
     if (!isSubmitted) {
       setKycModalVisible(true);
@@ -63,33 +63,12 @@ const ChitPaymentScreen = ({ navigation, route }) => {
       chitName,
     };
 
-    await executeRazorpayPayment({
+    navigation.navigate('ManualUpiPayment', {
       amount: totalAmount,
       paymentType,
       payloadData,
-      user: userData,
-      setLoading,
-      onSuccess: (response) => {
-        const nextScreen = returnScreen || 'MyChits';
-        navigation.replace('PaymentSuccess', {
-          title: type === 'join' ? 'Chit Joined Successfully! 🎉' : 'Chit Due Paid!',
-          message:
-            type === 'join'
-              ? 'Your payment was verified and your Chit membership is now active.'
-              : `Your monthly due for Month ${month} has been verified and recorded.`,
-          nextScreen,
-          amount: totalAmount,
-          type,
-        });
-      },
-      onFailure: (error) => {
-        console.error('[ChitPayment] Payment failed or cancelled:', error);
-        showError(
-          'Payment Not Completed',
-          'Payment was cancelled or failed. Your Chit membership has not been created.',
-          () => navigation.goBack()
-        );
-      },
+      title: type === 'join' ? `Join Chit: ${chitName || 'Growvest Chit'}` : `Chit Due Month ${month}`,
+      returnScreen: returnScreen || 'MyChits',
     });
   };
 

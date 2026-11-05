@@ -3,7 +3,7 @@ import { API_ENDPOINTS } from '../config/api';
 
 export const paymentService = {
   /**
-   * Create Razorpay order on backend
+   * Create payment order on backend
    * @param {number} amount
    * @param {string} purpose
    * @param {object} notes
@@ -32,6 +32,23 @@ export const paymentService = {
    */
   checkOrderStatus: async (orderId) => {
     const response = await api.post('/payment/check-order-status', { order_id: orderId });
+    return response.data;
+  },
+
+  /**
+   * Submit Manual UPI payment verification (UTR + optional screenshot)
+   * @param {object} data
+   */
+  submitManualPayment: async (data) => {
+    const response = await api.post('/payment/manual/submit', data);
+    return response.data;
+  },
+
+  /**
+   * Get active Company UPI details (VPA, Payee Name, QR)
+   */
+  getCompanyUpiDetails: async () => {
+    const response = await api.get('/payment/manual/config');
     return response.data;
   },
 };

@@ -4,7 +4,7 @@ import { paymentService } from './paymentService';
 import { customAlert } from '../context/AlertContext';
 
 /**
- * Reusable Cashfree Payment Handler
+ * Reusable Payment Handler (Direct Manual UPI & Gateway Fallback)
  * 
  * 1. Calls backend createOrder() (which generates order with Cashfree Payment Gateway)
  * 2. Launches the official Cashfree hosted checkout URL via Linking.openURL

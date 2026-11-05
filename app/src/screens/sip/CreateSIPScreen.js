@@ -206,61 +206,23 @@ const CreateSIPScreen = ({ navigation, route }) => {
         throw new Error(res?.message || 'Failed to initialize SIP');
       }
 
-      const { sip, firstContribution, orderId, paymentUrl, amount, keyId, isSimulated } = res.data;
+      const { sip, firstContribution, orderId } = res.data;
+      setSubmitting(false);
+      setShowConfirmModal(false);
 
-      // 2. Launch Checkout
-      await openRazorpayCheckout({
-        orderId,
-        paymentUrl,
-        amount,
-        keyId,
-        name: 'Growvest SIP',
-        description: `Initial Contribution for ${sip.sipId}`,
-        isSimulated,
-        onSuccess: async (paymentData) => {
-          try {
-            // Verify payment
-            const verifyRes = await sipService.verifyPayment({
-              ...paymentData,
-              sipId: sip._id,
-              contributionId: firstContribution?._id,
-              installmentNumber: 1,
-            });
-
-            if (verifyRes?.success) {
-              showSuccess(
-                '🎉 SIP Created Successfully!',
-                `Your ${selectedFrequency.toUpperCase()} SIP plan (${sip.sipId}) is now active with your first contribution of ₹${currentAmount.toLocaleString('en-IN')} paid.`,
-                () =>
-                  navigation.replace('SIPDetails', {
-                    sipId: sip._id,
-                    sipRefId: sip.sipId,
-                  }),
-                'View SIP Details'
-              );
-            } else {
-              showWarning('Verification Issue', verifyRes?.message || 'Please check contribution status in SIP details.');
-              navigation.replace('SIPDashboard');
-            }
-          } catch (vErr) {
-            showError('Error', 'Payment verification encountered an issue. Our support team will confirm shortly.');
-            navigation.replace('SIPDashboard');
-          } finally {
-            setSubmitting(false);
-          }
+      navigation.navigate('ManualUpiPayment', {
+        amount: currentAmount,
+        paymentType: 'sip_initial',
+        payloadData: {
+          sipId: sip._id,
+          contributionId: firstContribution?._id,
+          installmentNumber: 1,
         },
-        onError: async (err) => {
-          setSubmitting(false);
-          try {
-            if (sip?._id) {
-              await sipService.cancelPendingSIP(sip._id);
-            }
-          } catch (cancelErr) {
-            console.warn('[CreateSIP] Discard pending SIP failed (non-fatal):', cancelErr?.message);
-          }
-          showWarning('Payment Cancelled', 'SIP setup was cancelled and no plan was created. You will only join after a successful payment.');
-        },
+        title: `SIP Initial Contribution (${sip.sipId})`,
+        returnScreen: 'SIPDashboard',
+        existingOrderId: orderId,
       });
+      return;
     } catch (error) {
       setSubmitting(false);
       showError('Error', error?.message || 'Failed to create SIP. Please try again.');

@@ -112,43 +112,21 @@ const InvestmentPaymentScreen = ({ navigation, route }) => {
   };
 
   const handlePayNow = async () => {
-    // KYC Check when clicking Pay with Razorpay button
+    // KYC Check before proceeding to payment
     const isSubmitted = await kycService.isKYCSubmittedForInvestment();
     if (!isSubmitted) {
       setKycModalVisible(true);
       return;
     }
-    await executeRazorpayPayment({
+
+    navigation.navigate('ManualUpiPayment', {
       amount,
       paymentType: type === 'pocket_money' ? 'pocket_money' : 'investment',
       payloadData: type === 'pocket_money'
         ? { amount, type, frequency }
         : { amount, type, selectedWithdrawalDate, benefitEligibilityDate },
-      user: userData,
-      setLoading,
-      onSuccess: (response) => {
-        showAlert(
-          'success',
-          'Payment Successful! 🎉',
-          type === 'pocket_money'
-            ? `Your ₹${amount} Pocket Money Plan has been verified and activated.`
-            : `Your ₹${amount} ${getPlanDisplayName(type)} has been verified and automatically approved.`,
-          'View Dashboard',
-          () => {
-            navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
-          }
-        );
-      },
-      onFailure: (error) => {
-        console.error('[InvestmentPayment] Payment failed or cancelled:', error);
-        showAlert(
-          'warning',
-          'Payment Cancelled',
-          'Payment was not completed. Your investment has not been created.',
-          'OK',
-          () => navigation.goBack()
-        );
-      },
+      title: type === 'pocket_money' ? 'Pocket Money Plan' : getPlanDisplayName(type),
+      returnScreen: 'MainTabs',
     });
   };
 
@@ -217,16 +195,16 @@ const InvestmentPaymentScreen = ({ navigation, route }) => {
           <View style={styles.razorpayCard}>
             <View style={styles.razorpayHeader}>
               <MaterialCommunityIcons name="shield-check" size={24} color={colors.primary} />
-              <Text style={styles.razorpayTitle}>UPI Instant Checkout</Text>
+              <Text style={styles.razorpayTitle}>Direct UPI Payment (GPay, PhonePe, Paytm)</Text>
             </View>
             <Text style={styles.razorpayDesc}>
-              Instant payment processing via UPI apps (GPay, PhonePe, Paytm, BHIM). Your deposit will be automatically verified and credited to your account.
+              Pay directly to company UPI with 0% gateway fee. Enter the 12-digit UTR to submit for fast admin verification and approval.
             </Text>
 
             <View style={styles.featureList}>
               <View style={styles.featureRow}>
                 <MaterialCommunityIcons name="check-circle" size={16} color={colors.success} />
-                <Text style={styles.featureText}>Instant automatic approval</Text>
+                <Text style={styles.featureText}>Zero gateway / transaction fee</Text>
               </View>
               <View style={styles.featureRow}>
                 <MaterialCommunityIcons name="check-circle" size={16} color={colors.success} />

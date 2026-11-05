@@ -34,6 +34,7 @@ import ProfileScreen from '../screens/tabs/ProfileScreen';
 import InvestmentDashboardScreen from '../screens/investment/InvestmentDashboardScreen';
 import InvestmentAmountScreen from '../screens/investment/InvestmentAmountScreen';
 import InvestmentPaymentScreen from '../screens/investment/InvestmentPaymentScreen';
+import { ManualUpiPaymentScreen } from '../screens/payment/ManualUpiPaymentScreen';
 import InvestmentStatusScreen from '../screens/investment/InvestmentStatusScreen';
 import PocketMoneyScreen from '../screens/investment/PocketMoneyScreen';
 import PocketMoneyAmountScreen from '../screens/investment/PocketMoneyAmountScreen';
@@ -592,6 +593,7 @@ const AppNavigator = () => {
           <Stack.Screen name="InvestmentDashboard" component={InvestmentDashboardScreen} options={{ headerShown: false }} />
           <Stack.Screen name="InvestmentAmount" component={InvestmentAmountScreen} options={{ headerShown: false }} />
           <Stack.Screen name="InvestmentPayment" component={InvestmentPaymentScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="ManualUpiPayment" component={ManualUpiPaymentScreen} options={{ headerShown: false }} />
           <Stack.Screen name="InvestmentStatus" component={InvestmentStatusScreen} options={{ headerShown: false }} />
           <Stack.Screen name="PocketMoney" component={PocketMoneyScreen} options={{ headerShown: false }} />
           <Stack.Screen name="PocketMoneyAmount" component={PocketMoneyAmountScreen} options={{ headerShown: false }} />

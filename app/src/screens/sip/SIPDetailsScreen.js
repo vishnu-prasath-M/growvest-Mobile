@@ -95,43 +95,22 @@ const SIPDetailsScreen = ({ route, navigation }) => {
         throw new Error(res?.message || 'Failed to create payment order');
       }
 
-      const { orderId, paymentUrl, amount, keyId, isSimulated } = res;
+      const { orderId } = res;
+      setPayingContributionId(null);
 
-      await openRazorpayCheckout({
-        orderId,
-        paymentUrl,
-        amount,
-        keyId,
-        name: 'Growvest SIP',
-        description: `SIP Installment #${contrib.installmentNumber} for ${sip.sipId}`,
-        isSimulated,
-        onSuccess: async (paymentData) => {
-          try {
-            const verifyRes = await sipService.verifyPayment({
-              ...paymentData,
-              sipId: sip._id,
-              contributionId: contrib._id,
-              installmentNumber: contrib.installmentNumber,
-            });
-
-            if (verifyRes?.success) {
-              showSuccess('Payment Successful', `Contribution #${contrib.installmentNumber} has been verified and marked as Paid.`);
-              loadSIPDetails();
-            } else {
-              showWarning('Verification', verifyRes?.message || 'Payment received. Updating status shortly.');
-              loadSIPDetails();
-            }
-          } catch (vErr) {
-            showError('Error', 'Payment verification failed.');
-          } finally {
-            setPayingContributionId(null);
-          }
+      navigation.navigate('ManualUpiPayment', {
+        amount: contrib.amount,
+        paymentType: 'sip_installment',
+        payloadData: {
+          sipId: sip._id,
+          contributionId: contrib._id,
+          installmentNumber: contrib.installmentNumber,
         },
-        onError: () => {
-          setPayingContributionId(null);
-          showWarning('Payment Cancelled', 'You can retry paying your due installment anytime.');
-        },
+        title: `SIP Installment #${contrib.installmentNumber} (${sip.sipId})`,
+        returnScreen: 'SIPDashboard',
+        existingOrderId: orderId,
       });
+      return;
     } catch (error) {
       setPayingContributionId(null);
       showError('Error', error?.message || 'Failed to initiate installment payment.');

@@ -36,6 +36,9 @@ import PocketMoneyAdmin from "@/components/admin/PocketMoneyAdmin";
 import SIPAdmin from "@/components/admin/SIPAdmin";
 import KYCAdmin from "@/components/admin/KYCAdmin";
 import ReferralAdmin from "@/components/admin/ReferralAdmin";
+import { AdBannerAdmin } from "@/components/admin/AdBannerAdmin";
+import { PaymentApprovalAdmin } from "@/components/admin/PaymentApprovalAdmin";
+import { Image as ImageIcon, CreditCard } from "lucide-react";
 import { Gift, Bell, RefreshCw } from "lucide-react";
 
 import { toast } from "sonner";
@@ -138,7 +141,7 @@ const getUPIDeepLink = (
   return `upi://pay?${query}`;
 };
 
-type AdminTab = "overview" | "pending" | "users" | "withdrawals" | "kyc" | "chits" | "sip" | "settings" | "pocket" | "referral" | "push_test";
+type AdminTab = "overview" | "payment_approvals" | "ad_banners" | "pending" | "users" | "withdrawals" | "kyc" | "chits" | "sip" | "settings" | "pocket" | "referral" | "push_test";
 
 const AdminDashboard = () => {
   const { user: authUser, token, logout } = useAuth();
@@ -226,6 +229,8 @@ const AdminDashboard = () => {
   // Navigation items with state for badges (all dynamic from MongoDB)
   const [navItems, setNavItems] = useState<{ label: string; tab: AdminTab; icon: React.ElementType; badge?: number }[]>([
     { label: "Overview", tab: "overview", icon: LayoutDashboard },
+    { label: "Payment Approvals", tab: "payment_approvals", icon: CreditCard, badge: 0 },
+    { label: "Ad Banners", tab: "ad_banners", icon: ImageIcon },
     { label: "Pending Investments", tab: "pending", icon: Clock, badge: 0 },
     { label: "Users", tab: "users", icon: Users },
     { label: "Withdrawals", tab: "withdrawals", icon: ArrowDownToLine, badge: 0 },
@@ -1350,6 +1355,40 @@ const AdminDashboard = () => {
                   })()}
                 </div>
               </div>
+            </motion.div>
+          )}
+
+          
+          {/* ── PAYMENT APPROVALS ── */}
+          {activeTab === "payment_approvals" && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="w-full"
+            >
+              <PaymentApprovalAdmin
+                token={token}
+                onCountChange={(count) => {
+                  setNavItems((prev) =>
+                    prev.map((item) =>
+                      item.tab === "payment_approvals" ? { ...item, badge: count } : item
+                    )
+                  );
+                }}
+              />
+            </motion.div>
+          )}
+
+          {/* ── AD BANNERS ── */}
+          {activeTab === "ad_banners" && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="w-full"
+            >
+              <AdBannerAdmin token={token} />
             </motion.div>
           )}
 

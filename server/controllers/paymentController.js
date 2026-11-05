@@ -5,12 +5,37 @@ const ChitPayment = require('../models/ChitPayment');
 const Transaction = require('../models/Transaction');
 const User = require('../models/User');
 const PendingPayment = require('../models/PendingPayment');
+const ManualPayment = require('../models/ManualPayment');
+const Settings = require('../models/Settings');
+const fs = require('fs');
+const path = require('path');
 const { triggerReferralRewardOnInvestment } = require('../utils/referralHelper');
 const { sendNotification } = require('../services/notificationHelper');
 const PocketMoney = require('../models/PocketMoney');
 const PocketMoneyPayout = require('../models/PocketMoneyPayout');
 const { calculateInvestmentTier } = require('../services/investmentTierService');
 const cashfreeService = require('../services/cashfreeService');
+
+async function getCompanyUpiConfig() {
+  try {
+    const upiIdSetting = await Settings.findOne({ key: 'company_upi_id' });
+    const payeeNameSetting = await Settings.findOne({ key: 'company_payee_name' });
+    const qrImageSetting = await Settings.findOne({ key: 'company_qr_image' });
+
+    return {
+      upiId: (upiIdSetting?.value || '8925699005@upi').trim(),
+      payeeName: (payeeNameSetting?.value || 'Growvest Investments').trim(),
+      qrImage: (qrImageSetting?.value || '').trim(),
+    };
+  } catch (err) {
+    return {
+      upiId: '8925699005@upi',
+      payeeName: 'Growvest Investments',
+      qrImage: '',
+    };
+  }
+}
+
 
 // ============================================================================
 // === PREVIOUS STARPE PAYMENT GATEWAY (COMMENTED OUT AS REQUESTED) ===========
@@ -146,6 +171,10 @@ exports.createOrder = async (req, res) => {
       }
     }
 
+    // ============================================================================
+    // === MANUAL UPI ORDER CREATION (CASHFREE COMMENTED OUT AS REQUESTED) ========
+    // ============================================================================
+    /*
     // === CASHFREE ORDER CREATION ===
     const user = req.user;
     const orderId = `ORD_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
@@ -236,6 +265,42 @@ exports.createOrder = async (req, res) => {
         message: 'Cashfree offline or unreachable. Test simulation fallback enabled.',
       });
     }
+  } catch (error) {
+    */
+
+    const user = req.user;
+    const orderId = `UPI_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+    const effectivePaymentType = purpose || notes?.paymentType || 'investment';
+    const payload = notes || req.body?.payloadData || {};
+
+    try {
+      await PendingPayment.findOneAndUpdate(
+        { orderId },
+        {
+          orderId,
+          userId: user._id,
+          paymentType: effectivePaymentType,
+          payloadData: payload,
+          amount: Math.round(amount),
+          status: 'pending',
+        },
+        { upsert: true, new: true }
+      );
+    } catch (ppErr) {
+      console.warn('[PaymentController] PendingPayment save warning:', ppErr.message);
+    }
+
+    const upiConfig = await getCompanyUpiConfig();
+
+    return res.status(200).json({
+      success: true,
+      orderId,
+      amount: Math.round(amount),
+      currency: 'INR',
+      gateway: 'manual_upi',
+      paymentType: effectivePaymentType,
+      companyUpi: upiConfig,
+    });
   } catch (error) {
     console.error('[PaymentController] Create order error:', error);
     res.status(500).json({ message: 'Failed to create payment order', error: error.message });
@@ -1236,4 +1301,293 @@ async function completePocketMoney(user, data, orderId, paymentId, signature, pr
   }
   
   return pocketMoney;
+};
+
+
+// ============================================================================
+// ─── MANUAL UPI PAYMENT CONTROLLER METHODS ──────────────────────────────────
+// ============================================================================
+
+// 1. User submits UTR and optional screenshot for payment verification
+exports.submitManualPayment = async (req, res) => {
+  try {
+    const { orderId, utr, screenshotBase64, userRemarks, paymentType, amount, payloadData } = req.body;
+
+    if (!orderId || !utr || !utr.trim()) {
+      return res.status(400).json({ success: false, message: 'Order ID and 12-digit UPI Reference (UTR) are required.' });
+    }
+
+    const cleanUtr = utr.trim();
+
+    // Prevent duplicate UTR abuse on already-approved transactions
+    const duplicateApproved = await ManualPayment.findOne({ utr: cleanUtr, status: 'approved' });
+    if (duplicateApproved) {
+      return res.status(400).json({
+        success: false,
+        message: 'This UPI Reference (UTR) has already been approved for another transaction. If you believe this is an error, please contact support.',
+      });
+    }
+
+    let screenshotUrl = '';
+    if (screenshotBase64) {
+      try {
+        const uploadDir = path.join(__dirname, '../public/uploads/payments');
+        if (!fs.existsSync(uploadDir)) {
+          fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        const cleanBase64 = screenshotBase64.replace(/^data:image\/\w+;base64,/, '');
+        const buffer = Buffer.from(cleanBase64, 'base64');
+        const filename = `proof-${Date.now()}-${Math.round(Math.random() * 1e4)}.png`;
+        fs.writeFileSync(path.join(uploadDir, filename), buffer);
+        screenshotUrl = `/uploads/payments/${filename}`;
+      } catch (uploadErr) {
+        console.warn('[ManualPayment] Screenshot save error:', uploadErr.message);
+      }
+    }
+
+    // Retrieve pending payment context if exists
+    const pending = await PendingPayment.findOne({ orderId });
+
+    const finalPaymentType = pending?.paymentType || paymentType || 'investment';
+    const finalAmount = pending?.amount || Number(amount) || 0;
+    const finalPayload = pending?.payloadData || payloadData || {};
+
+    const manualRecord = await ManualPayment.findOneAndUpdate(
+      { orderId },
+      {
+        orderId,
+        userId: req.user._id,
+        paymentType: finalPaymentType,
+        amount: finalAmount,
+        payloadData: finalPayload,
+        utr: cleanUtr,
+        ...(screenshotUrl ? { screenshotUrl } : {}),
+        userRemarks: (userRemarks || '').trim(),
+        status: 'pending',
+        submittedAt: new Date(),
+      },
+      { upsert: true, new: true }
+    );
+
+    // Update PendingPayment status to track user submission
+    if (pending) {
+      pending.status = 'pending';
+      await pending.save();
+    }
+
+    // Send in-app notification confirming submission
+    try {
+      await sendNotification({
+        userId: req.user._id,
+        title: 'Payment Submitted ⏳',
+        description: `Your payment of ₹${finalAmount.toLocaleString('en-IN')} (Ref: ${cleanUtr}) has been submitted. Our team will verify and activate your ${finalPaymentType.replace('_', ' ')} within 15–30 minutes.`,
+        type: 'general',
+      });
+    } catch (_) {}
+
+    res.status(200).json({
+      success: true,
+      message: 'Payment verification submitted successfully! Admin will verify and activate shortly.',
+      manualPayment: manualRecord,
+    });
+  } catch (error) {
+    console.error('[ManualPayment] Submit error:', error);
+    res.status(500).json({ success: false, message: 'Failed to submit payment verification', error: error.message });
+  }
+};
+
+// 2. Admin: Get all pending manual payments
+exports.getPendingManualPayments = async (req, res) => {
+  try {
+    const list = await ManualPayment.find({ status: 'pending' })
+      .populate('userId', 'name username email mobileNumber')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ success: true, count: list.length, data: list });
+  } catch (error) {
+    console.error('[ManualPayment] Get pending error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch pending payments', error: error.message });
+  }
+};
+
+// 3. Admin: Get all manual payments history
+exports.getAllManualPayments = async (req, res) => {
+  try {
+    const list = await ManualPayment.find()
+      .populate('userId', 'name username email mobileNumber')
+      .sort({ createdAt: -1 })
+      .limit(200);
+
+    res.status(200).json({ success: true, count: list.length, data: list });
+  } catch (error) {
+    console.error('[ManualPayment] Get all error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch manual payments history', error: error.message });
+  }
+};
+
+// 4. Admin: Approve a manual payment request
+exports.approveManualPayment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const manualPayment = await ManualPayment.findById(id).populate('userId');
+
+    if (!manualPayment) {
+      return res.status(404).json({ success: false, message: 'Manual payment request not found' });
+    }
+
+    if (manualPayment.status === 'approved') {
+      return res.status(400).json({ success: false, message: 'This payment has already been approved.' });
+    }
+
+    // Call centralized business logic processor to activate investment / chit / SIP / pocket money
+    const processRes = await processSuccessfulOrder(
+      manualPayment.orderId,
+      manualPayment.utr,
+      manualPayment.userId,
+      manualPayment.paymentType,
+      manualPayment.payloadData
+    );
+
+    if (!processRes.success) {
+      return res.status(500).json({
+        success: false,
+        message: processRes.message || 'Error processing transaction completion',
+      });
+    }
+
+    manualPayment.status = 'approved';
+    manualPayment.reviewedBy = req.user._id;
+    manualPayment.reviewedAt = new Date();
+    await manualPayment.save();
+
+    // Update PendingPayment status if exists
+    await PendingPayment.findOneAndUpdate(
+      { orderId: manualPayment.orderId },
+      { status: 'completed', completedAt: new Date() }
+    );
+
+    // Send push notification & in-app alert to user
+    try {
+      await sendNotification({
+        userId: manualPayment.userId._id || manualPayment.userId,
+        title: 'Payment Approved! 🎉',
+        description: `Your payment of ₹${manualPayment.amount.toLocaleString('en-IN')} (UTR: ${manualPayment.utr}) has been verified. Your ${manualPayment.paymentType.replace('_', ' ')} is now active!`,
+        type: 'general',
+      });
+    } catch (_) {}
+
+    res.status(200).json({
+      success: true,
+      message: 'Payment approved successfully and account updated!',
+      data: processRes.data,
+      manualPayment,
+    });
+  } catch (error) {
+    console.error('[ManualPayment] Approve error:', error);
+    res.status(500).json({ success: false, message: 'Failed to approve payment', error: error.message });
+  }
+};
+
+// 5. Admin: Reject a manual payment request
+exports.rejectManualPayment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const manualPayment = await ManualPayment.findById(id);
+
+    if (!manualPayment) {
+      return res.status(404).json({ success: false, message: 'Manual payment request not found' });
+    }
+
+    if (manualPayment.status === 'approved') {
+      return res.status(400).json({ success: false, message: 'Cannot reject an already approved payment.' });
+    }
+
+    manualPayment.status = 'rejected';
+    manualPayment.adminRemarks = (reason || 'UTR could not be verified in company bank account').trim();
+    manualPayment.reviewedBy = req.user._id;
+    manualPayment.reviewedAt = new Date();
+    await manualPayment.save();
+
+    await PendingPayment.findOneAndUpdate(
+      { orderId: manualPayment.orderId },
+      { status: 'failed' }
+    );
+
+    // Notify user of rejection with reason
+    try {
+      await sendNotification({
+        userId: manualPayment.userId,
+        title: 'Payment Verification Rejected ⚠️',
+        description: `Your payment of ₹${manualPayment.amount.toLocaleString('en-IN')} was rejected: ${manualPayment.adminRemarks}. Please check your UTR or contact support.`,
+        type: 'general',
+      });
+    } catch (_) {}
+
+    res.status(200).json({
+      success: true,
+      message: 'Payment request rejected.',
+      manualPayment,
+    });
+  } catch (error) {
+    console.error('[ManualPayment] Reject error:', error);
+    res.status(500).json({ success: false, message: 'Failed to reject payment', error: error.message });
+  }
+};
+
+// 6. Public/User: Get active Company UPI configuration
+exports.getCompanyUpiDetails = async (req, res) => {
+  try {
+    const upiConfig = await getCompanyUpiConfig();
+    res.status(200).json({ success: true, config: upiConfig });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to get UPI details', error: error.message });
+  }
+};
+
+// 7. Admin: Update Company UPI configuration
+exports.updateCompanyUpiDetails = async (req, res) => {
+  try {
+    const { upiId, payeeName, qrImageBase64 } = req.body;
+
+    if (upiId) {
+      await Settings.findOneAndUpdate(
+        { key: 'company_upi_id' },
+        { value: upiId.trim(), updatedAt: new Date(), updatedBy: req.user._id },
+        { upsert: true }
+      );
+    }
+
+    if (payeeName) {
+      await Settings.findOneAndUpdate(
+        { key: 'company_payee_name' },
+        { value: payeeName.trim(), updatedAt: new Date(), updatedBy: req.user._id },
+        { upsert: true }
+      );
+    }
+
+    if (qrImageBase64) {
+      const uploadDir = path.join(__dirname, '../public/uploads/payments');
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      const cleanBase64 = qrImageBase64.replace(/^data:image\/\w+;base64,/, '');
+      const buffer = Buffer.from(cleanBase64, 'base64');
+      const filename = `company-qr-${Date.now()}.png`;
+      fs.writeFileSync(path.join(uploadDir, filename), buffer);
+      const qrUrl = `/uploads/payments/${filename}`;
+
+      await Settings.findOneAndUpdate(
+        { key: 'company_qr_image' },
+        { value: qrUrl, updatedAt: new Date(), updatedBy: req.user._id },
+        { upsert: true }
+      );
+    }
+
+    const updatedConfig = await getCompanyUpiConfig();
+    res.status(200).json({ success: true, message: 'Company UPI settings updated successfully!', config: updatedConfig });
+  } catch (error) {
+    console.error('[ManualPayment] Update UPI config error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update UPI settings', error: error.message });
+  }
 };
