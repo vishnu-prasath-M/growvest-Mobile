@@ -43,6 +43,7 @@ const RECOMMENDED_HEIGHT = 409;
 const RECOMMENDED_RATIO = 2.50;
 
 export const AdBannerAdmin = ({ token }: AdBannerAdminProps) => {
+  const effectiveToken = token || (typeof window !== "undefined" ? localStorage.getItem("token") : null);
   const [banners, setBanners] = useState<AdBanner[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -64,24 +65,38 @@ export const AdBannerAdmin = ({ token }: AdBannerAdminProps) => {
   const fetchBanners = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/banners/admin/all`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const headers: Record<string, string> = {};
+      if (effectiveToken) {
+        headers["Authorization"] = `Bearer ${effectiveToken}`;
+      }
+
+      let res = await fetch(`${API_URL}/api/banners/admin/all`, { headers });
+      if (!res.ok) {
+        // Fallback to public route if admin/all fails
+        res = await fetch(`${API_URL}/api/banners`);
+      }
       const data = await res.json();
       if (data.success && Array.isArray(data.banners)) {
         setBanners(data.banners);
       }
     } catch (err) {
       console.error("Error fetching banners:", err);
+      try {
+        const fallback = await fetch(`${API_URL}/api/banners`);
+        const fallbackData = await fallback.json();
+        if (fallbackData.success && Array.isArray(fallbackData.banners)) {
+          setBanners(fallbackData.banners);
+        }
+      } catch (e) {
+        console.error("Fallback fetch banners error:", e);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (token) fetchBanners();
+    fetchBanners();
   }, [token]);
 
   // Handle image file selection & dimension validation
@@ -143,7 +158,7 @@ export const AdBannerAdmin = ({ token }: AdBannerAdminProps) => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${effectiveToken}`,
         },
         body: JSON.stringify({
           title: title.trim(),
@@ -184,7 +199,7 @@ export const AdBannerAdmin = ({ token }: AdBannerAdminProps) => {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${effectiveToken}`,
         },
         body: JSON.stringify({ isActive: !banner.isActive }),
       });
@@ -208,7 +223,7 @@ export const AdBannerAdmin = ({ token }: AdBannerAdminProps) => {
       const res = await fetch(`${API_URL}/api/banners/admin/${bannerId}`, {
         method: "DELETE",
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${effectiveToken}`,
         },
       });
       const data = await res.json();
@@ -590,3 +605,4 @@ export const AdBannerAdmin = ({ token }: AdBannerAdminProps) => {
     </div>
   );
 };
+

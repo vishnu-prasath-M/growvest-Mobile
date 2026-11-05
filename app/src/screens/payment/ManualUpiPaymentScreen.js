@@ -971,3 +971,4 @@ const getStyles = (themeColors, isDarkMode) =>
       color: '#10B981',
     },
   });
+

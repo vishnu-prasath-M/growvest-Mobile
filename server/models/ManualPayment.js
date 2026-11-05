@@ -73,3 +73,4 @@ const manualPaymentSchema = new mongoose.Schema(
 manualPaymentSchema.index({ status: 1, createdAt: -1 });
 
 module.exports = mongoose.model('ManualPayment', manualPaymentSchema);
+

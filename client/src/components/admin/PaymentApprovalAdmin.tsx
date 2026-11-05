@@ -56,6 +56,7 @@ interface PaymentApprovalAdminProps {
 }
 
 export const PaymentApprovalAdmin = ({ token, onCountChange }: PaymentApprovalAdminProps) => {
+  const effectiveToken = token || (typeof window !== "undefined" ? localStorage.getItem("token") : null);
   const [activeTab, setActiveTab] = useState<"pending" | "history" | "settings">("pending");
   const [pendingList, setPendingList] = useState<ManualPayment[]>([]);
   const [historyList, setHistoryList] = useState<ManualPayment[]>([]);
@@ -82,9 +83,9 @@ export const PaymentApprovalAdmin = ({ token, onCountChange }: PaymentApprovalAd
   // Fetch pending payments
   const fetchPendingPayments = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/payment/manual/pending`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const headers: Record<string, string> = {};
+      if (effectiveToken) headers["Authorization"] = `Bearer ${effectiveToken}`;
+      const res = await fetch(`${API_URL}/api/payment/manual/pending`, { headers });
       const data = await res.json();
       if (data.success && Array.isArray(data.data)) {
         setPendingList(data.data);
@@ -98,9 +99,9 @@ export const PaymentApprovalAdmin = ({ token, onCountChange }: PaymentApprovalAd
   // Fetch all payment history
   const fetchHistory = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/payment/manual/all`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const headers: Record<string, string> = {};
+      if (effectiveToken) headers["Authorization"] = `Bearer ${effectiveToken}`;
+      const res = await fetch(`${API_URL}/api/payment/manual/all`, { headers });
       const data = await res.json();
       if (data.success && Array.isArray(data.data)) {
         setHistoryList(data.data);
@@ -132,9 +133,7 @@ export const PaymentApprovalAdmin = ({ token, onCountChange }: PaymentApprovalAd
   };
 
   useEffect(() => {
-    if (token) {
-      refreshAll();
-    }
+    refreshAll();
   }, [token]);
 
   // Handle Approve
@@ -145,7 +144,7 @@ export const PaymentApprovalAdmin = ({ token, onCountChange }: PaymentApprovalAd
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${effectiveToken}`,
         },
       });
       const data = await res.json();
@@ -172,7 +171,7 @@ export const PaymentApprovalAdmin = ({ token, onCountChange }: PaymentApprovalAd
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${effectiveToken}`,
         },
         body: JSON.stringify({ reason: rejectReason.trim() }),
       });
@@ -203,7 +202,7 @@ export const PaymentApprovalAdmin = ({ token, onCountChange }: PaymentApprovalAd
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${effectiveToken}`,
         },
         body: JSON.stringify({
           upiId: upiId.trim(),
@@ -750,3 +749,4 @@ export const PaymentApprovalAdmin = ({ token, onCountChange }: PaymentApprovalAd
     </div>
   );
 };
+
