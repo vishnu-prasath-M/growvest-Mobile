@@ -15,23 +15,49 @@ const PocketMoney = require('../models/PocketMoney');
 const PocketMoneyPayout = require('../models/PocketMoneyPayout');
 const { calculateInvestmentTier } = require('../services/investmentTierService');
 const cashfreeService = require('../services/cashfreeService');
+const autoUpiService = require('../services/autoUpiService');
+
+// Register AutoUPI payment completed callback
+autoUpiService.registerPaymentPaidCallback(async (payment) => {
+  try {
+    console.log('[AutoUPI Callback] Auto-completing order:', payment.orderId, 'UTR:', payment.utr);
+    await processSuccessfulOrder(
+      payment.orderId,
+      payment.utr,
+      null,
+      payment.metadata?.paymentType,
+      payment.metadata?.payloadData
+    );
+  } catch (err) {
+    console.error('[AutoUPI Callback] Error processing paid order:', err);
+  }
+});
 
 async function getCompanyUpiConfig() {
   try {
     const upiIdSetting = await Settings.findOne({ key: 'company_upi_id' });
     const payeeNameSetting = await Settings.findOne({ key: 'company_payee_name' });
     const qrImageSetting = await Settings.findOne({ key: 'company_qr_image' });
+    const gmailUserSetting = await Settings.findOne({ key: 'canara_gmail_user' });
+    const gmailPassSetting = await Settings.findOne({ key: 'canara_gmail_password' });
+    const autoApproveSetting = await Settings.findOne({ key: 'canara_auto_approval_enabled' });
 
     return {
       upiId: (upiIdSetting?.value || '8925699005@upi').trim(),
       payeeName: (payeeNameSetting?.value || 'Growvest Investments').trim(),
       qrImage: (qrImageSetting?.value || '').trim(),
+      gmailUser: (gmailUserSetting?.value || '').trim(),
+      hasGmailPassword: Boolean(gmailPassSetting?.value && !gmailPassSetting.value.includes('abcd')),
+      autoApprovalEnabled: autoApproveSetting ? autoApproveSetting.value === 'true' : true,
     };
   } catch (err) {
     return {
       upiId: '8925699005@upi',
       payeeName: 'Growvest Investments',
       qrImage: '',
+      gmailUser: '',
+      hasGmailPassword: false,
+      autoApprovalEnabled: true,
     };
   }
 }
@@ -272,6 +298,40 @@ exports.createOrder = async (req, res) => {
     const orderId = `UPI_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
     const effectivePaymentType = purpose || notes?.paymentType || 'investment';
     const payload = notes || req.body?.payloadData || {};
+    const baseAmount = Math.round(Number(amount));
+
+    let upiPayment = null;
+    let payAmount = baseAmount;
+    let upiLink = null;
+    let qrSvg = null;
+    let ref = `GV${Date.now().toString().slice(-8)}`;
+
+    try {
+      const autoUpi = await autoUpiService.initAutoUpi();
+      upiPayment = await autoUpi.createPayment({
+        amount: baseAmount,
+        orderId,
+        customer: user?.mobileNumber || user?.email || 'Growvest User',
+        note: `Growvest ${orderId}`,
+        metadata: {
+          userId: user._id,
+          paymentType: effectivePaymentType,
+          payloadData: payload,
+        },
+      });
+
+      if (upiPayment) {
+        payAmount = upiPayment.payAmount;
+        ref = upiPayment.ref;
+        upiLink = upiPayment.link;
+        qrSvg = upiPayment.qr;
+      }
+    } catch (upiErr) {
+      console.warn('[PaymentController] autoUpi createPayment warning, using fallback paise:', upiErr.message);
+      // Fallback: Add 1-99 paise if autoUpi failed
+      const randomPaise = Math.floor(Math.random() * 90 + 10) / 100;
+      payAmount = Math.round((baseAmount + randomPaise) * 100) / 100;
+    }
 
     try {
       await PendingPayment.findOneAndUpdate(
@@ -281,7 +341,9 @@ exports.createOrder = async (req, res) => {
           userId: user._id,
           paymentType: effectivePaymentType,
           payloadData: payload,
-          amount: Math.round(amount),
+          amount: baseAmount,
+          payAmount,
+          ref,
           status: 'pending',
         },
         { upsert: true, new: true }
@@ -295,9 +357,13 @@ exports.createOrder = async (req, res) => {
     return res.status(200).json({
       success: true,
       orderId,
-      amount: Math.round(amount),
+      amount: baseAmount,
+      payAmount,
       currency: 'INR',
-      gateway: 'manual_upi',
+      gateway: 'canara_auto_upi',
+      ref,
+      upiLink,
+      qrSvg,
       paymentType: effectivePaymentType,
       companyUpi: upiConfig,
     });
@@ -1584,10 +1650,180 @@ exports.updateCompanyUpiDetails = async (req, res) => {
       );
     }
 
+    if (req.body.gmailUser !== undefined) {
+      await Settings.findOneAndUpdate(
+        { key: 'canara_gmail_user' },
+        { value: String(req.body.gmailUser || '').trim(), updatedAt: new Date(), updatedBy: req.user._id },
+        { upsert: true }
+      );
+    }
+
+    if (req.body.gmailPassword !== undefined && String(req.body.gmailPassword).trim().length > 0) {
+      await Settings.findOneAndUpdate(
+        { key: 'canara_gmail_password' },
+        { value: String(req.body.gmailPassword).trim(), updatedAt: new Date(), updatedBy: req.user._id },
+        { upsert: true }
+      );
+    }
+
+    if (req.body.autoApprovalEnabled !== undefined) {
+      await Settings.findOneAndUpdate(
+        { key: 'canara_auto_approval_enabled' },
+        { value: String(Boolean(req.body.autoApprovalEnabled)), updatedAt: new Date(), updatedBy: req.user._id },
+        { upsert: true }
+      );
+    }
+
+    // Reload active autoUpi instance
+    await autoUpiService.reloadConfig();
+
     const updatedConfig = await getCompanyUpiConfig();
     res.status(200).json({ success: true, message: 'Company UPI settings updated successfully!', config: updatedConfig });
   } catch (error) {
     console.error('[ManualPayment] Update UPI config error:', error);
     res.status(500).json({ success: false, message: 'Failed to update UPI settings', error: error.message });
+  }
+};
+
+// 8. Direct live status check for mobile app auto-polling
+exports.checkUpiOrderStatus = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    if (!orderId) {
+      return res.status(400).json({ success: false, message: 'orderId is required' });
+    }
+
+    // Check PendingPayment
+    const pending = await PendingPayment.findOne({ orderId });
+    if (pending && pending.status === 'completed') {
+      return res.status(200).json({
+        success: true,
+        status: 'completed',
+        orderId,
+        amount: pending.amount,
+        payAmount: pending.payAmount,
+        message: 'Payment completed & verified!',
+      });
+    }
+
+    // Check UpiPayment from MongoStore
+    const UpiPayment = require('../models/UpiPayment');
+    const payment = await UpiPayment.findOne({ orderId });
+    if (payment && payment.status === 'paid') {
+      await processSuccessfulOrder(orderId, payment.utr);
+      return res.status(200).json({
+        success: true,
+        status: 'completed',
+        orderId,
+        utr: payment.utr,
+        amount: payment.amount,
+        payAmount: payment.payAmount,
+        message: 'Payment verified via Canara Bank alert!',
+      });
+    }
+
+    // Check ManualPayment
+    const manual = await ManualPayment.findOne({ orderId });
+    if (manual && manual.status === 'approved') {
+      return res.status(200).json({
+        success: true,
+        status: 'completed',
+        orderId,
+        utr: manual.utr,
+        message: 'Payment approved by Admin!',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      status: 'pending',
+      orderId,
+      payAmount: payment?.payAmount || pending?.payAmount || pending?.amount,
+      message: 'Awaiting Canara Bank transaction credit confirmation...',
+    });
+  } catch (err) {
+    console.error('[checkUpiOrderStatus] error:', err);
+    res.status(500).json({ success: false, message: 'Error checking order status', error: err.message });
+  }
+};
+
+// 9. Instant UTR claim from mobile app (against bank alerts)
+exports.claimUpiUtr = async (req, res) => {
+  try {
+    const { orderId, utr } = req.body;
+    if (!orderId || !utr) {
+      return res.status(400).json({ success: false, message: 'orderId and 12-digit utr are required' });
+    }
+
+    const cleanUtr = String(utr).trim();
+    if (!/^\d{12}$/.test(cleanUtr)) {
+      return res.status(400).json({ success: false, message: 'UTR must be exactly 12 digits' });
+    }
+
+    const UpiPayment = require('../models/UpiPayment');
+    const payment = await UpiPayment.findOne({ orderId });
+    if (!payment) {
+      return res.status(404).json({ success: false, message: 'Payment record not found for this order' });
+    }
+
+    if (payment.status === 'paid') {
+      return res.status(200).json({ success: true, status: 'paid', message: 'Payment already verified!' });
+    }
+
+    const store = autoUpiService.getStore();
+    if (store) {
+      const claimResult = await store.claimUtr(payment.id, cleanUtr);
+      if (claimResult && (claimResult.result === 'paid' || claimResult.settled)) {
+        await processSuccessfulOrder(orderId, cleanUtr);
+        return res.status(200).json({
+          success: true,
+          status: 'paid',
+          message: 'Payment verified instantly against Canara Bank credit alert!',
+          utr: cleanUtr,
+        });
+      }
+    }
+
+    // If alert has not landed in Gmail yet, save to ManualPayment so Admin can also see it
+    const pending = await PendingPayment.findOne({ orderId });
+    await ManualPayment.findOneAndUpdate(
+      { orderId },
+      {
+        orderId,
+        userId: req.user._id,
+        paymentType: pending?.paymentType || 'investment',
+        amount: pending?.amount || payment.amount,
+        payloadData: pending?.payloadData || {},
+        utr: cleanUtr,
+        userRemarks: 'Submitted via 12-digit UTR instant claim',
+        status: 'pending',
+      },
+      { upsert: true }
+    );
+
+    return res.status(200).json({
+      success: true,
+      status: 'pending',
+      message: 'UTR registered! Waiting for bank email sync or Admin approval.',
+      utr: cleanUtr,
+    });
+  } catch (err) {
+    console.error('[claimUpiUtr] error:', err);
+    res.status(500).json({ success: false, message: 'Failed to claim UTR', error: err.message });
+  }
+};
+
+// 10. Admin: Test Gmail IMAP connection
+exports.testGmailConnection = async (req, res) => {
+  try {
+    const { gmailUser, gmailPassword } = req.body;
+    const config = await autoUpiService.getUpiConfig();
+    const userToTest = (gmailUser || config.gmailUser || '').trim();
+    const passToTest = (gmailPassword || config.gmailPassword || '').trim();
+
+    const result = await autoUpiService.testGmailConnection(userToTest, passToTest);
+    return res.status(200).json(result);
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Test failed: ' + err.message });
   }
 };

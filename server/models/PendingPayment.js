@@ -10,6 +10,8 @@ const pendingPaymentSchema = new mongoose.Schema({
   paymentType: { type: String, required: true },
   payloadData: { type: mongoose.Schema.Types.Mixed, default: {} },
   amount:      { type: Number },
+  payAmount:   { type: Number },
+  ref:         { type: String },
   status:      { type: String, enum: ["pending", "completed", "failed"], default: "pending" },
   completedAt: { type: Date },
   createdAt:   { type: Date, default: Date.now, expires: 60 * 60 * 24 },

@@ -51,4 +51,23 @@ export const paymentService = {
     const response = await api.get('/payment/manual/config');
     return response.data;
   },
+
+  /**
+   * Live check UPI payment order status (Canara Bank auto-approval)
+   * @param {string} orderId
+   */
+  checkUpiOrderStatus: async (orderId) => {
+    const response = await api.get(`/payment/upi/status/${orderId}`);
+    return response.data;
+  },
+
+  /**
+   * Claim 12-digit UTR against bank credit alert
+   * @param {string} orderId
+   * @param {string} utr
+   */
+  claimUpiUtr: async (orderId, utr) => {
+    const response = await api.post('/payment/upi/claim-utr', { orderId, utr });
+    return response.data;
+  },
 };

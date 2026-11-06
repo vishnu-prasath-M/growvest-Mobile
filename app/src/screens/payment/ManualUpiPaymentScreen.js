@@ -37,6 +37,9 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
   } = route.params || {};
 
   const [orderId, setOrderId] = useState(existingOrderId || `UPI_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`);
+  const [exactPayAmount, setExactPayAmount] = useState(route.params?.payAmount || amount);
+  const [orderRef, setOrderRef] = useState(route.params?.ref || '');
+  const [upiLinkFromApi, setUpiLinkFromApi] = useState(null);
   const [upiId, setUpiId] = useState('8925699005@upi');
   const [payeeName, setPayeeName] = useState('Growvest Investments');
   const [customQrImage, setCustomQrImage] = useState('');
@@ -50,20 +53,30 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [copiedOrderId, setCopiedOrderId] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [pollingActive, setPollingActive] = useState(true);
+  const [paymentStatus, setPaymentStatus] = useState('pending'); // 'pending' | 'completed' | 'submitted'
 
-  // Fetch company UPI settings from backend
+  // Initialize Auto-UPI payment order and details from backend
   useEffect(() => {
     let isMounted = true;
     (async () => {
       try {
-        const res = await paymentService.getCompanyUpiDetails();
-        if (isMounted && res?.success && res.config) {
-          if (res.config.upiId) setUpiId(res.config.upiId);
-          if (res.config.payeeName) setPayeeName(res.config.payeeName);
-          if (res.config.qrImage) setCustomQrImage(res.config.qrImage);
+        setLoadingConfig(true);
+        // Create unique order with exact paise and ref from backend
+        const orderRes = await paymentService.createOrder(amount, paymentType, payloadData);
+        if (isMounted && orderRes?.success) {
+          if (orderRes.orderId) setOrderId(orderRes.orderId);
+          if (orderRes.payAmount) setExactPayAmount(orderRes.payAmount);
+          if (orderRes.ref) setOrderRef(orderRes.ref);
+          if (orderRes.upiLink) setUpiLinkFromApi(orderRes.upiLink);
+          if (orderRes.companyUpi) {
+            if (orderRes.companyUpi.upiId) setUpiId(orderRes.companyUpi.upiId);
+            if (orderRes.companyUpi.payeeName) setPayeeName(orderRes.companyUpi.payeeName);
+            if (orderRes.companyUpi.qrImage) setCustomQrImage(orderRes.companyUpi.qrImage);
+          }
         }
       } catch (err) {
-        console.warn('[ManualUpiPayment] Could not fetch UPI settings, using defaults:', err.message);
+        console.warn('[ManualUpiPayment] Error initializing auto UPI order:', err.message);
       } finally {
         if (isMounted) setLoadingConfig(false);
       }
@@ -73,6 +86,26 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
       isMounted = false;
     };
   }, []);
+
+  // Real-time Auto-Polling for Bank Credit Confirmation
+  useEffect(() => {
+    if (!orderId || !pollingActive || showSuccessModal) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const statusRes = await paymentService.checkUpiOrderStatus(orderId);
+        if (statusRes?.success && (statusRes.status === 'completed' || statusRes.status === 'paid')) {
+          setPaymentStatus('completed');
+          setPollingActive(false);
+          setShowSuccessModal(true);
+        }
+      } catch (err) {
+        // Quiet background polling
+      }
+    }, 3500);
+
+    return () => clearInterval(interval);
+  }, [orderId, pollingActive, showSuccessModal]);
 
   const formatCurrency = (val) =>
     `₹${Number(val || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -90,14 +123,19 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
     setTimeout(() => setCopiedOrderId(false), 2000);
   };
 
-  // Construct UPI URI
+  // Construct UPI URI with exact paise and reference code
   const getUpiUrl = (appScheme = null) => {
+    if (upiLinkFromApi && !appScheme) {
+      return upiLinkFromApi;
+    }
+
     const encodedUpi = encodeURIComponent(upiId);
     const encodedName = encodeURIComponent(payeeName);
-    const encodedNote = encodeURIComponent(`Growvest ${orderId}`);
-    const roundedAmount = Math.round(Number(amount));
+    const noteText = orderRef ? `${orderRef} Growvest` : `Growvest ${orderId}`;
+    const encodedNote = encodeURIComponent(noteText);
+    const finalAmountStr = Number(exactPayAmount || amount).toFixed(2);
 
-    let base = `upi://pay?pa=${encodedUpi}&pn=${encodedName}&am=${roundedAmount}&cu=INR&tn=${encodedNote}`;
+    let base = `upi://pay?pa=${encodedUpi}&pn=${encodedName}&am=${finalAmountStr}&cu=INR&tn=${encodedNote}`;
     if (appScheme) {
       return `${appScheme}://${base.replace('upi://', '')}`;
     }
@@ -155,7 +193,7 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
     }
   };
 
-  // Submit UTR verification
+  // Instant UTR Verification against Canara Bank Alerts
   const handleSubmitVerification = async () => {
     const cleanUtr = utrNumber.trim();
     if (!cleanUtr) {
@@ -164,12 +202,22 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
     }
 
     if (cleanUtr.length < 6) {
-      Alert.alert('Invalid UTR', 'Please enter a valid UPI Reference / UTR Number (usually 12 digits).');
+      Alert.alert('Invalid UTR', 'Please enter a valid 12-digit UPI Reference Number (UTR).');
       return;
     }
 
     setSubmitting(true);
     try {
+      // 1. Try instant UTR claim against bank alerts
+      const claimRes = await paymentService.claimUpiUtr(orderId, cleanUtr);
+      if (claimRes?.success && claimRes.status === 'paid') {
+        setPaymentStatus('completed');
+        setPollingActive(false);
+        setShowSuccessModal(true);
+        return;
+      }
+
+      // 2. Fallback to manual queue if bank email hasn't arrived yet
       const res = await paymentService.submitManualPayment({
         orderId,
         utr: cleanUtr,
@@ -181,9 +229,10 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
       });
 
       if (res?.success) {
+        setPaymentStatus('submitted');
         setShowSuccessModal(true);
       } else {
-        Alert.alert('Submission Error', res?.message || 'Failed to submit payment verification. Please try again.');
+        Alert.alert('Notice', claimRes?.message || res?.message || 'Payment under verification.');
       }
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Failed to submit verification';
@@ -224,8 +273,20 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.summaryLabel}>{title}</Text>
-              <Text style={styles.summaryAmount}>{formatCurrency(amount)}</Text>
+              <Text style={styles.summaryAmount}>{formatCurrency(exactPayAmount)}</Text>
+              {exactPayAmount !== amount && (
+                <Text style={{ fontSize: 11, color: '#10B981', fontWeight: '600', marginTop: 2 }}>
+                  Base: ₹{amount} + ₹{(exactPayAmount - amount).toFixed(2)} (Paise for Auto-Approval)
+                </Text>
+              )}
             </View>
+          </View>
+
+          <View style={styles.autoVerifyBadge}>
+            <MaterialCommunityIcons name="lightning-bolt" size={16} color="#059669" />
+            <Text style={styles.autoVerifyText}>
+              Canara Bank Auto-Approval • Verifies in 15–30 sec
+            </Text>
           </View>
 
           <View style={styles.orderIdRow}>
