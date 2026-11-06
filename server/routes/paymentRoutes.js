@@ -6,9 +6,6 @@ const { protect, admin } = require('../middleware/authMiddleware');
 router.post('/create-order', protect, paymentController.createOrder);
 router.post('/verify', protect, paymentController.verifyPayment);
 router.post('/check-order-status', protect, paymentController.checkOrderStatus);
-router.get('/upi/status/:orderId', paymentController.checkUpiOrderStatus);
-router.post('/upi/claim-utr', protect, paymentController.claimUpiUtr);
-router.post('/manual/test-gmail', protect, admin, paymentController.testGmailConnection);
 
 // ─── Manual UPI Payment Endpoints ───────────────────────────────────────────
 router.get('/manual/config', paymentController.getCompanyUpiDetails);

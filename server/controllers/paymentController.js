@@ -15,23 +15,6 @@ const PocketMoney = require('../models/PocketMoney');
 const PocketMoneyPayout = require('../models/PocketMoneyPayout');
 const { calculateInvestmentTier } = require('../services/investmentTierService');
 const cashfreeService = require('../services/cashfreeService');
-const autoUpiService = require('../services/autoUpiService');
-
-// Register AutoUPI payment completed callback
-autoUpiService.registerPaymentPaidCallback(async (payment) => {
-  try {
-    console.log('[AutoUPI Callback] Auto-completing order:', payment.orderId, 'UTR:', payment.utr);
-    await processSuccessfulOrder(
-      payment.orderId,
-      payment.utr,
-      null,
-      payment.metadata?.paymentType,
-      payment.metadata?.payloadData
-    );
-  } catch (err) {
-    console.error('[AutoUPI Callback] Error processing paid order:', err);
-  }
-});
 
 async function getCompanyUpiConfig() {
   try {
@@ -298,40 +281,7 @@ exports.createOrder = async (req, res) => {
     const orderId = `UPI_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
     const effectivePaymentType = purpose || notes?.paymentType || 'investment';
     const payload = notes || req.body?.payloadData || {};
-    const baseAmount = Math.round(Number(amount));
-
-    let upiPayment = null;
-    let payAmount = baseAmount;
-    let upiLink = null;
-    let qrSvg = null;
-    let ref = `GV${Date.now().toString().slice(-8)}`;
-
-    try {
-      const autoUpi = await autoUpiService.initAutoUpi();
-      upiPayment = await autoUpi.createPayment({
-        amount: baseAmount,
-        orderId,
-        customer: user?.mobileNumber || user?.email || 'Growvest User',
-        note: `Growvest ${orderId}`,
-        metadata: {
-          userId: user._id,
-          paymentType: effectivePaymentType,
-          payloadData: payload,
-        },
-      });
-
-      if (upiPayment) {
-        payAmount = upiPayment.payAmount;
-        ref = upiPayment.ref;
-        upiLink = upiPayment.link;
-        qrSvg = upiPayment.qr;
-      }
-    } catch (upiErr) {
-      console.warn('[PaymentController] autoUpi createPayment warning, using fallback paise:', upiErr.message);
-      // Fallback: Add 1-99 paise if autoUpi failed
-      const randomPaise = Math.floor(Math.random() * 90 + 10) / 100;
-      payAmount = Math.round((baseAmount + randomPaise) * 100) / 100;
-    }
+    const exactAmount = Math.round(Number(amount));
 
     try {
       await PendingPayment.findOneAndUpdate(
@@ -341,9 +291,7 @@ exports.createOrder = async (req, res) => {
           userId: user._id,
           paymentType: effectivePaymentType,
           payloadData: payload,
-          amount: baseAmount,
-          payAmount,
-          ref,
+          amount: exactAmount,
           status: 'pending',
         },
         { upsert: true, new: true }
@@ -357,13 +305,9 @@ exports.createOrder = async (req, res) => {
     return res.status(200).json({
       success: true,
       orderId,
-      amount: baseAmount,
-      payAmount,
+      amount: exactAmount,
       currency: 'INR',
-      gateway: 'canara_auto_upi',
-      ref,
-      upiLink,
-      qrSvg,
+      gateway: 'manual_upi',
       paymentType: effectivePaymentType,
       companyUpi: upiConfig,
     });

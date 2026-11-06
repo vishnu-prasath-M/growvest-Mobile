@@ -7,10 +7,10 @@ import {
   TouchableOpacity,
   TextInput,
   Image,
-  ActivityIndicator,
-  Linking,
-  Modal,
   Alert,
+  ActivityIndicator,
+  Modal,
+  Linking,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -36,10 +36,11 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
     existingOrderId = null,
   } = route.params || {};
 
-  const [orderId, setOrderId] = useState(existingOrderId || `UPI_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`);
-  const [exactPayAmount, setExactPayAmount] = useState(route.params?.payAmount || amount);
-  const [orderRef, setOrderRef] = useState(route.params?.ref || '');
-  const [upiLinkFromApi, setUpiLinkFromApi] = useState(null);
+  const cleanAmount = Math.round(Number(amount));
+
+  const [orderId, setOrderId] = useState(
+    existingOrderId || `UPI_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`
+  );
   const [upiId, setUpiId] = useState('8925699005@upi');
   const [payeeName, setPayeeName] = useState('Growvest Investments');
   const [customQrImage, setCustomQrImage] = useState('');
@@ -53,30 +54,21 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [copiedOrderId, setCopiedOrderId] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [pollingActive, setPollingActive] = useState(true);
-  const [paymentStatus, setPaymentStatus] = useState('pending'); // 'pending' | 'completed' | 'submitted'
 
-  // Initialize Auto-UPI payment order and details from backend
+  // Fetch company receiving UPI settings from backend
   useEffect(() => {
     let isMounted = true;
     (async () => {
       try {
         setLoadingConfig(true);
-        // Create unique order with exact paise and ref from backend
-        const orderRes = await paymentService.createOrder(amount, paymentType, payloadData);
-        if (isMounted && orderRes?.success) {
-          if (orderRes.orderId) setOrderId(orderRes.orderId);
-          if (orderRes.payAmount) setExactPayAmount(orderRes.payAmount);
-          if (orderRes.ref) setOrderRef(orderRes.ref);
-          if (orderRes.upiLink) setUpiLinkFromApi(orderRes.upiLink);
-          if (orderRes.companyUpi) {
-            if (orderRes.companyUpi.upiId) setUpiId(orderRes.companyUpi.upiId);
-            if (orderRes.companyUpi.payeeName) setPayeeName(orderRes.companyUpi.payeeName);
-            if (orderRes.companyUpi.qrImage) setCustomQrImage(orderRes.companyUpi.qrImage);
-          }
+        const res = await paymentService.getCompanyUpiDetails();
+        if (isMounted && res?.success && res.config) {
+          if (res.config.upiId) setUpiId(res.config.upiId);
+          if (res.config.payeeName) setPayeeName(res.config.payeeName);
+          if (res.config.qrImage) setCustomQrImage(res.config.qrImage);
         }
       } catch (err) {
-        console.warn('[ManualUpiPayment] Error initializing auto UPI order:', err.message);
+        console.warn('[ManualUpiPayment] Could not fetch UPI settings, using defaults:', err.message);
       } finally {
         if (isMounted) setLoadingConfig(false);
       }
@@ -86,26 +78,6 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
       isMounted = false;
     };
   }, []);
-
-  // Real-time Auto-Polling for Bank Credit Confirmation
-  useEffect(() => {
-    if (!orderId || !pollingActive || showSuccessModal) return;
-
-    const interval = setInterval(async () => {
-      try {
-        const statusRes = await paymentService.checkUpiOrderStatus(orderId);
-        if (statusRes?.success && (statusRes.status === 'completed' || statusRes.status === 'paid')) {
-          setPaymentStatus('completed');
-          setPollingActive(false);
-          setShowSuccessModal(true);
-        }
-      } catch (err) {
-        // Quiet background polling
-      }
-    }, 3500);
-
-    return () => clearInterval(interval);
-  }, [orderId, pollingActive, showSuccessModal]);
 
   const formatCurrency = (val) =>
     `₹${Number(val || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -123,19 +95,13 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
     setTimeout(() => setCopiedOrderId(false), 2000);
   };
 
-  // Construct UPI URI with exact paise and reference code
+  // Construct standard NPCI UPI URI with exact integer amount
   const getUpiUrl = (appScheme = null) => {
-    if (upiLinkFromApi && !appScheme) {
-      return upiLinkFromApi;
-    }
-
     const encodedUpi = encodeURIComponent(upiId);
     const encodedName = encodeURIComponent(payeeName);
-    const noteText = orderRef ? `${orderRef} Growvest` : `Growvest ${orderId}`;
-    const encodedNote = encodeURIComponent(noteText);
-    const finalAmountStr = Number(exactPayAmount || amount).toFixed(2);
+    const encodedNote = encodeURIComponent(`Growvest ${orderId}`);
 
-    let base = `upi://pay?pa=${encodedUpi}&pn=${encodedName}&am=${finalAmountStr}&cu=INR&tn=${encodedNote}`;
+    let base = `upi://pay?pa=${encodedUpi}&pn=${encodedName}&am=${cleanAmount}&cu=INR&tn=${encodedNote}`;
     if (appScheme) {
       return `${appScheme}://${base.replace('upi://', '')}`;
     }
@@ -154,7 +120,6 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
         await Linking.openURL(getUpiUrl());
       }
     } catch (err) {
-      // If specific scheme fails, try generic
       try {
         await Linking.openURL(getUpiUrl());
       } catch (fallbackErr) {
@@ -193,7 +158,7 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
     }
   };
 
-  // Instant UTR Verification against Canara Bank Alerts
+  // Submit UTR verification for admin approval
   const handleSubmitVerification = async () => {
     const cleanUtr = utrNumber.trim();
     if (!cleanUtr) {
@@ -202,37 +167,26 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
     }
 
     if (cleanUtr.length < 6) {
-      Alert.alert('Invalid UTR', 'Please enter a valid 12-digit UPI Reference Number (UTR).');
+      Alert.alert('Invalid UTR', 'Please enter a valid UPI Reference / UTR Number (usually 12 digits).');
       return;
     }
 
     setSubmitting(true);
     try {
-      // 1. Try instant UTR claim against bank alerts
-      const claimRes = await paymentService.claimUpiUtr(orderId, cleanUtr);
-      if (claimRes?.success && claimRes.status === 'paid') {
-        setPaymentStatus('completed');
-        setPollingActive(false);
-        setShowSuccessModal(true);
-        return;
-      }
-
-      // 2. Fallback to manual queue if bank email hasn't arrived yet
       const res = await paymentService.submitManualPayment({
         orderId,
         utr: cleanUtr,
         screenshotBase64,
         userRemarks,
         paymentType,
-        amount: Math.round(Number(amount)),
+        amount: cleanAmount,
         payloadData,
       });
 
       if (res?.success) {
-        setPaymentStatus('submitted');
         setShowSuccessModal(true);
       } else {
-        Alert.alert('Notice', claimRes?.message || res?.message || 'Payment under verification.');
+        Alert.alert('Submission Error', res?.message || 'Failed to submit payment verification. Please try again.');
       }
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Failed to submit verification';
@@ -242,7 +196,7 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
     }
   };
 
-  // Dynamic QR Code URL
+  // Dynamic QR Code URL for the exact amount
   const qrCodeApiUrl = customQrImage && customQrImage.startsWith('/')
     ? `${SERVER_ORIGIN}${customQrImage}`
     : customQrImage ||
@@ -273,20 +227,8 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.summaryLabel}>{title}</Text>
-              <Text style={styles.summaryAmount}>{formatCurrency(exactPayAmount)}</Text>
-              {exactPayAmount !== amount && (
-                <Text style={{ fontSize: 11, color: '#10B981', fontWeight: '600', marginTop: 2 }}>
-                  Base: ₹{amount} + ₹{(exactPayAmount - amount).toFixed(2)} (Paise for Auto-Approval)
-                </Text>
-              )}
+              <Text style={styles.summaryAmount}>{formatCurrency(cleanAmount)}</Text>
             </View>
-          </View>
-
-          <View style={styles.autoVerifyBadge}>
-            <MaterialCommunityIcons name="lightning-bolt" size={16} color="#059669" />
-            <Text style={styles.autoVerifyText}>
-              Canara Bank Auto-Approval • Verifies in 15–30 sec
-            </Text>
           </View>
 
           <View style={styles.orderIdRow}>
@@ -466,7 +408,7 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
               <MaterialCommunityIcons name="comment-text-outline" size={18} color="#64748B" style={{ marginRight: 8 }} />
               <TextInput
                 style={styles.textInput}
-                placeholder="e.g. Paid via my brother's GPay"
+                placeholder="e.g. Paid via Google Pay"
                 placeholderTextColor={isDarkMode ? '#64748B' : '#94A3B8'}
                 value={userRemarks}
                 onChangeText={setUserRemarks}
@@ -521,7 +463,7 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
             <View style={styles.modalDetailsBox}>
               <View style={styles.modalDetailRow}>
                 <Text style={styles.modalDetailLabel}>Amount:</Text>
-                <Text style={styles.modalDetailValueBold}>{formatCurrency(amount)}</Text>
+                <Text style={styles.modalDetailValueBold}>{formatCurrency(cleanAmount)}</Text>
               </View>
               <View style={styles.modalDetailRow}>
                 <Text style={styles.modalDetailLabel}>UTR Number:</Text>
@@ -534,7 +476,7 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
             </View>
 
             <Text style={styles.modalDesc}>
-              We have received your payment reference. Our accounts team will verify the transaction against our bank records. Your account will be activated within 10–30 minutes!
+              We have received your payment reference. Our accounts team will verify the transaction against our bank records. Your account will be activated within a few minutes!
             </Text>
 
             <TouchableOpacity
@@ -618,27 +560,27 @@ const getStyles = (themeColors, isDarkMode) =>
       gap: 16,
     },
     summaryCard: {
-      borderRadius: 16,
-      padding: 16,
       backgroundColor: isDarkMode ? '#111D16' : '#FFFFFF',
+      borderRadius: 20,
+      padding: 18,
       borderWidth: 1,
-      borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+      borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.05,
-      shadowRadius: 6,
+      shadowOpacity: isDarkMode ? 0.2 : 0.04,
+      shadowRadius: 8,
       elevation: 2,
     },
     summaryHeader: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 12,
+      gap: 14,
     },
     summaryIconBox: {
-      width: 44,
-      height: 44,
-      borderRadius: 12,
-      backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5',
+      width: 48,
+      height: 48,
+      borderRadius: 14,
+      backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.12)' : '#ECFDF5',
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -655,18 +597,19 @@ const getStyles = (themeColors, isDarkMode) =>
     },
     orderIdRow: {
       flexDirection: 'row',
-      alignItems: 'center',
       justifyContent: 'space-between',
-      marginTop: 12,
+      alignItems: 'center',
+      marginTop: 14,
       paddingTop: 12,
       borderTopWidth: 1,
-      borderTopColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+      borderTopColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
     },
     orderIdLabel: {
-      fontSize: 11,
+      fontSize: 12,
       color: isDarkMode ? '#94A3B8' : '#64748B',
     },
     orderIdVal: {
+      fontFamily: 'monospace',
       fontWeight: '700',
       color: themeColors.text,
     },
@@ -675,38 +618,43 @@ const getStyles = (themeColors, isDarkMode) =>
       alignItems: 'center',
       gap: 4,
       paddingHorizontal: 8,
-      paddingVertical: 3,
-      borderRadius: 6,
+      paddingVertical: 4,
+      borderRadius: 8,
       backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.1)' : '#ECFDF5',
     },
     orderIdCopyText: {
-      fontSize: 10,
-      fontWeight: '700',
+      fontSize: 11,
+      fontWeight: '600',
       color: '#10B981',
     },
     card: {
-      borderRadius: 16,
-      padding: 16,
       backgroundColor: isDarkMode ? '#111D16' : '#FFFFFF',
+      borderRadius: 20,
+      padding: 18,
       borderWidth: 1,
-      borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-      gap: 16,
+      borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: isDarkMode ? 0.2 : 0.04,
+      shadowRadius: 8,
+      elevation: 2,
     },
     stepHeader: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 10,
+      gap: 12,
+      marginBottom: 16,
     },
     stepNumberBadge: {
-      width: 26,
-      height: 26,
-      borderRadius: 13,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
       backgroundColor: '#10B981',
       alignItems: 'center',
       justifyContent: 'center',
     },
     stepNumberText: {
-      fontSize: 13,
+      fontSize: 14,
       fontWeight: '800',
       color: '#FFFFFF',
     },
@@ -718,27 +666,25 @@ const getStyles = (themeColors, isDarkMode) =>
     stepSubtitle: {
       fontSize: 11,
       color: isDarkMode ? '#94A3B8' : '#64748B',
-      marginTop: 1,
+      marginTop: 2,
     },
     upiIdBox: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
-      backgroundColor: isDarkMode ? '#19261F' : '#F1F5F9',
-      padding: 12,
-      borderRadius: 12,
+      backgroundColor: isDarkMode ? '#0A120E' : '#F1F5F9',
+      padding: 14,
+      borderRadius: 14,
       borderWidth: 1,
-      borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+      borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+      gap: 12,
     },
     upiPayeeName: {
-      fontSize: 10,
-      fontWeight: '700',
-      textTransform: 'uppercase',
-      color: '#10B981',
-      letterSpacing: 0.5,
+      fontSize: 11,
+      fontWeight: '600',
+      color: isDarkMode ? '#94A3B8' : '#64748B',
     },
     upiIdText: {
-      fontSize: 15,
+      fontSize: 14,
       fontWeight: '800',
       color: themeColors.text,
       marginTop: 2,
@@ -746,10 +692,10 @@ const getStyles = (themeColors, isDarkMode) =>
     copyBtn: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
+      gap: 6,
       paddingHorizontal: 12,
       paddingVertical: 8,
-      borderRadius: 8,
+      borderRadius: 10,
       backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5',
       borderWidth: 1,
       borderColor: 'rgba(16, 185, 129, 0.3)',
@@ -759,30 +705,29 @@ const getStyles = (themeColors, isDarkMode) =>
       borderColor: '#10B981',
     },
     copyBtnText: {
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: '700',
       color: '#10B981',
     },
     qrContainer: {
       alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: 10,
+      marginVertical: 18,
     },
     qrBox: {
-      width: 170,
-      height: 170,
-      borderRadius: 12,
+      width: 200,
+      height: 200,
+      borderRadius: 18,
       backgroundColor: '#FFFFFF',
-      padding: 10,
       alignItems: 'center',
       justifyContent: 'center',
+      padding: 12,
       borderWidth: 1,
-      borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : '#E2E8F0',
+      borderColor: 'rgba(0,0,0,0.1)',
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
+      shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.08,
-      shadowRadius: 4,
-      elevation: 2,
+      shadowRadius: 10,
+      elevation: 3,
     },
     qrImage: {
       width: '100%',
@@ -790,85 +735,85 @@ const getStyles = (themeColors, isDarkMode) =>
     },
     qrInstruction: {
       fontSize: 11,
+      fontWeight: '600',
       color: isDarkMode ? '#94A3B8' : '#64748B',
-      marginTop: 8,
-      textAlign: 'center',
+      marginTop: 10,
     },
     upiAppsLabel: {
       fontSize: 12,
       fontWeight: '700',
       color: themeColors.text,
-      marginTop: 4,
+      marginBottom: 10,
     },
     upiAppsGrid: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
       gap: 8,
     },
     upiAppBtn: {
       flex: 1,
       alignItems: 'center',
       paddingVertical: 10,
-      paddingHorizontal: 4,
+      paddingHorizontal: 6,
       borderRadius: 12,
-      backgroundColor: isDarkMode ? '#19261F' : '#F8FAFC',
+      backgroundColor: isDarkMode ? '#0A120E' : '#F8FAFC',
       borderWidth: 1,
-      borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#E2E8F0',
+      borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
     },
     upiAppIconCircle: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: 6,
     },
     upiAppName: {
       fontSize: 10,
-      fontWeight: '700',
+      fontWeight: '600',
       color: themeColors.text,
       textAlign: 'center',
     },
     inputGroup: {
-      gap: 6,
+      marginBottom: 14,
     },
     inputLabel: {
       fontSize: 12,
       fontWeight: '700',
       color: themeColors.text,
+      marginBottom: 6,
     },
     inputContainer: {
       flexDirection: 'row',
       alignItems: 'center',
+      backgroundColor: isDarkMode ? '#0A120E' : '#F8FAFC',
       borderRadius: 12,
       borderWidth: 1,
-      borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : '#CBD5E1',
-      backgroundColor: isDarkMode ? '#19261F' : '#F8FAFC',
+      borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
       paddingHorizontal: 12,
       height: 48,
     },
     textInput: {
       flex: 1,
       fontSize: 14,
-      color: themeColors.text,
       fontWeight: '600',
+      color: themeColors.text,
     },
     inputHelper: {
       fontSize: 10,
       color: isDarkMode ? '#94A3B8' : '#64748B',
-      marginTop: 2,
+      marginTop: 4,
     },
     screenshotPickerBtn: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: 8,
-      height: 44,
+      paddingVertical: 12,
       borderRadius: 12,
+      backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.08)' : '#ECFDF5',
       borderWidth: 1,
+      borderColor: 'rgba(16, 185, 129, 0.25)',
       borderStyle: 'dashed',
-      borderColor: '#10B981',
-      backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.06)' : '#ECFDF5',
     },
     screenshotPickerText: {
       fontSize: 12,
@@ -878,11 +823,11 @@ const getStyles = (themeColors, isDarkMode) =>
     screenshotPreviewContainer: {
       flexDirection: 'row',
       alignItems: 'center',
-      padding: 8,
+      padding: 10,
       borderRadius: 12,
-      backgroundColor: isDarkMode ? '#19261F' : '#F8FAFC',
+      backgroundColor: isDarkMode ? '#0A120E' : '#F1F5F9',
       borderWidth: 1,
-      borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#E2E8F0',
+      borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
     },
     screenshotThumb: {
       width: 48,
@@ -896,38 +841,32 @@ const getStyles = (themeColors, isDarkMode) =>
     },
     screenshotRemoveText: {
       fontSize: 11,
-      fontWeight: '600',
       color: '#EF4444',
+      fontWeight: '600',
       marginTop: 2,
     },
     submitBtn: {
       borderRadius: 14,
       overflow: 'hidden',
       marginTop: 8,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.2,
-      shadowRadius: 8,
-      elevation: 4,
     },
     submitGradient: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       paddingVertical: 14,
-      paddingHorizontal: 20,
+      borderRadius: 14,
     },
     submitBtnText: {
       fontSize: 14,
       fontWeight: '800',
       color: '#FFFFFF',
-      letterSpacing: 0.3,
     },
     modalOverlay: {
       flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.75)',
-      alignItems: 'center',
+      backgroundColor: 'rgba(0,0,0,0.7)',
       justifyContent: 'center',
+      alignItems: 'center',
       padding: 20,
     },
     modalCard: {
@@ -938,12 +877,7 @@ const getStyles = (themeColors, isDarkMode) =>
       padding: 24,
       alignItems: 'center',
       borderWidth: 1,
-      borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 10 },
-      shadowOpacity: 0.25,
-      shadowRadius: 20,
-      elevation: 10,
+      borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
     },
     modalIconCircle: {
       width: 72,
@@ -962,20 +896,17 @@ const getStyles = (themeColors, isDarkMode) =>
     },
     modalSubtitle: {
       fontSize: 13,
-      fontWeight: '700',
+      fontWeight: '600',
       color: '#10B981',
       marginTop: 2,
-      textAlign: 'center',
     },
     modalDetailsBox: {
       width: '100%',
-      backgroundColor: isDarkMode ? '#19261F' : '#F8FAFC',
-      borderRadius: 12,
-      padding: 12,
+      backgroundColor: isDarkMode ? '#0A120E' : '#F8FAFC',
+      borderRadius: 14,
+      padding: 14,
       marginVertical: 16,
-      gap: 6,
-      borderWidth: 1,
-      borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#E2E8F0',
+      gap: 8,
     },
     modalDetailRow: {
       flexDirection: 'row',
@@ -983,48 +914,47 @@ const getStyles = (themeColors, isDarkMode) =>
       alignItems: 'center',
     },
     modalDetailLabel: {
-      fontSize: 11,
+      fontSize: 12,
       color: isDarkMode ? '#94A3B8' : '#64748B',
     },
     modalDetailValue: {
-      fontSize: 11,
-      fontWeight: '600',
+      fontSize: 12,
+      fontWeight: '700',
       color: themeColors.text,
     },
     modalDetailValueBold: {
-      fontSize: 13,
+      fontSize: 14,
       fontWeight: '800',
       color: '#10B981',
     },
     modalDetailValueMono: {
-      fontSize: 11,
-      fontWeight: '700',
+      fontSize: 12,
       fontFamily: 'monospace',
+      fontWeight: '700',
       color: themeColors.text,
     },
     modalDesc: {
       fontSize: 12,
       color: isDarkMode ? '#94A3B8' : '#64748B',
       textAlign: 'center',
-      lineHeight: 17,
+      lineHeight: 18,
       marginBottom: 20,
     },
     modalPrimaryBtn: {
       width: '100%',
-      height: 46,
+      backgroundColor: '#10B981',
       borderRadius: 12,
-      backgroundColor: '#0E3D23',
+      paddingVertical: 12,
       alignItems: 'center',
-      justifyContent: 'center',
       marginBottom: 8,
     },
     modalPrimaryBtnText: {
-      fontSize: 14,
-      fontWeight: '700',
+      fontSize: 13,
+      fontWeight: '800',
       color: '#FFFFFF',
     },
     modalSecondaryBtn: {
-      paddingVertical: 6,
+      paddingVertical: 8,
     },
     modalSecondaryBtnText: {
       fontSize: 12,
@@ -1033,3 +963,4 @@ const getStyles = (themeColors, isDarkMode) =>
     },
   });
 
+export default ManualUpiPaymentScreen;

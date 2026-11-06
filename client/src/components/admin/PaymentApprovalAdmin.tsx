@@ -80,15 +80,7 @@ export const PaymentApprovalAdmin = ({ token, onCountChange }: PaymentApprovalAd
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsFeedback, setSettingsFeedback] = useState<string | null>(null);
 
-  // Canara Bank / Gmail Auto-Approval Settings
-  const [gmailUser, setGmailUser] = useState("");
-  const [gmailPassword, setGmailPassword] = useState("");
-  const [hasGmailPassword, setHasGmailPassword] = useState(false);
-  const [autoApprovalEnabled, setAutoApprovalEnabled] = useState(true);
-  const [showPassword, setShowPassword] = useState(false);
-  const [testingGmail, setTestingGmail] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
-
+  
   // Fetch pending payments
   const fetchPendingPayments = async () => {
     try {
@@ -129,10 +121,7 @@ export const PaymentApprovalAdmin = ({ token, onCountChange }: PaymentApprovalAd
         if (data.config.upiId) setUpiId(data.config.upiId);
         if (data.config.payeeName) setPayeeName(data.config.payeeName);
         if (data.config.qrImage) setQrImageUrl(data.config.qrImage);
-        if (data.config.gmailUser) setGmailUser(data.config.gmailUser);
-        if (data.config.hasGmailPassword) setHasGmailPassword(true);
-        if (data.config.autoApprovalEnabled !== undefined) setAutoApprovalEnabled(data.config.autoApprovalEnabled);
-      }
+              }
     } catch (err) {
       console.error("Error fetching UPI config:", err);
     }
@@ -219,9 +208,6 @@ export const PaymentApprovalAdmin = ({ token, onCountChange }: PaymentApprovalAd
         body: JSON.stringify({
           upiId: upiId.trim(),
           payeeName: payeeName.trim(),
-          gmailUser: gmailUser.trim(),
-          ...(gmailPassword.trim() ? { gmailPassword: gmailPassword.trim() } : {}),
-          autoApprovalEnabled,
           ...(qrBase64 ? { qrImageBase64: qrBase64 } : {}),
         }),
       });
@@ -240,30 +226,7 @@ export const PaymentApprovalAdmin = ({ token, onCountChange }: PaymentApprovalAd
     }
   };
 
-  const handleTestGmail = async () => {
-    setTestingGmail(true);
-    setTestResult(null);
-    try {
-      const res = await fetch(`${API_URL}/api/payment/manual/test-gmail`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${effectiveToken}`,
-        },
-        body: JSON.stringify({
-          gmailUser: gmailUser.trim(),
-          gmailPassword: gmailPassword.trim(),
-        }),
-      });
-      const data = await res.json();
-      setTestResult(data);
-    } catch (err: any) {
-      setTestResult({ success: false, message: "Error testing connection: " + err.message });
-    } finally {
-      setTestingGmail(false);
-    }
-  };
-
+  
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopiedUtr(text);
@@ -638,100 +601,6 @@ export const PaymentApprovalAdmin = ({ token, onCountChange }: PaymentApprovalAd
           )}
 
           <form onSubmit={handleSaveUpiSettings} className="space-y-4">
-            {/* Canara Bank Auto-Approval Box */}
-            <div className="p-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-500/30 space-y-3.5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-xs font-bold text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5">
-                    ⚡ Canara Bank UPI Auto-Approval (Zero Gateway Fees)
-                  </h4>
-                  <p className="text-[11px] text-emerald-700/80 dark:text-emerald-400 mt-0.5">
-                    Monitors your Canara Bank transaction credit emails to approve payments automatically in 15 seconds.
-                  </p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={autoApprovalEnabled}
-                    onChange={(e) => setAutoApprovalEnabled(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-9 h-5 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
-                </label>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-foreground mb-1">
-                  Gmail Address (Receiving Bank Alerts)
-                </label>
-                <input
-                  type="email"
-                  value={gmailUser}
-                  onChange={(e) => setGmailUser(e.target.value)}
-                  placeholder="e.g. youraccount@gmail.com"
-                  className="w-full h-9 px-3 rounded-xl border border-border/60 bg-background text-xs font-body text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-                <p className="text-[10px] text-muted-foreground mt-1">
-                  The email address where Canara Bank sends your transaction credit alerts.
-                </p>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[11px] font-bold text-foreground">
-                    Google App Password (16 characters)
-                  </label>
-                  {hasGmailPassword && !gmailPassword && (
-                    <span className="text-[10px] text-emerald-600 font-semibold">● Password Configured</span>
-                  )}
-                </div>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={gmailPassword}
-                    onChange={(e) => setGmailPassword(e.target.value)}
-                    placeholder={hasGmailPassword ? "Leave blank to keep existing password" : "e.g. abcd efgh ijkl mnop"}
-                    className="w-full h-9 pl-3 pr-16 rounded-xl border border-border/60 bg-background text-xs font-body text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-2 top-2 text-[10px] text-muted-foreground hover:text-foreground font-semibold px-1.5 py-0.5 rounded"
-                  >
-                    {showPassword ? "Hide" : "Show"}
-                  </button>
-                </div>
-                <p className="text-[10px] text-muted-foreground mt-1">
-                  Generated at: <span className="font-mono text-emerald-600">Google Account → Security → 2-Step Verification → App passwords</span>
-                </p>
-              </div>
-
-              {testResult && (
-                <div
-                  className={`p-2.5 rounded-xl text-xs font-body border ${
-                    testResult.success
-                      ? "bg-emerald-100/60 text-emerald-900 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300"
-                      : "bg-rose-100/60 text-rose-900 border-rose-300 dark:bg-rose-950/40 dark:text-rose-300"
-                  }`}
-                >
-                  {testResult.message}
-                </div>
-              )}
-
-              <div className="pt-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleTestGmail}
-                  disabled={testingGmail}
-                  className="rounded-xl h-8 px-3 text-[11px] font-bold border-emerald-600/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10"
-                >
-                  {testingGmail ? "Testing Connection..." : "Test Bank Email Connection"}
-                </Button>
-              </div>
-            </div>
-
             <div>
               <label className="block text-xs font-bold text-foreground mb-1.5">
                 Receiving UPI ID / VPA <span className="text-rose-500">*</span>
