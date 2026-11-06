@@ -263,3 +263,5 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.55)',
   },
 });
+
+export default AdBannerCarousel;
