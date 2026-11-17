@@ -12,6 +12,7 @@ router.get('/all', bannerController.getAllBanners);
 router.get('/admin/all', bannerController.getAllBanners);
 router.post('/admin', protect, adminOnly, bannerController.createBanner);
 router.patch('/admin/:id', protect, adminOnly, bannerController.updateBanner);
+router.put('/admin/:id', protect, adminOnly, bannerController.updateBanner);
 router.delete('/admin/:id', protect, adminOnly, bannerController.deleteBanner);
 
 module.exports = router;

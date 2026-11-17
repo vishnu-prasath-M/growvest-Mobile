@@ -97,77 +97,12 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
     }
   };
 
-  // Copy Amount to clipboard
-  const handleCopyAmount = async () => {
-    await Clipboard.setStringAsync(String(cleanAmount));
-    setCopiedAmount(true);
-    setTimeout(() => setCopiedAmount(false), 2500);
-    if (Platform.OS === 'android') {
-      try {
-        ToastAndroid.show('Amount ₹' + cleanAmount + ' copied to clipboard!', ToastAndroid.SHORT);
-      } catch (e) {}
-    }
-  };
-
-  const handleCopyOrderId = async () => {
-    await Clipboard.setStringAsync(orderId);
-    setCopiedOrderId(true);
-    setTimeout(() => setCopiedOrderId(false), 2000);
-  };
-
-  // Construct standard NPCI UPI URI with exact integer amount
-  const getUpiUrl = (appScheme = null) => {
+  // Construct standard NPCI UPI URI with exact integer amount for QR
+  const getUpiUrl = () => {
     const encodedUpi = encodeURIComponent(upiId);
     const encodedName = encodeURIComponent(payeeName);
     const encodedNote = encodeURIComponent('Growvest ' + orderId);
-
-    let base = 'upi://pay?pa=' + encodedUpi + '&pn=' + encodedName + '&am=' + cleanAmount + '&cu=INR&tn=' + encodedNote;
-    if (appScheme) {
-      return appScheme + '://' + base.replace('upi://', '');
-    }
-    return base;
-  };
-
-  // 1-Tap: Copy UPI ID and cleanly launch the selected UPI App
-  const handleOpenUpiApp = async (appScheme = null, appName = 'UPI App') => {
-    // 1. Instantly copy UPI ID so user can paste without retyping
-    await Clipboard.setStringAsync(upiId);
-    setCopiedUpi(true);
-    setTimeout(() => setCopiedUpi(false), 3000);
-
-    const toastMsg = 'UPI ID copied! Opening ' + appName + '... Paste UPI ID & pay ₹' + cleanAmount;
-    if (Platform.OS === 'android') {
-      try {
-        ToastAndroid.showWithGravity(toastMsg, ToastAndroid.LONG, ToastAndroid.BOTTOM);
-      } catch (e) {}
-    }
-
-    // 2. Try launching target app scheme
-    const directScheme = appScheme ? (appScheme + '://') : 'upi://';
-    try {
-      const canOpen = await Linking.canOpenURL(directScheme);
-      if (canOpen) {
-        await Linking.openURL(directScheme);
-        return;
-      }
-    } catch (e) {
-      // Ignore and attempt fallbacks
-    }
-
-    // 3. Fallback: try opening generic upi chooser or upi uri
-    try {
-      await Linking.openURL('upi://');
-    } catch (fallbackErr) {
-      try {
-        await Linking.openURL(getUpiUrl());
-      } catch (finalErr) {
-        Alert.alert(
-          'UPI ID Copied to Clipboard',
-          'UPI ID "' + upiId + '" has been copied.\n\nPlease open ' + appName + ' manually on your phone, paste the UPI ID into "Pay to UPI ID", and pay ₹' + cleanAmount + '.',
-          [{ text: 'OK' }]
-        );
-      }
-    }
+    return 'upi://pay?pa=' + encodedUpi + '&pn=' + encodedName + '&am=' + cleanAmount + '&cu=INR&tn=' + encodedNote;
   };
 
   // Pick payment screenshot
@@ -261,7 +196,7 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
         <View style={styles.summaryCard}>
           <View style={styles.summaryHeader}>
             <View style={styles.summaryIconBox}>
-              <MaterialCommunityIcons name="wallet-outline" size={24} color="#10B981" />
+              <MaterialCommunityIcons name="shield-check" size={26} color="#10B981" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.summaryLabel}>{title}</Text>
@@ -271,70 +206,22 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
 
           <View style={styles.orderIdRow}>
             <Text style={styles.orderIdLabel}>Order ID: <Text style={styles.orderIdVal}>{orderId}</Text></Text>
-            <TouchableOpacity onPress={handleCopyOrderId} style={styles.orderIdCopyBtn}>
-              <MaterialCommunityIcons name={copiedOrderId ? 'check' : 'content-copy'} size={14} color="#10B981" />
-              <Text style={styles.orderIdCopyText}>{copiedOrderId ? 'Copied' : 'Copy'}</Text>
-            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Step 1: Pay to Company UPI Card */}
+        {/* Step 1: Scan QR or Pay via UPI ID */}
         <View style={styles.card}>
           <View style={styles.stepHeader}>
             <View style={styles.stepNumberBadge}>
               <Text style={styles.stepNumberText}>1</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.stepTitle}>Pay Using Any UPI App</Text>
-              <Text style={styles.stepSubtitle}>Tap an app to copy UPI ID & open, or scan the QR code</Text>
+              <Text style={styles.stepTitle}>Pay via Any UPI App</Text>
+              <Text style={styles.stepSubtitle}>Scan QR code or copy official UPI ID</Text>
             </View>
           </View>
 
-          {/* Company UPI ID Highlight Box */}
-          <View style={styles.upiIdBox}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.upiPayeeName}>{payeeName}</Text>
-              <Text style={styles.upiIdText} selectable>{upiId}</Text>
-            </View>
-            <TouchableOpacity
-              onPress={handleCopyUpi}
-              style={[styles.copyBtn, copiedUpi && styles.copyBtnSuccess]}
-              activeOpacity={0.8}
-            >
-              <MaterialCommunityIcons
-                name={copiedUpi ? 'check' : 'content-copy'}
-                size={16}
-                color={copiedUpi ? '#FFFFFF' : '#10B981'}
-              />
-              <Text style={[styles.copyBtnText, copiedUpi && { color: '#FFFFFF' }]}>
-                {copiedUpi ? 'Copied!' : 'Copy UPI'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Exact Amount to Pay Box */}
-          <View style={[styles.upiIdBox, { marginTop: 8 }]}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.upiPayeeName}>EXACT AMOUNT TO PAY</Text>
-              <Text style={[styles.upiIdText, { color: '#10B981', fontSize: 16 }]} selectable>₹{cleanAmount}</Text>
-            </View>
-            <TouchableOpacity
-              onPress={handleCopyAmount}
-              style={[styles.copyBtn, copiedAmount && styles.copyBtnSuccess]}
-              activeOpacity={0.8}
-            >
-              <MaterialCommunityIcons
-                name={copiedAmount ? 'check' : 'content-copy'}
-                size={16}
-                color={copiedAmount ? '#FFFFFF' : '#10B981'}
-              />
-              <Text style={[styles.copyBtnText, copiedAmount && { color: '#FFFFFF' }]}>
-                {copiedAmount ? 'Copied!' : 'Copy ₹'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* QR Code Container */}
+          {/* Dynamic QR Code */}
           <View style={styles.qrContainer}>
             <View style={styles.qrBox}>
               {loadingConfig ? (
@@ -348,80 +235,50 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
               )}
             </View>
             <Text style={styles.qrInstruction}>
-              Scan with GPay, PhonePe, Paytm, or BHIM
+              Scan using Google Pay, PhonePe, Paytm, or BHIM
             </Text>
             <View style={styles.qrTipBadge}>
-              <MaterialCommunityIcons name="camera-outline" size={14} color="#10B981" />
+              <MaterialCommunityIcons name="camera" size={14} color="#10B981" />
               <Text style={styles.qrTipText}>
-                Screenshot this QR & tap "Scan from Gallery" in GPay/PhonePe
+                Screenshot this QR & tap "Scan from Gallery" in your UPI app
               </Text>
             </View>
           </View>
 
-          {/* 1-Tap Copy & Open App Launchers */}
-          <View style={styles.appsHeaderRow}>
-            <Text style={styles.upiAppsLabel}>Tap to Copy UPI ID & Open App:</Text>
-            <View style={styles.autoCopyPill}>
-              <MaterialCommunityIcons name="content-copy" size={11} color="#10B981" />
-              <Text style={styles.autoCopyPillText}>Auto-copies ID</Text>
+          {/* Divider */}
+          <View style={styles.orDividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.orDividerText}>OR PAY USING UPI ID</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* Company UPI ID Highlight Box */}
+          <View style={styles.upiIdBox}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.upiPayeeName}>PAYEE: {payeeName}</Text>
+              <Text style={styles.upiIdText} selectable>{upiId}</Text>
             </View>
-          </View>
-
-          <View style={styles.upiAppsGrid}>
             <TouchableOpacity
-              style={styles.upiAppBtn}
+              onPress={handleCopyUpi}
+              style={[styles.copyBtn, copiedUpi && styles.copyBtnSuccess]}
               activeOpacity={0.8}
-              onPress={() => handleOpenUpiApp('tez', 'Google Pay')}
             >
-              <View style={[styles.upiAppIconCircle, { backgroundColor: '#E8F0FE' }]}>
-                <MaterialCommunityIcons name="google" size={20} color="#1A73E8" />
-              </View>
-              <Text style={styles.upiAppName}>Google Pay</Text>
-              <Text style={styles.upiAppActionTag}>Copy & Open</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.upiAppBtn}
-              activeOpacity={0.8}
-              onPress={() => handleOpenUpiApp('phonepe', 'PhonePe')}
-            >
-              <View style={[styles.upiAppIconCircle, { backgroundColor: '#F3E8FD' }]}>
-                <MaterialCommunityIcons name="cellphone-wireless" size={20} color="#5F259F" />
-              </View>
-              <Text style={styles.upiAppName}>PhonePe</Text>
-              <Text style={styles.upiAppActionTag}>Copy & Open</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.upiAppBtn}
-              activeOpacity={0.8}
-              onPress={() => handleOpenUpiApp('paytmmp', 'Paytm')}
-            >
-              <View style={[styles.upiAppIconCircle, { backgroundColor: '#E0F7FA' }]}>
-                <MaterialCommunityIcons name="bank-transfer" size={20} color="#00BAF2" />
-              </View>
-              <Text style={styles.upiAppName}>Paytm</Text>
-              <Text style={styles.upiAppActionTag}>Copy & Open</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.upiAppBtn}
-              activeOpacity={0.8}
-              onPress={() => handleOpenUpiApp(null, 'Any UPI App')}
-            >
-              <View style={[styles.upiAppIconCircle, { backgroundColor: '#ECFDF5' }]}>
-                <MaterialCommunityIcons name="qrcode-scan" size={20} color="#059669" />
-              </View>
-              <Text style={styles.upiAppName}>Other UPI</Text>
-              <Text style={styles.upiAppActionTag}>Copy & Open</Text>
+              <MaterialCommunityIcons
+                name={copiedUpi ? 'check' : 'content-copy'}
+                size={16}
+                color={copiedUpi ? '#FFFFFF' : '#10B981'}
+              />
+              <Text style={[styles.copyBtnText, copiedUpi && { color: '#FFFFFF' }]}>
+                {copiedUpi ? 'Copied ✓' : 'Copy UPI ID'}
+              </Text>
             </TouchableOpacity>
           </View>
 
-          {/* Helpful 2-Step Payment Tip */}
+          {/* Payment Guidance Box */}
           <View style={styles.helperTipBox}>
             <MaterialCommunityIcons name="lightbulb-on-outline" size={16} color="#D4AF37" style={{ marginTop: 1 }} />
             <Text style={styles.helperTipText}>
-              Tapping any app above automatically copies <Text style={{ fontWeight: '700', color: themeColors.text }}>{upiId}</Text>. In your app, select "Pay to UPI ID", paste it, and pay <Text style={{ fontWeight: '700', color: '#10B981' }}>₹{cleanAmount}</Text>.
+              In your UPI app, select <Text style={{ fontWeight: '700', color: themeColors.text }}>"Pay to UPI ID"</Text>, paste <Text style={{ fontWeight: '700', color: themeColors.text }}>{upiId}</Text>, and enter <Text style={{ fontWeight: '700', color: '#10B981' }}>₹{cleanAmount}</Text>.
             </Text>
           </View>
         </View>
@@ -829,8 +686,8 @@ const getStyles = (themeColors, isDarkMode) =>
       alignItems: 'center',
       gap: 6,
       backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.12)' : '#ECFDF5',
-      paddingHorizontal: 10,
-      paddingVertical: 5,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
       borderRadius: 8,
       marginTop: 8,
     },
@@ -840,64 +697,22 @@ const getStyles = (themeColors, isDarkMode) =>
       color: '#10B981',
       textAlign: 'center',
     },
-    appsHeaderRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 10,
-    },
-    upiAppsLabel: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: themeColors.text,
-    },
-    autoCopyPill: {
+    orDividerRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
-      backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.12)' : '#ECFDF5',
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      borderRadius: 6,
+      gap: 10,
+      marginVertical: 14,
     },
-    autoCopyPillText: {
-      fontSize: 10,
-      fontWeight: '700',
-      color: '#10B981',
-    },
-    upiAppsGrid: {
-      flexDirection: 'row',
-      gap: 8,
-    },
-    upiAppBtn: {
+    dividerLine: {
       flex: 1,
-      alignItems: 'center',
-      paddingVertical: 10,
-      paddingHorizontal: 4,
-      borderRadius: 12,
-      backgroundColor: isDarkMode ? '#0A120E' : '#F8FAFC',
-      borderWidth: 1,
-      borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
+      height: 1,
+      backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
     },
-    upiAppIconCircle: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 5,
-    },
-    upiAppName: {
+    orDividerText: {
       fontSize: 10,
-      fontWeight: '700',
-      color: themeColors.text,
-      textAlign: 'center',
-    },
-    upiAppActionTag: {
-      fontSize: 8,
-      fontWeight: '700',
-      color: '#10B981',
-      marginTop: 2,
+      fontWeight: '800',
+      letterSpacing: 0.5,
+      color: isDarkMode ? '#64748B' : '#94A3B8',
     },
     helperTipBox: {
       flexDirection: 'row',
@@ -906,8 +721,8 @@ const getStyles = (themeColors, isDarkMode) =>
       backgroundColor: isDarkMode ? 'rgba(212, 175, 55, 0.08)' : '#FEFCE8',
       borderWidth: 1,
       borderColor: isDarkMode ? 'rgba(212, 175, 55, 0.2)' : '#FEF08A',
-      padding: 10,
-      borderRadius: 10,
+      padding: 12,
+      borderRadius: 12,
       marginTop: 12,
     },
     helperTipText: {

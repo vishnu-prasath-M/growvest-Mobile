@@ -12,6 +12,7 @@ import {
   EyeOff,
   Upload,
   Info,
+  Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -62,6 +63,119 @@ export const AdBannerAdmin = ({ token }: AdBannerAdminProps) => {
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Edit banner states
+  const [editingBanner, setEditingBanner] = useState<AdBanner | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editLinkUrl, setEditLinkUrl] = useState("");
+  const [editOrder, setEditOrder] = useState<number>(1);
+  const [editIsActive, setEditIsActive] = useState(true);
+  const [editPreviewImage, setEditPreviewImage] = useState<string | null>(null);
+  const [editBase64Image, setEditBase64Image] = useState<string | null>(null);
+  const [editImageDimensions, setEditImageDimensions] = useState<{ width: number; height: number; ratio: number } | null>(null);
+  const [editDimensionWarning, setEditDimensionWarning] = useState<string | null>(null);
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editFeedbackMsg, setEditFeedbackMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const editFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const openEditModal = (banner: AdBanner) => {
+    setEditingBanner(banner);
+    setEditTitle(banner.title);
+    setEditLinkUrl(banner.linkUrl || "");
+    setEditOrder(banner.order || 1);
+    setEditIsActive(banner.isActive);
+    setEditPreviewImage(getFullImageUrl(banner.imageUrl));
+    setEditBase64Image(null);
+    setEditImageDimensions({ width: banner.width || RECOMMENDED_WIDTH, height: banner.height || RECOMMENDED_HEIGHT, ratio: banner.aspectRatio || RECOMMENDED_RATIO });
+    setEditDimensionWarning(null);
+    setEditFeedbackMsg(null);
+    setShowEditModal(true);
+  };
+
+  const handleEditFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setEditFeedbackMsg({ type: "error", text: "Please select a valid image file (PNG, JPG, WEBP)." });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      setEditBase64Image(base64);
+      setEditPreviewImage(base64);
+
+      const img = new Image();
+      img.onload = () => {
+        const w = img.naturalWidth;
+        const h = img.naturalHeight;
+        const r = Number((w / h).toFixed(2));
+        setEditImageDimensions({ width: w, height: h, ratio: r });
+
+        const ratioDiff = Math.abs(r - RECOMMENDED_RATIO);
+        if (ratioDiff > 0.25 || w < 600 || h < 240) {
+          setEditDimensionWarning(
+            `⚠️ Size Mismatch: Recommended size is ${RECOMMENDED_WIDTH} × ${RECOMMENDED_HEIGHT} px (Aspect Ratio 2.50:1). Uploaded is ${w} × ${h} px (${r}:1).`
+          );
+        } else {
+          setEditDimensionWarning(null);
+        }
+      };
+      img.src = base64;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleUpdateBanner = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBanner) return;
+    if (!editTitle.trim()) {
+      setEditFeedbackMsg({ type: "error", text: "Please enter a banner title." });
+      return;
+    }
+
+    setEditSubmitting(true);
+    setEditFeedbackMsg(null);
+
+    try {
+      const payload: Record<string, any> = {
+        title: editTitle.trim(),
+        linkUrl: editLinkUrl.trim(),
+        order: Number(editOrder) || 1,
+        isActive: editIsActive,
+      };
+
+      if (editBase64Image) {
+        payload.base64Data = editBase64Image;
+        payload.width = editImageDimensions?.width || RECOMMENDED_WIDTH;
+        payload.height = editImageDimensions?.height || RECOMMENDED_HEIGHT;
+      }
+
+      const res = await fetch(`${API_URL}/api/banners/admin/${editingBanner._id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${effectiveToken}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setShowEditModal(false);
+        fetchBanners();
+      } else {
+        setEditFeedbackMsg({ type: "error", text: data.message || "Failed to update banner." });
+      }
+    } catch (err: any) {
+      setEditFeedbackMsg({ type: "error", text: err.message || "Server error updating banner." });
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
 
   const fetchBanners = async () => {
     setLoading(true);
@@ -622,6 +736,190 @@ export const AdBannerAdmin = ({ token }: AdBannerAdminProps) => {
           </div>
         )}
       </AnimatePresence>
+      {/* Edit Banner Modal */}
+      <AnimatePresence>
+        {showEditModal && editingBanner && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-xl bg-card border border-border/60 rounded-2xl shadow-xl overflow-hidden max-h-[90vh] flex flex-col"
+            >
+              {/* Modal Header */}
+              <div className="p-5 border-b border-border/40 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-blue-500/10 text-blue-600 flex items-center justify-center">
+                    <Pencil className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-heading font-bold text-foreground">Edit Ad Banner</h3>
+                    <p className="text-xs text-muted-foreground">Update title, redirect link, image, or display order</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Modal Form */}
+              <form onSubmit={handleUpdateBanner} className="p-6 overflow-y-auto space-y-5">
+                {editFeedbackMsg && (
+                  <div
+                    className={`p-3 rounded-xl text-xs font-body ${
+                      editFeedbackMsg.type === "success"
+                        ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                        : "bg-rose-50 text-rose-800 border border-rose-200"
+                    }`}
+                  >
+                    {editFeedbackMsg.text}
+                  </div>
+                )}
+
+                {/* Banner Title */}
+                <div>
+                  <label className="block text-xs font-bold text-foreground mb-1.5">
+                    Banner Title <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    placeholder="Banner title"
+                    className="w-full h-10 px-3.5 rounded-xl border border-border/60 bg-background text-sm font-body text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                {/* Image Upload Area */}
+                <div>
+                  <label className="block text-xs font-bold text-foreground mb-1.5">
+                    Banner Image <span className="text-muted-foreground font-normal">(Leave unchanged to keep current)</span>
+                  </label>
+
+                  <input
+                    ref={editFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleEditFileChange}
+                    className="hidden"
+                  />
+
+                  {editPreviewImage && (
+                    <div className="space-y-3">
+                      <div className="relative aspect-[2.5/1] w-full rounded-xl overflow-hidden border border-border/80 bg-slate-900/10 shadow-inner">
+                        <img src={editPreviewImage} alt="Preview" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => editFileInputRef.current?.click()}
+                          className="absolute bottom-2 right-2 px-3 py-1 bg-black/75 hover:bg-black text-white text-[11px] font-semibold rounded-lg backdrop-blur-sm"
+                        >
+                          Replace Image
+                        </button>
+                      </div>
+
+                      {editImageDimensions && (
+                        <div className="flex items-center justify-between text-xs font-body text-muted-foreground px-1">
+                          <span>
+                            Size: <strong className="text-foreground">{editImageDimensions.width} × {editImageDimensions.height} px</strong>
+                          </span>
+                          <span>
+                            Ratio: <strong className="text-foreground">{editImageDimensions.ratio} : 1</strong>
+                          </span>
+                        </div>
+                      )}
+
+                      {editDimensionWarning && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs font-body flex items-start gap-2.5"
+                        >
+                          <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                          <div>{editDimensionWarning}</div>
+                        </motion.div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Redirect Link */}
+                <div>
+                  <label className="block text-xs font-bold text-foreground mb-1.5">
+                    Redirect Link URL <span className="text-muted-foreground font-normal">(Optional)</span>
+                  </label>
+                  <input
+                    type="url"
+                    value={editLinkUrl}
+                    onChange={(e) => setEditLinkUrl(e.target.value)}
+                    placeholder="https://walink.me/... or website"
+                    className="w-full h-10 px-3.5 rounded-xl border border-border/60 bg-background text-sm font-body text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                {/* Order & Active Controls */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-foreground mb-1.5">Display Order (#)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={editOrder}
+                      onChange={(e) => setEditOrder(parseInt(e.target.value) || 1)}
+                      className="w-full h-10 px-3.5 rounded-xl border border-border/60 bg-background text-sm font-body text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-foreground mb-1.5">Visibility Status</label>
+                    <button
+                      type="button"
+                      onClick={() => setEditIsActive(!editIsActive)}
+                      className={`w-full h-10 px-3.5 rounded-xl border text-xs font-bold transition-colors flex items-center justify-center gap-1.5 ${
+                        editIsActive
+                          ? "bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-950/30 dark:border-emerald-700 dark:text-emerald-400"
+                          : "bg-muted border-border text-muted-foreground"
+                      }`}
+                    >
+                      {editIsActive ? <CheckCircle className="h-4 w-4" /> : null}
+                      {editIsActive ? "Active (Visible)" : "Inactive (Hidden)"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Modal Footer */}
+                <div className="pt-4 border-t border-border/40 flex items-center justify-end gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowEditModal(false)}
+                    className="rounded-xl h-10 px-4 text-xs font-body"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={editSubmitting}
+                    className="rounded-xl h-10 px-5 text-xs font-body font-semibold bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    {editSubmitting ? (
+                      <>
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin mr-1.5" /> Updating...
+                      </>
+                    ) : (
+                      "Save Changes"
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 };
