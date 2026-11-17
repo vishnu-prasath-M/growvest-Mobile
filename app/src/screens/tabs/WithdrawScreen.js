@@ -886,17 +886,17 @@ const WithdrawScreen = ({ navigation }) => {
                 </View>
               ) : (
                 <View style={[styles.amountInputCard, { flexDirection: 'column', alignItems: 'stretch', paddingVertical: 14 }]}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <View>
-                      <Text style={[styles.heroStatLabel, { color: isDarkMode ? '#94A3B8' : '#64748B' }]}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={[styles.heroStatLabel, { color: isDarkMode ? '#94A3B8' : '#64748B' }]} numberOfLines={1}>
                         {selectedChit?.chitName ? `${selectedChit.chitName} Payout` : 'Full Chit Payout Amount'}
                       </Text>
                       <Text style={[styles.amountTextInput, { fontSize: 24, fontWeight: '800', color: currentCategoryConfig.accent }]}>
                         {formatCurrency(selectedChitPayout)}
                       </Text>
                     </View>
-                    <View style={[styles.primaryBadge, { backgroundColor: isDarkMode ? 'rgba(52, 211, 153, 0.15)' : '#DCFCE7', borderWidth: 1, borderColor: '#34D399', paddingHorizontal: 10, paddingVertical: 5 }]}>
-                      <Text style={[styles.primaryBadgeText, { color: isDarkMode ? '#34D399' : '#059669', fontWeight: '700' }]}>Single Chit Payout</Text>
+                    <View style={[styles.primaryBadge, { backgroundColor: isDarkMode ? 'rgba(52, 211, 153, 0.15)' : '#DCFCE7', borderWidth: 1, borderColor: '#34D399', paddingHorizontal: 8, paddingVertical: 4, flexShrink: 0, marginTop: 4 }]}>
+                      <Text style={[styles.primaryBadgeText, { color: isDarkMode ? '#34D399' : '#059669', fontWeight: '700', fontSize: 11 }]}>Single Chit Payout</Text>
                     </View>
                   </View>
                   <Text style={{ fontSize: 11, color: isDarkMode ? '#94A3B8' : '#64748B', marginTop: 8, lineHeight: 16 }}>

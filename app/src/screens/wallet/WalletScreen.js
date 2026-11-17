@@ -50,6 +50,7 @@ const WalletScreen = ({ navigation }) => {
         setCashBalance(Number(res.data.cashBalance ?? res.data.balance) || 0);
         setCoinBalance(Number(res.data.coinBalance) || 0);
         setCoinRupeeValue(Number(res.data.coinRupeeValue) || Number(((res.data.coinBalance || 0) * 0.05).toFixed(2)));
+        setHasClaimedDaily(Boolean(res.data.hasClaimedDailyToday));
         setTransactions(res.data.transactions || []);
       } else {
         // Fallback: user profile & coin wallet
@@ -158,12 +159,12 @@ const WalletScreen = ({ navigation }) => {
           >
             <View style={styles.heroTop}>
               <View style={styles.walletHeaderLeft}>
-                <MaterialCommunityIcons name="wallet" size={18} color="#D4AF37" />
-                <Text style={styles.cashHeroLabel}>AVAILABLE CASH BALANCE</Text>
+                <MaterialCommunityIcons name="wallet" size={17} color="#D4AF37" />
+                <Text style={styles.cashHeroLabel}>AVAILABLE CASH</Text>
               </View>
               <View style={styles.activePill}>
                 <View style={styles.activeDot} />
-                <Text style={styles.activePillText}>INSTANT PAY READY</Text>
+                <Text style={styles.activePillText}>INSTANT PAY</Text>
               </View>
             </View>
 
@@ -211,9 +212,11 @@ const WalletScreen = ({ navigation }) => {
                 <View style={styles.coinBadge}>
                   <Text style={styles.coinBadgeIcon}>🪙</Text>
                 </View>
-                <View>
+                <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={styles.rewardsTitle}>Reward Coins</Text>
-                  <Text style={styles.rewardsSubtitle}>1 Coin = ₹0.05 • Earned via referral & daily login</Text>
+                  <Text style={styles.rewardsSubtitle} numberOfLines={1} ellipsizeMode="tail">
+                    1 Coin = ₹0.05 • Referral & daily login
+                  </Text>
                 </View>
               </View>
 
@@ -499,6 +502,7 @@ const getStyles = (themeColors, isDarkMode) =>
       paddingHorizontal: 8,
       paddingVertical: 3,
       borderRadius: 12,
+      flexShrink: 0,
     },
     activeDot: {
       width: 6,
@@ -588,8 +592,11 @@ const getStyles = (themeColors, isDarkMode) =>
       justifyContent: 'space-between',
       alignItems: 'center',
       marginBottom: 12,
+      gap: 8,
     },
     rewardsTitleRow: {
+      flex: 1,
+      minWidth: 0,
       flexDirection: 'row',
       alignItems: 'center',
       gap: 10,
@@ -601,6 +608,7 @@ const getStyles = (themeColors, isDarkMode) =>
       backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.15)' : '#FEF3C7',
       alignItems: 'center',
       justifyContent: 'center',
+      flexShrink: 0,
     },
     coinBadgeIcon: {
       fontSize: 18,
@@ -615,6 +623,7 @@ const getStyles = (themeColors, isDarkMode) =>
       color: themeColors.textSecondary,
     },
     referralLink: {
+      flexShrink: 0,
       flexDirection: 'row',
       alignItems: 'center',
       gap: 2,

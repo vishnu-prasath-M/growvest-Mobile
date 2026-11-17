@@ -693,6 +693,7 @@ const HomeScreen = ({ navigation }) => {
   const [userName, setUserName] = useState('');
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [coinsBalance, setCoinsBalance] = useState(0);
+  const [walletBalance, setWalletBalance] = useState(0);
   const [hideBalance, setHideBalance] = useState(false);
   const [kycModalVisible, setKycModalVisible] = useState(false);
   const [kycStatusInfo, setKycStatusInfo] = useState({ status: 'not_submitted', rejectionReason: null });
@@ -742,6 +743,8 @@ const HomeScreen = ({ navigation }) => {
         }
         const cachedCoins = await AsyncStorage.getItem('cached_coins_balance');
         if (cachedCoins != null) setCoinsBalance(Number(cachedCoins) || 0);
+        const cachedWallet = await AsyncStorage.getItem('cached_wallet_balance');
+        if (cachedWallet != null) setWalletBalance(Number(cachedWallet) || 0);
         const savedHide = await AsyncStorage.getItem('user_hide_balance');
         if (savedHide != null) setHideBalance(savedHide === 'true');
       } catch (err) {}
@@ -762,10 +765,10 @@ const HomeScreen = ({ navigation }) => {
       if (authUser?.name || authUser?.username) {
         setUserName(authUser.name || authUser.username || '');
       }
-      const [freshUserRes, dataRes, coinsRes] = await Promise.allSettled([
+      const [freshUserRes, dataRes, walletRes] = await Promise.allSettled([
         authService.refreshUserProfile().catch(() => null),
         dashboardService.getDashboard().catch(() => null),
-        api.get('/wallet/coins').catch(() => null),
+        api.get('/wallet/overview').catch(() => null),
       ]);
 
       if (freshUserRes.status === 'fulfilled' && freshUserRes.value) {
@@ -773,6 +776,9 @@ const HomeScreen = ({ navigation }) => {
         if (freshUser?.name || freshUser?.username) {
           setUserName(freshUser.name || freshUser.username || '');
           updateUser(freshUser);
+        }
+        if (freshUser?.balance !== undefined) {
+          setWalletBalance(Number(freshUser.balance) || 0);
         }
       }
       if (dataRes.status === 'fulfilled' && dataRes.value) {
@@ -782,13 +788,19 @@ const HomeScreen = ({ navigation }) => {
         if (data?.user?.name || data?.user?.username) {
           setUserName(data.user.name || data.user.username);
         }
+        if (data?.user?.balance !== undefined) {
+          setWalletBalance(Number(data.user.balance) || 0);
+        }
         if (data?.user?._id) {
           notificationService.registerDevice(data.user._id, data.user.username || data.user.name);
         }
       }
-      if (coinsRes.status === 'fulfilled' && coinsRes.value?.data) {
-        const cData = coinsRes.value.data;
-        const coins = cData?.coinBalance ?? cData?.totalCoins ?? cData?.coins ?? 0;
+      if (walletRes.status === 'fulfilled' && walletRes.value?.data) {
+        const wData = walletRes.value.data;
+        const bal = Number(wData?.cashBalance ?? wData?.balance) || 0;
+        setWalletBalance(bal);
+        AsyncStorage.setItem('cached_wallet_balance', String(bal)).catch(() => {});
+        const coins = wData?.coinBalance ?? 0;
         setCoinsBalance(coins);
         AsyncStorage.setItem('cached_coins_balance', String(coins)).catch(() => {});
       }
@@ -933,7 +945,10 @@ const HomeScreen = ({ navigation }) => {
                 onPress={() => navigation.navigate('Wallet')}
                 activeOpacity={0.8}
               >
-                <Text style={styles.walletCoinText}>🪙 {coinsBalance} Coins</Text>
+                <MaterialCommunityIcons name="wallet-outline" size={17} color="#D4AF37" />
+                <Text style={styles.walletCoinText}>
+                  ₹{(walletBalance || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.notifBtn}

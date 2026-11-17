@@ -251,12 +251,16 @@ exports.getWalletOverview = async (req, res) => {
     const coinBalance = Number(user.coinBalance) || 0;
     const coinRupeeValue = Number((coinBalance * 0.05).toFixed(2));
 
+    const todayStr = getTodayDateStringIST();
+    const hasClaimedDailyToday = user.lastDailyLoginDate === todayStr;
+
     return res.status(200).json({
       success: true,
       balance: cashBalance,
       cashBalance,
       coinBalance,
       coinRupeeValue,
+      hasClaimedDailyToday,
       transactions,
     });
   } catch (error) {

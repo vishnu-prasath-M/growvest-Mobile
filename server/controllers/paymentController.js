@@ -1416,7 +1416,7 @@ exports.submitManualPayment = async (req, res) => {
       await sendNotification({
         userId: req.user._id,
         title: 'Payment Submitted ⏳',
-        description: `Your payment of ₹${finalAmount.toLocaleString('en-IN')} (Ref: ${cleanUtr}) has been submitted. Our team will verify and activate your ${finalPaymentType.replace('_', ' ')} within 15–30 minutes.`,
+        description: `Your payment of ₹${finalAmount.toLocaleString('en-IN')} (Ref: ${cleanUtr}) has been submitted. Our team will verify and activate your ${finalPaymentType.replace('_', ' ')} within 12-24 hours.`,
         type: 'general',
       });
     } catch (_) {}
