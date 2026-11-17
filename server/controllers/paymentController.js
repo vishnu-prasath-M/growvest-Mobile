@@ -784,6 +784,30 @@ async function processSuccessfulOrder(orderId, utr, fallbackUser = null, fallbac
       json: (d) => { console.log('[PaymentProcess] SIP verify result:', d); },
     };
     await sipController.verifyPayment(fakeReq, fakeRes);
+  } else if (paymentType === 'wallet_topup') {
+    const topupAmount = Number(pending?.amount || payloadData?.amount || 0);
+    if (topupAmount > 0) {
+      await User.findByIdAndUpdate(user._id, { $inc: { balance: topupAmount } });
+      const Transaction = require('../models/Transaction');
+      result = await Transaction.create({
+        userId: user._id,
+        userEmail: user.email || `${user.username || 'user'}@growvest.com`,
+        type: 'wallet_topup',
+        amount: topupAmount,
+        status: 'approved',
+        description: `Wallet top-up approved (UTR: ${paymentId})`,
+      });
+      try {
+        const { sendPushNotification } = require('../services/fcmService');
+        await sendPushNotification(user._id, {
+          title: 'Wallet Credited! 💰',
+          body: `₹${topupAmount.toLocaleString('en-IN')} has been added to your Growvest Wallet.`,
+          data: { type: 'wallet_topup', amount: String(topupAmount) }
+        });
+      } catch (fcmErr) {
+        console.warn('[WalletTopup] FCM notification skipped:', fcmErr.message);
+      }
+    }
   }
 
   return { success: true, data: result, utr: paymentId };
@@ -1771,3 +1795,6 @@ exports.testGmailConnection = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Test failed: ' + err.message });
   }
 };
+
+// Export central business logic execution helper for internal services (e.g. Wallet Pay)
+exports.processSuccessfulOrder = processSuccessfulOrder;

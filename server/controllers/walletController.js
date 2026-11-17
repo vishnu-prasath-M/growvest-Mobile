@@ -232,3 +232,156 @@ exports.setRewardWithdrawalThreshold = async (req, res) => {
     res.status(500).json({ message: 'Server error updating threshold', error: error.message });
   }
 };
+
+// ─── GET /api/wallet/overview ────────────────────────────────────────────────
+exports.getWalletOverview = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const Transaction = require('../models/Transaction');
+    const transactions = await Transaction.find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(50);
+
+    const cashBalance = Number(user.balance) || 0;
+    const coinBalance = Number(user.coinBalance) || 0;
+    const coinRupeeValue = Number((coinBalance * 0.05).toFixed(2));
+
+    return res.status(200).json({
+      success: true,
+      balance: cashBalance,
+      cashBalance,
+      coinBalance,
+      coinRupeeValue,
+      transactions,
+    });
+  } catch (error) {
+    console.error('[getWalletOverview] Error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to load wallet overview', error: error.message });
+  }
+};
+
+// ─── GET /api/wallet/balance ────────────────────────────────────────────────
+exports.getWalletBalance = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select('balance coinBalance');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    return res.status(200).json({
+      success: true,
+      balance: Number(user.balance) || 0,
+      coinBalance: Number(user.coinBalance) || 0,
+    });
+  } catch (error) {
+    console.error('[getWalletBalance] Error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch balance', error: error.message });
+  }
+};
+
+// ─── POST /api/wallet/pay ───────────────────────────────────────────────────
+exports.payFromWallet = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { amount, paymentType, payloadData = {}, title = '' } = req.body;
+
+    const numAmount = Math.round(Number(amount));
+    if (!numAmount || numAmount <= 0) {
+      return res.status(400).json({ success: false, message: 'Valid amount is required' });
+    }
+
+    if (!paymentType) {
+      return res.status(400).json({ success: false, message: 'Payment type is required' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const currentBalance = Number(user.balance) || 0;
+    if (currentBalance < numAmount) {
+      return res.status(400).json({
+        success: false,
+        insufficientBalance: true,
+        currentBalance,
+        requiredAmount: numAmount,
+        deficit: numAmount - currentBalance,
+        message: `Insufficient wallet balance. Available: ₹${currentBalance.toLocaleString('en-IN')}, Required: ₹${numAmount.toLocaleString('en-IN')}. Please top up your wallet.`,
+      });
+    }
+
+    // Atomically deduct balance
+    const updatedUser = await User.findOneAndUpdate(
+      { _id: userId, balance: { $gte: numAmount } },
+      { $inc: { balance: -numAmount } },
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      const freshUser = await User.findById(userId);
+      const freshBalance = Number(freshUser?.balance) || 0;
+      return res.status(400).json({
+        success: false,
+        insufficientBalance: true,
+        currentBalance: freshBalance,
+        requiredAmount: numAmount,
+        deficit: Math.max(0, numAmount - freshBalance),
+        message: 'Insufficient wallet balance for this payment. Please top up your wallet.',
+      });
+    }
+
+    // Record Transaction
+    const Transaction = require('../models/Transaction');
+    const orderId = `WAL_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+    const paymentId = `WAL_PAY_${Date.now()}`;
+
+    const tx = await Transaction.create({
+      userId,
+      userEmail: updatedUser.email || `${updatedUser.username || 'user'}@growvest.com`,
+      type: 'wallet_debit',
+      amount: numAmount,
+      status: 'paid',
+      description: `Paid ₹${numAmount.toLocaleString('en-IN')} from wallet for ${title || paymentType}`,
+    });
+
+    // Execute business logic through centralized helper
+    const paymentController = require('./paymentController');
+    const result = await paymentController.processSuccessfulOrder(
+      orderId,
+      paymentId,
+      updatedUser,
+      paymentType,
+      payloadData
+    );
+
+    // Send in-app notification
+    try {
+      await sendNotification({
+        userId,
+        title: 'Wallet Payment Successful! ⚡',
+        description: `₹${numAmount.toLocaleString('en-IN')} debited from wallet for ${title || paymentType}. New balance: ₹${updatedUser.balance.toLocaleString('en-IN')}.`,
+        type: 'wallet_payment',
+        metadata: { amount: numAmount, paymentType, orderId },
+      });
+    } catch (notifErr) {
+      console.warn('[payFromWallet] Notification skipped:', notifErr.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Payment completed successfully from wallet!',
+      balance: updatedUser.balance,
+      orderId,
+      transactionId: tx._id,
+      data: result?.data,
+    });
+  } catch (error) {
+    console.error('[payFromWallet] Error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to process payment from wallet', error: error.message });
+  }
+};

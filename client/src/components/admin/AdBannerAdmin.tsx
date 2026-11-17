@@ -46,6 +46,7 @@ export const AdBannerAdmin = ({ token }: AdBannerAdminProps) => {
   const effectiveToken = token || (typeof window !== "undefined" ? localStorage.getItem("token") : null);
   const [banners, setBanners] = useState<AdBanner[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
 
   // Form states
@@ -64,6 +65,7 @@ export const AdBannerAdmin = ({ token }: AdBannerAdminProps) => {
 
   const fetchBanners = async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const headers: Record<string, string> = {};
       if (effectiveToken) {
@@ -78,18 +80,24 @@ export const AdBannerAdmin = ({ token }: AdBannerAdminProps) => {
       const data = await res.json();
       if (data.success && Array.isArray(data.banners)) {
         setBanners(data.banners);
+        setFetchError(null);
+      } else {
+        throw new Error(data.message || "Failed to parse banners response");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error fetching banners:", err);
       try {
         const fallback = await fetch(`${API_URL}/api/banners`);
         const fallbackData = await fallback.json();
         if (fallbackData.success && Array.isArray(fallbackData.banners)) {
           setBanners(fallbackData.banners);
+          setFetchError(null);
+          return;
         }
       } catch (e) {
         console.error("Fallback fetch banners error:", e);
       }
+      setFetchError("Unable to connect to backend. The server might be waking up (Render cold-start).");
     } finally {
       setLoading(false);
     }
@@ -304,6 +312,18 @@ export const AdBannerAdmin = ({ token }: AdBannerAdminProps) => {
         <div className="flex items-center justify-center py-16 text-muted-foreground text-sm font-body">
           <RefreshCw className="h-5 w-5 animate-spin mr-2" />
           Loading ad banners...
+        </div>
+      ) : fetchError ? (
+        <div className="text-center py-16 bg-card rounded-2xl border border-dashed border-amber-500/40 p-6">
+          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-3" />
+          <h3 className="text-base font-semibold text-foreground">Backend Connection Pending</h3>
+          <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
+            {fetchError}
+          </p>
+          <Button onClick={fetchBanners} variant="outline" className="mt-4 rounded-xl text-xs">
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+            Retry Now
+          </Button>
         </div>
       ) : banners.length === 0 ? (
         <div className="text-center py-16 bg-card rounded-2xl border border-dashed border-border/60">

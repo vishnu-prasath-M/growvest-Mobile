@@ -18,6 +18,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { colors } from '../../theme/theme';
 import { sipService } from '../../services/sipService';
+import api from '../../services/apiService';
 import { SkeletonLoader } from '../../components/SkeletonLoader';
 import { openRazorpayCheckout } from '../../services/razorpayHandler';
 import { useAlert } from '../../context/AlertContext';
@@ -89,28 +90,96 @@ const SIPDetailsScreen = ({ route, navigation }) => {
   const handlePayInstallment = async (contrib) => {
     try {
       setPayingContributionId(contrib._id);
-      const res = await sipService.payInstallment(sip._id, contrib._id);
+      
+      // Check wallet balance
+      let walletBal = 0;
+      try {
+        const balRes = await api.get('/wallet/balance').catch(() => null);
+        if (balRes && balRes.data && typeof balRes.data.balance === 'number') {
+          walletBal = balRes.data.balance;
+        }
+      } catch (e) {}
 
-      if (!res?.success) {
-        throw new Error(res?.message || 'Failed to create payment order');
-      }
+      const executeUpiFlow = async () => {
+        setPayingContributionId(contrib._id);
+        const res = await sipService.payInstallment(sip._id, contrib._id);
+        if (!res?.success) throw new Error(res?.message || 'Failed to create payment order');
+        setPayingContributionId(null);
+        navigation.navigate('ManualUpiPayment', {
+          amount: contrib.amount,
+          paymentType: 'sip_installment',
+          payloadData: {
+            sipId: sip._id,
+            contributionId: contrib._id,
+            installmentNumber: contrib.installmentNumber,
+          },
+          title: `SIP Installment #${contrib.installmentNumber} (${sip.sipId})`,
+          returnScreen: 'SIPDashboard',
+          existingOrderId: res.orderId,
+        });
+      };
 
-      const { orderId } = res;
+      const executeWalletPay = async () => {
+        setPayingContributionId(contrib._id);
+        try {
+          const wRes = await api.post('/wallet/pay', {
+            amount: contrib.amount,
+            paymentType: 'sip_installment',
+            payloadData: {
+              sipId: sip._id,
+              contributionId: contrib._id,
+              installmentNumber: contrib.installmentNumber,
+            },
+            title: `SIP Installment #${contrib.installmentNumber} (${sip.sipId})`,
+          });
+          setPayingContributionId(null);
+          if (wRes?.data?.success) {
+            showSuccess('Payment Successful! 🎉', `₹${contrib.amount.toLocaleString('en-IN')} debited from wallet for Installment #${contrib.installmentNumber}.`);
+            fetchSIPDetails();
+          } else {
+            showError('Payment Failed', wRes?.data?.message || 'Failed to process payment from wallet.');
+          }
+        } catch (err) {
+          setPayingContributionId(null);
+          showError('Payment Failed', err?.response?.data?.message || err.message || 'Wallet payment error.');
+        }
+      };
+
       setPayingContributionId(null);
 
-      navigation.navigate('ManualUpiPayment', {
-        amount: contrib.amount,
-        paymentType: 'sip_installment',
-        payloadData: {
-          sipId: sip._id,
-          contributionId: contrib._id,
-          installmentNumber: contrib.installmentNumber,
-        },
-        title: `SIP Installment #${contrib.installmentNumber} (${sip.sipId})`,
-        returnScreen: 'SIPDashboard',
-        existingOrderId: orderId,
-      });
-      return;
+      if (walletBal >= contrib.amount) {
+        Alert.alert(
+          'Choose Payment Method',
+          `Pay Installment #${contrib.installmentNumber} (₹${contrib.amount.toLocaleString('en-IN')}) from Growvest Wallet or Direct UPI?\n\nWallet Balance: ₹${walletBal.toLocaleString('en-IN')}`,
+          [
+            { text: 'Pay from Wallet (Instant)', onPress: executeWalletPay },
+            { text: 'Pay via UPI', onPress: executeUpiFlow },
+            { text: 'Cancel', style: 'cancel' },
+          ]
+        );
+      } else {
+        const deficit = Math.max(10, Math.ceil(contrib.amount - walletBal));
+        Alert.alert(
+          'Insufficient Wallet Balance',
+          `Your wallet balance is ₹${walletBal.toLocaleString('en-IN')}. You need ₹${deficit.toLocaleString('en-IN')} more to pay this installment.`,
+          [
+            {
+              text: `Add ₹${deficit.toLocaleString('en-IN')} to Wallet`,
+              onPress: () => {
+                navigation.navigate('ManualUpiPayment', {
+                  amount: deficit,
+                  paymentType: 'wallet_topup',
+                  payloadData: { amount: deficit },
+                  title: 'Wallet Top-Up',
+                  returnScreen: 'SIPDashboard',
+                });
+              },
+            },
+            { text: 'Pay via UPI', onPress: executeUpiFlow },
+            { text: 'Cancel', style: 'cancel' },
+          ]
+        );
+      }
     } catch (error) {
       setPayingContributionId(null);
       showError('Error', error?.message || 'Failed to initiate installment payment.');

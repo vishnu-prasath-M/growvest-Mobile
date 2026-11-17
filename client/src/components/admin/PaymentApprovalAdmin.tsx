@@ -254,6 +254,8 @@ export const PaymentApprovalAdmin = ({ token, onCountChange }: PaymentApprovalAd
       case "sip_initial":
       case "sip_installment":
         return "SIP Contribution";
+      case "wallet_topup":
+        return "Wallet Top-Up";
       default:
         return type.replace(/_/g, " ").toUpperCase();
     }

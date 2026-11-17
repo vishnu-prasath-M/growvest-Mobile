@@ -1131,3 +1131,139 @@ exports.getAdminSIPs = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch admin SIPs', error: error.message });
   }
 };
+
+// ─── Process Daily/Due SIP Autopay From User Wallets ─────────────────────────
+exports.processSipAutopayFromWallet = async (req, res) => {
+  try {
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
+    // Find all active SIPs with dues on or before today
+    const activeSIPs = await SIP.find({
+      status: 'active',
+      nextContributionDate: { $lte: endOfToday },
+    });
+
+    console.log(`[SIPAutopay] Processing autopay for ${activeSIPs.length} due SIPs...`);
+
+    let successCount = 0;
+    let failedCount = 0;
+    const results = [];
+
+    for (const sip of activeSIPs) {
+      // Find earliest pending installment
+      const contribution = await SIPContribution.findOne({
+        sipId: sip._id,
+        paymentStatus: 'pending',
+      }).sort({ installmentNumber: 1 });
+
+      if (!contribution) continue;
+
+      const installmentAmount = Math.round(Number(contribution.amount));
+
+      // Attempt atomic deduction from user wallet balance
+      const updatedUser = await User.findOneAndUpdate(
+        { _id: sip.userId, balance: { $gte: installmentAmount } },
+        { $inc: { balance: -installmentAmount } },
+        { new: true }
+      );
+
+      if (updatedUser) {
+        // Success: Mark contribution as paid via Wallet
+        const receiptId = `RCP-SIPA-${Date.now().toString().slice(-8)}`;
+        contribution.paymentStatus = 'paid';
+        contribution.paidAt = new Date();
+        contribution.paymentProvider = 'Growvest_Wallet';
+        contribution.receiptId = receiptId;
+        contribution.withdrawableAmount = installmentAmount;
+        await contribution.save();
+
+        // Update SIP record
+        sip.totalPaidAmount = (sip.totalPaidAmount || 0) + installmentAmount;
+        sip.contributionsCompleted = (sip.contributionsCompleted || 0) + 1;
+        sip.remainingContributions = Math.max(0, sip.totalContributions - sip.contributionsCompleted);
+
+        const nextPending = await SIPContribution.findOne({
+          sipId: sip._id,
+          paymentStatus: 'pending',
+        }).sort({ installmentNumber: 1 });
+
+        if (nextPending) {
+          sip.nextContributionDate = nextPending.dueDate;
+        } else {
+          sip.nextContributionDate = null;
+          if (sip.contributionsCompleted >= sip.totalContributions) {
+            sip.status = 'completed';
+          }
+        }
+        await sip.save();
+
+        // Create Transaction record
+        const Transaction = require('../models/Transaction');
+        await Transaction.create({
+          userId: sip.userId,
+          userEmail: sip.userEmail || `${sip.userName}@growvest.com`,
+          type: 'sip_deposit',
+          amount: installmentAmount,
+          status: 'paid',
+          referenceId: contribution._id,
+          referenceType: 'SIPContribution',
+          description: `SIP Autopay #${contribution.installmentNumber} paid from wallet (${sip.sipId})`,
+        });
+
+        // Send Push Notification
+        try {
+          const { sendNotification } = require('../services/notificationHelper');
+          await sendNotification({
+            userId: sip.userId,
+            title: '⚡ SIP Autopay Successful',
+            description: `₹${installmentAmount.toLocaleString('en-IN')} auto-debited from wallet for ${sip.sipId} (Installment #${contribution.installmentNumber}). Remaining balance: ₹${updatedUser.balance.toLocaleString('en-IN')}.`,
+            type: 'sip_deposit',
+            pushData: { screen: 'SIPDetails', sipId: sip._id.toString() },
+          });
+        } catch (e) {
+          console.warn('[SIPAutopay] Notif error:', e.message);
+        }
+
+        successCount++;
+        results.push({ sipId: sip.sipId, status: 'success', amount: installmentAmount });
+      } else {
+        // Insufficient wallet balance
+        failedCount++;
+        results.push({ sipId: sip.sipId, status: 'insufficient_balance', amount: installmentAmount });
+
+        try {
+          const { sendNotification } = require('../services/notificationHelper');
+          await sendNotification({
+            userId: sip.userId,
+            title: '⚠️ SIP Autopay Failed — Low Balance',
+            description: `Could not auto-debit ₹${installmentAmount.toLocaleString('en-IN')} for your daily SIP (${sip.sipId}). Please add money to your wallet to keep your SIP active!`,
+            type: 'sip_autopay_failed',
+            pushData: { screen: 'Wallet' },
+          });
+        } catch (e) {
+          console.warn('[SIPAutopay] Fail notif error:', e.message);
+        }
+      }
+    }
+
+    const summary = {
+      success: true,
+      processed: activeSIPs.length,
+      successCount,
+      failedCount,
+      results,
+    };
+
+    if (res) {
+      return res.status(200).json(summary);
+    }
+    return summary;
+  } catch (error) {
+    console.error('[SIPAutopay] Fatal error:', error);
+    if (res) {
+      return res.status(500).json({ success: false, message: 'SIP Autopay processing error', error: error.message });
+    }
+    return { success: false, error: error.message };
+  }
+};

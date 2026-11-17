@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,9 +14,11 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../../context/ThemeContext';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { colors } from '../../theme/theme';
+import api from '../../services/apiService';
 import { sipService } from '../../services/sipService';
 import { openRazorpayCheckout } from '../../services/razorpayHandler';
 import { useAlert } from '../../context/AlertContext';
@@ -88,6 +90,22 @@ const CreateSIPScreen = ({ navigation, route }) => {
 
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(0);
+
+  const fetchWallet = async () => {
+    try {
+      const res = await api.get('/wallet/balance').catch(() => null);
+      if (res && res.data && typeof res.data.balance === 'number') {
+        setWalletBalance(res.data.balance);
+      }
+    } catch (e) {}
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchWallet();
+    }, [])
+  );
 
   // Switch frequency
   const handleFrequencyChange = (freq) => {
@@ -182,7 +200,7 @@ const CreateSIPScreen = ({ navigation, route }) => {
     setShowConfirmModal(true);
   };
 
-  const handleConfirmAndPay = async () => {
+  const handleConfirmAndPay = async (payMethod = 'auto') => {
     try {
       setSubmitting(true);
       setShowConfirmModal(false);
@@ -207,6 +225,37 @@ const CreateSIPScreen = ({ navigation, route }) => {
       }
 
       const { sip, firstContribution, orderId } = res.data;
+
+      // 2. If user has sufficient wallet balance, pay immediately from wallet!
+      if (payMethod !== 'upi' && walletBalance >= currentAmount) {
+        const walletPayRes = await api.post('/wallet/pay', {
+          amount: currentAmount,
+          paymentType: 'sip_initial',
+          payloadData: {
+            sipId: sip._id,
+            contributionId: firstContribution?._id,
+            installmentNumber: 1,
+          },
+          title: `SIP Initial Contribution (${sip.sipId})`,
+        });
+
+        if (walletPayRes?.data?.success) {
+          setSubmitting(false);
+          Alert.alert(
+            'SIP Activated Successfully! 🎉',
+            `₹${currentAmount.toLocaleString('en-IN')} paid directly from your Growvest Wallet! Daily installments will automatically be debited from your wallet.`,
+            [
+              {
+                text: 'View SIP Dashboard',
+                onPress: () => navigation.navigate('SIPDashboard'),
+              },
+            ]
+          );
+          return;
+        }
+      }
+
+      // 3. Otherwise navigate to manual UPI screen
       setSubmitting(false);
       setShowConfirmModal(false);
 
@@ -634,9 +683,29 @@ const CreateSIPScreen = ({ navigation, route }) => {
               </View>
             </View>
 
-            <Text style={styles.mandateNotice}>
-              Each upcoming SIP contribution will require payment through your preferred UPI / Netbanking method on the due date.
-            </Text>
+            <View style={{
+              backgroundColor: walletBalance >= currentAmount ? 'rgba(5, 150, 105, 0.08)' : 'rgba(217, 119, 6, 0.08)',
+              borderRadius: 14,
+              padding: 12,
+              marginBottom: 14,
+              borderWidth: 1,
+              borderColor: walletBalance >= currentAmount ? '#A7F3D0' : '#FDE68A',
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <MaterialCommunityIcons name="wallet-outline" size={18} color={walletBalance >= currentAmount ? '#059669' : '#D97706'} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: themeColors.text }}>Growvest Wallet</Text>
+                </View>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: walletBalance >= currentAmount ? '#059669' : '#D97706' }}>
+                  ₹{walletBalance.toLocaleString('en-IN')}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 11.5, color: themeColors.textSecondary, lineHeight: 16 }}>
+                {walletBalance >= currentAmount
+                  ? '⚡ Contribution #1 will be paid from wallet. Daily installments will automatically be debited from your wallet balance.'
+                  : `⚠️ Wallet balance is low (Need ₹${(currentAmount - walletBalance).toLocaleString('en-IN')} more). You can pay via UPI now and top up wallet for daily autopay.`}
+              </Text>
+            </View>
 
             <View style={styles.modalBtnRow}>
               <TouchableOpacity
@@ -649,9 +718,11 @@ const CreateSIPScreen = ({ navigation, route }) => {
               <TouchableOpacity
                 style={styles.modalConfirmBtn}
                 activeOpacity={0.85}
-                onPress={handleConfirmAndPay}
+                onPress={() => handleConfirmAndPay(walletBalance >= currentAmount ? 'wallet' : 'upi')}
               >
-                <Text style={styles.modalConfirmBtnText}>Pay Contribution #1</Text>
+                <Text style={styles.modalConfirmBtnText}>
+                  {walletBalance >= currentAmount ? `Pay ₹${currentAmount.toLocaleString('en-IN')} from Wallet` : 'Pay via UPI'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

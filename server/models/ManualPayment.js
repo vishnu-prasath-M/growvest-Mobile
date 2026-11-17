@@ -17,7 +17,7 @@ const manualPaymentSchema = new mongoose.Schema(
     paymentType: {
       type: String,
       required: true,
-      enum: ['investment', 'chit_join', 'chit_payment', 'pocket_money', 'sip_initial', 'sip_installment'],
+      enum: ['investment', 'chit_join', 'chit_payment', 'pocket_money', 'sip_initial', 'sip_installment', 'wallet_topup'],
     },
     amount: {
       type: Number,

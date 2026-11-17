@@ -329,6 +329,7 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const pocketMoneyRoutes = require('./routes/pocketMoneyRoutes');
 const referralRoutes = require('./routes/referralRoutes');
+const walletRoutes = require('./routes/walletRoutes');
 const sipRoutes = require('./routes/sipRoutes');
 const bannerRoutes = require('./routes/bannerRoutes');
 const SIP = require('./models/SIP');
@@ -398,6 +399,10 @@ cron.schedule("30 8 * * *", async () => {
       }
     }
     console.log(`SIP Cron Finished: Sent ${reminderCount} SIP reminders.`);
+
+    // Run Daily SIP Autopay from Wallets
+    const sipController = require('./controllers/sipController');
+    await sipController.processSipAutopayFromWallet();
   } catch (error) {
     console.error("SIP Reminder Cron Error:", error);
   }
@@ -418,7 +423,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/pocket-money', pocketMoneyRoutes);
 app.use('/api/referral', referralRoutes);
-app.use('/api/wallet', referralRoutes);
+app.use('/api/wallet', walletRoutes);
 app.use('/api/sip', sipRoutes);
 app.use('/api/cron', cronRoutes);
 app.use('/api/banners', bannerRoutes);

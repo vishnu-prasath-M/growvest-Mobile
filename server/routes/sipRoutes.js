@@ -6,6 +6,7 @@ const sipController = require('../controllers/sipController');
 // User routes
 router.post('/create', protect, sipController.createSIP);
 router.post('/verify-payment', protect, sipController.verifyPayment);
+router.post('/autopay/process', protect, sipController.processSipAutopayFromWallet);
 router.get('/my', protect, sipController.getMySIPs);
 router.get('/:id', protect, sipController.getSIPById);
 router.post('/pay-installment', protect, sipController.payInstallment);
