@@ -364,7 +364,11 @@ exports.verifyPayment = async (req, res) => {
       clientIsSimulated ||
       effectiveOrderId.startsWith('order_sim_') ||
       effectiveOrderId.startsWith('ORD_SIM_') ||
-      (razorpay_signature && razorpay_signature.startsWith('simulated_'));
+      effectiveOrderId.startsWith('WAL_') ||
+      effectiveOrderId.startsWith('UPI_') ||
+      effectiveOrderId.startsWith('MANUAL_') ||
+      (razorpay_signature && razorpay_signature.startsWith('simulated_')) ||
+      (razorpay_signature && razorpay_signature.includes('WALLET'));
 
     if (!isSimulated) {
       const statusRes = await cashfreeService.checkOrderStatus(effectiveOrderId);

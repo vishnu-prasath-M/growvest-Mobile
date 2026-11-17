@@ -335,29 +335,28 @@ exports.payFromWallet = async (req, res) => {
       });
     }
 
-    // Record Transaction
-    const Transaction = require('../models/Transaction');
     const orderId = `WAL_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
     const paymentId = `WAL_PAY_${Date.now()}`;
 
-    const tx = await Transaction.create({
-      userId,
-      userEmail: updatedUser.email || `${updatedUser.username || 'user'}@growvest.com`,
-      type: 'wallet_debit',
-      amount: numAmount,
-      status: 'paid',
-      description: `Paid ₹${numAmount.toLocaleString('en-IN')} from wallet for ${title || paymentType}`,
-    });
-
-    // Execute business logic through centralized helper
+    // Execute business logic through centralized helper with automatic rollback on error
     const paymentController = require('./paymentController');
-    const result = await paymentController.processSuccessfulOrder(
-      orderId,
-      paymentId,
-      updatedUser,
-      paymentType,
-      payloadData
-    );
+    let result = null;
+    try {
+      result = await paymentController.processSuccessfulOrder(
+        orderId,
+        paymentId,
+        updatedUser,
+        paymentType,
+        payloadData
+      );
+    } catch (execErr) {
+      console.error('[payFromWallet] Process error, rolling back balance:', execErr);
+      await User.findByIdAndUpdate(userId, { $inc: { balance: numAmount } });
+      return res.status(500).json({
+        success: false,
+        message: execErr.message || 'Failed to complete order. Your wallet balance has been refunded.',
+      });
+    }
 
     // Send in-app notification
     try {
@@ -377,7 +376,6 @@ exports.payFromWallet = async (req, res) => {
       message: 'Payment completed successfully from wallet!',
       balance: updatedUser.balance,
       orderId,
-      transactionId: tx._id,
       data: result?.data,
     });
   } catch (error) {

@@ -746,22 +746,24 @@ async function processSuccessfulOrder(orderId, utr, fallbackUser = null, fallbac
   const paymentType = pending?.paymentType || fallbackPaymentType || 'investment';
   const payloadData = pending?.payloadData || fallbackPayloadData || {};
   const paymentId = utr || `UTR_${Date.now()}`;
-  const signature = `VERIFIED_CASHFREE_${orderId}`;
+  const isWallet = (orderId && String(orderId).startsWith('WAL_')) || (paymentId && String(paymentId).startsWith('WAL_'));
+  const provider = isWallet ? 'Growvest_Wallet' : 'Manual_UPI';
+  const signature = `VERIFIED_${provider.toUpperCase()}_${orderId}`;
 
-  console.log(`[PaymentProcess] Completing: order=${orderId}, type=${paymentType}, user=${user._id}`);
+  console.log(`[PaymentProcess] Completing: order=${orderId}, type=${paymentType}, user=${user._id}, provider=${provider}`);
 
   let result = null;
   if (paymentType === 'investment') {
-    result = await completeInvestment(user, payloadData, orderId, paymentId, signature, 'Cashfree');
+    result = await completeInvestment(user, payloadData, orderId, paymentId, signature, provider);
     await triggerReferralRewardOnInvestment(user._id, result?._id).catch(() => {});
   } else if (paymentType === 'chit_join') {
-    result = await completeChitJoin(user, payloadData, orderId, paymentId, signature, 'Cashfree');
+    result = await completeChitJoin(user, payloadData, orderId, paymentId, signature, provider);
     await triggerReferralRewardOnInvestment(user._id, result?.member?._id || result?._id).catch(() => {});
   } else if (paymentType === 'chit_payment') {
-    result = await completeMonthlyDue(user, payloadData, orderId, paymentId, signature, 'Cashfree');
+    result = await completeMonthlyDue(user, payloadData, orderId, paymentId, signature, provider);
     await triggerReferralRewardOnInvestment(user._id, result?._id).catch(() => {});
   } else if (paymentType === 'pocket_money') {
-    result = await completePocketMoney(user, payloadData, orderId, paymentId, signature, 'Cashfree');
+    result = await completePocketMoney(user, payloadData, orderId, paymentId, signature, provider);
     await triggerReferralRewardOnInvestment(user._id, result?._id).catch(() => {});
   } else if (paymentType === 'sip_initial' || paymentType === 'sip_installment') {
     const sipController = require('./sipController');
@@ -772,7 +774,7 @@ async function processSuccessfulOrder(orderId, utr, fallbackUser = null, fallbac
         razorpay_payment_id: paymentId,
         razorpay_signature: signature,
         utr: paymentId,
-        isSimulated: false,
+        isSimulated: isWallet ? true : false,
         sipId: payloadData?.sipId,
         contributionId: payloadData?.contributionId,
         installmentNumber: payloadData?.installmentNumber,

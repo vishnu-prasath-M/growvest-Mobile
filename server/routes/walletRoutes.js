@@ -15,3 +15,4 @@ router.post('/withdraw-coins', protect, walletController.requestCoinWithdrawal);
 router.put('/admin/threshold', protect, admin, walletController.setRewardWithdrawalThreshold);
 
 module.exports = router;
+
