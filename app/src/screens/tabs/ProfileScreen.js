@@ -31,6 +31,7 @@ import { appLockService } from '../../services/appLockService';
 import { useAlert } from '../../context/AlertContext';
 import { useAppUpdate } from '../../context/AppUpdateContext';
 import SmoothToggle from '../../components/SmoothToggle';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ProfileScreen = ({ navigation }) => {
   const { isDarkMode, toggleTheme, colors: themeColors } = useTheme();
@@ -42,6 +43,7 @@ const ProfileScreen = ({ navigation }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const styles = React.useMemo(() => getStyles(themeColors, isDarkMode, insets), [themeColors, isDarkMode, insets]);
   const [userData, setUserData] = useState(null);
+  const [walletBalance, setWalletBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [personalInfoModalVisible, setPersonalInfoModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -64,12 +66,35 @@ const ProfileScreen = ({ navigation }) => {
 
   const fetchUserData = async () => {
     try {
+      const cachedWallet = await AsyncStorage.getItem('cached_wallet_balance');
+      if (cachedWallet != null) setWalletBalance(Number(cachedWallet) || 0);
+    } catch (_) {}
+
+    try {
       const user = await authService.refreshUserProfile();
-      if (user) { await updateUser(user); setUserData(user); setLoading(false); return; }
+      if (user) {
+        await updateUser(user);
+        setUserData(user);
+        if (user.balance !== undefined) setWalletBalance(Number(user.balance) || 0);
+      }
     } catch (error) { console.error('Error fetching user profile from API:', error); }
+
+    try {
+      const api = (await import('../../services/apiService')).default;
+      const walletRes = await api.get('/wallet/overview');
+      if (walletRes.data) {
+        const bal = Number(walletRes.data.cashBalance ?? walletRes.data.balance) || 0;
+        setWalletBalance(bal);
+        AsyncStorage.setItem('cached_wallet_balance', String(bal)).catch(() => {});
+      }
+    } catch (walletErr) {
+      // ignore
+    }
+
     try {
       const cachedUser = await authService.getUserData();
       setUserData(cachedUser);
+      if (cachedUser?.balance !== undefined) setWalletBalance(Number(cachedUser.balance) || 0);
     } catch (error) { console.error('Error fetching cached user data:', error); }
     finally { setLoading(false); }
   };
@@ -308,6 +333,22 @@ const ProfileScreen = ({ navigation }) => {
             <Text style={styles.profileName}>{activeUserObj?.name || activeUserObj?.username || 'User'}</Text>
             <MaterialCommunityIcons name="check-decagram" size={18} color={colors.primary} />
           </View>
+
+          {/* Quick Wallet Button nearby user name */}
+          <TouchableOpacity
+            style={styles.walletQuickBtn}
+            onPress={() => navigation.navigate('Wallet')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.walletIconCircle}>
+              <MaterialCommunityIcons name="wallet-outline" size={16} color="#10B981" />
+            </View>
+            <Text style={styles.walletQuickLabel}>Growvest Wallet</Text>
+            <View style={styles.walletBalanceBadge}>
+              <Text style={styles.walletBalanceText}>₹{(walletBalance || 0).toLocaleString('en-IN')}</Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={16} color={themeColors.textMuted} />
+          </TouchableOpacity>
         </View>
 
         {/* Stats Row */}
@@ -330,6 +371,26 @@ const ProfileScreen = ({ navigation }) => {
           <View style={styles.menuGroup}>
             <Text style={styles.menuGroupLabel}>ACCOUNT</Text>
             <View style={styles.menuCard}>
+              {/* Growvest Wallet */}
+              <TouchableOpacity
+                style={styles.menuRow}
+                activeOpacity={0.7}
+                onPress={() => navigation.navigate('Wallet')}
+              >
+                <View style={[styles.mintIconBox, { backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.2)' : '#D1FAE5' }]}>
+                  <MaterialCommunityIcons name="wallet-outline" size={20} color="#10B981" />
+                </View>
+                <Text style={styles.menuLabel}>Growvest Wallet</Text>
+                <View style={[styles.menuBadge, { backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.18)' : '#ECFDF5' }]}>
+                  <Text style={[styles.menuBadgeText, { color: '#10B981', fontWeight: '800' }]}>
+                    ₹{(walletBalance || 0).toLocaleString('en-IN')}
+                  </Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={20} color={styles.chevronColor.color} />
+              </TouchableOpacity>
+
+              <View style={styles.menuDivider} />
+
               {/* Personal Information */}
               <TouchableOpacity
                 style={styles.menuRow}
@@ -788,6 +849,42 @@ const getStyles = (themeColors, isDarkMode, insets = { top: 0 }) => StyleSheet.c
 
   // Name
   nameSection: { alignItems: 'center', paddingHorizontal: 24, marginTop: 12 },
+  walletQuickBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.12)' : '#ECFDF5',
+    borderWidth: 1,
+    borderColor: isDarkMode ? 'rgba(16, 185, 129, 0.3)' : '#A7F3D0',
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    marginTop: 10,
+    gap: 8,
+  },
+  walletIconCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.25)' : '#D1FAE5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  walletQuickLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: isDarkMode ? '#34D399' : '#059669',
+  },
+  walletBalanceBadge: {
+    backgroundColor: isDarkMode ? '#064E3B' : '#10B981',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  walletBalanceText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   profileName: { fontSize: 22, fontWeight: '800', color: themeColors.text, letterSpacing: -0.5 },
   profileMeta: { fontSize: 13, color: themeColors.textMuted, marginTop: 4, textAlign: 'center' },

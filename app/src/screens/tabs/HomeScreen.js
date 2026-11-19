@@ -945,10 +945,7 @@ const HomeScreen = ({ navigation }) => {
                 onPress={() => navigation.navigate('Wallet')}
                 activeOpacity={0.8}
               >
-                <MaterialCommunityIcons name="wallet-outline" size={17} color="#D4AF37" />
-                <Text style={styles.walletCoinText}>
-                  ₹{(walletBalance || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-                </Text>
+                <Text style={styles.walletCoinText}>🪙 {coinsBalance} Coins</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.notifBtn}
