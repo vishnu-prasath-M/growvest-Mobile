@@ -8,6 +8,7 @@ const { sendNotification, notifyAdmins } = require('../services/notificationHelp
 const crypto = require('crypto');
 const cashfreeService = require('../services/cashfreeService');
 const PendingPayment = require('../models/PendingPayment');
+const PlatformCharge = require('../models/PlatformCharge');
 
 // ============================================================================
 // === PREVIOUS STARPE PAYMENT GATEWAY (COMMENTED OUT AS REQUESTED) ===========
@@ -616,6 +617,10 @@ const calculateSIPInterest = (sip, contributions = []) => {
     accruedInterest: Number(accruedInterest.toFixed(2)),
     availableToWithdraw,
     currentValue,
+    balanceAmount: activePrincipal,
+    activeBalance: activePrincipal,
+    totalPaidAmount: totalPaid,
+    dailyRatePercent: Number((dailyRate * 100).toFixed(4)),
   };
 };
 
@@ -973,6 +978,20 @@ exports.cancelSIP = async (req, res) => {
       return res.status(400).json({ message: 'Completed SIP plans cannot be cancelled.' });
     }
 
+    // Calculate cancellation penalty based on platform charges
+    let penaltyPercent = 0;
+    let penaltyAmount = 0;
+    try {
+      const chargeDoc = await PlatformCharge.getSingleton();
+      const effectiveCharges = chargeDoc.getEffectiveCharges();
+      penaltyPercent = Number(effectiveCharges.sip?.cancelPenalty) || 0;
+      if (penaltyPercent > 0 && sip.totalPaidAmount > 0) {
+        penaltyAmount = Number(((sip.totalPaidAmount * penaltyPercent) / 100).toFixed(2));
+      }
+    } catch (e) {
+      console.warn('Could not compute platform charge penalty:', e.message);
+    }
+
     // 1. Mark future pending contributions as cancelled (preserve paid history)
     await SIPContribution.updateMany(
       { sipId: sip._id, paymentStatus: 'pending' },
@@ -982,14 +1001,17 @@ exports.cancelSIP = async (req, res) => {
     // 2. Set SIP status to cancelled
     sip.status = 'cancelled';
     sip.nextContributionDate = null;
+    sip.cancelPenaltyPercent = penaltyPercent;
+    sip.cancelPenaltyApplied = penaltyAmount;
     await sip.save();
 
     // 3. Send Notification
     try {
+      const penaltyNote = penaltyAmount > 0 ? ` (Cancellation penalty of ${penaltyPercent}% / ₹${penaltyAmount} applied).` : ` (0% cancellation penalty applied under launch offer).`;
       await sendNotification({
         userId,
         title: 'SIP Cancelled',
-        description: `Your SIP plan ${sip.sipId} has been cancelled. Your past contributions of ₹${sip.totalPaidAmount.toLocaleString('en-IN')} remain safe in your portfolio.`,
+        description: `Your SIP plan ${sip.sipId} has been cancelled.${penaltyNote} Your remaining paid balance of ₹${Math.max(0, sip.totalPaidAmount - penaltyAmount).toLocaleString('en-IN')} remains safe in your portfolio.`,
         type: 'general',
       });
     } catch (e) {}
@@ -998,6 +1020,9 @@ exports.cancelSIP = async (req, res) => {
       success: true,
       message: 'SIP cancelled successfully. Future scheduled contributions stopped.',
       data: sip,
+      penaltyPercent,
+      penaltyAmount,
+      remainingBalance: Math.max(0, sip.totalPaidAmount - penaltyAmount),
     });
   } catch (error) {
     console.error('[SIPController] Cancel SIP error:', error);

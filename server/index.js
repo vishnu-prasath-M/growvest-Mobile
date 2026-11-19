@@ -332,6 +332,7 @@ const referralRoutes = require('./routes/referralRoutes');
 const walletRoutes = require('./routes/walletRoutes');
 const sipRoutes = require('./routes/sipRoutes');
 const bannerRoutes = require('./routes/bannerRoutes');
+const chargeRoutes = require('./routes/chargeRoutes');
 const SIP = require('./models/SIP');
 const SIPContribution = require('./models/SIPContribution');
 
@@ -427,6 +428,7 @@ app.use('/api/wallet', walletRoutes);
 app.use('/api/sip', sipRoutes);
 app.use('/api/cron', cronRoutes);
 app.use('/api/banners', bannerRoutes);
+app.use('/api/charges', chargeRoutes);
 
 // Admin manual trigger — calls the same cron functions as GitHub Actions
 const { protect, admin } = require('./middleware/authMiddleware');

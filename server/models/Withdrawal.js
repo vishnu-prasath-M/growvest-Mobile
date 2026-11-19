@@ -51,6 +51,17 @@ const withdrawalSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  commissionPercent: {
+    type: Number,
+    default: 0,
+  },
+  commissionAmount: {
+    type: Number,
+    default: 0,
+  },
+  netPayoutAmount: {
+    type: Number,
+  },
   date: {
     type: String, // String for easier display on frontend matching previous logic
   }

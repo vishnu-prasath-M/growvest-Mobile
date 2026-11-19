@@ -45,6 +45,17 @@ const SIPDetailsScreen = ({ route, navigation }) => {
   // Cancel state
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [platformCharges, setPlatformCharges] = useState(null);
+
+  const loadPlatformCharges = async () => {
+    try {
+      const api = (await import('../../services/apiService')).default;
+      const res = await api.get('/charges');
+      if (res?.data?.charges) {
+        setPlatformCharges(res.data.charges);
+      }
+    } catch (_) {}
+  };
 
   // Installment payment state
   const [payingContributionId, setPayingContributionId] = useState(null);
@@ -67,6 +78,7 @@ const SIPDetailsScreen = ({ route, navigation }) => {
   useFocusEffect(
     useCallback(() => {
       loadSIPDetails();
+      loadPlatformCharges();
     }, [sipId, sipRefId])
   );
 
@@ -384,7 +396,50 @@ const SIPDetailsScreen = ({ route, navigation }) => {
 
         {/* Plan Parameters Card */}
         <View style={styles.card}>
-          <Text style={styles.cardSectionTitle}>Plan Breakdown</Text>
+          <Text style={styles.cardSectionTitle}>Balance & Interest Breakdown</Text>
+          {/* Active Balance & Daily Interest Calculation */}
+          <View style={styles.balanceHighlightCard}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.balanceHighlightLabel}>CURRENT ACTIVE BALANCE</Text>
+              <Text style={styles.balanceHighlightAmount}>
+                {formatCurrency(sip.balanceAmount || sip.totalPaidAmount || 0)}
+              </Text>
+              <Text style={styles.balanceHighlightSub}>
+                Daily return calculated on this balance
+              </Text>
+            </View>
+            <View style={styles.dailyReturnPill}>
+              <MaterialCommunityIcons name="trending-up" size={14} color="#059669" />
+              <Text style={styles.dailyReturnPillText}>
+                +{formatCurrency(sip.dailyInterest || 0)}/day
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>Invested Balance Amount</Text>
+            <Text style={[styles.breakdownValue, { fontWeight: '800', color: '#085428' }]}>
+              {formatCurrency(sip.balanceAmount || sip.totalPaidAmount || 0)}
+            </Text>
+          </View>
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>Daily Interest on Balance (26% p.a.)</Text>
+            <Text style={[styles.breakdownValue, { color: '#059669', fontWeight: '800' }]}>
+              +{formatCurrency(sip.dailyInterest || 0)}/day
+            </Text>
+          </View>
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>Accrued Interest Earned</Text>
+            <Text style={[styles.breakdownValue, { color: '#059669', fontWeight: '800' }]}>
+              +{formatCurrency(sip.interestEarned || 0)}
+            </Text>
+          </View>
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>Current Value (Balance + Return)</Text>
+            <Text style={[styles.breakdownValue, { color: '#085428', fontWeight: '800' }]}>
+              {formatCurrency(sip.currentValue || ((Number(sip.totalPaidAmount) || 0) + (Number(sip.interestEarned) || 0)))}
+            </Text>
+          </View>
           <View style={styles.breakdownRow}>
             <Text style={styles.breakdownLabel}>Frequency</Text>
             <Text style={[styles.breakdownValue, { textTransform: 'capitalize' }]}>
@@ -666,8 +721,35 @@ const SIPDetailsScreen = ({ route, navigation }) => {
 
             <Text style={styles.modalTitle}>Cancel this SIP?</Text>
             <Text style={styles.modalSubtitle}>
-              Cancelling will stop all future scheduled contributions for {sip.sipId}. Your already invested amount of {formatCurrency(sip.totalPaidAmount)} remains completely safe in your portfolio.
+              Cancelling will stop all future scheduled contributions for {sip.sipId}.
             </Text>
+
+            {/* Launch Offer 0% vs Standard Cancel Penalty Warning */}
+            {platformCharges?.sip?.cancelPenalty === 0 || platformCharges?.isPromotionalLaunchOffer ? (
+              <View style={styles.cancelPenaltyNoticeBox}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <MaterialCommunityIcons name="gift-outline" size={16} color="#059669" />
+                  <Text style={[styles.cancelPenaltyNoticeTitle, { color: '#059669' }]}>
+                    0% Launch Offer Active
+                  </Text>
+                </View>
+                <Text style={styles.cancelPenaltyNoticeDesc}>
+                  Special launch period: 0% cancellation penalty applied (Normally 15%). Your full balance of {formatCurrency(sip.totalPaidAmount)} remains 100% safe.
+                </Text>
+              </View>
+            ) : (
+              <View style={[styles.cancelPenaltyNoticeBox, { backgroundColor: '#FEF2F2', borderColor: '#FCA5A5' }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#DC2626" />
+                  <Text style={[styles.cancelPenaltyNoticeTitle, { color: '#DC2626' }]}>
+                    Early Cancellation Penalty ({platformCharges?.sip?.cancelPenalty || 15}%)
+                  </Text>
+                </View>
+                <Text style={[styles.cancelPenaltyNoticeDesc, { color: '#991B1B' }]}>
+                  Cancelling early incurs a {platformCharges?.sip?.cancelPenalty || 15}% penalty (-₹{(((Number(sip.totalPaidAmount) || 0) * (platformCharges?.sip?.cancelPenalty || 15)) / 100).toFixed(2)}) as per platform rules.
+                </Text>
+              </View>
+            )}
 
             <View style={styles.modalBtnRow}>
               <TouchableOpacity
@@ -843,6 +925,67 @@ const getStyles = (themeColors, isDark) =>
       marginBottom: 16,
       borderWidth: 1,
       borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#E2E8F0',
+    },
+    balanceHighlightCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : '#ECFDF5',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(16, 185, 129, 0.25)' : '#A7F3D0',
+      borderRadius: 14,
+      padding: 14,
+      marginBottom: 14,
+    },
+    balanceHighlightLabel: {
+      fontSize: 10,
+      fontWeight: '800',
+      letterSpacing: 0.6,
+      color: isDark ? '#34D399' : '#059669',
+      marginBottom: 2,
+    },
+    balanceHighlightAmount: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: isDark ? '#FFFFFF' : '#064E3B',
+    },
+    balanceHighlightSub: {
+      fontSize: 10.5,
+      color: isDark ? '#94A3B8' : '#64748B',
+      marginTop: 2,
+    },
+    dailyReturnPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : '#D1FAE5',
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 10,
+    },
+    dailyReturnPillText: {
+      fontSize: 12,
+      fontWeight: '800',
+      color: '#059669',
+    },
+    cancelPenaltyNoticeBox: {
+      backgroundColor: '#ECFDF5',
+      borderWidth: 1,
+      borderColor: '#A7F3D0',
+      borderRadius: 12,
+      padding: 12,
+      marginVertical: 12,
+      width: '100%',
+    },
+    cancelPenaltyNoticeTitle: {
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    cancelPenaltyNoticeDesc: {
+      fontSize: 11,
+      color: '#064E3B',
+      marginTop: 4,
+      lineHeight: 16,
     },
     cardSectionTitle: {
       fontSize: 15,

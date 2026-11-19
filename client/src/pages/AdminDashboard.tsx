@@ -37,6 +37,8 @@ import SIPAdmin from "@/components/admin/SIPAdmin";
 import KYCAdmin from "@/components/admin/KYCAdmin";
 import ReferralAdmin from "@/components/admin/ReferralAdmin";
 import { AdBannerAdmin } from "@/components/admin/AdBannerAdmin";
+import { ChargesAdmin } from "@/components/admin/ChargesAdmin";
+import { Percent } from "lucide-react";
 import { PaymentApprovalAdmin } from "@/components/admin/PaymentApprovalAdmin";
 import { Image as ImageIcon, CreditCard } from "lucide-react";
 import { Gift, Bell, RefreshCw } from "lucide-react";
@@ -141,7 +143,7 @@ const getUPIDeepLink = (
   return `upi://pay?${query}`;
 };
 
-type AdminTab = "overview" | "payment_approvals" | "ad_banners" | "pending" | "users" | "withdrawals" | "kyc" | "chits" | "sip" | "settings" | "pocket" | "referral" | "push_test";
+type AdminTab = "overview" | "payment_approvals" | "charges" | "ad_banners" | "pending" | "users" | "withdrawals" | "kyc" | "chits" | "sip" | "settings" | "pocket" | "referral" | "push_test";
 
 const AdminDashboard = () => {
   const { user: authUser, token, logout } = useAuth();
@@ -1377,6 +1379,18 @@ const AdminDashboard = () => {
                   );
                 }}
               />
+            </motion.div>
+          )}
+
+          {/* ── PLATFORM CHARGES ── */}
+          {activeTab === "charges" && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="w-full"
+            >
+              <ChargesAdmin token={token} />
             </motion.div>
           )}
 

@@ -111,6 +111,14 @@ const sipSchema = new mongoose.Schema({
   notes: {
     type: String,
   },
+  cancelPenaltyApplied: {
+    type: Number,
+    default: 0,
+  },
+  cancelPenaltyPercent: {
+    type: Number,
+    default: 0,
+  },
 }, { timestamps: true });
 
 // Compound indexes for user listing and due processing

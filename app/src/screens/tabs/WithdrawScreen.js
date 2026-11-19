@@ -92,6 +92,17 @@ const WithdrawScreen = ({ navigation }) => {
   const [amount, setAmount] = useState('');
   const [upiId, setUpiId] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
+  const [platformCharges, setPlatformCharges] = useState(null);
+
+  const fetchPlatformCharges = async () => {
+    try {
+      const api = (await import('../../services/apiService')).default;
+      const res = await api.get('/charges');
+      if (res?.data?.charges) {
+        setPlatformCharges(res.data.charges);
+      }
+    } catch (_) {}
+  };
   const [selectedChitId, setSelectedChitId] = useState(null);
   const [emailRequiredModalVisible, setEmailRequiredModalVisible] = useState(false);
   const [investments, setInvestments] = useState([]);
@@ -282,6 +293,7 @@ const WithdrawScreen = ({ navigation }) => {
   useFocusEffect(
     useCallback(() => {
       fetchUserData();
+      fetchPlatformCharges();
     }, [])
   );
 
@@ -1249,6 +1261,53 @@ const WithdrawScreen = ({ navigation }) => {
               />
             </View>
 
+            {/* Transparent Platform Commission Breakdown */}
+            {(() => {
+              const isLaunch = platformCharges?.isPromotionalLaunchOffer !== false;
+              let commPct = 0;
+              if (!isLaunch && platformCharges) {
+                if (activeCategory === 'chit') {
+                  commPct = Number(platformCharges.chitFund?.withdrawCommission) || 0;
+                } else if (activeCategory === 'sip') {
+                  commPct = Number(platformCharges.sip?.withdrawCommission) || 0;
+                } else {
+                  commPct = Number(platformCharges.investmentPlans?.[0]?.processingCharge) || 0;
+                }
+              }
+              const numAmt = Number(amount) || (selectedChitPayout || 0);
+              const commAmt = commPct > 0 ? (numAmt * commPct) / 100 : 0;
+              const netAmt = Math.max(0, numAmt - commAmt);
+
+              return (
+                <View style={styles.chargeBreakdownCard}>
+                  <View style={styles.chargeRow}>
+                    <Text style={styles.chargeLabel}>Gross Amount</Text>
+                    <Text style={styles.chargeVal}>{formatCurrency(numAmt)}</Text>
+                  </View>
+                  <View style={styles.chargeRow}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={styles.chargeLabel}>Withdrawal Commission</Text>
+                      {commPct === 0 && (
+                        <View style={styles.launchOfferPill}>
+                          <Text style={styles.launchOfferPillText}>0% Launch Offer</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={[styles.chargeVal, { color: commPct === 0 ? '#10B981' : themeColors.text }]}>
+                      {commPct === 0 ? '₹0.00 (Free)' : `-₹${commAmt.toFixed(2)} (${commPct}%)`}
+                    </Text>
+                  </View>
+                  <View style={styles.chargeDivider} />
+                  <View style={styles.chargeRow}>
+                    <Text style={[styles.chargeLabel, { fontWeight: '700', color: themeColors.text }]}>Net Payout to Bank/UPI</Text>
+                    <Text style={[styles.chargeVal, { fontWeight: '800', color: '#10B981', fontSize: 16 }]}>
+                      {formatCurrency(netAmt)}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })()}
+
             {/* Actions */}
             <View style={styles.modalActions}>
               <TouchableOpacity
@@ -1760,6 +1819,46 @@ const getStyles = (themeColors, isDarkMode) => StyleSheet.create({
     borderWidth: 1.5, borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#ECEFE6', gap: 8,
   },
   upiInput: { flex: 1, fontSize: 14, color: themeColors.text, padding: 0 },
+  chargeBreakdownCard: {
+    backgroundColor: isDarkMode ? 'rgba(255,255,255,0.04)' : '#F8FAFC',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#E2E8F0',
+    padding: 14,
+    marginTop: 14,
+    marginBottom: 6,
+    gap: 8,
+  },
+  chargeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  chargeLabel: {
+    fontSize: 12,
+    color: themeColors.textMuted,
+  },
+  chargeVal: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: themeColors.text,
+  },
+  chargeDivider: {
+    height: 1,
+    backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#E2E8F0',
+    marginVertical: 4,
+  },
+  launchOfferPill: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  launchOfferPillText: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: '#059669',
+  },
   modalActions: { flexDirection: 'row', gap: 12, marginTop: 22 },
   cancelBtn: {
     flex: 1, height: 50, borderRadius: 14,
