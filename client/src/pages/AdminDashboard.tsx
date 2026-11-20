@@ -240,6 +240,7 @@ const AdminDashboard = () => {
     { label: "Chit Funds", tab: "chits", icon: TrendingUp, badge: 0 },
     { label: "Pocket Money", tab: "pocket", icon: Wallet },
     { label: "SIP Investments", tab: "sip", icon: RefreshCw },
+    { label: "Platform Charges & Commission", tab: "charges", icon: Percent },
     { label: "Referral & APK", tab: "referral", icon: Gift },
     { label: "Push Notifications", tab: "push_test", icon: Bell },
     { label: "Settings", tab: "settings", icon: Settings },

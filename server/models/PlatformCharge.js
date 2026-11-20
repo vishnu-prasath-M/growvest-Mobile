@@ -150,3 +150,4 @@ platformChargeSchema.methods.getEffectiveCharges = function () {
 };
 
 module.exports = mongoose.model('PlatformCharge', platformChargeSchema);
+

@@ -12,3 +12,4 @@ router.put('/admin', protect, adminOnly, chargeController.updateAdminCharges);
 router.patch('/admin', protect, adminOnly, chargeController.updateAdminCharges);
 
 module.exports = router;
+
