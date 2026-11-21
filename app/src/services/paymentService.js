@@ -70,4 +70,28 @@ export const paymentService = {
     const response = await api.post('/payment/upi/claim-utr', { orderId, utr });
     return response.data;
   },
+
+  /**
+   * Create ZapUPI payment order
+   * @param {number} amount
+   * @param {string} purpose
+   * @param {object} notes
+   */
+  createZapupiOrder: async (amount, purpose = 'investment', notes = {}) => {
+    const response = await api.post('/payment/zapupi/create-order', {
+      amount,
+      purpose,
+      notes,
+    });
+    return response.data;
+  },
+
+  /**
+   * Check live ZapUPI order status
+   * @param {string} orderId
+   */
+  checkZapupiOrderStatus: async (orderId) => {
+    const response = await api.post('/payment/zapupi/check-status', { order_id: orderId });
+    return response.data;
+  },
 };

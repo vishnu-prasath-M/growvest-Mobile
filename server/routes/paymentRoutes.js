@@ -16,6 +16,12 @@ router.get('/manual/all', protect, admin, paymentController.getAllManualPayments
 router.post('/manual/:id/approve', protect, admin, paymentController.approveManualPayment);
 router.post('/manual/:id/reject', protect, admin, paymentController.rejectManualPayment);
 
+// ─── ZapUPI Gateway Endpoints ──────────────────────────────────────────────
+router.post('/zapupi/create-order', protect, paymentController.createZapupiOrder);
+router.post('/zapupi/check-status', protect, paymentController.checkZapupiOrderStatus);
+router.post('/zapupi-webhook', paymentController.handleZapupiWebhook);
+router.get('/zapupi-webhook', paymentController.handleZapupiWebhook);
+
 // ─── Gateway Webhooks & Callbacks (Preserved for Future) ────────────────────
 router.post('/webhook', paymentController.handleWebhook);
 router.get('/webhook', paymentController.handleWebhook);

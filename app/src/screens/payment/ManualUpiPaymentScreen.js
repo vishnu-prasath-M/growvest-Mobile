@@ -57,6 +57,14 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
   const [copiedOrderId, setCopiedOrderId] = useState(false);
   const [copiedAmount, setCopiedAmount] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [isZapVerified, setIsZapVerified] = useState(false);
+
+  // ZapUPI Online Gateway State
+  const [zapupiLoading, setZapupiLoading] = useState(false);
+  const [zapOrderId, setZapOrderId] = useState(null);
+  const [zapPaymentUrl, setZapPaymentUrl] = useState(null);
+  const [zapPolling, setZapPolling] = useState(false);
+  const [zapPollingTimer, setZapPollingTimer] = useState(null);
 
   // Fetch company receiving UPI settings from backend
   useEffect(() => {
@@ -84,6 +92,86 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
 
   const formatCurrency = (val) =>
     `₹${Number(val || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  // ─── ZapUPI Gateway Flow ──────────────────────────────────────────────────
+  const stopZapPolling = () => {
+    setZapPolling(false);
+    if (zapPollingTimer) {
+      clearInterval(zapPollingTimer);
+      setZapPollingTimer(null);
+    }
+  };
+
+  const checkStatusOnce = async (oid) => {
+    try {
+      const res = await paymentService.checkZapupiOrderStatus(oid);
+      if (res?.success && res.isPaid) {
+        stopZapPolling();
+        setIsZapVerified(true);
+        setShowSuccessModal(true);
+        return true;
+      }
+    } catch (e) {
+      console.warn('[ZapUPI] Status check notice:', e.message);
+    }
+    return false;
+  };
+
+  const startZapPolling = (oid) => {
+    stopZapPolling();
+    setZapPolling(true);
+    let attempts = 0;
+    const interval = setInterval(async () => {
+      attempts++;
+      const done = await checkStatusOnce(oid);
+      if (done || attempts >= 40) {
+        stopZapPolling();
+      }
+    }, 3000);
+    setZapPollingTimer(interval);
+  };
+
+  const handleZapupiPay = async () => {
+    setZapupiLoading(true);
+    try {
+      const res = await paymentService.createZapupiOrder(cleanAmount, paymentType, payloadData);
+      if (res?.success && res.paymentUrl) {
+        setZapOrderId(res.orderId);
+        setZapPaymentUrl(res.paymentUrl);
+        await Linking.openURL(res.paymentUrl);
+        startZapPolling(res.orderId);
+      } else {
+        Alert.alert('Payment Gateway', res?.message || 'Failed to initiate ZapUPI payment.');
+      }
+    } catch (err) {
+      console.error('[ZapUPI Pay] error:', err);
+      Alert.alert(
+        'Payment Gateway Error',
+        err?.response?.data?.message || err.message || 'Failed to connect to ZapUPI'
+      );
+    } finally {
+      setZapupiLoading(false);
+    }
+  };
+
+  const handleCheckZapStatus = async () => {
+    if (!zapOrderId) return;
+    setZapupiLoading(true);
+    const done = await checkStatusOnce(zapOrderId);
+    setZapupiLoading(false);
+    if (!done) {
+      Alert.alert(
+        'Status Check',
+        'Payment is still pending on ZapUPI. If you already completed payment, please wait a few seconds and check again.'
+      );
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (zapPollingTimer) clearInterval(zapPollingTimer);
+    };
+  }, [zapPollingTimer]);
 
   // Copy UPI ID to clipboard
   const handleCopyUpi = async () => {
@@ -207,6 +295,82 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
           <View style={styles.orderIdRow}>
             <Text style={styles.orderIdLabel}>Order ID: <Text style={styles.orderIdVal}>{orderId}</Text></Text>
           </View>
+        </View>
+
+        {/* ─── ZAPUPI INSTANT PAYMENT GATEWAY ─── */}
+        <View style={styles.zapCard}>
+          <LinearGradient
+            colors={isDarkMode ? ['#064e3b', '#022c22'] : ['#ecfdf5', '#d1fae5']}
+            style={styles.zapGradient}
+          >
+            <View style={styles.zapHeaderRow}>
+              <View style={styles.zapIconCircle}>
+                <MaterialCommunityIcons name="lightning-bolt" size={24} color="#10B981" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.zapTitle}>Instant Online Checkout</Text>
+                <Text style={styles.zapSubtitle}>Powered by ZapUPI • Automated Approval</Text>
+              </View>
+              <View style={styles.zapLiveBadge}>
+                <Text style={styles.zapLiveText}>INSTANT</Text>
+              </View>
+            </View>
+
+            <Text style={styles.zapDesc}>
+              Pay via Google Pay, PhonePe, Paytm, or BHIM. Your payment is verified automatically within seconds!
+            </Text>
+
+            {/* Supported App Badges */}
+            <View style={styles.zapBadgesRow}>
+              <View style={styles.appBadge}><Text style={styles.appBadgeText}>GPay</Text></View>
+              <View style={styles.appBadge}><Text style={styles.appBadgeText}>PhonePe</Text></View>
+              <View style={styles.appBadge}><Text style={styles.appBadgeText}>Paytm</Text></View>
+              <View style={styles.appBadge}><Text style={styles.appBadgeText}>BHIM / UPI</Text></View>
+            </View>
+
+            {/* Pay Button */}
+            <TouchableOpacity
+              style={styles.zapPayBtn}
+              onPress={handleZapupiPay}
+              disabled={zapupiLoading}
+              activeOpacity={0.85}
+            >
+              {zapupiLoading ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <>
+                  <MaterialCommunityIcons name="shield-check" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.zapPayBtnText}>Pay {formatCurrency(cleanAmount)} via ZapUPI</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {/* If order initiated, show status checker */}
+            {zapOrderId && (
+              <View style={styles.zapStatusBox}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={styles.zapStatusLabel}>Order: <Text style={{ fontFamily: 'monospace' }}>{zapOrderId}</Text></Text>
+                  <TouchableOpacity onPress={handleCheckZapStatus} style={styles.zapRefreshBtn}>
+                    <MaterialCommunityIcons name="refresh" size={16} color="#10B981" />
+                    <Text style={styles.zapRefreshText}>Check Status</Text>
+                  </TouchableOpacity>
+                </View>
+                {zapPolling && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+                    <ActivityIndicator size="small" color="#10B981" style={{ marginRight: 8 }} />
+                    <Text style={styles.zapPollingText}>Waiting for payment confirmation from ZapUPI...</Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </LinearGradient>
+        </View>
+
+        {/* OR DIVIDER TO MANUAL PAYMENT */}
+        <View style={styles.orDividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.orDividerText}>OR PAY MANUALLY VIA DIRECT QR / UPI</Text>
+          <View style={styles.dividerLine} />
         </View>
 
         {/* Step 1: Scan QR or Pay via UPI ID */}
@@ -396,29 +560,46 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalIconCircle}>
-              <MaterialCommunityIcons name="clock-check-outline" size={42} color="#10B981" />
+              <MaterialCommunityIcons
+                name={isZapVerified ? "check-decagram" : "clock-check-outline"}
+                size={42}
+                color="#10B981"
+              />
             </View>
 
-            <Text style={styles.modalTitle}>Payment Submitted!</Text>
-            <Text style={styles.modalSubtitle}>Pending Admin Verification</Text>
+            <Text style={styles.modalTitle}>
+              {isZapVerified ? "Payment Successful! 🎉" : "Payment Submitted!"}
+            </Text>
+            <Text style={styles.modalSubtitle}>
+              {isZapVerified ? "ZapUPI Automated Verification" : "Pending Admin Verification"}
+            </Text>
 
             <View style={styles.modalDetailsBox}>
               <View style={styles.modalDetailRow}>
                 <Text style={styles.modalDetailLabel}>Amount:</Text>
                 <Text style={styles.modalDetailValueBold}>{formatCurrency(cleanAmount)}</Text>
               </View>
-              <View style={styles.modalDetailRow}>
-                <Text style={styles.modalDetailLabel}>UTR Number:</Text>
-                <Text style={styles.modalDetailValueMono}>{utrNumber}</Text>
-              </View>
+              {isZapVerified ? (
+                <View style={styles.modalDetailRow}>
+                  <Text style={styles.modalDetailLabel}>Payment Mode:</Text>
+                  <Text style={styles.modalDetailValueBold}>ZapUPI Instant</Text>
+                </View>
+              ) : (
+                <View style={styles.modalDetailRow}>
+                  <Text style={styles.modalDetailLabel}>UTR Number:</Text>
+                  <Text style={styles.modalDetailValueMono}>{utrNumber}</Text>
+                </View>
+              )}
               <View style={styles.modalDetailRow}>
                 <Text style={styles.modalDetailLabel}>Order Ref:</Text>
-                <Text style={styles.modalDetailValue}>{orderId}</Text>
+                <Text style={styles.modalDetailValue}>{zapOrderId || orderId}</Text>
               </View>
             </View>
 
             <Text style={styles.modalDesc}>
-              We have received your payment reference. Our accounts team will verify the transaction against our bank records. Your account will be activated within a few minutes!
+              {isZapVerified
+                ? "Your payment was confirmed automatically by ZapUPI. Your investment / wallet has been credited and is active immediately!"
+                : "We have received your payment reference. Our accounts team will verify the transaction against our bank records. Your account will be activated within a few minutes!"}
             </Text>
 
             <TouchableOpacity
@@ -568,6 +749,132 @@ const getStyles = (themeColors, isDarkMode) =>
       fontSize: 11,
       fontWeight: '600',
       color: '#10B981',
+    },
+    zapCard: {
+      borderRadius: 20,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.25)',
+      shadowColor: '#10B981',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: isDarkMode ? 0.3 : 0.1,
+      shadowRadius: 10,
+      elevation: 3,
+    },
+    zapGradient: {
+      padding: 18,
+    },
+    zapHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      marginBottom: 10,
+    },
+    zapIconCircle: {
+      width: 44,
+      height: 44,
+      borderRadius: 14,
+      backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.2)' : '#D1FAE5',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    zapTitle: {
+      fontSize: 16,
+      fontWeight: '800',
+      color: themeColors.text,
+    },
+    zapSubtitle: {
+      fontSize: 12,
+      color: isDarkMode ? '#94A3B8' : '#64748B',
+      marginTop: 2,
+    },
+    zapLiveBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 8,
+      backgroundColor: '#10B981',
+    },
+    zapLiveText: {
+      fontSize: 10,
+      fontWeight: '900',
+      color: '#FFFFFF',
+      letterSpacing: 0.5,
+    },
+    zapDesc: {
+      fontSize: 13,
+      color: isDarkMode ? '#CBD5E1' : '#475569',
+      lineHeight: 18,
+      marginBottom: 14,
+    },
+    zapBadgesRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 16,
+      flexWrap: 'wrap',
+    },
+    appBadge: {
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 8,
+      backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#FFFFFF',
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
+    },
+    appBadgeText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: isDarkMode ? '#E2E8F0' : '#1E293B',
+    },
+    zapPayBtn: {
+      backgroundColor: '#10B981',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 14,
+      paddingHorizontal: 20,
+      borderRadius: 14,
+      shadowColor: '#10B981',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    zapPayBtnText: {
+      color: '#FFFFFF',
+      fontSize: 15,
+      fontWeight: '800',
+    },
+    zapStatusBox: {
+      marginTop: 14,
+      padding: 12,
+      borderRadius: 12,
+      backgroundColor: isDarkMode ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.7)',
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+    },
+    zapStatusLabel: {
+      fontSize: 12,
+      color: isDarkMode ? '#94A3B8' : '#64748B',
+    },
+    zapRefreshBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 6,
+      backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5',
+    },
+    zapRefreshText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: '#10B981',
+    },
+    zapPollingText: {
+      fontSize: 12,
+      color: '#10B981',
+      fontWeight: '600',
     },
     card: {
       backgroundColor: isDarkMode ? '#111D16' : '#FFFFFF',

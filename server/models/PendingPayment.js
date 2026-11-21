@@ -12,6 +12,8 @@ const pendingPaymentSchema = new mongoose.Schema({
   amount:      { type: Number },
   payAmount:   { type: Number },
   ref:         { type: String },
+  gateway:     { type: String, default: "manual_upi" },
+  paymentUrl:  { type: String },
   status:      { type: String, enum: ["pending", "completed", "failed"], default: "pending" },
   completedAt: { type: Date },
   createdAt:   { type: Date, default: Date.now, expires: 60 * 60 * 24 },

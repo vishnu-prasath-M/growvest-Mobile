@@ -277,6 +277,10 @@ exports.createOrder = async (req, res) => {
   } catch (error) {
     */
 
+    /*
+    // ============================================================================
+    // === MANUAL UPI ORDER CREATION (COMMENTED OUT AS REQUESTED FOR ZAPUPI) ======
+    // ============================================================================
     const user = req.user;
     const orderId = `UPI_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
     const effectivePaymentType = purpose || notes?.paymentType || 'investment';
@@ -310,6 +314,68 @@ exports.createOrder = async (req, res) => {
       gateway: 'manual_upi',
       paymentType: effectivePaymentType,
       companyUpi: upiConfig,
+    });
+    */
+
+    // ============================================================================
+    // === ZAPUPI PAYMENT GATEWAY ORDER CREATION ==================================
+    // ============================================================================
+    const zapupiService = require('../services/zapupiService');
+    const user = req.user;
+    const orderId = `ZAP_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+    const effectivePaymentType = purpose || notes?.paymentType || 'investment';
+    const payload = notes || req.body?.payloadData || {};
+    const exactAmount = Math.round(Number(amount));
+    const customerMobile = user?.mobileNumber || req.body?.customerMobile || '9999999999';
+
+    // 1. Call ZapUPI create-order API
+    const zapRes = await zapupiService.createOrder({
+      orderId,
+      amount: exactAmount,
+      customerMobile,
+      remark: `${effectivePaymentType} | ${user?._id || 'user'}`,
+    });
+
+    if (!zapRes.success || !zapRes.paymentUrl) {
+      console.error('[PaymentController] ZapUPI order creation failed:', zapRes);
+      return res.status(500).json({
+        success: false,
+        message: zapRes.message || 'Failed to initialize ZapUPI payment gateway',
+        error: zapRes.error,
+      });
+    }
+
+    // 2. Save PendingPayment in DB for webhook and status checking
+    try {
+      await PendingPayment.findOneAndUpdate(
+        { orderId },
+        {
+          orderId,
+          userId: user._id,
+          paymentType: effectivePaymentType,
+          payloadData: payload,
+          amount: exactAmount,
+          status: 'pending',
+          gateway: 'zapupi',
+          paymentUrl: zapRes.paymentUrl,
+        },
+        { upsert: true, new: true }
+      );
+      console.log(`[PaymentController] PendingPayment saved for ZapUPI order: ${orderId}`);
+    } catch (ppErr) {
+      console.warn('[PaymentController] PendingPayment save warning:', ppErr.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      orderId,
+      paymentUrl: zapRes.paymentUrl,
+      txnId: zapRes.txnId,
+      environment: zapRes.environment || 'cashier',
+      gateway: 'zapupi',
+      amount: exactAmount,
+      currency: 'INR',
+      paymentType: effectivePaymentType,
     });
   } catch (error) {
     console.error('[PaymentController] Create order error:', error);
@@ -1800,3 +1866,187 @@ exports.testGmailConnection = async (req, res) => {
 
 // Export central business logic execution helper for internal services (e.g. Wallet Pay)
 exports.processSuccessfulOrder = processSuccessfulOrder;
+
+// ============================================================================
+// === ZAPUPI PAYMENT GATEWAY CONTROLLERS ======================================
+// ============================================================================
+
+// 11. Create ZapUPI Order
+exports.createZapupiOrder = async (req, res) => {
+  try {
+    const { amount, purpose, notes } = req.body;
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ message: 'Valid amount is required' });
+    }
+
+    if (purpose === 'investment') {
+      const KYC = require('../models/KYC');
+      const kyc = await KYC.findOne({ userId: req.user._id });
+      if (kyc && kyc.status === 'rejected') {
+        return res.status(403).json({ message: 'Your KYC was rejected. Please re-submit KYC before investing.' });
+      }
+    }
+
+    const zapupiService = require('../services/zapupiService');
+    const user = req.user;
+    const orderId = `ZAP_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+    const effectivePaymentType = purpose || notes?.paymentType || 'investment';
+    const payload = notes || req.body?.payloadData || {};
+    const exactAmount = Math.round(Number(amount));
+    const customerMobile = user?.mobileNumber || req.body?.customerMobile || '9999999999';
+
+    const zapRes = await zapupiService.createOrder({
+      orderId,
+      amount: exactAmount,
+      customerMobile,
+      remark: `${effectivePaymentType} | ${user?._id || 'user'}`,
+    });
+
+    if (!zapRes.success || !zapRes.paymentUrl) {
+      return res.status(500).json({
+        success: false,
+        message: zapRes.message || 'Failed to initialize ZapUPI order',
+        error: zapRes.error,
+      });
+    }
+
+    try {
+      await PendingPayment.findOneAndUpdate(
+        { orderId },
+        {
+          orderId,
+          userId: user._id,
+          paymentType: effectivePaymentType,
+          payloadData: payload,
+          amount: exactAmount,
+          status: 'pending',
+          gateway: 'zapupi',
+          paymentUrl: zapRes.paymentUrl,
+        },
+        { upsert: true, new: true }
+      );
+    } catch (ppErr) {
+      console.warn('[PaymentController] PendingPayment save warning:', ppErr.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      orderId,
+      paymentUrl: zapRes.paymentUrl,
+      txnId: zapRes.txnId,
+      environment: zapRes.environment || 'cashier',
+      gateway: 'zapupi',
+      amount: exactAmount,
+      currency: 'INR',
+      paymentType: effectivePaymentType,
+    });
+  } catch (error) {
+    console.error('[PaymentController] createZapupiOrder error:', error);
+    res.status(500).json({ message: 'Failed to create ZapUPI order', error: error.message });
+  }
+};
+
+// 12. Handle ZapUPI Webhook
+// ZapUPI posts JSON: { order_id, txn_id, status: 'Success'|'Failed', amount, pay_amount, utr, customer_mobile, remark, environment }
+exports.handleZapupiWebhook = async (req, res) => {
+  try {
+    const data = req.body || {};
+    console.log('[ZapUPI Webhook] Received webhook payload:', JSON.stringify(data));
+
+    const orderId = data.order_id || req.query.order_id;
+    const status = data.status || '';
+    const txnId = data.txn_id || '';
+    const utr = data.utr || txnId || `ZAP_UTR_${Date.now()}`;
+    const environment = data.environment || 'cashier';
+
+    if (!orderId) {
+      console.warn('[ZapUPI Webhook] Webhook missing order_id');
+      return res.status(200).json({ status: 'ok', message: 'Missing order_id' });
+    }
+
+    if (String(status).toLowerCase() === 'success') {
+      console.log(`[ZapUPI Webhook] Payment Successful for order: ${orderId}, txn_id: ${txnId}, utr: ${utr}, env: ${environment}`);
+
+      // Double confirmation via order-status API (recommended in ZapUPI docs)
+      try {
+        const zapupiService = require('../services/zapupiService');
+        const statusCheck = await zapupiService.getOrderStatus(orderId).catch(() => null);
+        console.log(`[ZapUPI Webhook] Order status double-check for ${orderId}:`, statusCheck?.success);
+      } catch (checkErr) {
+        console.warn(`[ZapUPI Webhook] Double-check notice:`, checkErr.message);
+      }
+
+      // Complete business logic in Growvest
+      try {
+        const result = await processSuccessfulOrder(orderId, utr);
+        console.log(`[ZapUPI Webhook] Order ${orderId} business logic processed:`, result?.success);
+      } catch (procErr) {
+        console.error(`[ZapUPI Webhook] Error processing business logic for ${orderId}:`, procErr.message);
+      }
+    } else {
+      console.log(`[ZapUPI Webhook] Order ${orderId} status received as: ${status}`);
+      await PendingPayment.findOneAndUpdate(
+        { orderId, status: 'pending' },
+        { status: 'failed', failureReason: `ZapUPI status: ${status}` }
+      ).catch(() => {});
+    }
+
+    // Always respond with HTTP 200 and {"status":"ok"} as mandated by ZapUPI
+    return res.status(200).json({ status: 'ok' });
+  } catch (error) {
+    console.error('[ZapUPI Webhook] Webhook error:', error);
+    return res.status(200).json({ status: 'ok', error: error.message });
+  }
+};
+
+// 13. Live Check ZapUPI Order Status
+exports.checkZapupiOrderStatus = async (req, res) => {
+  try {
+    const { order_id, orderId } = req.body;
+    const effectiveOrderId = order_id || orderId;
+
+    if (!effectiveOrderId) {
+      return res.status(400).json({ success: false, message: 'order_id is required' });
+    }
+
+    const pending = await PendingPayment.findOne({ orderId: effectiveOrderId });
+
+    if (pending && pending.status === 'completed') {
+      return res.status(200).json({
+        success: true,
+        isPaid: true,
+        status: 'completed',
+        orderId: effectiveOrderId,
+      });
+    }
+
+    // Check with ZapUPI API
+    const zapupiService = require('../services/zapupiService');
+    const zapRes = await zapupiService.getOrderStatus(effectiveOrderId);
+    const orderData = zapRes.data || {};
+    const statusStr = String(orderData.status || '').toLowerCase();
+
+    if (statusStr === 'success' || statusStr === 'paid') {
+      const utr = orderData.utr || orderData.txn_id || `ZAP_${Date.now()}`;
+      await processSuccessfulOrder(effectiveOrderId, utr);
+      return res.status(200).json({
+        success: true,
+        isPaid: true,
+        status: 'completed',
+        orderId: effectiveOrderId,
+        zapData: orderData,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      isPaid: false,
+      status: pending?.status || statusStr || 'pending',
+      orderId: effectiveOrderId,
+      zapData: orderData,
+    });
+  } catch (error) {
+    console.error('[PaymentController] checkZapupiOrderStatus error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
