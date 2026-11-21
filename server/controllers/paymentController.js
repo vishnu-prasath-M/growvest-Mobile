@@ -528,28 +528,52 @@ exports.handleCallback = async (req, res) => {
                      req.body?.order_id  || req.body?.orderId  || '';
     let finalStatus = 'pending';
 
-    console.log(`[PaymentCallback] Received Cashfree callback — order_id: ${order_id}`);
+    console.log(`[PaymentCallback] Received callback — order_id: ${order_id}`);
 
     if (order_id) {
       try {
-        const statusRes = await cashfreeService.checkOrderStatus(order_id);
-        const status = (statusRes?.orderStatus || statusRes?.status || '').toUpperCase();
-        const isPaid = statusRes?.isPaid || status === 'PAID' || status === 'SUCCESS';
-        const isPending = statusRes?.isPending || status === 'ACTIVE' || status === 'PENDING';
+        const isZap = String(order_id).startsWith('ZAP_') || Boolean(await PendingPayment.findOne({ orderId: order_id, gateway: 'zapupi' }));
 
-        if (isPaid) {
-          finalStatus = 'success';
-          const utr =
-            statusRes.paymentDetails?.bankReference ||
-            statusRes.paymentDetails?.cfPaymentId ||
-            statusRes.utr ||
-            `UTR_CF_${Date.now()}`;
-          await processSuccessfulOrder(order_id, utr);
-          console.log(`[PaymentCallback] Order ${order_id} verified & processed into DB via Cashfree callback!`);
-        } else if (isPending) {
-          finalStatus = 'pending';
+        if (isZap) {
+          const zapupiService = require('../services/zapupiService');
+          const zapRes = await zapupiService.getOrderStatus(order_id).catch(() => null);
+          const zapData = zapRes?.data || {};
+          const statusStr = String(zapData.status || '').toLowerCase();
+          const utr = req.query?.utr || zapData.utr || zapData.txn_id || `ZAP_CB_${Date.now()}`;
+          const isSuccessQuery = req.query?.status === 'Success' || req.query?.s === 's';
+
+          if (statusStr === 'success' || statusStr === 'paid' || isSuccessQuery) {
+            finalStatus = 'success';
+            await processSuccessfulOrder(order_id, utr);
+            console.log(`[PaymentCallback] ZapUPI order ${order_id} verified & processed into DB!`);
+          } else {
+            const alreadyDone = await PendingPayment.findOne({ orderId: order_id, status: 'completed' });
+            if (alreadyDone) {
+              finalStatus = 'success';
+            } else {
+              finalStatus = 'pending';
+            }
+          }
         } else {
-          finalStatus = 'failed';
+          const statusRes = await cashfreeService.checkOrderStatus(order_id);
+          const status = (statusRes?.orderStatus || statusRes?.status || '').toUpperCase();
+          const isPaid = statusRes?.isPaid || status === 'PAID' || status === 'SUCCESS';
+          const isPending = statusRes?.isPending || status === 'ACTIVE' || status === 'PENDING';
+
+          if (isPaid) {
+            finalStatus = 'success';
+            const utr =
+              statusRes.paymentDetails?.bankReference ||
+              statusRes.paymentDetails?.cfPaymentId ||
+              statusRes.utr ||
+              `UTR_CF_${Date.now()}`;
+            await processSuccessfulOrder(order_id, utr);
+            console.log(`[PaymentCallback] Order ${order_id} verified & processed into DB via Cashfree callback!`);
+          } else if (isPending) {
+            finalStatus = 'pending';
+          } else {
+            finalStatus = 'failed';
+          }
         }
       } catch (cbErr) {
         console.warn('[PaymentCallback] Background verify warning:', cbErr.message);

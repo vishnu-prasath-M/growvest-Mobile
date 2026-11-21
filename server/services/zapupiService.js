@@ -19,6 +19,9 @@ class ZapUPIService {
    */
   async createOrder({ orderId, amount, customerMobile, remark, webhookUrl }) {
     try {
+      const callbackBase = process.env.APP_URL || 'https://growvest-mobile.onrender.com';
+      const redirectUrl = `${callbackBase}/api/payment/callback?order_id=${encodeURIComponent(orderId)}`;
+
       const payload = {
         zap_key: ZAP_KEY,
         order_id: String(orderId),
@@ -26,6 +29,9 @@ class ZapUPIService {
         customer_mobile: customerMobile ? String(customerMobile) : '9999999999',
         remark: remark || 'Growvest Payment',
         webhook_url: webhookUrl || DEFAULT_WEBHOOK_URL,
+        success_url: redirectUrl,
+        failed_url: redirectUrl,
+        timeout_url: redirectUrl,
       };
 
       console.log('[ZapUPI Service] Creating order with payload:', {
@@ -101,3 +107,4 @@ class ZapUPIService {
 }
 
 module.exports = new ZapUPIService();
+

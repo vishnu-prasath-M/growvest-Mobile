@@ -13,7 +13,9 @@ import {
   Linking,
   Platform,
   ToastAndroid,
+  AppState,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
@@ -138,6 +140,19 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
       if (res?.success && res.paymentUrl) {
         setZapOrderId(res.orderId);
         setZapPaymentUrl(res.paymentUrl);
+
+        // Store payment context so app auto-verifies when user returns from UPI app / browser
+        try {
+          await AsyncStorage.setItem(
+            'pendingPaymentContext',
+            JSON.stringify({
+              orderId: res.orderId,
+              paymentType,
+              payloadData,
+            })
+          );
+        } catch (e) {}
+
         await Linking.openURL(res.paymentUrl);
         startZapPolling(res.orderId);
       } else {
@@ -167,11 +182,19 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
     }
   };
 
+  // Re-check order status whenever the user returns to the app from browser / UPI app
   useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active' && zapOrderId) {
+        checkStatusOnce(zapOrderId);
+      }
+    });
+
     return () => {
+      if (sub && sub.remove) sub.remove();
       if (zapPollingTimer) clearInterval(zapPollingTimer);
     };
-  }, [zapPollingTimer]);
+  }, [zapOrderId, zapPollingTimer]);
 
   // Copy UPI ID to clipboard
   const handleCopyUpi = async () => {
