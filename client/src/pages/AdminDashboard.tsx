@@ -27,6 +27,8 @@ import {
   ExternalLink,
   QrCode,
   Zap,
+  ArrowLeft,
+  ChevronRight,
 } from "lucide-react";
 import ZenvestLogo from "@/components/ZenvestLogo";
 import { Button } from "@/components/ui/button";
@@ -209,12 +211,8 @@ const AdminDashboard = () => {
     window.location.href = link;
   };
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
-  const [sidebarOpen, setSidebarOpen] = useState(() => {
-    if (typeof window !== "undefined") {
-      return window.innerWidth < 1024;
-    }
-    return false;
-  });
+  const [mobileTabSelected, setMobileTabSelected] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingList, setPendingList] = useState<PendingInv[]>([]);
   const [payModalData, setPayModalData] = useState<WithdrawReq | null>(null);
   const [withdrawList, setWithdrawList] = useState<WithdrawReq[]>([]);
@@ -957,21 +955,123 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen flex bg-background overflow-x-hidden">
-      {/* Sidebar */}
-      <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-card border-r border-border transform transition-transform duration-300 flex flex-col lg:translate-x-0 lg:static lg:flex ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-          }`}
-      >
+      {/* ── MOBILE-ONLY NAVIGATION HUB (When on small screens and no tab is chosen) ── */}
+      <div className={`flex-1 flex-col w-full min-h-screen bg-background lg:hidden ${mobileTabSelected ? "hidden" : "flex"}`}>
+        {/* Mobile Hub Top Bar */}
+        <div className="sticky top-0 z-20 flex items-center justify-between p-4 bg-card/95 backdrop-blur border-b border-border shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="max-w-[130px] overflow-hidden">
+              <ZenvestLogo />
+            </div>
+            <div className="px-2.5 py-0.5 rounded-full bg-primary/10 border border-primary/20 flex items-center gap-1.5">
+              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[11px] font-semibold text-primary">Admin Hub</span>
+            </div>
+          </div>
+          {totalPendingActions > 0 && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-700 text-xs font-bold">
+              <AlertCircle size={14} className="text-amber-600" />
+              <span>{totalPendingActions} Pending</span>
+            </div>
+          )}
+        </div>
+
+        {/* Mobile Hub Menu Content */}
+        <div className="p-4 space-y-4 pb-16">
+          <div className="px-1">
+            <h2 className="text-xl font-heading font-bold text-foreground">Admin Control Hub</h2>
+            <p className="text-xs font-body text-muted-foreground mt-0.5">Tap any management section below to open</p>
+          </div>
+
+          <div className="space-y-2">
+            {navItems.map((item) => {
+              const badge =
+                item.tab === "pending"
+                  ? pendingCount
+                  : item.tab === "withdrawals"
+                  ? wdPendingCount
+                  : item.tab === "kyc"
+                  ? kycPendingCount
+                  : item.tab === "chits"
+                  ? (dashboardStats?.pendingChitRequests || 0)
+                  : item.tab === "pocket"
+                  ? pendingPocketCount
+                  : 0;
+
+              return (
+                <button
+                  key={item.tab}
+                  onClick={() => {
+                    setActiveTab(item.tab);
+                    setMobileTabSelected(true);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-card border border-border/80 shadow-xs hover:border-primary/40 active:scale-[0.99] transition-all text-left"
+                >
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                      <item.icon className="h-5 w-5" />
+                    </div>
+                    <div className="truncate">
+                      <p className="font-heading font-semibold text-sm text-foreground truncate">{item.label}</p>
+                      <p className="text-[11px] font-body text-muted-foreground truncate">
+                        {item.tab === 'overview' ? 'Live stats & platform analytics' :
+                         item.tab === 'payment_approvals' ? 'Review & verify user deposits' :
+                         item.tab === 'charges' ? 'Platform charges & commissions' :
+                         item.tab === 'ad_banners' ? 'App banners & marketing graphics' :
+                         item.tab === 'pending' ? 'Pending investments queue' :
+                         item.tab === 'users' ? 'Registered member management' :
+                         item.tab === 'withdrawals' ? 'Payouts & UPI disbursements' :
+                         item.tab === 'kyc' ? 'Aadhaar & identity verification' :
+                         item.tab === 'chits' ? 'Auction cycles & chit plans' :
+                         item.tab === 'pocket' ? 'Pocket money cycles & daily payouts' :
+                         item.tab === 'sip' ? 'SIP portfolios & installments' :
+                         item.tab === 'referral' ? 'Referral links & APK update' :
+                         item.tab === 'push_test' ? 'Real-time push broadcasts' :
+                         'System config & credentials'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {badge > 0 && (
+                      <span className="h-5 min-w-5 px-1.5 rounded-full text-[11px] font-bold flex items-center justify-center bg-amber-500 text-white shadow-xs">
+                        {badge}
+                      </span>
+                    )}
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="pt-4 border-t border-border space-y-2">
+            <Link to="/">
+              <Button variant="outline" className="w-full rounded-xl font-body">
+                Back to Site
+              </Button>
+            </Link>
+            <Button
+              variant="ghost"
+              className="w-full rounded-xl font-body text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center justify-center gap-2"
+              onClick={() => {
+                logout();
+                navigate("/login");
+              }}
+            >
+              <LogOut className="h-4 w-4" />
+              Logout
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── DESKTOP SIDEBAR (Visible only on desktop screens) ── */}
+      <aside className="hidden lg:flex w-64 bg-card border-r border-border flex-col shrink-0">
         <div className="flex items-center justify-between p-5 border-b border-border">
           <div className="max-w-[140px] overflow-hidden">
             <ZenvestLogo />
           </div>
-          <button
-            className="lg:hidden p-1 text-muted-foreground hover:text-foreground"
-            onClick={() => setSidebarOpen(false)}
-          >
-            <X size={18} />
-          </button>
         </div>
 
         {/* Admin badge */}
@@ -980,7 +1080,7 @@ const AdminDashboard = () => {
           <span className="text-xs font-body font-semibold text-primary">Admin Panel</span>
         </div>
 
-        <nav className="flex-1 p-3 space-y-1 mt-2">
+        <nav className="flex-1 p-3 space-y-1 mt-2 overflow-y-auto">
           {navItems.map((item) => {
             const badge =
               item.tab === "pending"
@@ -997,7 +1097,7 @@ const AdminDashboard = () => {
             return (
               <button
                 key={item.tab}
-                onClick={() => { setActiveTab(item.tab); setSidebarOpen(false); }}
+                onClick={() => { setActiveTab(item.tab); }}
                 className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-body font-medium transition-colors ${activeTab === item.tab
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -1041,29 +1141,26 @@ const AdminDashboard = () => {
         </div>
       </aside>
 
-      {/* Overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-30 bg-foreground/20 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Main */}
-      <div className="flex-1 min-w-0 flex flex-col overflow-x-hidden">
+      {/* ── MAIN CONTENT CONTAINER (On mobile: shown only when a tab is selected; on desktop: always shown) ── */}
+      <div className={`flex-1 min-w-0 flex-col overflow-x-hidden ${mobileTabSelected ? "flex" : "hidden lg:flex"}`}>
         {/* Header */}
         <header className="sticky top-0 z-20 flex items-center h-16 px-4 sm:px-6 border-b border-border bg-card/95 backdrop-blur justify-between w-full">
           <div className="flex items-center gap-3">
+            {/* Mobile Back Button: Returns to Mobile Admin Hub */}
             <button
-              className="lg:hidden w-10 h-10 flex items-center justify-center text-foreground rounded-lg hover:bg-muted"
-              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-semibold text-xs shadow-xs active:scale-95 transition-all"
+              onClick={() => {
+                setMobileTabSelected(false);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
             >
-              <Menu size={20} />
+              <ArrowLeft size={16} />
+              <span>Back to Menu</span>
             </button>
             <div>
               <p className="text-xs font-body text-muted-foreground hidden sm:block">Growvest Admin</p>
               <h1 className="font-heading font-bold text-foreground capitalize text-base sm:text-lg leading-tight">
-                {activeTab === "pending" ? "Pending" : activeTab === "settings" ? "Admin Dashboard" : activeTab}
+                {navItems.find((n) => n.tab === activeTab)?.label || (activeTab === "pending" ? "Pending" : activeTab === "settings" ? "Admin Dashboard" : activeTab)}
               </h1>
             </div>
           </div>

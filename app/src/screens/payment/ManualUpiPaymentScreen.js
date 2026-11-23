@@ -402,14 +402,13 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
           </LinearGradient>
         </View>
 
-        {/* OR DIVIDER TO MANUAL PAYMENT */}
+        {/* ── MANUAL PAYMENT (COMMENTED OUT - AUTOMATED GATEWAY ACTIVE) ──
         <View style={styles.orDividerRow}>
           <View style={styles.dividerLine} />
           <Text style={styles.orDividerText}>OR PAY MANUALLY VIA DIRECT QR / UPI</Text>
           <View style={styles.dividerLine} />
         </View>
 
-        {/* Step 1: Scan QR or Pay via UPI ID */}
         <View style={styles.card}>
           <View style={styles.stepHeader}>
             <View style={styles.stepNumberBadge}>
@@ -421,7 +420,6 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
             </View>
           </View>
 
-          {/* Dynamic QR Code */}
           <View style={styles.qrContainer}>
             <View style={styles.qrBox}>
               {loadingConfig ? (
@@ -445,14 +443,12 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
             </View>
           </View>
 
-          {/* Divider */}
           <View style={styles.orDividerRow}>
             <View style={styles.dividerLine} />
             <Text style={styles.orDividerText}>OR PAY USING UPI ID</Text>
             <View style={styles.dividerLine} />
           </View>
 
-          {/* Company UPI ID Highlight Box */}
           <View style={styles.upiIdBox}>
             <View style={{ flex: 1 }}>
               <Text style={styles.upiPayeeName}>PAYEE: {payeeName}</Text>
@@ -474,7 +470,6 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
             </TouchableOpacity>
           </View>
 
-          {/* Payment Guidance Box */}
           <View style={styles.helperTipBox}>
             <MaterialCommunityIcons name="lightbulb-on-outline" size={16} color="#D4AF37" style={{ marginTop: 1 }} />
             <Text style={styles.helperTipText}>
@@ -483,7 +478,6 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
           </View>
         </View>
 
-        {/* Step 2: Enter 12-Digit UTR */}
         <View style={styles.card}>
           <View style={styles.stepHeader}>
             <View style={[styles.stepNumberBadge, { backgroundColor: '#10B981' }]}>
@@ -495,7 +489,6 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
             </View>
           </View>
 
-          {/* UTR Input */}
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>
               12-Digit UPI Reference Number (UTR) <Text style={{ color: '#EF4444' }}>*</Text>
@@ -518,7 +511,6 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
             </Text>
           </View>
 
-          {/* Screenshot Upload (Optional) */}
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Attach Payment Screenshot (Optional)</Text>
             {screenshotUri ? (
@@ -543,7 +535,6 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
             )}
           </View>
 
-          {/* User Note (Optional) */}
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Remarks / Your Name (Optional)</Text>
             <View style={styles.inputContainer}>
@@ -558,7 +549,6 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
             </View>
           </View>
 
-          {/* Submit Button */}
           <TouchableOpacity
             style={styles.submitBtn}
             activeOpacity={0.85}
@@ -582,6 +572,7 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
             </LinearGradient>
           </TouchableOpacity>
         </View>
+        ── END OF MANUAL PAYMENT ── */}
 
         <View style={{ height: 40 }} />
       </ScrollView>

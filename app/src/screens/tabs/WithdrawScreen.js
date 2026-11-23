@@ -981,9 +981,9 @@ const WithdrawScreen = ({ navigation }) => {
                   style={styles.requestBtnGradient}
                 >
                   <MaterialCommunityIcons name="arrow-top-right" size={18} color="#FFFFFF" />
-                  <Text style={styles.requestBtnText}>
-                    {activeCategory === 'chit' && selectedChit?.chitName
-                      ? `Request ${selectedChit.chitName} Withdrawal (${formatCurrency(selectedChitPayout)})`
+                  <Text style={styles.requestBtnText} numberOfLines={1} ellipsizeMode="tail">
+                    {activeCategory === 'chit'
+                      ? `Request Chit Payout (${formatCurrency(selectedChitPayout)})`
                       : `Request ${currentCategoryConfig.name} Withdrawal`}
                   </Text>
                 </LinearGradient>
@@ -1692,9 +1692,16 @@ const getStyles = (themeColors, isDarkMode) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
+    paddingHorizontal: 16,
     gap: 8,
   },
-  requestBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+  requestBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    flexShrink: 1,
+    textAlign: 'center',
+  },
 
   securityFooterNote: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 4 },
   securityFooterText: { fontSize: 11, color: themeColors.textMuted, textAlign: 'center' },
