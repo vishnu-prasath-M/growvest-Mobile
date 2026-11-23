@@ -377,11 +377,15 @@ exports.verifyPayment = async (req, res) => {
       const zapRes = await zapupiService.getOrderStatus(effectiveOrderId).catch(() => null);
       const zapData = zapRes?.data || {};
       const statusStr = String(zapData.status || '').toLowerCase();
-      if (statusStr === 'success' || statusStr === 'paid' || existingPending?.status === 'completed') {
-        verifiedUtr = utr || zapData.utr || zapData.txn_id || `ZAP_UTR_${Date.now()}`;
-      } else {
-        verifiedUtr = utr || zapData.utr || zapData.txn_id || `ZAP_UTR_${Date.now()}`;
+      const isPaid = statusStr === 'success' || statusStr === 'paid' || existingPending?.status === 'completed';
+      if (!isPaid) {
+        return res.status(200).json({
+          success: false,
+          isPending: true,
+          message: 'Payment is not completed yet on ZapUPI. Please complete the transaction in your UPI app and tap verify.',
+        });
       }
+      verifiedUtr = utr || zapData.utr || zapData.txn_id || `ZAP_UTR_${Date.now()}`;
     } else if (!isSimulated) {
       const statusRes = await cashfreeService.checkOrderStatus(effectiveOrderId);
       console.log('[SIPController] Cashfree status check result:', statusRes);

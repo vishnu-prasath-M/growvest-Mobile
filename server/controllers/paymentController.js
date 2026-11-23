@@ -427,20 +427,27 @@ exports.verifyPayment = async (req, res) => {
 
     // === GATEWAY VERIFICATION (ZAPUPI / CASHFREE / SIMULATED) ===
     let verifiedUtr = utr || razorpay_payment_id || `UTR_${Date.now()}`;
-    const isZap = effectiveOrderId.startsWith('ZAP_');
+    const isZap = effectiveOrderId.startsWith('ZAP_') || Boolean(existingPending && existingPending.gateway === 'zapupi');
     const isSimulated =
       clientIsSimulated ||
       effectiveOrderId.startsWith('order_sim_') ||
       effectiveOrderId.startsWith('ORD_SIM_') ||
-      effectiveOrderId.startsWith('WAL_') ||
-      effectiveOrderId.startsWith('UPI_') ||
-      effectiveOrderId.startsWith('MANUAL_') ||
       (razorpay_signature && razorpay_signature.startsWith('simulated_'));
 
     if (isZap) {
       const zapupiService = require('../services/zapupiService');
       const zapRes = await zapupiService.getOrderStatus(effectiveOrderId).catch(() => null);
       const zapData = zapRes?.data || {};
+      const statusStr = String(zapData.status || '').toLowerCase();
+      const isPaid = statusStr === 'success' || zapData.status === 'SUCCESS' || zapData.status === 'Success' || existingPending?.status === 'completed';
+
+      if (!isPaid) {
+        return res.status(200).json({
+          success: false,
+          isPending: true,
+          message: 'Payment is not completed yet on ZapUPI. Please complete the transaction in your UPI app and tap verify.',
+        });
+      }
       verifiedUtr = utr || zapData.utr || zapData.txn_id || `ZAP_UTR_${Date.now()}`;
     } else if (!isSimulated) {
       const statusRes = await cashfreeService.checkOrderStatus(effectiveOrderId);

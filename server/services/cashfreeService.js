@@ -233,11 +233,11 @@ const checkOrderStatus = async (orderId) => {
   const { baseUrl, isConfigured } = getCashfreeConfig();
   if (!isConfigured) {
     return {
-      isPaid: true,
-      status: 'SUCCESS',
-      isSimulated: true,
+      isPaid: false,
+      status: 'NOT_CONFIGURED',
+      isSimulated: false,
       orderId,
-      utr: `SIM_UTR_${Date.now()}`,
+      message: 'Cashfree gateway is not configured.',
     };
   }
 

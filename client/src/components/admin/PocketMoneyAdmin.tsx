@@ -16,6 +16,7 @@ import {
   Smartphone,
   Copy,
   Check,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -56,8 +57,44 @@ export default function PocketMoneyAdmin({ token }: PocketMoneyAdminProps) {
   const [modalUpiId, setModalUpiId] = useState("");
   const [fetchingUpi, setFetchingUpi] = useState(false);
   const [copiedUpi, setCopiedUpi] = useState(false);
+  const [initiatingGateway, setInitiatingGateway] = useState(false);
   const isMobile = typeof navigator !== "undefined" && /Android|iPhone|iPad/i.test(navigator.userAgent);
   const [showQr, setShowQr] = useState(!isMobile);
+
+  const handlePayViaGateway = async () => {
+    if (!releaseModalData) return;
+    try {
+      setInitiatingGateway(true);
+      const res = await fetch(`${API_URL}/api/payment/zapupi/create-order`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          amount: releaseModalData.payoutAmount,
+          purpose: "pocket_money_release",
+          notes: {
+            payoutId: releaseModalData._id,
+            userName: releaseModalData.userName,
+            userEmail: releaseModalData.userEmail,
+            recipientUpi: modalUpiId,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.paymentUrl) {
+        window.location.href = data.paymentUrl;
+      } else {
+        toast.error(data.message || "Failed to initiate payment gateway");
+      }
+    } catch (err: any) {
+      console.error("Gateway launch error:", err);
+      toast.error(err.message || "Failed to launch payment gateway");
+    } finally {
+      setInitiatingGateway(false);
+    }
+  };
 
   const handleOpenUPI = (
     upiId: string,
@@ -594,59 +631,31 @@ export default function PocketMoneyAdmin({ token }: PocketMoneyAdminProps) {
                   </span>
                 </div>
 
-                {/* Direct 1-Click Mobile UPI App Launchers */}
-                {modalUpiId && releaseModalData.payoutAmount > 0 && (
-                  <div className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50/50 border border-emerald-200/80 shadow-sm space-y-2.5">
+                {/* Official Payment Gateway Integration */}
+                {releaseModalData.payoutAmount > 0 && (
+                  <div className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-cyan-500/10 border border-emerald-500/20 shadow-sm space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-heading font-bold text-emerald-950 flex items-center gap-1.5">
-                        <Smartphone className="h-4 w-4 text-emerald-600" />
-                        Pay via UPI Mobile App
+                      <span className="text-xs font-heading font-bold text-foreground flex items-center gap-1.5">
+                        <Zap className="h-4 w-4 text-emerald-600" />
+                        Official Payment Gateway
                       </span>
-                      <span className="text-[10px] font-body font-semibold px-2 py-0.5 rounded-full bg-emerald-200/70 text-emerald-800">
-                        Instant Deeplink
+                      <span className="text-[10px] font-body font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                        Live Checkout
                       </span>
                     </div>
 
-                    {/* Primary UPI Chooser Button */}
                     <button
                       type="button"
-                      onClick={() => handleOpenUPI(modalUpiId, releaseModalData.payoutAmount, `PM-${releaseModalData._id}`, releaseModalData.userName)}
+                      disabled={initiatingGateway}
+                      onClick={handlePayViaGateway}
                       className="w-full h-11 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-[0.99] text-white font-body font-bold text-sm flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 hover:shadow-lg transition-all"
                     >
-                      <DollarSign className="h-4 w-4 text-white" />
-                      Open UPI App (GPay / PhonePe / Paytm)
+                      <Zap className="h-4 w-4 text-amber-300" />
+                      {initiatingGateway ? "Opening Payment Gateway..." : `Pay ₹${fmt(releaseModalData.payoutAmount)} via Payment Gateway`}
                     </button>
-
-                    {/* Dedicated App Buttons */}
-                    <div className="grid grid-cols-3 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenUPI(modalUpiId, releaseModalData.payoutAmount, `PM-${releaseModalData._id}`, releaseModalData.userName, 'gpay')}
-                        className="h-9 px-1 rounded-xl bg-white hover:bg-blue-50 border border-blue-200 text-blue-700 font-body text-xs font-bold flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-all"
-                        title="Pay with Google Pay"
-                      >
-                        <span className="w-2 h-2 rounded-full bg-blue-500" />
-                        Google Pay
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenUPI(modalUpiId, releaseModalData.payoutAmount, `PM-${releaseModalData._id}`, releaseModalData.userName, 'phonepe')}
-                        className="h-9 px-1 rounded-xl bg-white hover:bg-purple-50 border border-purple-200 text-purple-700 font-body text-xs font-bold flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-all"
-                        title="Pay with PhonePe"
-                      >
-                        <span className="w-2 h-2 rounded-full bg-purple-500" />
-                        PhonePe
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenUPI(modalUpiId, releaseModalData.payoutAmount, `PM-${releaseModalData._id}`, releaseModalData.userName, 'paytm')}
-                        className="h-9 px-1 rounded-xl bg-white hover:bg-sky-50 border border-sky-200 text-sky-700 font-body text-xs font-bold flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-all"
-                        title="Pay with Paytm"
-                      >
-                        <span className="w-2 h-2 rounded-full bg-sky-500" />
-                        Paytm
-                      </button>
-                    </div>
+                    <p className="text-[11px] text-muted-foreground text-center">
+                      Opens official payment gateway with GPay, PhonePe, Paytm & Net Banking.
+                    </p>
                   </div>
                 )}
 

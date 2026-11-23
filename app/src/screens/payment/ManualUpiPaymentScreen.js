@@ -156,14 +156,27 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
         await Linking.openURL(res.paymentUrl);
         startZapPolling(res.orderId);
       } else {
-        Alert.alert('Payment Gateway', res?.message || 'Failed to initiate ZapUPI payment.');
+        const msg = res?.message || 'Failed to initiate ZapUPI payment.';
+        if (msg.includes('Insufficient Topup Balance')) {
+          Alert.alert(
+            'ZapUPI Wallet Topup Needed',
+            `ZapUPI charges a small transaction fee from your ZapUPI merchant wallet. For ₹${cleanAmount}, please top up ₹50-₹100 on panel.zapupi.com.\n\nIn the meantime, you can pay instantly via Direct UPI Transfer below.`
+          );
+        } else {
+          Alert.alert('Payment Gateway Error', msg);
+        }
       }
     } catch (err) {
       console.error('[ZapUPI Pay] error:', err);
-      Alert.alert(
-        'Payment Gateway Error',
-        err?.response?.data?.message || err.message || 'Failed to connect to ZapUPI'
-      );
+      const errorMsg = err?.response?.data?.message || err.message || 'Failed to connect to ZapUPI';
+      if (errorMsg.includes('Insufficient Topup Balance')) {
+        Alert.alert(
+          'ZapUPI Wallet Topup Needed',
+          `ZapUPI charges a small transaction fee from your ZapUPI merchant wallet. For ₹${cleanAmount}, please top up ₹50-₹100 on panel.zapupi.com.\n\nIn the meantime, you can pay instantly via Direct UPI Transfer below.`
+        );
+      } else {
+        Alert.alert('Payment Gateway Error', errorMsg);
+      }
     } finally {
       setZapupiLoading(false);
     }
