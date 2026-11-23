@@ -7,6 +7,17 @@ const DEFAULT_WEBHOOK_URL =
   `${process.env.APP_URL || 'https://growvest-mobile.onrender.com'}/api/payment/zapupi-webhook`;
 
 class ZapUPIService {
+  async getEffectiveZapKey() {
+    try {
+      const Settings = require('../models/Settings');
+      const setting = await Settings.findOne({ key: 'zap_key' });
+      if (setting && setting.value && setting.value.trim()) {
+        return setting.value.trim();
+      }
+    } catch (_) {}
+    return ZAP_KEY;
+  }
+
   /**
    * Create an order on ZapUPI
    * @param {Object} params
@@ -19,11 +30,12 @@ class ZapUPIService {
    */
   async createOrder({ orderId, amount, customerMobile, remark, webhookUrl }) {
     try {
+      const zapKey = await this.getEffectiveZapKey();
       const callbackBase = process.env.APP_URL || 'https://growvest-mobile.onrender.com';
       const redirectUrl = `${callbackBase}/api/payment/callback?order_id=${encodeURIComponent(orderId)}`;
 
       const payload = {
-        zap_key: ZAP_KEY,
+        zap_key: zapKey,
         order_id: String(orderId),
         amount: String(amount),
         customer_mobile: customerMobile ? String(customerMobile) : '9999999999',
@@ -36,7 +48,7 @@ class ZapUPIService {
 
       console.log('[ZapUPI Service] Creating order with payload:', {
         ...payload,
-        zap_key: '***' + ZAP_KEY.slice(-4),
+        zap_key: '***' + zapKey.slice(-4),
       });
 
       const response = await axios.post(`${BASE_URL}/create-order`, payload, {
@@ -80,10 +92,11 @@ class ZapUPIService {
    */
   async getOrderStatus(orderId) {
     try {
+      const zapKey = await this.getEffectiveZapKey();
       const response = await axios.post(
         `${BASE_URL}/order-status`,
         {
-          zap_key: ZAP_KEY,
+          zap_key: zapKey,
           order_id: String(orderId),
         },
         {

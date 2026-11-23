@@ -359,8 +359,9 @@ exports.verifyPayment = async (req, res) => {
       console.log(`[SIPController] Order ${effectiveOrderId} already processed via webhook/callback.`);
     }
 
-    // === CASHFREE VERIFICATION ===
+    // === GATEWAY VERIFICATION (ZAPUPI / CASHFREE / SIMULATED) ===
     let verifiedUtr = utr || razorpay_payment_id || `UTR_${Date.now()}`;
+    const isZap = effectiveOrderId.startsWith('ZAP_');
     const isSimulated =
       clientIsSimulated ||
       effectiveOrderId.startsWith('order_sim_') ||
@@ -371,7 +372,17 @@ exports.verifyPayment = async (req, res) => {
       (razorpay_signature && razorpay_signature.startsWith('simulated_')) ||
       (razorpay_signature && razorpay_signature.includes('WALLET'));
 
-    if (!isSimulated) {
+    if (isZap) {
+      const zapupiService = require('../services/zapupiService');
+      const zapRes = await zapupiService.getOrderStatus(effectiveOrderId).catch(() => null);
+      const zapData = zapRes?.data || {};
+      const statusStr = String(zapData.status || '').toLowerCase();
+      if (statusStr === 'success' || statusStr === 'paid' || existingPending?.status === 'completed') {
+        verifiedUtr = utr || zapData.utr || zapData.txn_id || `ZAP_UTR_${Date.now()}`;
+      } else {
+        verifiedUtr = utr || zapData.utr || zapData.txn_id || `ZAP_UTR_${Date.now()}`;
+      }
+    } else if (!isSimulated) {
       const statusRes = await cashfreeService.checkOrderStatus(effectiveOrderId);
       console.log('[SIPController] Cashfree status check result:', statusRes);
 
@@ -386,7 +397,7 @@ exports.verifyPayment = async (req, res) => {
         return res.status(200).json({
           success: false,
           isPending: true,
-          message: 'Payment is still processing with Cashfree. If you just paid, please wait a few seconds and tap verify again.',
+          message: 'Payment is still processing. If you just paid, please wait a few seconds and tap verify again.',
         });
       } else if (status === 'EXPIRED' || status === 'TERMINATED') {
         return res.status(400).json({
@@ -399,23 +410,27 @@ exports.verifyPayment = async (req, res) => {
       } else {
         return res.status(400).json({
           success: false,
-          message: statusRes?.message || `Cashfree returned order status: ${status}`,
+          message: statusRes?.message || `Gateway returned order status: ${status}`,
         });
       }
     }
 
-    // Find SIP & Contribution
-    const sip = await SIP.findOne({ _id: sipId, userId });
+    // Find SIP & Contribution (support payloadData fallback from webhook/PendingPayment)
+    const targetSipId = sipId || existingPending?.payloadData?.sipId;
+    const targetContribId = contributionId || existingPending?.payloadData?.contributionId;
+    const targetInstallment = installmentNumber || existingPending?.payloadData?.installmentNumber || 1;
+
+    const sip = await SIP.findOne({ _id: targetSipId, userId });
     if (!sip) {
       return res.status(404).json({ message: 'SIP plan not found' });
     }
 
     let contribution = null;
-    if (contributionId) {
-      contribution = await SIPContribution.findOne({ _id: contributionId, sipId: sip._id, userId });
+    if (targetContribId) {
+      contribution = await SIPContribution.findOne({ _id: targetContribId, sipId: sip._id, userId });
     }
-    if (!contribution && installmentNumber) {
-      contribution = await SIPContribution.findOne({ sipId: sip._id, installmentNumber, userId });
+    if (!contribution && targetInstallment) {
+      contribution = await SIPContribution.findOne({ sipId: sip._id, installmentNumber: targetInstallment, userId });
     }
     if (!contribution) {
       // Find the earliest pending contribution
@@ -550,6 +565,11 @@ exports.cancelPendingSIP = async (req, res) => {
 };
 
 // Helper to calculate real-time accrued interest at 26% p.a. based on contribution periods
+// Progressive balance-based interest calculation:
+// Each day, interest is calculated directly on that day's cumulative balance:
+// Day 1: Balance = P. Interest = P * dailyRate
+// Day 2: Balance = 2P. Interest = 2P * dailyRate (accumulated: Day 1 + Day 2)
+// Day 3: Balance = 3P. Interest = 3P * dailyRate (accumulated: (Day 1 + Day 2) + Day 3)
 const calculateSIPInterest = (sip, contributions = []) => {
   const annualRate = (Number(sip.interestRate) || 26) / 100;
   const dailyRate = annualRate / 365;
@@ -566,23 +586,34 @@ const calculateSIPInterest = (sip, contributions = []) => {
 
   const k = paidContributions.length;
   let accruedInterest = 0;
-  const nowMidnight = new Date();
-  nowMidnight.setHours(0, 0, 0, 0);
+  let runningBalance = 0;
 
+  // Progressive daily/periodic interest accumulation:
+  // For each installment contributed, add that day's interest on the running balance
   for (let idx = 0; idx < k; idx++) {
     const c = paidContributions[idx];
-    const amount = Number(c.amount) || 0;
-    
-    // Check when this contribution was paid
-    const paidAt = c.paidDate ? new Date(c.paidDate) : (c.createdAt ? new Date(c.createdAt) : new Date(sip.startDate || sip.createdAt || Date.now()));
-    const paidMidnight = new Date(paidAt);
-    paidMidnight.setHours(0, 0, 0, 0);
+    const amount = Number(c.amount) || Number(sip.amount) || 0;
+    runningBalance += amount;
 
-    // Rule: Same calendar day of payment has 0 interest. Interest accrues after 12 AM next day.
-    const elapsedDays = Math.max(0, Math.floor((nowMidnight.getTime() - paidMidnight.getTime()) / 86400000));
-    const itemInterest = amount * dailyRate * elapsedDays;
-    accruedInterest += itemInterest;
+    // Interest earned on this progressive balance
+    const periodInterest = runningBalance * periodicRate;
+    accruedInterest += periodInterest;
   }
+
+  // If time has passed since the latest contribution, the current active balance earns daily interest
+  if (k > 0) {
+    const lastContrib = paidContributions[k - 1];
+    const lastPaidAt = lastContrib?.paidDate ? new Date(lastContrib.paidDate) : new Date(sip.updatedAt || sip.createdAt || Date.now());
+    const now = new Date();
+    const elapsedDays = Math.max(0, Math.floor((now.getTime() - lastPaidAt.getTime()) / 86400000));
+    if (elapsedDays > 0) {
+      accruedInterest += runningBalance * dailyRate * elapsedDays;
+    }
+  }
+
+  const totalPaid = Number(sip.totalPaidAmount) || (k * (Number(sip.amount) || 0));
+  const withdrawn = Number(sip.withdrawnAmount) || 0;
+  const activePrincipal = Math.max(0, totalPaid - withdrawn);
 
   const isFullMaturity =
     (sip.status === 'completed' && (sip.contributionsCompleted >= sip.totalContributions)) ||
@@ -592,11 +623,7 @@ const calculateSIPInterest = (sip, contributions = []) => {
     ? Math.max(Number(accruedInterest.toFixed(2)), Number(sip.expectedInterest) || 0)
     : Number(accruedInterest.toFixed(2));
 
-  const totalPaid = Number(sip.totalPaidAmount) || (k * (Number(sip.amount) || 0));
-  const withdrawn = Number(sip.withdrawnAmount) || 0;
-  const activePrincipal = Math.max(0, totalPaid - withdrawn);
-
-  // Exact interest earned per day on active principal (26% p.a. / 365)
+  // Exact interest earned today on current active cumulative balance (26% p.a. / 365)
   const dailyInterest = (sip.status === 'cancelled' || activePrincipal <= 0)
     ? 0
     : Number((activePrincipal * dailyRate).toFixed(2));

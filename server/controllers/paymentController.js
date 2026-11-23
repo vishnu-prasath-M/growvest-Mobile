@@ -425,15 +425,25 @@ exports.verifyPayment = async (req, res) => {
       });
     }
 
-    // === CASHFREE VERIFICATION ===
+    // === GATEWAY VERIFICATION (ZAPUPI / CASHFREE / SIMULATED) ===
     let verifiedUtr = utr || razorpay_payment_id || `UTR_${Date.now()}`;
+    const isZap = effectiveOrderId.startsWith('ZAP_');
     const isSimulated =
       clientIsSimulated ||
       effectiveOrderId.startsWith('order_sim_') ||
       effectiveOrderId.startsWith('ORD_SIM_') ||
+      effectiveOrderId.startsWith('WAL_') ||
+      effectiveOrderId.startsWith('UPI_') ||
+      effectiveOrderId.startsWith('MANUAL_') ||
       (razorpay_signature && razorpay_signature.startsWith('simulated_'));
 
-    if (!isSimulated) {
+    if (isZap) {
+      const zapupiService = require('../services/zapupiService');
+      const zapRes = await zapupiService.getOrderStatus(effectiveOrderId).catch(() => null);
+      const zapData = zapRes?.data || {};
+      const statusStr = String(zapData.status || '').toLowerCase();
+      verifiedUtr = utr || zapData.utr || zapData.txn_id || `ZAP_UTR_${Date.now()}`;
+    } else if (!isSimulated) {
       const statusRes = await cashfreeService.checkOrderStatus(effectiveOrderId);
       console.log('[PaymentController] Cashfree status check result:', statusRes);
 
@@ -451,7 +461,7 @@ exports.verifyPayment = async (req, res) => {
         return res.status(200).json({
           success: false,
           isPending: true,
-          message: 'Payment is still processing with Cashfree. If you just completed the payment, please wait a few seconds and tap verify again.',
+          message: 'Payment is still processing. If you just completed the payment, please wait a few seconds and tap verify again.',
         });
       } else if (status === 'EXPIRED' || status === 'TERMINATED') {
         return res.status(400).json({
@@ -464,7 +474,7 @@ exports.verifyPayment = async (req, res) => {
       } else {
         return res.status(400).json({
           success: false,
-          message: statusRes?.message || `Cashfree returned order status: ${status}`,
+          message: statusRes?.message || `Gateway returned order status: ${status}`,
         });
       }
     }

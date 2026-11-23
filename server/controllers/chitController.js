@@ -502,6 +502,50 @@ const joinChit = async (req, res) => {
       return res.status(403).json({ message: 'Submit KYC before Investment' });
     }
 
+    // Overdue/Pending Dues Guard: If user has an active chit with pending or overdue dues, block joining until cleared
+    const activeMemberships = await ChitMember.find({
+      userId,
+      status: 'active',
+    }).populate('chitId', 'name isWeekly weeklyAmount monthlyAmount totalWeeks duration');
+
+    const now = new Date();
+    for (const m of activeMemberships) {
+      const isWeekly = m.chitId?.isWeekly || false;
+      const joinedDate = new Date(m.joinedAt);
+      const durationUnits = isWeekly
+        ? (m.totalWeeks || m.chitId?.totalWeeks || m.chitId?.duration || 10)
+        : (m.totalWeeks || m.chitId?.duration || 12);
+      const paidUnits = m.paidWeeks || m.currentWeek || m.currentMonth || 1;
+
+      if (paidUnits < durationUnits) {
+        let expectedUnits = 0;
+        if (isWeekly) {
+          const diffTime = Math.abs(now - joinedDate);
+          const weeksElapsed = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7));
+          expectedUnits = Math.max(1, weeksElapsed + 1);
+        } else {
+          const monthsElapsed = (now.getFullYear() - joinedDate.getFullYear()) * 12 +
+                                (now.getMonth() - joinedDate.getMonth());
+          const fullMonthsElapsed = now.getDate() >= joinedDate.getDate() ? monthsElapsed : monthsElapsed - 1;
+          expectedUnits = Math.max(1, fullMonthsElapsed + 1);
+        }
+
+        const pendingCount = Math.max(0, expectedUnits - paidUnits);
+        const due = isWeekly
+          ? calcNextWeeklyDueDate(m.joinedAt, paidUnits)
+          : calcNextDueDate(m.joinedAt, paidUnits);
+
+        const isDueNow = pendingCount > 0 || now >= due || (m.penaltiesUnpaid && m.penaltiesUnpaid > 0);
+        if (isDueNow) {
+          const chitName = m.chitId?.name || 'an existing chit';
+          return res.status(400).json({
+            success: false,
+            message: `You have a pending or overdue installment in '${chitName}'. Please clear your pending chit dues before joining another chit fund.`
+          });
+        }
+      }
+    }
+
     const chit = await Chit.findById(chitId);
     if (!chit) {
       return res.status(404).json({ message: 'Chit not found' });

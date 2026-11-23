@@ -1263,15 +1263,18 @@ const WithdrawScreen = ({ navigation }) => {
 
             {/* Transparent Platform Commission Breakdown */}
             {(() => {
-              const isLaunch = platformCharges?.isPromotionalLaunchOffer !== false;
+              const isLaunch = platformCharges ? platformCharges.isPromotionalLaunchOffer === true : false;
               let commPct = 0;
               if (!isLaunch && platformCharges) {
                 if (activeCategory === 'chit') {
-                  commPct = Number(platformCharges.chitFund?.withdrawCommission) || 0;
+                  commPct = Number(platformCharges.chitFund?.withdrawCommission) || 1.95;
                 } else if (activeCategory === 'sip') {
-                  commPct = Number(platformCharges.sip?.withdrawCommission) || 0;
+                  commPct = Number(platformCharges.sip?.withdrawCommission) || 1.95;
                 } else {
-                  commPct = Number(platformCharges.investmentPlans?.[0]?.processingCharge) || 0;
+                  const p0 = platformCharges.investmentPlans?.[0];
+                  const sum = (Number(p0?.processingCharge || 0) + Number(p0?.maintenanceCharge || 0));
+                  commPct = sum > 0 ? Number(sum.toFixed(2)) : (Number(platformCharges.chitFund?.withdrawCommission) || 1.0);
+                  if (commPct < 1.0) commPct = 1.0;
                 }
               }
               const numAmt = Number(amount) || (selectedChitPayout || 0);
@@ -1287,13 +1290,17 @@ const WithdrawScreen = ({ navigation }) => {
                   <View style={styles.chargeRow}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Text style={styles.chargeLabel}>Withdrawal Commission</Text>
-                      {commPct === 0 && (
+                      {commPct === 0 ? (
                         <View style={styles.launchOfferPill}>
                           <Text style={styles.launchOfferPillText}>0% Launch Offer</Text>
                         </View>
+                      ) : (
+                        <View style={[styles.launchOfferPill, { backgroundColor: '#FEE2E2' }]}>
+                          <Text style={[styles.launchOfferPillText, { color: '#DC2626' }]}>{commPct}% Fee</Text>
+                        </View>
                       )}
                     </View>
-                    <Text style={[styles.chargeVal, { color: commPct === 0 ? '#10B981' : themeColors.text }]}>
+                    <Text style={[styles.chargeVal, { color: commPct === 0 ? '#10B981' : '#EF4444', fontWeight: '700' }]}>
                       {commPct === 0 ? '₹0.00 (Free)' : `-₹${commAmt.toFixed(2)} (${commPct}%)`}
                     </Text>
                   </View>
@@ -1304,6 +1311,11 @@ const WithdrawScreen = ({ navigation }) => {
                       {formatCurrency(netAmt)}
                     </Text>
                   </View>
+                  {commPct > 0 && numAmt > 0 && (
+                    <Text style={{ fontSize: 11, color: themeColors.textMuted, marginTop: 4 }}>
+                      • Platform commission of ₹{commAmt.toFixed(2)} ({commPct}%) is deducted. Exactly {formatCurrency(netAmt)} will be transferred to your account.
+                    </Text>
+                  )}
                 </View>
               );
             })()}

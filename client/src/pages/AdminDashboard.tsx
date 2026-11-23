@@ -38,7 +38,8 @@ import KYCAdmin from "@/components/admin/KYCAdmin";
 import ReferralAdmin from "@/components/admin/ReferralAdmin";
 import { AdBannerAdmin } from "@/components/admin/AdBannerAdmin";
 import { ChargesAdmin } from "@/components/admin/ChargesAdmin";
-import { Percent } from "lucide-react";
+import { ZapUPIGatewayAdmin } from "@/components/admin/ZapUPIGatewayAdmin";
+import { Percent, Zap } from "lucide-react";
 import { PaymentApprovalAdmin } from "@/components/admin/PaymentApprovalAdmin";
 import { Image as ImageIcon, CreditCard } from "lucide-react";
 import { Gift, Bell, RefreshCw } from "lucide-react";
@@ -143,7 +144,7 @@ const getUPIDeepLink = (
   return `upi://pay?${query}`;
 };
 
-type AdminTab = "overview" | "payment_approvals" | "charges" | "ad_banners" | "pending" | "users" | "withdrawals" | "kyc" | "chits" | "sip" | "settings" | "pocket" | "referral" | "push_test";
+type AdminTab = "overview" | "payment_approvals" | "zapupi" | "charges" | "ad_banners" | "pending" | "users" | "withdrawals" | "kyc" | "chits" | "sip" | "settings" | "pocket" | "referral" | "push_test";
 
 const AdminDashboard = () => {
   const { user: authUser, token, logout } = useAuth();
@@ -232,6 +233,8 @@ const AdminDashboard = () => {
   const [navItems, setNavItems] = useState<{ label: string; tab: AdminTab; icon: React.ElementType; badge?: number }[]>([
     { label: "Overview", tab: "overview", icon: LayoutDashboard },
     { label: "Payment Approvals", tab: "payment_approvals", icon: CreditCard, badge: 0 },
+    { label: "ZapUPI Gateway", tab: "zapupi", icon: Zap },
+    { label: "Platform Charges & Commission", tab: "charges", icon: Percent },
     { label: "Ad Banners", tab: "ad_banners", icon: ImageIcon },
     { label: "Pending Investments", tab: "pending", icon: Clock, badge: 0 },
     { label: "Users", tab: "users", icon: Users },
@@ -240,7 +243,6 @@ const AdminDashboard = () => {
     { label: "Chit Funds", tab: "chits", icon: TrendingUp, badge: 0 },
     { label: "Pocket Money", tab: "pocket", icon: Wallet },
     { label: "SIP Investments", tab: "sip", icon: RefreshCw },
-    { label: "Platform Charges & Commission", tab: "charges", icon: Percent },
     { label: "Referral & APK", tab: "referral", icon: Gift },
     { label: "Push Notifications", tab: "push_test", icon: Bell },
     { label: "Settings", tab: "settings", icon: Settings },
@@ -1383,6 +1385,18 @@ const AdminDashboard = () => {
             </motion.div>
           )}
 
+          {/* ── ZAPUPI GATEWAY ── */}
+          {activeTab === "zapupi" && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="w-full"
+            >
+              <ZapUPIGatewayAdmin token={token} />
+            </motion.div>
+          )}
+
           {/* ── PLATFORM CHARGES ── */}
           {activeTab === "charges" && (
             <motion.div
@@ -2011,6 +2025,11 @@ const AdminDashboard = () => {
                     Save UPI ID
                   </Button>
                 </div>
+              </div>
+
+              {/* ZapUPI Payment Gateway Settings */}
+              <div className="w-full mt-10">
+                <ZapUPIGatewayAdmin token={token} />
               </div>
             </motion.div>
           )}

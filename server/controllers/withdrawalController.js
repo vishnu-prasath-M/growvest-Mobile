@@ -130,16 +130,44 @@ exports.createWithdrawal = async (req, res) => {
     const resolvedEmail = userEmail || user.email || user.mobileNumber || user.username || 'user@growvest.in';
     const resolvedName = userName || user.name || user.username || 'User';
 
+    // Fetch dynamic Platform Charges to determine withdrawal commission
+    const PlatformCharge = require('../models/PlatformCharge');
+    const chargeDoc = await PlatformCharge.getSingleton();
+    const effective = chargeDoc ? chargeDoc.getEffectiveCharges() : null;
+
+    let commissionPercent = 0;
+    const isLaunch = effective?.isPromotionalLaunchOffer !== false;
+
+    if (!isLaunch && effective) {
+      if (withdrawType === 'chit' || req.body.activeCategory === 'chit') {
+        commissionPercent = Number(effective.chitFund?.withdrawCommission) || 1.95;
+      } else if (withdrawType === 'sip' || req.body.activeCategory === 'sip') {
+        commissionPercent = Number(effective.sip?.withdrawCommission) || 1.95;
+      } else {
+        const p0 = effective.investmentPlans?.[0];
+        const tierRate = Number(p0?.processingCharge || 0) + Number(p0?.maintenanceCharge || 0);
+        commissionPercent = tierRate > 0 ? Number(tierRate.toFixed(2)) : 1.0;
+        if (commissionPercent < 1.0) commissionPercent = 1.0;
+      }
+    }
+
+    const numAmount = Number(amount);
+    const commissionAmount = commissionPercent > 0 ? Number(((numAmount * commissionPercent) / 100).toFixed(2)) : 0;
+    const netPayoutAmount = Math.max(0, Number((numAmount - commissionAmount).toFixed(2)));
+
     const newWithdrawal = new Withdrawal({
       userId: user._id,
       investmentId: targetInv ? targetInv._id : (mongoose.Types.ObjectId.isValid(withdrawType) ? withdrawType : undefined),
-      amount: Number(amount),
+      amount: numAmount,
+      commissionPercent,
+      commissionAmount,
+      netPayoutAmount,
       upiId,
       userName: resolvedName,
       userEmail: resolvedEmail,
       date: new Date().toLocaleDateString('en-IN'),
-      status: 'pending',
       withdrawType: targetInv ? (targetInv.type || 'investment') : (withdrawType || 'saving'),
+      status: 'pending',
       isEarlyWithdrawal: targetInv ? (new Date() < new Date(targetInv.maturityDate || Date.now())) : false,
     });
 
