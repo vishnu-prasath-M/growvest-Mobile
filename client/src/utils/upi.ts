@@ -60,3 +60,31 @@ export const validateAmount = (amount: number | string): boolean => {
   const numericAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
   return !isNaN(numericAmount) && numericAmount > 0 && numericAmount <= 100000; // Max 1 lakh for safety
 };
+
+/**
+ * Generates platform-specific UPI deeplinks for instant app launching
+ */
+export const openUPIDeeplink = (
+  upiId: string,
+  amount: number | string,
+  note: string = "Growvest Payout",
+  payeeName: string = "User",
+  app?: "generic" | "gpay" | "phonepe" | "paytm"
+): string => {
+  if (!upiId) return "";
+  const cleanUpi = upiId.trim();
+  const cleanAmt = typeof amount === "number" ? amount.toFixed(2) : parseFloat(amount).toFixed(2);
+  const encodedName = encodeURIComponent(payeeName || "User");
+  const query = `pa=${cleanUpi}&pn=${encodedName}&am=${cleanAmt}&cu=INR`;
+
+  if (app === "gpay") {
+    return `tez://upi/pay?${query}`;
+  }
+  if (app === "phonepe") {
+    return `phonepe://pay?${query}`;
+  }
+  if (app === "paytm") {
+    return `paytmmp://pay?${query}`;
+  }
+  return `upi://pay?${query}`;
+};

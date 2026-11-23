@@ -441,7 +441,6 @@ exports.verifyPayment = async (req, res) => {
       const zapupiService = require('../services/zapupiService');
       const zapRes = await zapupiService.getOrderStatus(effectiveOrderId).catch(() => null);
       const zapData = zapRes?.data || {};
-      const statusStr = String(zapData.status || '').toLowerCase();
       verifiedUtr = utr || zapData.utr || zapData.txn_id || `ZAP_UTR_${Date.now()}`;
     } else if (!isSimulated) {
       const statusRes = await cashfreeService.checkOrderStatus(effectiveOrderId);
@@ -461,7 +460,7 @@ exports.verifyPayment = async (req, res) => {
         return res.status(200).json({
           success: false,
           isPending: true,
-          message: 'Payment is still processing. If you just completed the payment, please wait a few seconds and tap verify again.',
+          message: 'Payment is still processing with Cashfree. If you just completed the payment, please wait a few seconds and tap verify again.',
         });
       } else if (status === 'EXPIRED' || status === 'TERMINATED') {
         return res.status(400).json({
@@ -474,7 +473,7 @@ exports.verifyPayment = async (req, res) => {
       } else {
         return res.status(400).json({
           success: false,
-          message: statusRes?.message || `Gateway returned order status: ${status}`,
+          message: statusRes?.message || `Cashfree returned order status: ${status}`,
         });
       }
     }

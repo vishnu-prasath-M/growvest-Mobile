@@ -25,6 +25,7 @@ import {
   Copy,
   Check,
   ExternalLink,
+  QrCode,
 } from "lucide-react";
 import ZenvestLogo from "@/components/ZenvestLogo";
 import { Button } from "@/components/ui/button";
@@ -38,8 +39,7 @@ import KYCAdmin from "@/components/admin/KYCAdmin";
 import ReferralAdmin from "@/components/admin/ReferralAdmin";
 import { AdBannerAdmin } from "@/components/admin/AdBannerAdmin";
 import { ChargesAdmin } from "@/components/admin/ChargesAdmin";
-import { ZapUPIGatewayAdmin } from "@/components/admin/ZapUPIGatewayAdmin";
-import { Percent, Zap } from "lucide-react";
+import { Percent } from "lucide-react";
 import { PaymentApprovalAdmin } from "@/components/admin/PaymentApprovalAdmin";
 import { Image as ImageIcon, CreditCard } from "lucide-react";
 import { Gift, Bell, RefreshCw } from "lucide-react";
@@ -144,13 +144,14 @@ const getUPIDeepLink = (
   return `upi://pay?${query}`;
 };
 
-type AdminTab = "overview" | "payment_approvals" | "zapupi" | "charges" | "ad_banners" | "pending" | "users" | "withdrawals" | "kyc" | "chits" | "sip" | "settings" | "pocket" | "referral" | "push_test";
+type AdminTab = "overview" | "payment_approvals" | "charges" | "ad_banners" | "pending" | "users" | "withdrawals" | "kyc" | "chits" | "sip" | "settings" | "pocket" | "referral" | "push_test";
 
 const AdminDashboard = () => {
   const { user: authUser, token, logout } = useAuth();
   const navigate = useNavigate();
   const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
   const [copiedUPI, setCopiedUPI] = useState(false);
+  const [showWithdrawQr, setShowWithdrawQr] = useState(!isMobile);
 
   const handleOpenUPI = (
     upiId?: string,
@@ -233,7 +234,6 @@ const AdminDashboard = () => {
   const [navItems, setNavItems] = useState<{ label: string; tab: AdminTab; icon: React.ElementType; badge?: number }[]>([
     { label: "Overview", tab: "overview", icon: LayoutDashboard },
     { label: "Payment Approvals", tab: "payment_approvals", icon: CreditCard, badge: 0 },
-    { label: "ZapUPI Gateway", tab: "zapupi", icon: Zap },
     { label: "Platform Charges & Commission", tab: "charges", icon: Percent },
     { label: "Ad Banners", tab: "ad_banners", icon: ImageIcon },
     { label: "Pending Investments", tab: "pending", icon: Clock, badge: 0 },
@@ -1385,18 +1385,6 @@ const AdminDashboard = () => {
             </motion.div>
           )}
 
-          {/* ── ZAPUPI GATEWAY ── */}
-          {activeTab === "zapupi" && (
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4 }}
-              className="w-full"
-            >
-              <ZapUPIGatewayAdmin token={token} />
-            </motion.div>
-          )}
-
           {/* ── PLATFORM CHARGES ── */}
           {activeTab === "charges" && (
             <motion.div
@@ -2026,11 +2014,6 @@ const AdminDashboard = () => {
                   </Button>
                 </div>
               </div>
-
-              {/* ZapUPI Payment Gateway Settings */}
-              <div className="w-full mt-10">
-                <ZapUPIGatewayAdmin token={token} />
-              </div>
             </motion.div>
           )}
         </main>
@@ -2112,18 +2095,20 @@ const AdminDashboard = () => {
               </div>
             )}
 
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-border" />
-              </div>
-              <div className="relative flex justify-center text-[10px] uppercase">
-                <span className="bg-card px-2 text-muted-foreground font-semibold tracking-wider">
-                  Or Scan QR Code
-                </span>
-              </div>
+            {/* QR Code Container with Toggle */}
+            <div className="pt-1 mb-4">
+              <button
+                type="button"
+                onClick={() => setShowWithdrawQr(!showWithdrawQr)}
+                className="w-full py-1.5 text-[11px] font-body text-muted-foreground hover:text-foreground flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <QrCode className="h-3.5 w-3.5" />
+                {showWithdrawQr ? "Hide QR Code" : "Show QR Code (For Desktop / Another Device)"}
+              </button>
             </div>
 
-            <div className="flex flex-col items-center justify-center mb-6 gap-4">
+            {showWithdrawQr && (
+              <div className="flex flex-col items-center justify-center mb-6 gap-4 animate-in fade-in duration-200">
               {(() => {
                 try {
                   // Validate data before generating QR
@@ -2211,6 +2196,7 @@ const AdminDashboard = () => {
                 }
               })()}
             </div>
+            )}
 
             <div className="space-y-4 mb-6">
               <div>

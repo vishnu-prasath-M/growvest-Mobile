@@ -13,11 +13,14 @@ import {
   DollarSign,
   X,
   QrCode,
+  Smartphone,
+  Copy,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
-import { generateUPILink } from "@/utils/upi";
+import { generateUPILink, openUPIDeeplink } from "@/utils/upi";
 
 const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" ? "http://localhost:5000" : "https://growvest-mobile.onrender.com");
 
@@ -52,6 +55,32 @@ export default function PocketMoneyAdmin({ token }: PocketMoneyAdminProps) {
   const [releaseModalData, setReleaseModalData] = useState<any | null>(null);
   const [modalUpiId, setModalUpiId] = useState("");
   const [fetchingUpi, setFetchingUpi] = useState(false);
+  const [copiedUpi, setCopiedUpi] = useState(false);
+  const isMobile = typeof navigator !== "undefined" && /Android|iPhone|iPad/i.test(navigator.userAgent);
+  const [showQr, setShowQr] = useState(!isMobile);
+
+  const handleOpenUPI = (
+    upiId: string,
+    amount: number | string,
+    note: string = "Pocket Money Payout",
+    payeeName: string = "User",
+    app?: "generic" | "gpay" | "phonepe" | "paytm"
+  ) => {
+    if (!upiId) {
+      toast.error("User does not have a UPI ID provided");
+      return;
+    }
+    const url = openUPIDeeplink(upiId, amount, note, payeeName, app);
+    window.location.href = url;
+  };
+
+  const handleCopyUpi = (upiId: string) => {
+    if (!upiId) return;
+    navigator.clipboard.writeText(upiId);
+    setCopiedUpi(true);
+    toast.success("UPI ID copied to clipboard!");
+    setTimeout(() => setCopiedUpi(false), 2000);
+  };
 
   const fetchStats = async () => {
     if (!token) return;
@@ -565,31 +594,79 @@ export default function PocketMoneyAdmin({ token }: PocketMoneyAdminProps) {
                   </span>
                 </div>
 
-                {/* QR Code Container */}
-                <div className="flex flex-col items-center justify-center py-2">
-                  {modalUpiId ? (
-                    <div className="rounded-2xl border border-border p-4 bg-white shadow-sm flex flex-col items-center">
-                      <QRCodeSVG value={upiLink} size={160} level="M" />
-                      <span className="text-[10px] font-body text-muted-foreground mt-2 uppercase tracking-wider font-semibold">
-                        Scan to Pay with Any UPI App
+                {/* Direct 1-Click Mobile UPI App Launchers */}
+                {modalUpiId && releaseModalData.payoutAmount > 0 && (
+                  <div className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50/50 border border-emerald-200/80 shadow-sm space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-heading font-bold text-emerald-950 flex items-center gap-1.5">
+                        <Smartphone className="h-4 w-4 text-emerald-600" />
+                        Pay via UPI Mobile App
+                      </span>
+                      <span className="text-[10px] font-body font-semibold px-2 py-0.5 rounded-full bg-emerald-200/70 text-emerald-800">
+                        Instant Deeplink
                       </span>
                     </div>
-                  ) : (
-                    <div className="text-center p-4 border border-dashed border-destructive/30 rounded-xl bg-destructive/5 text-destructive">
-                      <AlertCircle className="mx-auto h-6 w-6 mb-2" />
-                      <p className="text-xs font-body font-semibold">No UPI address registered in user KYC.</p>
-                      <p className="text-[10px] font-body mt-1">
-                        Please enter their UPI address manually below to generate the QR code.
-                      </p>
-                    </div>
-                  )}
-                </div>
 
-                {/* Editable UPI ID Input */}
+                    {/* Primary UPI Chooser Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleOpenUPI(modalUpiId, releaseModalData.payoutAmount, `PM-${releaseModalData._id}`, releaseModalData.userName)}
+                      className="w-full h-11 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-[0.99] text-white font-body font-bold text-sm flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 hover:shadow-lg transition-all"
+                    >
+                      <DollarSign className="h-4 w-4 text-white" />
+                      Open UPI App (GPay / PhonePe / Paytm)
+                    </button>
+
+                    {/* Dedicated App Buttons */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenUPI(modalUpiId, releaseModalData.payoutAmount, `PM-${releaseModalData._id}`, releaseModalData.userName, 'gpay')}
+                        className="h-9 px-1 rounded-xl bg-white hover:bg-blue-50 border border-blue-200 text-blue-700 font-body text-xs font-bold flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-all"
+                        title="Pay with Google Pay"
+                      >
+                        <span className="w-2 h-2 rounded-full bg-blue-500" />
+                        Google Pay
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenUPI(modalUpiId, releaseModalData.payoutAmount, `PM-${releaseModalData._id}`, releaseModalData.userName, 'phonepe')}
+                        className="h-9 px-1 rounded-xl bg-white hover:bg-purple-50 border border-purple-200 text-purple-700 font-body text-xs font-bold flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-all"
+                        title="Pay with PhonePe"
+                      >
+                        <span className="w-2 h-2 rounded-full bg-purple-500" />
+                        PhonePe
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenUPI(modalUpiId, releaseModalData.payoutAmount, `PM-${releaseModalData._id}`, releaseModalData.userName, 'paytm')}
+                        className="h-9 px-1 rounded-xl bg-white hover:bg-sky-50 border border-sky-200 text-sky-700 font-body text-xs font-bold flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-all"
+                        title="Pay with Paytm"
+                      >
+                        <span className="w-2 h-2 rounded-full bg-sky-500" />
+                        Paytm
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Recipient UPI ID with Copy Button */}
                 <div className="space-y-1">
-                  <label className="text-[11px] font-body font-semibold text-muted-foreground uppercase tracking-wider block">
-                    Recipient UPI ID
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-body font-semibold text-muted-foreground uppercase tracking-wider block">
+                      Recipient UPI ID
+                    </label>
+                    {modalUpiId && (
+                      <button
+                        type="button"
+                        onClick={() => handleCopyUpi(modalUpiId)}
+                        className="text-[11px] text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1"
+                      >
+                        {copiedUpi ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                        {copiedUpi ? "Copied" : "Copy UPI ID"}
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={modalUpiId}
@@ -598,6 +675,36 @@ export default function PocketMoneyAdmin({ token }: PocketMoneyAdminProps) {
                     className="w-full px-3 py-2 border border-border rounded-xl bg-background text-sm font-body text-center focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary font-semibold"
                   />
                 </div>
+
+                {/* QR Code Container with Toggle */}
+                {modalUpiId ? (
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowQr(!showQr)}
+                      className="w-full py-1.5 text-[11px] font-body text-muted-foreground hover:text-foreground flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <QrCode className="h-3.5 w-3.5" />
+                      {showQr ? "Hide QR Code" : "Show QR Code (For Desktop / Another Device)"}
+                    </button>
+                    {showQr && (
+                      <div className="rounded-2xl border border-border p-4 bg-white shadow-sm flex flex-col items-center mt-2 animate-in fade-in duration-200">
+                        <QRCodeSVG value={upiLink} size={150} level="M" />
+                        <span className="text-[10px] font-body text-muted-foreground mt-2 uppercase tracking-wider font-semibold">
+                          Scan to Pay with Any UPI App
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center p-4 border border-dashed border-destructive/30 rounded-xl bg-destructive/5 text-destructive">
+                    <AlertCircle className="mx-auto h-6 w-6 mb-2" />
+                    <p className="text-xs font-body font-semibold">No UPI address registered in user KYC.</p>
+                    <p className="text-[10px] font-body mt-1">
+                      Please enter their UPI address manually above to pay or generate QR code.
+                    </p>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-3 pt-2">
                   <Button
