@@ -59,13 +59,20 @@ class ZoxyService {
       const data = response.data;
       console.log('[Zoxy Service] Create order response:', data);
 
-      // Zoxy returns { status: true, payment_url: "...", hash: "...", ... } on success
-      if (data && (data.status === true || data.status === 'true' || data.payment_url)) {
+      const resultObj = data?.result || data?.data || data || {};
+      const paymentUrl = resultObj.payment_url || data.payment_url;
+      const orderIdFinal = resultObj.order_id || resultObj.orderId || data.order_id || orderId;
+      const hash = resultObj.hash || data.hash;
+      const qrData = resultObj.qr_data || data.qr_data;
+
+      // Zoxy returns { status: true, result: { payment_url: "...", hash: "..." } } on success
+      if (data && (data.status === true || data.status === 'true' || paymentUrl)) {
         return {
           success: true,
-          orderId: data.order_id || orderId,
-          paymentUrl: data.payment_url,
-          hash: data.hash,
+          orderId: orderIdFinal,
+          paymentUrl,
+          qrData,
+          hash,
           raw: data,
         };
       }
@@ -109,15 +116,18 @@ class ZoxyService {
       );
 
       const resData = response.data;
+      const resultObj = resData?.result || resData?.data || resData || {};
+      const statusStr = String(resultObj?.status || resultObj?.txnStatus || resData?.status || '').toUpperCase();
       const isSuccess =
-        resData?.status === 'COMPLETED' ||
-        resData?.status === 'SUCCESS' ||
-        resData?.status === true ||
-        String(resData?.result?.status || '').toUpperCase() === 'COMPLETED';
+        statusStr === 'COMPLETED' ||
+        statusStr === 'SUCCESS' ||
+        resData?.status === true;
 
       return {
         success: isSuccess,
-        data: resData?.result || resData?.data || resData,
+        status: statusStr,
+        utr: resultObj?.utr || resultObj?.gateway_txn || resultObj?.byteTransactionId || '',
+        data: resultObj,
         raw: resData,
       };
     } catch (err) {
@@ -131,3 +141,4 @@ class ZoxyService {
 }
 
 module.exports = new ZoxyService();
+
