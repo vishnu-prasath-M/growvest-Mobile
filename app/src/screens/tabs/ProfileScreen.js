@@ -325,6 +325,23 @@ const ProfileScreen = ({ navigation }) => {
               </View>
             </LinearGradient>
           </View>
+
+          {/* Quick Wallet Button nearby "RA" Avatar */}
+          <TouchableOpacity
+            style={styles.avatarWalletBtn}
+            onPress={() => navigation.navigate('Wallet')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.avatarWalletIconBox}>
+              <MaterialCommunityIcons name="wallet-outline" size={24} color="#10B981" />
+            </View>
+            <View style={styles.avatarWalletTextBox}>
+              <Text style={styles.avatarWalletTitle}>Wallet</Text>
+              <Text style={styles.avatarWalletAmount} numberOfLines={1}>
+                ₹{(walletBalance || 0).toLocaleString('en-IN')}
+              </Text>
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* Name & Info */}
@@ -333,22 +350,6 @@ const ProfileScreen = ({ navigation }) => {
             <Text style={styles.profileName}>{activeUserObj?.name || activeUserObj?.username || 'User'}</Text>
             <MaterialCommunityIcons name="check-decagram" size={18} color={colors.primary} />
           </View>
-
-          {/* Quick Wallet Button nearby user name */}
-          <TouchableOpacity
-            style={styles.walletQuickBtn}
-            onPress={() => navigation.navigate('Wallet')}
-            activeOpacity={0.8}
-          >
-            <View style={styles.walletIconCircle}>
-              <MaterialCommunityIcons name="wallet-outline" size={16} color="#10B981" />
-            </View>
-            <Text style={styles.walletQuickLabel}>Growvest Wallet</Text>
-            <View style={styles.walletBalanceBadge}>
-              <Text style={styles.walletBalanceText}>₹{(walletBalance || 0).toLocaleString('en-IN')}</Text>
-            </View>
-            <MaterialCommunityIcons name="chevron-right" size={16} color={themeColors.textMuted} />
-          </TouchableOpacity>
         </View>
 
         {/* Stats Row */}
@@ -847,44 +848,52 @@ const getStyles = (themeColors, isDarkMode, insets = { top: 0 }) => StyleSheet.c
   },
   avatarInitials: { fontSize: 28, fontWeight: '800', color: colors.primary, letterSpacing: -0.5 },
 
-  // Name
-  nameSection: { alignItems: 'center', paddingHorizontal: 24, marginTop: 12 },
-  walletQuickBtn: {
+  // Wallet button nearby "RA"
+  avatarWalletBtn: {
+    position: 'absolute',
+    right: 16,
+    bottom: -32,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.12)' : '#ECFDF5',
-    borderWidth: 1,
-    borderColor: isDarkMode ? 'rgba(16, 185, 129, 0.3)' : '#A7F3D0',
-    paddingVertical: 7,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    marginTop: 10,
+    backgroundColor: isDarkMode ? '#0E2818' : '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: isDarkMode ? 'rgba(52, 211, 153, 0.4)' : '#A7F3D0',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 16,
     gap: 8,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 5,
   },
-  walletIconCircle: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.25)' : '#D1FAE5',
+  avatarWalletIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.2)' : '#D1FAE5',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  walletQuickLabel: {
-    fontSize: 12,
+  avatarWalletTextBox: {
+    justifyContent: 'center',
+  },
+  avatarWalletTitle: {
+    fontSize: 11,
     fontWeight: '700',
     color: isDarkMode ? '#34D399' : '#059669',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
-  walletBalanceBadge: {
-    backgroundColor: isDarkMode ? '#064E3B' : '#10B981',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  walletBalanceText: {
-    fontSize: 12,
+  avatarWalletAmount: {
+    fontSize: 13,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: themeColors.text,
   },
+
+  // Name
+  nameSection: { alignItems: 'center', paddingHorizontal: 24, marginTop: 12 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   profileName: { fontSize: 22, fontWeight: '800', color: themeColors.text, letterSpacing: -0.5 },
   profileMeta: { fontSize: 13, color: themeColors.textMuted, marginTop: 4, textAlign: 'center' },
