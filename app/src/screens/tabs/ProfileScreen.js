@@ -326,21 +326,14 @@ const ProfileScreen = ({ navigation }) => {
             </LinearGradient>
           </View>
 
-          {/* Quick Wallet Button nearby "RA" Avatar */}
+          {/* Top-Right Header Wallet Quick Access */}
           <TouchableOpacity
-            style={styles.avatarWalletBtn}
+            style={styles.topHeaderWalletBtn}
             onPress={() => navigation.navigate('Wallet')}
             activeOpacity={0.8}
           >
-            <View style={styles.avatarWalletIconBox}>
-              <MaterialCommunityIcons name="wallet-outline" size={24} color="#10B981" />
-            </View>
-            <View style={styles.avatarWalletTextBox}>
-              <Text style={styles.avatarWalletTitle}>Wallet</Text>
-              <Text style={styles.avatarWalletAmount} numberOfLines={1}>
-                ₹{(walletBalance || 0).toLocaleString('en-IN')}
-              </Text>
-            </View>
+            <MaterialCommunityIcons name="wallet-outline" size={18} color="#FFFFFF" />
+            <Text style={styles.topHeaderWalletText}>Wallet</Text>
           </TouchableOpacity>
         </View>
 
@@ -848,48 +841,27 @@ const getStyles = (themeColors, isDarkMode, insets = { top: 0 }) => StyleSheet.c
   },
   avatarInitials: { fontSize: 28, fontWeight: '800', color: colors.primary, letterSpacing: -0.5 },
 
-  // Wallet button nearby "RA"
-  avatarWalletBtn: {
+  // Top-Right Header Wallet button
+  topHeaderWalletBtn: {
     position: 'absolute',
-    right: 16,
-    bottom: -32,
+    top: (insets?.top || 16) + 10,
+    right: 18,
+    zIndex: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: isDarkMode ? '#0E2818' : '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: isDarkMode ? 'rgba(52, 211, 153, 0.4)' : '#A7F3D0',
+    backgroundColor: 'rgba(0, 0, 0, 0.32)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.22)',
     paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 16,
-    gap: 8,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 5,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    gap: 6,
   },
-  avatarWalletIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
-    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.2)' : '#D1FAE5',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarWalletTextBox: {
-    justifyContent: 'center',
-  },
-  avatarWalletTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: isDarkMode ? '#34D399' : '#059669',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  avatarWalletAmount: {
+  topHeaderWalletText: {
     fontSize: 13,
-    fontWeight: '800',
-    color: themeColors.text,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
   },
 
   // Name
