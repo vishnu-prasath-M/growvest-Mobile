@@ -106,15 +106,15 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
 
   const checkStatusOnce = async (oid) => {
     try {
-      const res = await paymentService.checkZapupiOrderStatus(oid);
-      if (res?.success && res.isPaid) {
+      const res = await paymentService.checkZoxyOrderStatus(oid);
+      if (res?.success && (res.isPaid || res.status === 'completed')) {
         stopZapPolling();
         setIsZapVerified(true);
         setShowSuccessModal(true);
         return true;
       }
     } catch (e) {
-      console.warn('[ZapUPI] Status check notice:', e.message);
+      console.warn('[Zoxy] Status check notice:', e.message);
     }
     return false;
   };
@@ -136,7 +136,7 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
   const handleZapupiPay = async () => {
     setZapupiLoading(true);
     try {
-      const res = await paymentService.createZapupiOrder(cleanAmount, paymentType, payloadData);
+      const res = await paymentService.createZoxyOrder(cleanAmount, paymentType, payloadData);
       if (res?.success && res.paymentUrl) {
         setZapOrderId(res.orderId);
         setZapPaymentUrl(res.paymentUrl);
@@ -156,27 +156,13 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
         await Linking.openURL(res.paymentUrl);
         startZapPolling(res.orderId);
       } else {
-        const msg = res?.message || 'Failed to initiate ZapUPI payment.';
-        if (msg.includes('Insufficient Topup Balance')) {
-          Alert.alert(
-            'ZapUPI Wallet Topup Needed',
-            `ZapUPI charges a small transaction fee from your ZapUPI merchant wallet. For ₹${cleanAmount}, please top up ₹50-₹100 on panel.zapupi.com.\n\nIn the meantime, you can pay instantly via Direct UPI Transfer below.`
-          );
-        } else {
-          Alert.alert('Payment Gateway Error', msg);
-        }
+        const msg = res?.message || 'Failed to initiate payment gateway.';
+        Alert.alert('Payment Gateway Error', msg);
       }
     } catch (err) {
-      console.error('[ZapUPI Pay] error:', err);
-      const errorMsg = err?.response?.data?.message || err.message || 'Failed to connect to ZapUPI';
-      if (errorMsg.includes('Insufficient Topup Balance')) {
-        Alert.alert(
-          'ZapUPI Wallet Topup Needed',
-          `ZapUPI charges a small transaction fee from your ZapUPI merchant wallet. For ₹${cleanAmount}, please top up ₹50-₹100 on panel.zapupi.com.\n\nIn the meantime, you can pay instantly via Direct UPI Transfer below.`
-        );
-      } else {
-        Alert.alert('Payment Gateway Error', errorMsg);
-      }
+      console.error('[Payment Gateway Pay] error:', err);
+      const errorMsg = err?.response?.data?.message || err.message || 'Failed to connect to payment gateway';
+      Alert.alert('Payment Gateway Error', errorMsg);
     } finally {
       setZapupiLoading(false);
     }
@@ -345,7 +331,7 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.zapTitle}>Instant Online Checkout</Text>
-                <Text style={styles.zapSubtitle}>Powered by ZapUPI • Automated Approval</Text>
+                <Text style={styles.zapSubtitle}>Official UPI Gateway • Automated Approval</Text>
               </View>
               <View style={styles.zapLiveBadge}>
                 <Text style={styles.zapLiveText}>INSTANT</Text>
@@ -376,7 +362,7 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
               ) : (
                 <>
                   <MaterialCommunityIcons name="shield-check" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-                  <Text style={styles.zapPayBtnText}>Pay {formatCurrency(cleanAmount)} via ZapUPI</Text>
+                  <Text style={styles.zapPayBtnText}>Pay {formatCurrency(cleanAmount)} via UPI Gateway</Text>
                 </>
               )}
             </TouchableOpacity>

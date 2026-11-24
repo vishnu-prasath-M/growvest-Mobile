@@ -161,7 +161,7 @@ const AdminDashboard = () => {
     if (!payModalData) return;
     try {
       setInitiatingGateway(true);
-      const res = await fetch(`${API_URL}/api/payment/zapupi/create-order`, {
+      const res = await fetch(`${API_URL}/api/payment/zoxy/create-order`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

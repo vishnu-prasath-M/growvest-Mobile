@@ -16,11 +16,19 @@ router.get('/manual/all', protect, admin, paymentController.getAllManualPayments
 router.post('/manual/:id/approve', protect, admin, paymentController.approveManualPayment);
 router.post('/manual/:id/reject', protect, admin, paymentController.rejectManualPayment);
 
-// ─── ZapUPI Gateway Endpoints ──────────────────────────────────────────────
-router.post('/zapupi/create-order', protect, paymentController.createZapupiOrder);
-router.post('/zapupi/check-status', protect, paymentController.checkZapupiOrderStatus);
-router.post('/zapupi-webhook', paymentController.handleZapupiWebhook);
-router.get('/zapupi-webhook', paymentController.handleZapupiWebhook);
+// ─── Zoxy Official Payment Gateway Endpoints (0% Commission) ────────────────
+router.post('/zoxy/create-order', protect, paymentController.createZoxyOrder);
+router.post('/zoxy/check-status', protect, paymentController.checkZoxyOrderStatus);
+router.post('/zoxy-webhook', paymentController.handleZoxyWebhook);
+router.get('/zoxy-webhook', paymentController.handleZoxyWebhook);
+router.get('/zoxy-callback', paymentController.handleZoxyCallback);
+router.post('/zoxy-callback', paymentController.handleZoxyCallback);
+
+// ─── ZapUPI Legacy Aliases (Forward to Zoxy or Compatibility) ───────────────
+router.post('/zapupi/create-order', protect, paymentController.createZoxyOrder);
+router.post('/zapupi/check-status', protect, paymentController.checkZoxyOrderStatus);
+router.post('/zapupi-webhook', paymentController.handleZoxyWebhook);
+router.get('/zapupi-webhook', paymentController.handleZoxyWebhook);
 
 // ─── Gateway Webhooks & Callbacks (Preserved for Future) ────────────────────
 router.post('/webhook', paymentController.handleWebhook);

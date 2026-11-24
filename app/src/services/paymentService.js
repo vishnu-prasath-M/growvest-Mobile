@@ -72,13 +72,13 @@ export const paymentService = {
   },
 
   /**
-   * Create ZapUPI payment order
+   * Create Zoxy Official UPI payment order (0% Commission)
    * @param {number} amount
    * @param {string} purpose
    * @param {object} notes
    */
-  createZapupiOrder: async (amount, purpose = 'investment', notes = {}) => {
-    const response = await api.post('/payment/zapupi/create-order', {
+  createZoxyOrder: async (amount, purpose = 'investment', notes = {}) => {
+    const response = await api.post('/payment/zoxy/create-order', {
       amount,
       purpose,
       notes,
@@ -87,11 +87,28 @@ export const paymentService = {
   },
 
   /**
-   * Check live ZapUPI order status
+   * Check live Zoxy order status
    * @param {string} orderId
    */
+  checkZoxyOrderStatus: async (orderId) => {
+    const response = await api.post('/payment/zoxy/check-status', { order_id: orderId });
+    return response.data;
+  },
+
+  /**
+   * Legacy Aliases (Forward to Zoxy)
+   */
+  createZapupiOrder: async (amount, purpose = 'investment', notes = {}) => {
+    const response = await api.post('/payment/zoxy/create-order', {
+      amount,
+      purpose,
+      notes,
+    });
+    return response.data;
+  },
+
   checkZapupiOrderStatus: async (orderId) => {
-    const response = await api.post('/payment/zapupi/check-status', { order_id: orderId });
+    const response = await api.post('/payment/zoxy/check-status', { order_id: orderId });
     return response.data;
   },
 };

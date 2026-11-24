@@ -318,8 +318,9 @@ exports.createOrder = async (req, res) => {
     */
 
     // ============================================================================
-    // === ZAPUPI PAYMENT GATEWAY ORDER CREATION ==================================
+    // === PREVIOUS ZAPUPI PAYMENT GATEWAY (COMMENTED OUT AS REQUESTED) ===========
     // ============================================================================
+    /*
     const zapupiService = require('../services/zapupiService');
     const user = req.user;
     const orderId = `ZAP_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
@@ -377,6 +378,67 @@ exports.createOrder = async (req, res) => {
       currency: 'INR',
       paymentType: effectivePaymentType,
     });
+    */
+
+    // ============================================================================
+    // === ZOXY PAYMENT GATEWAY ORDER CREATION (0% COMMISSION OFFICIAL GATEWAY) ===
+    // ============================================================================
+    const zoxyService = require('../services/zoxyService');
+    const user = req.user;
+    const orderId = `ZOX_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+    const effectivePaymentType = purpose || notes?.paymentType || 'investment';
+    const payload = notes || req.body?.payloadData || {};
+    const exactAmount = Math.round(Number(amount));
+    const customerMobile = user?.mobileNumber || req.body?.customerMobile || '9999999999';
+
+    // 1. Call Zoxy create-order API
+    const zoxyRes = await zoxyService.createOrder({
+      orderId,
+      amount: exactAmount,
+      customerMobile,
+      remark: `${effectivePaymentType} | ${user?._id || 'user'}`,
+    });
+
+    if (!zoxyRes.success || !zoxyRes.paymentUrl) {
+      console.error('[PaymentController] Zoxy order creation failed:', zoxyRes);
+      return res.status(500).json({
+        success: false,
+        message: zoxyRes.message || 'Failed to initialize Zoxy payment gateway',
+        error: zoxyRes.error,
+      });
+    }
+
+    // 2. Save PendingPayment in DB for webhook and status checking
+    try {
+      await PendingPayment.findOneAndUpdate(
+        { orderId },
+        {
+          orderId,
+          userId: user._id,
+          paymentType: effectivePaymentType,
+          payloadData: payload,
+          amount: exactAmount,
+          status: 'pending',
+          gateway: 'zoxy',
+          paymentUrl: zoxyRes.paymentUrl,
+        },
+        { upsert: true, new: true }
+      );
+      console.log(`[PaymentController] PendingPayment saved for Zoxy order: ${orderId}`);
+    } catch (ppErr) {
+      console.warn('[PaymentController] PendingPayment save warning:', ppErr.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      orderId,
+      paymentUrl: zoxyRes.paymentUrl,
+      hash: zoxyRes.hash,
+      gateway: 'zoxy',
+      amount: exactAmount,
+      currency: 'INR',
+      paymentType: effectivePaymentType,
+    });
   } catch (error) {
     console.error('[PaymentController] Create order error:', error);
     res.status(500).json({ message: 'Failed to create payment order', error: error.message });
@@ -425,8 +487,9 @@ exports.verifyPayment = async (req, res) => {
       });
     }
 
-    // === GATEWAY VERIFICATION (ZAPUPI / CASHFREE / SIMULATED) ===
+    // === GATEWAY VERIFICATION (ZOXY / ZAPUPI / CASHFREE / SIMULATED) ===
     let verifiedUtr = utr || razorpay_payment_id || `UTR_${Date.now()}`;
+    const isZoxy = effectiveOrderId.startsWith('ZOX_') || Boolean(existingPending && existingPending.gateway === 'zoxy');
     const isZap = effectiveOrderId.startsWith('ZAP_') || Boolean(existingPending && existingPending.gateway === 'zapupi');
     const isSimulated =
       clientIsSimulated ||
@@ -434,7 +497,26 @@ exports.verifyPayment = async (req, res) => {
       effectiveOrderId.startsWith('ORD_SIM_') ||
       (razorpay_signature && razorpay_signature.startsWith('simulated_'));
 
-    if (isZap) {
+    if (isZoxy) {
+      const zoxyService = require('../services/zoxyService');
+      const zoxyRes = await zoxyService.getOrderStatus(effectiveOrderId).catch(() => null);
+      const zoxyData = zoxyRes?.data || {};
+      const statusStr = String(zoxyData.status || zoxyRes?.raw?.status || '').toUpperCase();
+      const isPaid =
+        statusStr === 'COMPLETED' ||
+        statusStr === 'SUCCESS' ||
+        zoxyRes?.success === true ||
+        existingPending?.status === 'completed';
+
+      if (!isPaid) {
+        return res.status(200).json({
+          success: false,
+          isPending: true,
+          message: 'Payment is not completed yet on Zoxy. Please complete the transaction in your UPI app and tap verify.',
+        });
+      }
+      verifiedUtr = utr || zoxyData.utr || zoxyData.gateway_txn || zoxyData.txn_id || `ZOX_UTR_${Date.now()}`;
+    } else if (isZap) {
       const zapupiService = require('../services/zapupiService');
       const zapRes = await zapupiService.getOrderStatus(effectiveOrderId).catch(() => null);
       const zapData = zapRes?.data || {};
@@ -523,6 +605,24 @@ exports.checkOrderStatus = async (req, res) => {
       return res.status(400).json({ success: false, message: 'order_id is required' });
     }
 
+    if (String(order_id).startsWith('ZOX_')) {
+      const zoxyService = require('../services/zoxyService');
+      const zoxyData = await zoxyService.getOrderStatus(order_id);
+      return res.status(200).json({
+        success: true,
+        data: zoxyData,
+      });
+    }
+
+    if (String(order_id).startsWith('ZAP_')) {
+      const zapupiService = require('../services/zapupiService');
+      const zapData = await zapupiService.getOrderStatus(order_id);
+      return res.status(200).json({
+        success: true,
+        data: zapData,
+      });
+    }
+
     const statusData = await cashfreeService.checkOrderStatus(order_id);
     return res.status(200).json({
       success: true,
@@ -548,9 +648,34 @@ exports.handleCallback = async (req, res) => {
 
     if (order_id) {
       try {
+        const isZoxy = String(order_id).startsWith('ZOX_') || Boolean(await PendingPayment.findOne({ orderId: order_id, gateway: 'zoxy' }));
         const isZap = String(order_id).startsWith('ZAP_') || Boolean(await PendingPayment.findOne({ orderId: order_id, gateway: 'zapupi' }));
 
-        if (isZap) {
+        if (isZoxy) {
+          const zoxyService = require('../services/zoxyService');
+          const zoxyRes = await zoxyService.getOrderStatus(order_id).catch(() => null);
+          const zoxyData = zoxyRes?.data || {};
+          const statusStr = String(zoxyData.status || zoxyRes?.raw?.status || '').toUpperCase();
+          const utr = req.query?.utr || req.query?.gateway_txn || zoxyData.utr || zoxyData.gateway_txn || `ZOX_CB_${Date.now()}`;
+          const isSuccessQuery =
+            String(req.query?.status || '').toUpperCase() === 'SUCCESS' ||
+            String(req.body?.status || '').toUpperCase() === 'SUCCESS' ||
+            String(req.query?.status || '').toUpperCase() === 'COMPLETED' ||
+            String(req.body?.status || '').toUpperCase() === 'COMPLETED';
+
+          if (statusStr === 'COMPLETED' || statusStr === 'SUCCESS' || isSuccessQuery || zoxyRes?.success) {
+            finalStatus = 'success';
+            await processSuccessfulOrder(order_id, utr);
+            console.log(`[PaymentCallback] Zoxy order ${order_id} verified & processed into DB!`);
+          } else {
+            const alreadyDone = await PendingPayment.findOne({ orderId: order_id, status: 'completed' });
+            if (alreadyDone) {
+              finalStatus = 'success';
+            } else {
+              finalStatus = 'pending';
+            }
+          }
+        } else if (isZap) {
           const zapupiService = require('../services/zapupiService');
           const zapRes = await zapupiService.getOrderStatus(order_id).catch(() => null);
           const zapData = zapRes?.data || {};
@@ -1908,9 +2033,9 @@ exports.testGmailConnection = async (req, res) => {
 exports.processSuccessfulOrder = processSuccessfulOrder;
 
 // ============================================================================
-// === ZAPUPI PAYMENT GATEWAY CONTROLLERS ======================================
+// === PREVIOUS ZAPUPI PAYMENT GATEWAY CONTROLLERS (COMMENTED OUT) =============
 // ============================================================================
-
+/*
 // 11. Create ZapUPI Order
 exports.createZapupiOrder = async (req, res) => {
   try {
@@ -1987,54 +2112,23 @@ exports.createZapupiOrder = async (req, res) => {
 };
 
 // 12. Handle ZapUPI Webhook
-// ZapUPI posts JSON: { order_id, txn_id, status: 'Success'|'Failed', amount, pay_amount, utr, customer_mobile, remark, environment }
 exports.handleZapupiWebhook = async (req, res) => {
   try {
     const data = req.body || {};
-    console.log('[ZapUPI Webhook] Received webhook payload:', JSON.stringify(data));
-
     const orderId = data.order_id || req.query.order_id;
     const status = data.status || '';
     const txnId = data.txn_id || '';
     const utr = data.utr || txnId || `ZAP_UTR_${Date.now()}`;
-    const environment = data.environment || 'cashier';
 
     if (!orderId) {
-      console.warn('[ZapUPI Webhook] Webhook missing order_id');
       return res.status(200).json({ status: 'ok', message: 'Missing order_id' });
     }
 
     if (String(status).toLowerCase() === 'success') {
-      console.log(`[ZapUPI Webhook] Payment Successful for order: ${orderId}, txn_id: ${txnId}, utr: ${utr}, env: ${environment}`);
-
-      // Double confirmation via order-status API (recommended in ZapUPI docs)
-      try {
-        const zapupiService = require('../services/zapupiService');
-        const statusCheck = await zapupiService.getOrderStatus(orderId).catch(() => null);
-        console.log(`[ZapUPI Webhook] Order status double-check for ${orderId}:`, statusCheck?.success);
-      } catch (checkErr) {
-        console.warn(`[ZapUPI Webhook] Double-check notice:`, checkErr.message);
-      }
-
-      // Complete business logic in Growvest
-      try {
-        const result = await processSuccessfulOrder(orderId, utr);
-        console.log(`[ZapUPI Webhook] Order ${orderId} business logic processed:`, result?.success);
-      } catch (procErr) {
-        console.error(`[ZapUPI Webhook] Error processing business logic for ${orderId}:`, procErr.message);
-      }
-    } else {
-      console.log(`[ZapUPI Webhook] Order ${orderId} status received as: ${status}`);
-      await PendingPayment.findOneAndUpdate(
-        { orderId, status: 'pending' },
-        { status: 'failed', failureReason: `ZapUPI status: ${status}` }
-      ).catch(() => {});
+      await processSuccessfulOrder(orderId, utr);
     }
-
-    // Always respond with HTTP 200 and {"status":"ok"} as mandated by ZapUPI
     return res.status(200).json({ status: 'ok' });
   } catch (error) {
-    console.error('[ZapUPI Webhook] Webhook error:', error);
     return res.status(200).json({ status: 'ok', error: error.message });
   }
 };
@@ -2050,7 +2144,6 @@ exports.checkZapupiOrderStatus = async (req, res) => {
     }
 
     const pending = await PendingPayment.findOne({ orderId: effectiveOrderId });
-
     if (pending && pending.status === 'completed') {
       return res.status(200).json({
         success: true,
@@ -2060,7 +2153,6 @@ exports.checkZapupiOrderStatus = async (req, res) => {
       });
     }
 
-    // Check with ZapUPI API
     const zapupiService = require('../services/zapupiService');
     const zapRes = await zapupiService.getOrderStatus(effectiveOrderId);
     const orderData = zapRes.data || {};
@@ -2086,7 +2178,272 @@ exports.checkZapupiOrderStatus = async (req, res) => {
       zapData: orderData,
     });
   } catch (error) {
-    console.error('[PaymentController] checkZapupiOrderStatus error:', error);
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+*/
+
+// ============================================================================
+// === ZOXY PAYMENT GATEWAY CONTROLLERS (0% COMMISSION OFFICIAL GATEWAY) =======
+// ============================================================================
+
+// 14. Create Zoxy Gateway Order
+exports.createZoxyOrder = async (req, res) => {
+  try {
+    const { amount, purpose, notes } = req.body;
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ message: 'Valid amount is required' });
+    }
+
+    // KYC check for investment plans
+    if (purpose === 'investment') {
+      const KYC = require('../models/KYC');
+      const kyc = await KYC.findOne({ userId: req.user._id });
+      if (kyc && kyc.status === 'rejected') {
+        return res.status(403).json({ message: 'Your KYC was rejected. Please re-submit KYC before investing.' });
+      }
+    }
+
+    const zoxyService = require('../services/zoxyService');
+    const user = req.user;
+    const orderId = `ZOX_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+    const effectivePaymentType = purpose || notes?.paymentType || 'investment';
+    const payload = notes || req.body?.payloadData || {};
+    const exactAmount = Math.round(Number(amount));
+    const customerMobile = user?.mobileNumber || req.body?.customerMobile || '9999999999';
+
+    const zoxyRes = await zoxyService.createOrder({
+      orderId,
+      amount: exactAmount,
+      customerMobile,
+      remark: `${effectivePaymentType} | ${user?._id || 'user'}`,
+    });
+
+    if (!zoxyRes.success || !zoxyRes.paymentUrl) {
+      console.error('[PaymentController] Zoxy createOrder failed:', zoxyRes);
+      return res.status(500).json({
+        success: false,
+        message: zoxyRes.message || 'Failed to initialize Zoxy payment order',
+        error: zoxyRes.error,
+      });
+    }
+
+    try {
+      await PendingPayment.findOneAndUpdate(
+        { orderId },
+        {
+          orderId,
+          userId: user._id,
+          paymentType: effectivePaymentType,
+          payloadData: payload,
+          amount: exactAmount,
+          status: 'pending',
+          gateway: 'zoxy',
+          paymentUrl: zoxyRes.paymentUrl,
+        },
+        { upsert: true, new: true }
+      );
+      console.log(`[PaymentController] PendingPayment saved for Zoxy order: ${orderId}`);
+    } catch (ppErr) {
+      console.warn('[PaymentController] PendingPayment save warning:', ppErr.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      orderId,
+      paymentUrl: zoxyRes.paymentUrl,
+      hash: zoxyRes.hash,
+      gateway: 'zoxy',
+      amount: exactAmount,
+      currency: 'INR',
+      paymentType: effectivePaymentType,
+    });
+  } catch (error) {
+    console.error('[PaymentController] createZoxyOrder error:', error);
+    res.status(500).json({ message: 'Failed to create Zoxy order', error: error.message });
+  }
+};
+
+// 15. Live Check Zoxy Order Status
+exports.checkZoxyOrderStatus = async (req, res) => {
+  try {
+    const { order_id, orderId } = req.body;
+    const effectiveOrderId = order_id || orderId;
+
+    if (!effectiveOrderId) {
+      return res.status(400).json({ success: false, message: 'order_id is required' });
+    }
+
+    const pending = await PendingPayment.findOne({ orderId: effectiveOrderId });
+
+    if (pending && pending.status === 'completed') {
+      return res.status(200).json({
+        success: true,
+        isPaid: true,
+        status: 'completed',
+        orderId: effectiveOrderId,
+      });
+    }
+
+    // Check directly with Zoxy status API
+    const zoxyService = require('../services/zoxyService');
+    const zoxyRes = await zoxyService.getOrderStatus(effectiveOrderId);
+    const zoxyData = zoxyRes.data || {};
+    const statusStr = String(zoxyData.status || zoxyRes?.raw?.status || '').toUpperCase();
+
+    const isPaid =
+      statusStr === 'COMPLETED' ||
+      statusStr === 'SUCCESS' ||
+      zoxyRes.success === true;
+
+    if (isPaid) {
+      const utr = zoxyData.utr || zoxyData.gateway_txn || zoxyData.txn_id || `ZOX_${Date.now()}`;
+      await processSuccessfulOrder(effectiveOrderId, utr);
+      return res.status(200).json({
+        success: true,
+        isPaid: true,
+        status: 'completed',
+        orderId: effectiveOrderId,
+        zoxyData,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      isPaid: false,
+      status: pending?.status || statusStr || 'pending',
+      orderId: effectiveOrderId,
+      zoxyData,
+    });
+  } catch (error) {
+    console.error('[PaymentController] checkZoxyOrderStatus error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 16. Handle Zoxy Webhook (Instant Server-to-Server Confirmation)
+// Official Zoxy webhook sends transaction details when user pays via UPI
+exports.handleZoxyWebhook = async (req, res) => {
+  try {
+    const data = { ...req.query, ...req.body };
+    console.log('[Zoxy Webhook] Received webhook payload:', JSON.stringify(data));
+
+    const orderId = data.order_id || data.orderId;
+    const status = String(data.status || '').toUpperCase();
+    const gatewayTxn = data.gateway_txn || data.txn_id || '';
+    const utr = data.utr || gatewayTxn || `ZOX_UTR_${Date.now()}`;
+
+    if (!orderId) {
+      console.warn('[Zoxy Webhook] Webhook missing order_id');
+      return res.status(200).json({ status: true, message: 'Missing order_id' });
+    }
+
+    if (status === 'SUCCESS' || status === 'COMPLETED') {
+      console.log(`[Zoxy Webhook] Payment Successful for order: ${orderId}, utr: ${utr}`);
+
+      // Auto-process business logic in Growvest (credits balance, activates chit, updates SIP, etc.)
+      try {
+        const result = await processSuccessfulOrder(orderId, utr);
+        console.log(`[Zoxy Webhook] Order ${orderId} business logic processed:`, result?.success);
+      } catch (procErr) {
+        console.error(`[Zoxy Webhook] Error processing business logic for ${orderId}:`, procErr.message);
+      }
+    } else {
+      console.log(`[Zoxy Webhook] Order ${orderId} received status: ${status}`);
+      await PendingPayment.findOneAndUpdate(
+        { orderId, status: 'pending' },
+        { status: 'failed', failureReason: `Zoxy status: ${status}` }
+      ).catch(() => {});
+    }
+
+    return res.status(200).json({ status: true, message: 'Webhook processed successfully' });
+  } catch (error) {
+    console.error('[Zoxy Webhook] Webhook error:', error);
+    return res.status(200).json({ status: true, error: error.message });
+  }
+};
+
+// 17. Handle Zoxy Return Callback (User redirect after payment)
+exports.handleZoxyCallback = async (req, res) => {
+  try {
+    const data = { ...req.query, ...req.body };
+    const orderId = data.order_id || data.orderId || '';
+    let finalStatus = 'pending';
+
+    console.log(`[Zoxy Callback] Received browser redirect for order: ${orderId}`, data);
+
+    if (orderId) {
+      try {
+        const zoxyService = require('../services/zoxyService');
+        const zoxyRes = await zoxyService.getOrderStatus(orderId).catch(() => null);
+        const zoxyData = zoxyRes?.data || {};
+        const statusStr = String(zoxyData.status || zoxyRes?.raw?.status || '').toUpperCase();
+        const utr = data.utr || data.gateway_txn || zoxyData.utr || zoxyData.gateway_txn || `ZOX_CB_${Date.now()}`;
+        const isSuccessQuery =
+          String(data.status || '').toUpperCase() === 'SUCCESS' ||
+          String(data.status || '').toUpperCase() === 'COMPLETED';
+
+        if (statusStr === 'COMPLETED' || statusStr === 'SUCCESS' || isSuccessQuery || zoxyRes?.success) {
+          finalStatus = 'success';
+          await processSuccessfulOrder(orderId, utr);
+          console.log(`[Zoxy Callback] Order ${orderId} verified & processed into DB!`);
+        } else {
+          const alreadyDone = await PendingPayment.findOne({ orderId, status: 'completed' });
+          if (alreadyDone) {
+            finalStatus = 'success';
+          }
+        }
+      } catch (cbErr) {
+        console.warn('[Zoxy Callback] Background verify warning:', cbErr.message);
+      }
+    }
+
+    const deepLink = `growvest://payment-callback?order_id=${encodeURIComponent(orderId)}&status=${encodeURIComponent(finalStatus)}`;
+
+    res.setHeader('Content-Type', 'text/html');
+    return res.status(200).send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Payment Complete – Growvest</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+           background: #085428; color: #fff; display: flex; align-items: center;
+           justify-content: center; min-height: 100vh; text-align: center; padding: 24px; }
+    .card { background: rgba(255,255,255,0.12); border-radius: 24px; padding: 40px 28px;
+            max-width: 380px; width: 100%; backdrop-filter: blur(12px); box-shadow: 0 20px 40px rgba(0,0,0,0.25); }
+    .icon { width: 72px; height: 72px; background: #FFD700; border-radius: 50%; display: flex;
+            align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 38px; color: #085428; font-weight: bold; }
+    h1 { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+    p  { font-size: 15px; opacity: 0.9; margin-bottom: 28px; line-height: 1.5; }
+    .btn { display: block; background: #FFD700; color: #085428; font-weight: 700;
+           font-size: 16px; padding: 15px 32px; border-radius: 50px; text-decoration: none;
+           box-shadow: 0 4px 15px rgba(255,215,0,0.4); }
+    .spinner { width: 32px; height: 32px; border: 3px solid rgba(255,255,255,0.3);
+               border-top-color: #FFD700; border-radius: 50%; animation: spin 0.8s linear infinite;
+               margin: 16px auto 0; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">${finalStatus === 'success' ? '✓' : '⧗'}</div>
+    <h1>${finalStatus === 'success' ? 'Payment Verified!' : 'Payment Processing'}</h1>
+    <p>${finalStatus === 'success' ? 'Your investment has been confirmed. Returning you to the Growvest app...' : 'Please return to Growvest to view your updated status.'}</p>
+    <a href="${deepLink}" class="btn">Open Growvest App</a>
+    <div class="spinner"></div>
+  </div>
+  <script>
+    setTimeout(function() {
+      window.location.href = "${deepLink}";
+    }, 1200);
+  </script>
+</body>
+</html>`);
+  } catch (error) {
+    console.error('[Zoxy Callback] Error:', error);
+    res.status(500).send('Error processing callback');
   }
 };
