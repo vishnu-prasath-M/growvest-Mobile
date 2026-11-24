@@ -198,14 +198,20 @@ exports.createSIP = async (req, res) => {
     const totalPlannedAmount = numAmount * totalInstallments;
     const sipIdStr = generateSIPId();
 
-    // 26% p.a. Dynamic SIP Returns Calculation
+    // 26% p.a. Dynamic SIP Returns Calculation (Compounding Excel model)
     const interestRate = 26; // 26% p.a.
     const periodicRate = frequency === 'daily'
       ? (0.26 / 365)
       : frequency === 'weekly'
       ? ((0.26 * 7) / 365)
       : (0.26 / 12);
-    const expectedInterest = Math.round(numAmount * periodicRate * ((totalInstallments * (totalInstallments + 1)) / 2));
+    let projClosing = 0;
+    for (let i = 1; i <= totalInstallments; i++) {
+      const projOpening = projClosing;
+      const projProfit = projOpening * periodicRate;
+      projClosing = projOpening + numAmount + projProfit;
+    }
+    const expectedInterest = Math.round(projClosing - totalPlannedAmount);
     const expectedMaturityAmount = totalPlannedAmount + expectedInterest;
 
     // 1. Create Parent SIP record in pending_payment status until first contribution succeeds
@@ -569,11 +575,11 @@ exports.cancelPendingSIP = async (req, res) => {
 };
 
 // Helper to calculate real-time accrued interest at 26% p.a. based on contribution periods
-// Progressive balance-based interest calculation:
-// Each day, interest is calculated directly on that day's cumulative balance:
-// Day 1: Balance = P. Interest = P * dailyRate
-// Day 2: Balance = 2P. Interest = 2P * dailyRate (accumulated: Day 1 + Day 2)
-// Day 3: Balance = 3P. Interest = 3P * dailyRate (accumulated: (Day 1 + Day 2) + Day 3)
+// Progressive balance-based compounding interest calculation (matches Excel model):
+// Day 1: Opening = 0. Profit = 0. Invest = P. Closing = P.
+// Day 2: Opening = Day 1 Closing (= P). Profit = Opening * dailyRate. Invest = P. Closing = Opening + P + Profit.
+// Day 3: Opening = Day 2 Closing. Profit = Opening * dailyRate. Invest = P. Closing = Opening + P + Profit.
+// Day k: Opening = Day k-1 Closing. Profit = Opening * dailyRate. Invest = P. Closing = Opening + P + Profit.
 const calculateSIPInterest = (sip, contributions = []) => {
   const annualRate = (Number(sip.interestRate) || 26) / 100;
   const dailyRate = annualRate / 365;
@@ -589,19 +595,17 @@ const calculateSIPInterest = (sip, contributions = []) => {
     .sort((a, b) => (a.installmentNumber || 0) - (b.installmentNumber || 0));
 
   const k = paidContributions.length;
-  let accruedInterest = 0;
-  let runningBalance = 0;
+  let closingBalance = 0;
+  let totalInvested = 0;
 
-  // Progressive daily/periodic interest accumulation:
-  // For each installment contributed, add that day's interest on the running balance
+  // Progressive daily/periodic interest accumulation (matches Excel formulas):
   for (let idx = 0; idx < k; idx++) {
     const c = paidContributions[idx];
     const amount = Number(c.amount) || Number(sip.amount) || 0;
-    runningBalance += amount;
-
-    // Interest earned on this progressive balance
-    const periodInterest = runningBalance * periodicRate;
-    accruedInterest += periodInterest;
+    const openingBalance = closingBalance;
+    const periodProfit = openingBalance * periodicRate;
+    closingBalance = openingBalance + amount + periodProfit;
+    totalInvested += amount;
   }
 
   // If time has passed since the latest contribution, the current active balance earns daily interest
@@ -611,13 +615,16 @@ const calculateSIPInterest = (sip, contributions = []) => {
     const now = new Date();
     const elapsedDays = Math.max(0, Math.floor((now.getTime() - lastPaidAt.getTime()) / 86400000));
     if (elapsedDays > 0) {
-      accruedInterest += runningBalance * dailyRate * elapsedDays;
+      for (let d = 0; d < elapsedDays; d++) {
+        const dailyProfit = closingBalance * dailyRate;
+        closingBalance += dailyProfit;
+      }
     }
   }
 
-  const totalPaid = Number(sip.totalPaidAmount) || (k * (Number(sip.amount) || 0));
   const withdrawn = Number(sip.withdrawnAmount) || 0;
-  const activePrincipal = Math.max(0, totalPaid - withdrawn);
+  const activePrincipal = Math.max(0, totalInvested - withdrawn);
+  const accruedInterest = Math.max(0, closingBalance - totalInvested);
 
   const isFullMaturity =
     (sip.status === 'completed' && (sip.contributionsCompleted >= sip.totalContributions)) ||
@@ -627,10 +634,11 @@ const calculateSIPInterest = (sip, contributions = []) => {
     ? Math.max(Number(accruedInterest.toFixed(2)), Number(sip.expectedInterest) || 0)
     : Number(accruedInterest.toFixed(2));
 
-  // Exact interest earned today on current active cumulative balance (26% p.a. / 365)
+  // Exact interest earned today on current active closing balance (26% p.a. / 365)
+  // Matches Excel Column D: "Anaikana Profit" = Opening/Current Balance * dailyRate
   const dailyInterest = (sip.status === 'cancelled' || activePrincipal <= 0)
     ? 0
-    : Number((activePrincipal * dailyRate).toFixed(2));
+    : Number((closingBalance * dailyRate).toFixed(2));
 
   // Available to withdraw: strictly allowed only after the SIP plan is fully completed
   const isPlanCompleted = sip.status === 'completed' || k >= sip.totalContributions;
@@ -638,9 +646,9 @@ const calculateSIPInterest = (sip, contributions = []) => {
     ? 0
     : interestEarned;
   const availableToWithdraw = isPlanCompleted
-    ? Math.max(0, Number((totalPaid + withdrawableInterest - withdrawn).toFixed(2)))
+    ? Math.max(0, Number((totalInvested + withdrawableInterest - withdrawn).toFixed(2)))
     : 0;
-  const currentValue = Math.max(0, Number((totalPaid + interestEarned - withdrawn).toFixed(2)));
+  const currentValue = Math.max(0, Number((totalInvested + interestEarned - withdrawn).toFixed(2)));
 
   return {
     interestEarned,
@@ -650,7 +658,7 @@ const calculateSIPInterest = (sip, contributions = []) => {
     currentValue,
     balanceAmount: activePrincipal,
     activeBalance: activePrincipal,
-    totalPaidAmount: totalPaid,
+    totalPaidAmount: totalInvested,
     dailyRatePercent: Number((dailyRate * 100).toFixed(4)),
   };
 };

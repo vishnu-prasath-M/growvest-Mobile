@@ -118,38 +118,65 @@ const sendDailyPocketMoneyNotifications = async () => {
       nextPayoutDate: { $lte: now },
     }).populate('userId');
 
-    let count = 0;
+    // Group active plans by user to guarantee at most ONE notification per user
+    const plansByUser = new Map();
     for (const plan of activePlans) {
       if (!plan.userId?._id) continue;
+      const uid = plan.userId._id.toString();
+      if (!plansByUser.has(uid)) {
+        plansByUser.set(uid, { user: plan.userId, plans: [] });
+      }
+      plansByUser.get(uid).plans.push(plan);
+    }
 
-      const payoutAmount = plan.payoutAmount || Math.round((plan.investedAmount || 0) / 10);
-      const freqLabel = plan.frequency === 'daily' ? 'daily'
-        : plan.frequency === 'every_2_days' ? 'every 2 days' : 'weekly';
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
 
-      // Determine greeting based on current Indian Standard Time (IST = UTC+5:30)
-      const now = new Date();
-      const istMinutesTotal = now.getUTCHours() * 60 + now.getUTCMinutes() + 330;
-      const istHour = Math.floor((istMinutesTotal / 60) % 24);
-      const greeting = (istHour >= 4 && istHour < 12)
-        ? 'Good morning!'
-        : (istHour >= 12 && istHour < 17)
-        ? 'Good afternoon!'
-        : 'Good day!';
+    // Determine greeting based on current Indian Standard Time (IST = UTC+5:30)
+    const istMinutesTotal = now.getUTCHours() * 60 + now.getUTCMinutes() + 330;
+    const istHour = Math.floor((istMinutesTotal / 60) % 24);
+    const greeting = (istHour >= 4 && istHour < 12)
+      ? 'Good morning!'
+      : (istHour >= 12 && istHour < 17)
+      ? 'Good afternoon!'
+      : 'Good day!';
 
-      const title = '☀️ Daily Pocket Money Ready to Claim!';
-      const body = `${greeting} Your ${freqLabel} pocket money payout of ₹${payoutAmount.toLocaleString('en-IN')} is ready. Log in to claim it in the Pocket Money section.`;
+    let count = 0;
+    for (const [uid, { user, plans }] of plansByUser.entries()) {
+      // De-duplication: Prevent sending more than once per day to the same user
+      const alreadySent = await Notification.findOne({
+        userId: user._id,
+        type: 'pocket_money_payout',
+        createdAt: { $gte: todayStart },
+      });
+      if (alreadySent) continue;
+
+      const totalPayout = plans.reduce((sum, p) => {
+        return sum + (p.payoutAmount || Math.round((p.investedAmount || 0) / 10));
+      }, 0);
+
+      const title = '☀️ Pocket Money Ready to Claim!';
+      let body = '';
+      if (plans.length === 1) {
+        const p = plans[0];
+        const freqLabel = p.frequency === 'daily' ? 'daily'
+          : p.frequency === 'every_2_days' ? 'every 2 days' : 'weekly';
+        body = `${greeting} Your ${freqLabel} pocket money payout of ₹${totalPayout.toLocaleString('en-IN')} is ready. Log in to claim it in the Pocket Money section.`;
+      } else {
+        body = `${greeting} You have ${plans.length} pocket money payouts totaling ₹${totalPayout.toLocaleString('en-IN')} ready to claim today. Log in to claim them in the Pocket Money section.`;
+      }
 
       await sendUserNotification(
-        plan.userId._id,
+        user._id,
         title,
         body,
         'pocket_money_payout',
-        { screen: 'PocketMoney', pocketMoneyId: plan._id.toString() }
+        { screen: 'PocketMoney' }
       );
       count++;
     }
 
-    console.log(`[CronService] Pocket Money notifications sent to ${count} active plan holders.`);
+    console.log(`[CronService] Pocket Money notifications sent to ${count} users (grouped/de-duplicated).`);
     return { sent: count };
   } catch (error) {
     console.error('[CronService] Error sending pocket money notifications:', error);
@@ -289,9 +316,11 @@ const sendChitDueReminders = async () => {
       status: 'active',
     }).populate('userId').populate('chitId');
 
-    let count = 0;
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
+
+    // Group due/overdue items by user to ensure each user receives only ONE notification
+    const dueMembersByUser = new Map();
 
     for (const member of activeMembers) {
       if (!member.userId?._id || !member.chitId) continue;
@@ -311,15 +340,6 @@ const sendChitDueReminders = async () => {
 
       // Check if due date is within the 4-day window (or overdue)
       if (dueDate && dueDate.getTime() <= fourDaysLater.getTime()) {
-        // Prevent duplicate notification for the same chit to the same user on the same day
-        const alreadySentToday = await Notification.findOne({
-          userId: member.userId._id,
-          type: 'chit_due_reminder',
-          'metadata.chitId': member.chitId._id.toString(),
-          createdAt: { $gte: todayStart },
-        });
-        if (alreadySentToday) continue;
-
         const dueAmount = isWeekly
           ? (member.weeklyAmount || member.chitId.weeklyAmount || 200)
           : (member.chitId.monthlyAmount || member.monthlyAmount || 1000);
@@ -335,6 +355,35 @@ const sendChitDueReminders = async () => {
 
         const diffDays = Math.round((dueMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24));
 
+        const uid = member.userId._id.toString();
+        if (!dueMembersByUser.has(uid)) {
+          dueMembersByUser.set(uid, { user: member.userId, items: [] });
+        }
+        dueMembersByUser.get(uid).items.push({
+          member,
+          dueDate,
+          diffDays,
+          dueAmount,
+          isWeekly,
+          chitTitle,
+          frequencyLabel,
+          dueDayName,
+        });
+      }
+    }
+
+    let count = 0;
+    for (const [uid, { user, items }] of dueMembersByUser.entries()) {
+      // De-duplication: Prevent sending more than once per day to the same user
+      const alreadySentToday = await Notification.findOne({
+        userId: user._id,
+        type: 'chit_due_reminder',
+        createdAt: { $gte: todayStart },
+      });
+      if (alreadySentToday) continue;
+
+      if (items.length === 1) {
+        const { diffDays, dueAmount, chitTitle, frequencyLabel, dueDayName, member } = items[0];
         let title = '';
         let body = '';
 
@@ -348,7 +397,6 @@ const sendChitDueReminders = async () => {
           title = `⏳ ${frequencyLabel} Chit Due in ${diffDays} Days!`;
           body = `Your ${frequencyLabel.toLowerCase()} contribution of ₹${dueAmount.toLocaleString('en-IN')} for "${chitTitle}" is due in ${diffDays} days (${dueDayName}). Pay early to maintain your clean chit record.`;
         } else {
-          // Overdue
           const daysLate = Math.abs(diffDays);
           const lateFee = Math.max(5, daysLate * 5);
           title = `⚠️ ${frequencyLabel} Chit Due Overdue!`;
@@ -356,17 +404,38 @@ const sendChitDueReminders = async () => {
         }
 
         await sendUserNotification(
-          member.userId._id,
+          user._id,
           title,
           body,
           'chit_due_reminder',
           { screen: 'MonthlyDueScreen', chitId: member.chitId._id.toString() }
         );
-        count++;
+      } else {
+        // Multiple chits due/overdue: Consolidate into 1 notification!
+        const totalDueAmount = items.reduce((sum, it) => sum + (it.dueAmount || 0), 0);
+        const overdueCount = items.filter((it) => it.diffDays < 0).length;
+        let title = '';
+        let body = '';
+        if (overdueCount > 0) {
+          title = `⚠️ Chit Dues Alert: Overdue Contributions!`;
+          body = `You have ${items.length} chit dues (${overdueCount} overdue) totaling ₹${totalDueAmount.toLocaleString('en-IN')}. Please pay now to clear your dues and stay eligible for draws!`;
+        } else {
+          title = `⏳ Chit Dues Reminder!`;
+          body = `You have ${items.length} upcoming chit dues totaling ₹${totalDueAmount.toLocaleString('en-IN')}. Pay on time to maintain your clean chit record!`;
+        }
+
+        await sendUserNotification(
+          user._id,
+          title,
+          body,
+          'chit_due_reminder',
+          { screen: 'ChitFunds' }
+        );
       }
+      count++;
     }
 
-    console.log(`[CronService] Chit due reminders dispatched to ${count} members.`);
+    console.log(`[CronService] Chit due reminders dispatched to ${count} members (grouped/de-duplicated).`);
     return { sent: count };
   } catch (error) {
     console.error('[CronService] Error sending chit due reminders:', error);
@@ -381,16 +450,20 @@ const sendDailySIPNotifications = async () => {
     const SIP = require('../models/SIP');
     const SIPContribution = require('../models/SIPContribution');
 
-    const now = new Date();
     const todayEnd = new Date();
     todayEnd.setHours(23, 59, 59, 999);
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
 
     // Find all active SIPs
     const activeSIPs = await SIP.find({
       status: 'active',
     }).populate('userId');
 
-    let count = 0;
+    // Group pending SIP installments by user so each user gets only ONE notification
+    const dueSIPsByUser = new Map();
+
     for (const sip of activeSIPs) {
       if (!sip.userId?._id) continue;
 
@@ -402,7 +475,28 @@ const sendDailySIPNotifications = async () => {
       }).sort({ installmentNumber: 1 });
 
       if (pendingContribution) {
-        const userName = sip.userId.name || sip.userId.username || 'Investor';
+        const uid = sip.userId._id.toString();
+        if (!dueSIPsByUser.has(uid)) {
+          dueSIPsByUser.set(uid, { user: sip.userId, items: [] });
+        }
+        dueSIPsByUser.get(uid).items.push({ sip, pendingContribution });
+      }
+    }
+
+    let count = 0;
+    for (const [uid, { user, items }] of dueSIPsByUser.entries()) {
+      // De-duplication: Prevent sending more than once per day to the same user
+      const alreadySent = await Notification.findOne({
+        userId: user._id,
+        type: 'sip_due_reminder',
+        createdAt: { $gte: todayStart },
+      });
+      if (alreadySent) continue;
+
+      const userName = user.name || user.username || 'Investor';
+
+      if (items.length === 1) {
+        const { sip, pendingContribution } = items[0];
         const amount = pendingContribution.amount || sip.amount || 10;
         const isDaily = sip.frequency === 'daily';
 
@@ -415,17 +509,33 @@ const sendDailySIPNotifications = async () => {
           : `Hi ${userName}, your installment #${pendingContribution.installmentNumber} of ₹${amount.toLocaleString('en-IN')} for ${sip.sipId} is due today. Complete your payment now!`;
 
         await sendUserNotification(
-          sip.userId._id,
+          user._id,
           title,
           body,
           'sip_due_reminder',
           { screen: 'SIPDetails', sipId: sip._id.toString() }
         );
-        count++;
+      } else {
+        // Multiple SIPs due: Consolidate into 1 notification!
+        const totalDue = items.reduce(
+          (sum, it) => sum + (it.pendingContribution.amount || it.sip.amount || 10),
+          0
+        );
+        const title = '💰 Time to Pay Your SIP Installments!';
+        const body = `Hi ${userName}, you have ${items.length} SIP installments totaling ₹${totalDue.toLocaleString('en-IN')} due today. Keep investing daily to earn compound returns!`;
+
+        await sendUserNotification(
+          user._id,
+          title,
+          body,
+          'sip_due_reminder',
+          { screen: 'SIPDashboard' }
+        );
       }
+      count++;
     }
 
-    console.log(`[CronService] SIP due notifications dispatched to ${count} active SIP holders.`);
+    console.log(`[CronService] SIP due notifications dispatched to ${count} users (grouped/de-duplicated).`);
     return { sent: count };
   } catch (error) {
     console.error('[CronService] Error sending SIP notifications:', error);

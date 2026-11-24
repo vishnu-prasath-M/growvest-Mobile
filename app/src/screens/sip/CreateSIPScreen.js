@@ -152,9 +152,17 @@ const CreateSIPScreen = ({ navigation, route }) => {
       rateLabel = `${(periodicRate * 100).toFixed(2)}% / month (26% p.a.)`;
     }
 
-    // Installment on period k accrues interest for remaining duration: Interest = P * r * (N * (N + 1) / 2)
-    const expectedInterest = Math.round(P * periodicRate * ((N * (N + 1)) / 2));
+    // Progressive compounding calculation (matches Excel model):
+    // Day 1: Opening = 0. Closing = P.
+    // Day 2: Opening = Day 1 Closing. Profit = Opening * periodicRate. Closing = Opening + P + Profit.
+    let projClosing = 0;
+    for (let i = 1; i <= N; i++) {
+      const projOpening = projClosing;
+      const projProfit = projOpening * periodicRate;
+      projClosing = projOpening + P + projProfit;
+    }
     const totalDeposited = P * N;
+    const expectedInterest = Math.round(projClosing - totalDeposited);
     const expectedMaturity = totalDeposited + expectedInterest;
 
     return {

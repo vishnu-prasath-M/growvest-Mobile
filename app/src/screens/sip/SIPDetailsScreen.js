@@ -466,18 +466,40 @@ const SIPDetailsScreen = ({ route, navigation }) => {
             <Text style={styles.breakdownLabel}>Annual Return Yield</Text>
             <Text style={[styles.breakdownValue, { color: '#085428', fontWeight: '700' }]}>26% p.a.</Text>
           </View>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Expected Returns (26% p.a.)</Text>
-            <Text style={[styles.breakdownValue, { color: '#085428', fontWeight: '700' }]}>
-              +₹{Math.round((Number(sip.amount) || 0) * (sip.frequency === 'daily' ? (0.26 / 365) : sip.frequency === 'weekly' ? (0.26 * 7 / 365) : (0.26 / 12)) * (((Number(sip.totalContributions || sip.durationCount) || 12) * ((Number(sip.totalContributions || sip.durationCount) || 12) + 1)) / 2)).toLocaleString('en-IN')}
-            </Text>
-          </View>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Estimated Maturity Value</Text>
-            <Text style={[styles.breakdownValue, { color: '#085428', fontWeight: '800' }]}>
-              ₹{((Number(sip.totalPlannedAmount) || 0) + Math.round((Number(sip.amount) || 0) * (sip.frequency === 'daily' ? (0.26 / 365) : sip.frequency === 'weekly' ? (0.26 * 7 / 365) : (0.26 / 12)) * (((Number(sip.totalContributions || sip.durationCount) || 12) * ((Number(sip.totalContributions || sip.durationCount) || 12) + 1)) / 2))).toLocaleString('en-IN')}
-            </Text>
-          </View>
+          {(() => {
+            let expReturns = 0;
+            if (sip.expectedInterest !== undefined && sip.expectedInterest !== null) {
+              expReturns = Math.round(Number(sip.expectedInterest));
+            } else {
+              const P = Number(sip.amount) || 0;
+              const N = Number(sip.totalContributions || sip.durationCount) || 12;
+              const pRate = sip.frequency === 'daily' ? (0.26 / 365) : sip.frequency === 'weekly' ? (0.26 * 7 / 365) : (0.26 / 12);
+              let closing = 0;
+              for (let i = 1; i <= N; i++) {
+                const opening = closing;
+                const profit = opening * pRate;
+                closing = opening + P + profit;
+              }
+              expReturns = Math.round(closing - (P * N));
+            }
+            const estMaturity = (Number(sip.totalPlannedAmount) || 0) + expReturns;
+            return (
+              <>
+                <View style={styles.breakdownRow}>
+                  <Text style={styles.breakdownLabel}>Expected Returns (26% p.a.)</Text>
+                  <Text style={[styles.breakdownValue, { color: '#085428', fontWeight: '700' }]}>
+                    +₹{expReturns.toLocaleString('en-IN')}
+                  </Text>
+                </View>
+                <View style={styles.breakdownRow}>
+                  <Text style={styles.breakdownLabel}>Estimated Maturity Value</Text>
+                  <Text style={[styles.breakdownValue, { color: '#085428', fontWeight: '800' }]}>
+                    ₹{estMaturity.toLocaleString('en-IN')}
+                  </Text>
+                </View>
+              </>
+            );
+          })()}
           <View style={styles.breakdownRow}>
             <Text style={styles.breakdownLabel}>Withdrawn Principal</Text>
             <Text style={styles.breakdownValue}>{formatCurrency(sip.withdrawnAmount)}</Text>
