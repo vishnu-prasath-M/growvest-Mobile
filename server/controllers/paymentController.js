@@ -277,9 +277,8 @@ exports.createOrder = async (req, res) => {
   } catch (error) {
     */
 
-    /*
     // ============================================================================
-    // === MANUAL UPI ORDER CREATION (COMMENTED OUT AS REQUESTED FOR ZAPUPI) ======
+    // === MANUAL UPI ORDER CREATION (ACTIVE: DIRECT QR + SHARE + ADMIN APPROVAL) =
     // ============================================================================
     const user = req.user;
     const orderId = `UPI_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
@@ -297,6 +296,7 @@ exports.createOrder = async (req, res) => {
           payloadData: payload,
           amount: exactAmount,
           status: 'pending',
+          gateway: 'manual_upi',
         },
         { upsert: true, new: true }
       );
@@ -315,12 +315,11 @@ exports.createOrder = async (req, res) => {
       paymentType: effectivePaymentType,
       companyUpi: upiConfig,
     });
-    */
 
+    /*
     // ============================================================================
     // === PREVIOUS ZAPUPI PAYMENT GATEWAY (COMMENTED OUT AS REQUESTED) ===========
     // ============================================================================
-    /*
     const zapupiService = require('../services/zapupiService');
     const user = req.user;
     const orderId = `ZAP_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
@@ -380,8 +379,9 @@ exports.createOrder = async (req, res) => {
     });
     */
 
+    /*
     // ============================================================================
-    // === ZOXY PAYMENT GATEWAY ORDER CREATION (0% COMMISSION OFFICIAL GATEWAY) ===
+    // === PREVIOUS ZOXY PAYMENT GATEWAY (COMMENTED OUT AS REQUESTED) =============
     // ============================================================================
     const zoxyService = require('../services/zoxyService');
     const user = req.user;
@@ -440,6 +440,7 @@ exports.createOrder = async (req, res) => {
       currency: 'INR',
       paymentType: effectivePaymentType,
     });
+    */
   } catch (error) {
     console.error('[PaymentController] Create order error:', error);
     res.status(500).json({ message: 'Failed to create payment order', error: error.message });

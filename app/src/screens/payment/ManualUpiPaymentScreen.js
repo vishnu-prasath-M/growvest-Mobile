@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
+import { captureRef } from 'react-native-view-shot';
 import { useTheme } from '../../context/ThemeContext';
 import { colors } from '../../theme/theme';
 import { paymentService } from '../../services/paymentService';
@@ -60,6 +63,8 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
   const [copiedAmount, setCopiedAmount] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [isZapVerified, setIsZapVerified] = useState(false);
+  const qrCardRef = useRef(null);
+  const [sharingQr, setSharingQr] = useState(false);
 
   // ZapUPI Online Gateway State
   const [zapupiLoading, setZapupiLoading] = useState(false);
@@ -215,6 +220,57 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
     return 'upi://pay?pa=' + encodedUpi + '&pn=' + encodedName + '&am=' + cleanAmount + '&cu=INR&tn=' + encodedNote;
   };
 
+  // Share QR PNG image directly to GPay / PhonePe / Paytm (Auto-Scan without camera/gallery)
+  const handleShareQrToUpiApp = async (preferredApp = 'UPI App') => {
+    setSharingQr(true);
+    try {
+      let fileUri = null;
+      if (qrCardRef.current) {
+        try {
+          fileUri = await captureRef(qrCardRef, {
+            format: 'png',
+            quality: 1.0,
+            result: 'tmpfile',
+          });
+        } catch (capErr) {
+          console.warn('[ShareQR] captureRef fallback:', capErr.message);
+        }
+      }
+
+      if (!fileUri) {
+        const dest = `${FileSystem.cacheDirectory}growvest_upi_qr_${Date.now()}.png`;
+        const dl = await FileSystem.downloadAsync(qrCodeApiUrl, dest);
+        fileUri = dl.uri;
+      }
+
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (!isAvailable) {
+        Alert.alert('Sharing Unavailable', 'Please screenshot the QR code or copy the UPI ID below.');
+        return;
+      }
+
+      if (Platform.OS === 'android') {
+        try {
+          ToastAndroid.show(
+            `Select ${preferredApp} — it will scan & fill ₹${cleanAmount} automatically!`,
+            ToastAndroid.LONG
+          );
+        } catch (_) {}
+      }
+
+      await Sharing.shareAsync(fileUri, {
+        mimeType: 'image/png',
+        dialogTitle: `Pay ₹${cleanAmount} via ${preferredApp}`,
+        UTI: 'public.png',
+      });
+    } catch (err) {
+      console.error('[ShareQR] Error:', err);
+      Alert.alert('Could Not Share QR', 'Please copy the UPI ID or screenshot the QR code to pay.');
+    } finally {
+      setSharingQr(false);
+    }
+  };
+
   // Pick payment screenshot
   const handlePickScreenshot = async () => {
     try {
@@ -319,7 +375,7 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
           </View>
         </View>
 
-        {/* ─── ZAPUPI INSTANT PAYMENT GATEWAY ─── */}
+        {/* ─── PREVIOUS GATEWAY CHECKOUT (COMMENTED OUT AS REQUESTED) ───
         <View style={styles.zapCard}>
           <LinearGradient
             colors={isDarkMode ? ['#064e3b', '#022c22'] : ['#ecfdf5', '#d1fae5']}
@@ -342,7 +398,6 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
               Pay via Google Pay, PhonePe, Paytm, or BHIM. Your payment is verified automatically within seconds!
             </Text>
 
-            {/* Supported App Badges */}
             <View style={styles.zapBadgesRow}>
               <View style={styles.appBadge}><Text style={styles.appBadgeText}>GPay</Text></View>
               <View style={styles.appBadge}><Text style={styles.appBadgeText}>PhonePe</Text></View>
@@ -350,7 +405,6 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
               <View style={styles.appBadge}><Text style={styles.appBadgeText}>BHIM / UPI</Text></View>
             </View>
 
-            {/* Pay Button */}
             <TouchableOpacity
               style={styles.zapPayBtn}
               onPress={handleZapupiPay}
@@ -367,7 +421,6 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
               )}
             </TouchableOpacity>
 
-            {/* If order initiated, show status checker */}
             {zapOrderId && (
               <View style={styles.zapStatusBox}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -387,14 +440,9 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
             )}
           </LinearGradient>
         </View>
+        ─── END PREVIOUS GATEWAY CHECKOUT ─── */}
 
-        {/* ── MANUAL PAYMENT (COMMENTED OUT - AUTOMATED GATEWAY ACTIVE) ──
-        <View style={styles.orDividerRow}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.orDividerText}>OR PAY MANUALLY VIA DIRECT QR / UPI</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
+        {/* ── MANUAL DIRECT UPI PAYMENT (QR + AUTO-SHARE TO UPI APPS + COPY UPI ID) ── */}
         <View style={styles.card}>
           <View style={styles.stepHeader}>
             <View style={styles.stepNumberBadge}>
@@ -402,12 +450,12 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.stepTitle}>Pay via Any UPI App</Text>
-              <Text style={styles.stepSubtitle}>Scan QR code or copy official UPI ID</Text>
+              <Text style={styles.stepSubtitle}>Tap a UPI app to auto-scan QR, or copy UPI ID</Text>
             </View>
           </View>
 
           <View style={styles.qrContainer}>
-            <View style={styles.qrBox}>
+            <View ref={qrCardRef} collapsable={false} style={styles.qrBox}>
               {loadingConfig ? (
                 <ActivityIndicator size="small" color="#10B981" />
               ) : (
@@ -419,19 +467,51 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
               )}
             </View>
             <Text style={styles.qrInstruction}>
-              Scan using Google Pay, PhonePe, Paytm, or BHIM
+              Tap any UPI app below — it will auto-scan & fill ₹{cleanAmount}
             </Text>
-            <View style={styles.qrTipBadge}>
-              <MaterialCommunityIcons name="camera" size={14} color="#10B981" />
-              <Text style={styles.qrTipText}>
-                Screenshot this QR & tap "Scan from Gallery" in your UPI app
-              </Text>
+
+            {/* Primary Auto-Share QR to UPI App Button */}
+            <TouchableOpacity
+              style={[styles.zapPayBtn, { width: '100%', marginTop: 12 }]}
+              onPress={() => handleShareQrToUpiApp('UPI App')}
+              disabled={sharingQr || loadingConfig}
+              activeOpacity={0.85}
+            >
+              {sharingQr ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <>
+                  <MaterialCommunityIcons name="qrcode-scan" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.zapPayBtnText}>Pay {formatCurrency(cleanAmount)} via UPI App</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {/* Quick App Buttons (Auto-Shares QR PNG to Selected UPI App) */}
+            <View style={[styles.zapBadgesRow, { marginTop: 12, marginBottom: 4, justifyContent: 'center' }]}>
+              {[
+                { label: 'GPay', icon: 'google', color: '#4285F4' },
+                { label: 'PhonePe', icon: 'cellphone-check', color: '#5F259F' },
+                { label: 'Paytm', icon: 'wallet', color: '#00BAF2' },
+                { label: 'BHIM / Other', icon: 'bank', color: '#10B981' },
+              ].map((appItem) => (
+                <TouchableOpacity
+                  key={appItem.label}
+                  style={[styles.appBadge, { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 8, paddingHorizontal: 12 }]}
+                  onPress={() => handleShareQrToUpiApp(appItem.label)}
+                  disabled={sharingQr || loadingConfig}
+                  activeOpacity={0.75}
+                >
+                  <MaterialCommunityIcons name={appItem.icon} size={14} color={appItem.color} />
+                  <Text style={styles.appBadgeText}>{appItem.label}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
 
           <View style={styles.orDividerRow}>
             <View style={styles.dividerLine} />
-            <Text style={styles.orDividerText}>OR PAY USING UPI ID</Text>
+            <Text style={styles.orDividerText}>OR COPY UPI ID</Text>
             <View style={styles.dividerLine} />
           </View>
 
@@ -558,7 +638,6 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
             </LinearGradient>
           </TouchableOpacity>
         </View>
-        ── END OF MANUAL PAYMENT ── */}
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -581,10 +660,10 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
             </View>
 
             <Text style={styles.modalTitle}>
-              {isZapVerified ? "Payment Successful! 🎉" : "Payment Submitted!"}
+              {isZapVerified ? "Payment Successful! 🎉" : "Waiting for Admin Approval"}
             </Text>
             <Text style={styles.modalSubtitle}>
-              {isZapVerified ? "ZapUPI Automated Verification" : "Pending Admin Verification"}
+              {isZapVerified ? "Automated Verification" : "Payment Under Review"}
             </Text>
 
             <View style={styles.modalDetailsBox}>
@@ -595,7 +674,7 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
               {isZapVerified ? (
                 <View style={styles.modalDetailRow}>
                   <Text style={styles.modalDetailLabel}>Payment Mode:</Text>
-                  <Text style={styles.modalDetailValueBold}>ZapUPI Instant</Text>
+                  <Text style={styles.modalDetailValueBold}>Instant UPI</Text>
                 </View>
               ) : (
                 <View style={styles.modalDetailRow}>
@@ -611,8 +690,8 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
 
             <Text style={styles.modalDesc}>
               {isZapVerified
-                ? "Your payment was confirmed automatically by ZapUPI. Your investment / wallet has been credited and is active immediately!"
-                : "We have received your payment reference. Our accounts team will verify the transaction against our bank records. Your account will be activated within a few minutes!"}
+                ? "Your payment was confirmed automatically. Your investment / wallet has been credited and is active immediately!"
+                : "Your payment details have been submitted and are waiting for admin approval. Once the admin verifies and approves your payment, your investment / plan will be activated automatically!"}
             </Text>
 
             <TouchableOpacity
