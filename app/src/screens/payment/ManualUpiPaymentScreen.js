@@ -48,7 +48,7 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
   const [orderId, setOrderId] = useState(
     existingOrderId || `UPI_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`
   );
-  const [upiId, setUpiId] = useState('8925699005@upi');
+  const [upiId, setUpiId] = useState('paytm.s3soed8@pty');
   const [payeeName, setPayeeName] = useState('Growvest Investments');
   const [customQrImage, setCustomQrImage] = useState('');
   const [utrNumber, setUtrNumber] = useState('');
@@ -323,6 +323,9 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
       });
 
       if (res?.success) {
+        if (res?.autoApproved) {
+          setIsZapVerified(true);
+        }
         setShowSuccessModal(true);
       } else {
         Alert.alert('Submission Error', res?.message || 'Failed to submit payment verification. Please try again.');

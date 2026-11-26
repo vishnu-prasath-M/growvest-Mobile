@@ -448,4 +448,12 @@ app.post('/api/admin/trigger-daily-notifications', protect, admin, async (req, r
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  try {
+    const autoUpiService = require('./services/autoUpiService');
+    const paymentController = require('./controllers/paymentController');
+    autoUpiService.setOrderProcessor(paymentController.processSuccessfulOrder);
+    autoUpiService.startPolling(35000);
+  } catch (e) {
+    console.warn('[AutoUPI] Startup notice:', e.message);
+  }
 });

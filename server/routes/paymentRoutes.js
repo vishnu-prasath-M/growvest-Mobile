@@ -11,6 +11,8 @@ router.post('/check-order-status', protect, paymentController.checkOrderStatus);
 router.get('/manual/config', paymentController.getCompanyUpiDetails);
 router.post('/manual/config', protect, admin, paymentController.updateCompanyUpiDetails);
 router.post('/manual/submit', protect, paymentController.submitManualPayment);
+router.post('/sms-webhook', paymentController.handleSmsWebhook);
+router.get('/sms-webhook', paymentController.handleSmsWebhook);
 router.get('/manual/pending', protect, admin, paymentController.getPendingManualPayments);
 router.get('/manual/all', protect, admin, paymentController.getAllManualPayments);
 router.post('/manual/:id/approve', protect, admin, paymentController.approveManualPayment);

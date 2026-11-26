@@ -15,6 +15,7 @@ const PocketMoney = require('../models/PocketMoney');
 const PocketMoneyPayout = require('../models/PocketMoneyPayout');
 const { calculateInvestmentTier } = require('../services/investmentTierService');
 const cashfreeService = require('../services/cashfreeService');
+const autoUpiService = require('../services/autoUpiService');
 
 async function getCompanyUpiConfig() {
   try {
@@ -26,7 +27,7 @@ async function getCompanyUpiConfig() {
     const autoApproveSetting = await Settings.findOne({ key: 'canara_auto_approval_enabled' });
 
     return {
-      upiId: (upiIdSetting?.value || '8925699005@upi').trim(),
+      upiId: (upiIdSetting?.value || 'paytm.s3soed8@pty').trim(),
       payeeName: (payeeNameSetting?.value || 'Growvest Investments').trim(),
       qrImage: (qrImageSetting?.value || '').trim(),
       gmailUser: (gmailUserSetting?.value || '').trim(),
@@ -35,7 +36,7 @@ async function getCompanyUpiConfig() {
     };
   } catch (err) {
     return {
-      upiId: '8925699005@upi',
+      upiId: 'paytm.s3soed8@pty',
       payeeName: 'Growvest Investments',
       qrImage: '',
       gmailUser: '',
@@ -1644,19 +1645,36 @@ exports.submitManualPayment = async (req, res) => {
       await pending.save();
     }
 
-    // Send in-app notification confirming submission
+    // Check if slice Gmail or SMS alert already arrived for this exact UTR + Amount
+    let autoApproved = false;
     try {
-      await sendNotification({
-        userId: req.user._id,
-        title: 'Payment Submitted ⏳',
-        description: `Your payment of ₹${finalAmount.toLocaleString('en-IN')} (Ref: ${cleanUtr}) has been submitted. Our team will verify and activate your ${finalPaymentType.replace('_', ' ')} within 12-24 hours.`,
-        type: 'general',
-      });
-    } catch (_) {}
+      autoUpiService.setOrderProcessor(processSuccessfulOrder);
+      const autoRes = await autoUpiService.tryAutoApprovePendingManual(manualRecord);
+      if (autoRes && autoRes.matched) {
+        autoApproved = true;
+      }
+    } catch (autoErr) {
+      console.warn('[ManualPayment] Auto-approval check warning:', autoErr.message);
+    }
+
+    if (!autoApproved) {
+      // Send in-app notification confirming submission
+      try {
+        await sendNotification({
+          userId: req.user._id,
+          title: 'Payment Submitted ⏳',
+          description: `Your payment of ₹${finalAmount.toLocaleString('en-IN')} (Ref: ${cleanUtr}) has been submitted. It will be auto-verified or approved by admin shortly.`,
+          type: 'general',
+        });
+      } catch (_) {}
+    }
 
     res.status(200).json({
       success: true,
-      message: 'Payment verification submitted successfully! Admin will verify and activate shortly.',
+      autoApproved,
+      message: autoApproved
+        ? 'Payment verified & approved automatically!'
+        : 'Payment verification submitted successfully! Waiting for admin or bank auto-approval.',
       manualPayment: manualRecord,
     });
   } catch (error) {
@@ -2028,6 +2046,49 @@ exports.testGmailConnection = async (req, res) => {
     return res.status(200).json(result);
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Test failed: ' + err.message });
+  }
+};
+
+// 10b. Slice Bank SMS / Notification Forwarder Webhook
+// Receives forwarded SMS from Admin's phone: { text / message / sms, secret }
+exports.handleSmsWebhook = async (req, res) => {
+  try {
+    const data = { ...req.query, ...req.body };
+    const { smsWebhookSecret } = await autoUpiService.getUpiConfig();
+
+    const providedSecret = data.secret || req.headers['x-sms-secret'] || '';
+    if (smsWebhookSecret && providedSecret !== smsWebhookSecret) {
+      return res.status(401).json({ success: false, message: 'Invalid SMS webhook secret' });
+    }
+
+    const smsText = data.text || data.message || data.sms || data.body || '';
+    if (!smsText) {
+      return res.status(400).json({ success: false, message: 'SMS text is required' });
+    }
+
+    const parsed = autoUpiService.parseSliceCreditText(smsText);
+    if (!parsed) {
+      return res.status(200).json({
+        success: true,
+        ignored: true,
+        message: 'Not a matching slice UPI credit SMS (or missing 12-digit Ref ID/UTR).',
+      });
+    }
+
+    autoUpiService.setOrderProcessor(processSuccessfulOrder);
+    const matchRes = await autoUpiService.recordAndMatchAlert({
+      ...parsed,
+      source: 'sms',
+    });
+
+    return res.status(200).json({
+      success: true,
+      parsed,
+      ...matchRes,
+    });
+  } catch (err) {
+    console.error('[SMS Webhook] error:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
 };
 
