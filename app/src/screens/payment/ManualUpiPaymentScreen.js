@@ -48,7 +48,7 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
   const [orderId, setOrderId] = useState(
     existingOrderId || `UPI_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`
   );
-  const [upiId, setUpiId] = useState('paytm.s3soed8@pty');
+  const [upiId, setUpiId] = useState('7418662750@ibl');
   const [payeeName, setPayeeName] = useState('Growvest Investments');
   const [customQrImage, setCustomQrImage] = useState('');
   const [utrNumber, setUtrNumber] = useState('');

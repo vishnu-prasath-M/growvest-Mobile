@@ -27,7 +27,7 @@ async function getCompanyUpiConfig() {
     const autoApproveSetting = await Settings.findOne({ key: 'canara_auto_approval_enabled' });
 
     return {
-      upiId: (upiIdSetting?.value || 'paytm.s3soed8@pty').trim(),
+      upiId: (upiIdSetting?.value || '7418662750@ibl').trim(),
       payeeName: (payeeNameSetting?.value || 'Growvest Investments').trim(),
       qrImage: (qrImageSetting?.value || '').trim(),
       gmailUser: (gmailUserSetting?.value || '').trim(),
@@ -36,7 +36,7 @@ async function getCompanyUpiConfig() {
     };
   } catch (err) {
     return {
-      upiId: 'paytm.s3soed8@pty',
+      upiId: '7418662750@ibl',
       payeeName: 'Growvest Investments',
       qrImage: '',
       gmailUser: '',

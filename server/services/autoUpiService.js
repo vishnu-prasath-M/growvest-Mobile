@@ -103,10 +103,10 @@ class AutoUpiService {
     const isCredit = /\b(received|credited)\b/i.test(combined) && !/\b(debited|sent|paid\s+to)\b/i.test(combined);
     if (!isCredit) return null;
 
-    // 1. Extract Amount (e.g., "Rs. 700", "₹1", "INR 500.00")
+    // 1. Extract Amount (e.g., "Rs. 700", "₹1", "credited with INR 1.00")
     let amount = null;
     const amtPatterns = [
-      /(?:received|credited)\s*(?:₹|Rs\.?|INR)\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
+      /(?:received|credited)(?:\s+(?:with|for|of|by))?\s*(?:₹|Rs\.?|INR)\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
       /(?:₹|Rs\.?|INR)\s*([0-9,]+(?:\.[0-9]{1,2})?)\s*(?:received|credited)/i,
     ];
     for (const regex of amtPatterns) {
@@ -120,10 +120,10 @@ class AutoUpiService {
       }
     }
 
-    // 2. Extract 12-digit UTR / RRN / Ref ID
+    // 2. Extract 12-digit UTR / RRN / Ref ID / UPI Ref No
     let utr = null;
     const utrPatterns = [
-      /(?:RRN|Ref\s*ID|UTR|Reference(?:\s*No\.?)?)[:\s#-]*(\d{12})\b/i,
+      /(?:RRN|UPI\s*Ref\s*No\.?|Ref\s*ID|Ref\s*No\.?|UTR|Reference(?:\s*No\.?)?)[:\s#-]*(\d{12})\b/i,
       /\b(\d{12})\b/,
     ];
     for (const regex of utrPatterns) {
@@ -396,3 +396,4 @@ class AutoUpiService {
 }
 
 module.exports = new AutoUpiService();
+
