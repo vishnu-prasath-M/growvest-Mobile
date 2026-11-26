@@ -40,7 +40,15 @@ exports.createWithdrawal = async (req, res) => {
     }
 
     let available = enrichedUser.availableToWithdraw || 0;
-    if (targetInv) {
+    if (withdrawType === 'wallet') {
+      const pendingWalletWithdrawals = await Withdrawal.find({
+        userId: user._id,
+        withdrawType: 'wallet',
+        status: 'pending',
+      });
+      const lockedPending = pendingWalletWithdrawals.reduce((s, w) => s + (Number(w.amount) || 0), 0);
+      available = Math.max(0, (Number(user.balance) || 0) - lockedPending);
+    } else if (targetInv) {
       const now = new Date();
       const principal = Number(targetInv.amount) || 0;
       
@@ -251,55 +259,56 @@ async function processWithdrawalDeductions(withdrawal) {
   }
 
   // Deduct from user.balance (ensure it never goes negative)
-  user.balance = Math.max(0, (user.balance || 0) - withdrawal.amount);
+  user.balance = Math.max(0, Number(((Number(user.balance) || 0) - Number(withdrawal.amount)).toFixed(2)));
   await user.save();
 
-  // Deduct from investments of the matching type
-  const investOrConditions = [];
-  if (withdrawal.userEmail) investOrConditions.push({ userEmail: withdrawal.userEmail });
-  if (user.mobileNumber) investOrConditions.push({ mobileNumber: user.mobileNumber });
-
-  const Investment = require('../models/Investment');
-  const approvedInvestments = await Investment.find({
-    $or: investOrConditions,
-    status: 'approved',
-    type: withdrawal.withdrawType || 'saving'
-  }).sort({ startDate: 1 });
-
   let remainingWithdrawAmount = withdrawal.amount;
-  
-  // Pass 1: Deduct from interest first across ALL investments
-  for (const inv of approvedInvestments) {
-    if (remainingWithdrawAmount <= 0) break;
-    let updatedInterestEarned = inv.interestEarned || 0;
-    
-    if (updatedInterestEarned > 0) {
-      if (remainingWithdrawAmount >= updatedInterestEarned) {
-        remainingWithdrawAmount -= updatedInterestEarned;
-        inv.interestEarned = 0;
-      } else {
-        inv.interestEarned -= remainingWithdrawAmount;
-        remainingWithdrawAmount = 0;
-      }
-    }
-  }
 
-  // Pass 2: DO NOT deduct from principal - withdrawals should only come from interest
-  // If remaining amount after interest deduction, it means insufficient interest
-  // Leave principal intact as per business rules
+  // Skip Investment deductions for direct Wallet withdrawals
+  if (withdrawal.withdrawType !== 'wallet') {
+    // Deduct from investments of the matching type
+    const investOrConditions = [];
+    if (withdrawal.userEmail) investOrConditions.push({ userEmail: withdrawal.userEmail });
+    if (user.mobileNumber) investOrConditions.push({ mobileNumber: user.mobileNumber });
 
-  // Save all updated investments
-  for (const inv of approvedInvestments) {
-    await Investment.updateOne(
-      { _id: inv._id },
-      {
-        $set: {
-          amount: inv.amount,
-          interestEarned: inv.interestEarned,
-          status: inv.status
+    const Investment = require('../models/Investment');
+    const approvedInvestments = await Investment.find({
+      $or: investOrConditions,
+      status: 'approved',
+      type: withdrawal.withdrawType || 'saving'
+    }).sort({ startDate: 1 });
+
+    // Pass 1: Deduct from interest first across ALL investments
+    for (const inv of approvedInvestments) {
+      if (remainingWithdrawAmount <= 0) break;
+      let updatedInterestEarned = inv.interestEarned || 0;
+
+      if (updatedInterestEarned > 0) {
+        if (remainingWithdrawAmount >= updatedInterestEarned) {
+          remainingWithdrawAmount -= updatedInterestEarned;
+          inv.interestEarned = 0;
+        } else {
+          inv.interestEarned -= remainingWithdrawAmount;
+          remainingWithdrawAmount = 0;
         }
       }
-    );
+    }
+
+    // Save all updated investments
+    for (const inv of approvedInvestments) {
+      await Investment.updateOne(
+        { _id: inv._id },
+        {
+          $set: {
+            amount: inv.amount,
+            interestEarned: inv.interestEarned,
+            status: inv.status
+          }
+        }
+      );
+    }
+  } else {
+    remainingWithdrawAmount = 0;
   }
 
   // Mark withdrawal as processed

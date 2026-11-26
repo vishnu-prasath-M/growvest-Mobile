@@ -73,9 +73,18 @@ const CATEGORIES = [
     icon: 'wallet-giftcard',
     accent: '#FCD34D',
   },
+  {
+    id: 'wallet',
+    name: 'Wallet',
+    badge: 'Available Cash',
+    colors: ['#064E3B', '#047857', '#10B981'],
+    blobColor: 'rgba(16, 185, 129, 0.25)',
+    icon: 'wallet-outline',
+    accent: '#34D399',
+  },
 ];
 
-const WithdrawScreen = ({ navigation }) => {
+const WithdrawScreen = ({ navigation, route }) => {
   const { colors: themeColors, isDarkMode } = useTheme();
   const styles = React.useMemo(() => getStyles(themeColors, isDarkMode), [themeColors, isDarkMode]);
   const insets = useScreenInsets(8);
@@ -106,6 +115,8 @@ const WithdrawScreen = ({ navigation }) => {
   const [selectedChitId, setSelectedChitId] = useState(null);
   const [emailRequiredModalVisible, setEmailRequiredModalVisible] = useState(false);
   const [investments, setInvestments] = useState([]);
+  const [walletCashBalance, setWalletCashBalance] = useState(0);
+  const [walletWithdrawals, setWalletWithdrawals] = useState([]);
   const carouselRef = useRef(null);
 
   // Modern Alert state
@@ -151,13 +162,20 @@ const WithdrawScreen = ({ navigation }) => {
         setBankInfo(kycRes.data.data);
       }
 
-      // Fetch all investment types in parallel
-      const [allInvestments, myChits, pocketMoneyRes, sipRes] = await Promise.all([
+      // Fetch all investment types + wallet balance + withdrawals in parallel
+      const [allInvestments, myChits, pocketMoneyRes, sipRes, walletBalRes, withdrawalsRes] = await Promise.all([
         investmentService.getInvestments().catch(() => []),
         chitFundService.getMyChits().catch(() => []),
         api.get('/pocket-money/my').catch(() => ({ data: [] })),
         sipService.getMySIPs().catch(() => ({ sips: [] })),
+        api.get('/wallet/balance').catch(() => ({ data: {} })),
+        withdrawalService.getWithdrawals().catch(() => []),
       ]);
+
+      const fetchedWalletCash = Number(walletBalRes?.data?.balance ?? currentUser?.balance ?? 0);
+      setWalletCashBalance(fetchedWalletCash);
+      const allW = Array.isArray(withdrawalsRes) ? withdrawalsRes : (withdrawalsRes?.data || []);
+      setWalletWithdrawals(allW.filter(w => w.withdrawType === 'wallet'));
 
       // Savings/Fixed investments — already scoped to logged-in user by backend
       const validInvestments = (allInvestments || []).filter(inv => inv.status !== 'rejected');
@@ -294,7 +312,18 @@ const WithdrawScreen = ({ navigation }) => {
     useCallback(() => {
       fetchUserData();
       fetchPlatformCharges();
-    }, [])
+      const initCat = route?.params?.initialCategory;
+      if (initCat) {
+        const idx = CATEGORIES.findIndex(c => c.id === initCat);
+        if (idx >= 0) {
+          setActiveCategory(initCat);
+          setAmount('');
+          setTimeout(() => {
+            carouselRef.current?.scrollTo({ x: idx * (CARD_WIDTH + 14), animated: true });
+          }, 150);
+        }
+      }
+    }, [route?.params?.initialCategory])
   );
 
   // Polling for auto-updating UI
@@ -396,6 +425,12 @@ const WithdrawScreen = ({ navigation }) => {
   const activePMCount = activePMItems.filter(inv => inv.status === 'active').length;
   const pmTotalPaidOut = activePMItems.reduce((sum, inv) => sum + (Number(inv.totalPaidOut) || 0), 0);
 
+  // 5. Wallet Cash Balance
+  const pendingWalletTotal = walletWithdrawals
+    .filter(w => w.status === 'pending')
+    .reduce((sum, w) => sum + (Number(w.amount) || 0), 0);
+  const walletAvailable = Math.max(0, Number((walletCashBalance - pendingWalletTotal).toFixed(2)));
+
   // Category balance dictionary
   const categoryBalances = {
     investment: {
@@ -425,6 +460,13 @@ const WithdrawScreen = ({ navigation }) => {
       stat1Val: activePMCount,
       stat2Label: 'Total Released',
       stat2Val: formatCurrencyNoDecimals(pmTotalPaidOut),
+    },
+    wallet: {
+      available: walletAvailable,
+      stat1Label: 'Wallet Cash',
+      stat1Val: formatCurrency(walletCashBalance),
+      stat2Label: 'Pending Payout',
+      stat2Val: formatCurrency(pendingWalletTotal),
     },
   };
 
@@ -628,6 +670,21 @@ const WithdrawScreen = ({ navigation }) => {
           'payout',
           'Pocket Money Release Requested ⌛',
           `Your Pocket Money release request of ${formatCurrency(numAmt)} has been submitted successfully.`,
+          'Got It'
+        );
+      } else if (activeCategory === 'wallet' || withdrawType === 'wallet') {
+        await withdrawalService.createWithdrawal({
+          amount: numAmt,
+          upiId: upiId.trim(),
+          userName: userData?.name || userData?.username || 'User',
+          userEmail: userData?.email || userData?.mobileNumber || '',
+          withdrawType: 'wallet',
+          activeCategory: 'wallet',
+        });
+        showAlert(
+          'payout',
+          'Wallet Withdrawal Requested ⌛',
+          `Your Wallet withdrawal request of ${formatCurrency(numAmt)} has been submitted successfully and is pending admin approval.`,
           'Got It'
         );
       } else {
@@ -1011,16 +1068,20 @@ const WithdrawScreen = ({ navigation }) => {
           <View style={styles.sectionHeaderRow}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Text style={styles.sectionHeaderTitle}>
-                {listFilter === 'all' ? 'All Investments & Assets' : `${currentCategoryConfig.name} Plans`}
+                {listFilter === 'all'
+                  ? 'All Investments & Assets'
+                  : (activeCategory === 'wallet' ? 'Wallet Withdrawals' : `${currentCategoryConfig.name} Plans`)}
               </Text>
               <Text style={styles.sectionHeaderCount}>
-                ({investments.filter(inv => {
-                  if (listFilter === 'all') return true;
-                  if (activeCategory === 'chit') return inv.isChit;
-                  if (activeCategory === 'sip') return inv.isSIP;
-                  if (activeCategory === 'pocket_money') return inv.isPocketMoney;
-                  return !inv.isChit && !inv.isPocketMoney && !inv.isSIP;
-                }).length})
+                ({activeCategory === 'wallet' && listFilter !== 'all'
+                  ? walletWithdrawals.length
+                  : investments.filter(inv => {
+                      if (listFilter === 'all') return true;
+                      if (activeCategory === 'chit') return inv.isChit;
+                      if (activeCategory === 'sip') return inv.isSIP;
+                      if (activeCategory === 'pocket_money') return inv.isPocketMoney;
+                      return !inv.isChit && !inv.isPocketMoney && !inv.isSIP;
+                    }).length})
               </Text>
             </View>
             <TouchableOpacity
@@ -1032,6 +1093,51 @@ const WithdrawScreen = ({ navigation }) => {
           </View>
 
           {(() => {
+            if (activeCategory === 'wallet' && listFilter !== 'all') {
+              if (walletWithdrawals.length === 0) {
+                return (
+                  <View style={styles.emptyInvestmentsCard}>
+                    <MaterialCommunityIcons name="wallet-outline" size={36} color={themeColors.textTertiary} />
+                    <Text style={styles.emptyInvestmentsText}>
+                      No wallet withdrawal requests yet.
+                    </Text>
+                    <TouchableOpacity
+                      style={[styles.exploreBtn, { backgroundColor: currentCategoryConfig.colors[0] }]}
+                      onPress={() => navigation.navigate('Wallet')}
+                    >
+                      <Text style={styles.exploreBtnText}>Go to Growvest Wallet</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              }
+              return walletWithdrawals.map((w, idx) => (
+                <View key={String(w._id || idx)} style={[styles.emptyInvestmentsCard, { alignItems: 'stretch', paddingVertical: 14, marginBottom: 10 }]}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 15, fontWeight: '800', color: themeColors.text }}>
+                      {formatCurrency(w.amount)}
+                    </Text>
+                    <View style={{
+                      paddingHorizontal: 8,
+                      paddingVertical: 3,
+                      borderRadius: 6,
+                      backgroundColor: w.status === 'paid' || w.status === 'approved' ? 'rgba(16,185,129,0.15)' : (w.status === 'rejected' ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)'),
+                    }}>
+                      <Text style={{
+                        fontSize: 10,
+                        fontWeight: '800',
+                        color: w.status === 'paid' || w.status === 'approved' ? '#10B981' : (w.status === 'rejected' ? '#EF4444' : '#F59E0B'),
+                      }}>
+                        {String(w.status || 'pending').toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 12, color: themeColors.textMuted, marginTop: 4 }}>
+                    UPI: {w.upiId} • {w.date || ''}
+                  </Text>
+                </View>
+              ));
+            }
+
             const displayItems = investments.filter(inv => {
               if (listFilter === 'all') return true;
               if (activeCategory === 'chit') return inv.isChit === true;
@@ -1053,6 +1159,7 @@ const WithdrawScreen = ({ navigation }) => {
                       if (activeCategory === 'chit') navigation.navigate('ChitFunds');
                       else if (activeCategory === 'sip') navigation.navigate('SIPDashboard');
                       else if (activeCategory === 'pocket_money') navigation.navigate('PocketMoney');
+                      else if (activeCategory === 'wallet') navigation.navigate('Wallet');
                       else navigation.navigate('Investments');
                     }}
                   >

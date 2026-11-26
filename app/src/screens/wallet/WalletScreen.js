@@ -193,7 +193,7 @@ const WalletScreen = ({ navigation }) => {
               <TouchableOpacity
                 style={styles.withdrawBtn}
                 activeOpacity={0.85}
-                onPress={() => navigation.navigate('Withdraw')}
+                onPress={() => navigation.navigate('MainTabs', { screen: 'Withdraw', params: { initialCategory: 'wallet' } })}
               >
                 <MaterialCommunityIcons name="arrow-top-right-bold-box-outline" size={18} color="#FFFFFF" />
                 <Text style={styles.withdrawBtnText}>Withdraw</Text>
