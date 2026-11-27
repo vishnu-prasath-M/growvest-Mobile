@@ -325,11 +325,8 @@ const ProfileScreen = ({ navigation }) => {
               style={styles.avatarRing}
             >
               <View style={styles.avatarInner}>
-                <Text style={styles.avatarInitials}>{getInitials()}</Text>
-                <View style={styles.avatarWalletPill}>
-                  <MaterialCommunityIcons name="wallet-outline" size={12} color="#10B981" />
-                  <Text style={styles.avatarWalletText}>Wallet</Text>
-                </View>
+                <MaterialCommunityIcons name="wallet-outline" size={38} color="#10B981" />
+                <Text style={styles.avatarWalletLabel}>Wallet</Text>
               </View>
             </LinearGradient>
           </TouchableOpacity>
@@ -827,34 +824,22 @@ const getStyles = (themeColors, isDarkMode, insets = { top: 0 }) => StyleSheet.c
     width: 160, height: 160, borderRadius: 80,
     backgroundColor: 'rgba(212,168,67,0.22)',
   },
-  avatarOuter: { position: 'absolute', bottom: -54, alignSelf: 'center' },
+  avatarOuter: { position: 'absolute', bottom: -52, alignSelf: 'center' },
   avatarRing: {
-    width: 108, height: 108, borderRadius: 28, padding: 3,
+    width: 100, height: 100, borderRadius: 28, padding: 3,
     shadowColor: '#C89A30', shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3, shadowRadius: 20, elevation: 12,
   },
   avatarInner: {
     flex: 1, borderRadius: 24, backgroundColor: themeColors.surface,
     justifyContent: 'center', alignItems: 'center',
-    paddingVertical: 8, gap: 4,
-  },
-  avatarInitials: { fontSize: 26, fontWeight: '800', color: colors.primary, letterSpacing: -0.5, lineHeight: 30 },
-  avatarWalletPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 4,
-    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.16)' : '#ECFDF5',
-    borderWidth: 1,
-    borderColor: isDarkMode ? 'rgba(16, 185, 129, 0.35)' : 'rgba(16, 185, 129, 0.25)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
   },
-  avatarWalletText: {
-    fontSize: 10.5,
-    fontWeight: '700',
+  avatarWalletLabel: {
+    fontSize: 13,
+    fontWeight: '800',
     color: '#10B981',
-    letterSpacing: 0.2,
+    letterSpacing: 0.3,
   },
 
   // Name
