@@ -156,6 +156,38 @@ const AdminDashboard = () => {
   const [copiedUPI, setCopiedUPI] = useState(false);
   const [showWithdrawQr, setShowWithdrawQr] = useState(!isMobile);
   const [initiatingGateway, setInitiatingGateway] = useState(false);
+  const [adminUpiId, setAdminUpiId] = useState("7418662750@ibl");
+  const [savingUpiId, setSavingUpiId] = useState(false);
+
+  const handleSaveAdminUpiId = async () => {
+    const cleanUpi = adminUpiId.trim();
+    if (!cleanUpi || !cleanUpi.includes("@")) {
+      toast.error("Please enter a valid UPI ID (e.g. 7418662750@ibl)");
+      return;
+    }
+    try {
+      setSavingUpiId(true);
+      const res = await fetch(`${API_URL}/api/payment/manual/config`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ upiId: cleanUpi }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        if (data.config?.upiId) setAdminUpiId(data.config.upiId);
+        toast.success(`Active UPI ID updated to ${cleanUpi}!`);
+      } else {
+        toast.error(data.message || "Failed to update UPI ID");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save UPI ID");
+    } finally {
+      setSavingUpiId(false);
+    }
+  };
 
   const handlePayWithdrawalViaGateway = async () => {
     if (!payModalData) return;
@@ -493,6 +525,16 @@ const AdminDashboard = () => {
           }
         })
         .catch(err => console.error("Error fetching withdrawals:", err));
+
+      // Fetch Active Company UPI Config
+      fetch(`${API_URL}/api/payment/manual/config`)
+        .then(res => res.json())
+        .then(data => {
+          if (data?.success && data?.config?.upiId) {
+            setAdminUpiId(data.config.upiId);
+          }
+        })
+        .catch(() => {});
 
       // Fetch Investments
       fetch(`${API_URL}/api/investments`, {
@@ -2135,7 +2177,8 @@ const AdminDashboard = () => {
                         type="text"
                         className="w-full h-12 text-base font-body rounded-xl border border-border bg-background px-4 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
                         placeholder="example@upi"
-                        defaultValue="7418662750@ibl"
+                        value={adminUpiId}
+                        onChange={(e) => setAdminUpiId(e.target.value)}
                       />
                       <p className="text-[10px] font-body text-muted-foreground mt-2 leading-relaxed">
                         This UPI ID will be shown to users when they initiate a manual deposit via QR code.
@@ -2143,8 +2186,12 @@ const AdminDashboard = () => {
                     </div>
                   </div>
 
-                  <Button className="w-full rounded-xl font-body font-medium h-12 mt-6">
-                    Save UPI ID
+                  <Button
+                    onClick={handleSaveAdminUpiId}
+                    disabled={savingUpiId}
+                    className="w-full rounded-xl font-body font-medium h-12 mt-6"
+                  >
+                    {savingUpiId ? "Saving..." : "Save UPI ID"}
                   </Button>
                 </div>
               </div>
