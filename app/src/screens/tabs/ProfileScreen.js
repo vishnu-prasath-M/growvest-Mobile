@@ -325,8 +325,10 @@ const ProfileScreen = ({ navigation }) => {
               style={styles.avatarRing}
             >
               <View style={styles.avatarInner}>
-                <MaterialCommunityIcons name="wallet-outline" size={38} color="#10B981" />
-                <Text style={styles.avatarWalletLabel}>Wallet</Text>
+                <MaterialCommunityIcons name="wallet-outline" size={34} color="#10B981" />
+                <Text style={styles.avatarWalletAmount} numberOfLines={1} adjustsFontSizeToFit>
+                  ₹{(walletBalance || 0).toLocaleString('en-IN')}
+                </Text>
               </View>
             </LinearGradient>
           </TouchableOpacity>
@@ -360,26 +362,6 @@ const ProfileScreen = ({ navigation }) => {
           <View style={styles.menuGroup}>
             <Text style={styles.menuGroupLabel}>ACCOUNT</Text>
             <View style={styles.menuCard}>
-              {/* Growvest Wallet */}
-              <TouchableOpacity
-                style={styles.menuRow}
-                activeOpacity={0.7}
-                onPress={() => navigation.navigate('Wallet')}
-              >
-                <View style={[styles.mintIconBox, { backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.2)' : '#D1FAE5' }]}>
-                  <MaterialCommunityIcons name="wallet-outline" size={20} color="#10B981" />
-                </View>
-                <Text style={styles.menuLabel}>Growvest Wallet</Text>
-                <View style={[styles.menuBadge, { backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.18)' : '#ECFDF5' }]}>
-                  <Text style={[styles.menuBadgeText, { color: '#10B981', fontWeight: '800' }]}>
-                    ₹{(walletBalance || 0).toLocaleString('en-IN')}
-                  </Text>
-                </View>
-                <MaterialCommunityIcons name="chevron-right" size={20} color={styles.chevronColor.color} />
-              </TouchableOpacity>
-
-              <View style={styles.menuDivider} />
-
               {/* Personal Information */}
               <TouchableOpacity
                 style={styles.menuRow}
@@ -824,22 +806,23 @@ const getStyles = (themeColors, isDarkMode, insets = { top: 0 }) => StyleSheet.c
     width: 160, height: 160, borderRadius: 80,
     backgroundColor: 'rgba(212,168,67,0.22)',
   },
-  avatarOuter: { position: 'absolute', bottom: -52, alignSelf: 'center' },
+  avatarOuter: { position: 'absolute', bottom: -48, alignSelf: 'center' },
   avatarRing: {
-    width: 100, height: 100, borderRadius: 28, padding: 3,
+    width: 176, height: 96, borderRadius: 24, padding: 3,
     shadowColor: '#C89A30', shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3, shadowRadius: 20, elevation: 12,
   },
   avatarInner: {
-    flex: 1, borderRadius: 24, backgroundColor: themeColors.surface,
+    flex: 1, borderRadius: 21, backgroundColor: themeColors.surface,
     justifyContent: 'center', alignItems: 'center',
+    paddingHorizontal: 14,
     gap: 4,
   },
-  avatarWalletLabel: {
-    fontSize: 13,
+  avatarWalletAmount: {
+    fontSize: 17,
     fontWeight: '800',
     color: '#10B981',
-    letterSpacing: 0.3,
+    letterSpacing: -0.2,
   },
 
   // Name
