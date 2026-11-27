@@ -312,8 +312,12 @@ const ProfileScreen = ({ navigation }) => {
             <View style={styles.heroBlobGold} />
           </LinearGradient>
 
-          {/* Avatar overlapping */}
-          <View style={styles.avatarOuter}>
+          {/* Avatar overlapping (with Wallet quick access inside) */}
+          <TouchableOpacity
+            style={styles.avatarOuter}
+            onPress={() => navigation.navigate('Wallet')}
+            activeOpacity={0.85}
+          >
             <LinearGradient
               colors={['#E8D083', '#C89A30']}
               start={{ x: 0, y: 0 }}
@@ -322,18 +326,12 @@ const ProfileScreen = ({ navigation }) => {
             >
               <View style={styles.avatarInner}>
                 <Text style={styles.avatarInitials}>{getInitials()}</Text>
+                <View style={styles.avatarWalletPill}>
+                  <MaterialCommunityIcons name="wallet-outline" size={12} color="#10B981" />
+                  <Text style={styles.avatarWalletText}>Wallet</Text>
+                </View>
               </View>
             </LinearGradient>
-          </View>
-
-          {/* Top-Right Header Wallet Quick Access */}
-          <TouchableOpacity
-            style={styles.topHeaderWalletBtn}
-            onPress={() => navigation.navigate('Wallet')}
-            activeOpacity={0.8}
-          >
-            <MaterialCommunityIcons name="wallet-outline" size={18} color="#FFFFFF" />
-            <Text style={styles.topHeaderWalletText}>Wallet</Text>
           </TouchableOpacity>
         </View>
 
@@ -829,38 +827,33 @@ const getStyles = (themeColors, isDarkMode, insets = { top: 0 }) => StyleSheet.c
     width: 160, height: 160, borderRadius: 80,
     backgroundColor: 'rgba(212,168,67,0.22)',
   },
-  avatarOuter: { position: 'absolute', bottom: -52, alignSelf: 'center' },
+  avatarOuter: { position: 'absolute', bottom: -54, alignSelf: 'center' },
   avatarRing: {
-    width: 100, height: 100, borderRadius: 28, padding: 3,
+    width: 108, height: 108, borderRadius: 28, padding: 3,
     shadowColor: '#C89A30', shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3, shadowRadius: 20, elevation: 12,
   },
   avatarInner: {
     flex: 1, borderRadius: 24, backgroundColor: themeColors.surface,
     justifyContent: 'center', alignItems: 'center',
+    paddingVertical: 8, gap: 4,
   },
-  avatarInitials: { fontSize: 28, fontWeight: '800', color: colors.primary, letterSpacing: -0.5 },
-
-  // Top-Right Header Wallet button
-  topHeaderWalletBtn: {
-    position: 'absolute',
-    top: (insets?.top || 16) + 10,
-    right: 18,
-    zIndex: 10,
+  avatarInitials: { fontSize: 26, fontWeight: '800', color: colors.primary, letterSpacing: -0.5, lineHeight: 30 },
+  avatarWalletPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.32)',
+    gap: 4,
+    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.16)' : '#ECFDF5',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.22)',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    gap: 6,
+    borderColor: isDarkMode ? 'rgba(16, 185, 129, 0.35)' : 'rgba(16, 185, 129, 0.25)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
   },
-  topHeaderWalletText: {
-    fontSize: 13,
+  avatarWalletText: {
+    fontSize: 10.5,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#10B981',
     letterSpacing: 0.2,
   },
 
