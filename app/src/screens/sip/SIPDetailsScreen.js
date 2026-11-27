@@ -161,11 +161,10 @@ const SIPDetailsScreen = ({ route, navigation }) => {
 
       if (walletBal >= contrib.amount) {
         Alert.alert(
-          'Choose Payment Method',
-          `Pay Installment #${contrib.installmentNumber} (₹${contrib.amount.toLocaleString('en-IN')}) from Growvest Wallet or Direct UPI?\n\nWallet Balance: ₹${walletBal.toLocaleString('en-IN')}`,
+          'Pay from Growvest Wallet',
+          `Pay Installment #${contrib.installmentNumber} (₹${contrib.amount.toLocaleString('en-IN')}) from your Growvest Wallet?\n\nWallet Balance: ₹${walletBal.toLocaleString('en-IN')}`,
           [
-            { text: 'Pay from Wallet (Instant)', onPress: executeWalletPay },
-            { text: 'Pay via UPI', onPress: executeUpiFlow },
+            { text: `Pay ₹${contrib.amount.toLocaleString('en-IN')} from Wallet`, onPress: executeWalletPay },
             { text: 'Cancel', style: 'cancel' },
           ]
         );
@@ -173,7 +172,7 @@ const SIPDetailsScreen = ({ route, navigation }) => {
         const deficit = Math.max(10, Math.ceil(contrib.amount - walletBal));
         Alert.alert(
           'Insufficient Wallet Balance',
-          `Your wallet balance is ₹${walletBal.toLocaleString('en-IN')}. You need ₹${deficit.toLocaleString('en-IN')} more to pay this installment.`,
+          `Your wallet balance is ₹${walletBal.toLocaleString('en-IN')}. You need ₹${deficit.toLocaleString('en-IN')} more in your wallet to pay this installment.`,
           [
             {
               text: `Add ₹${deficit.toLocaleString('en-IN')} to Wallet`,
@@ -182,12 +181,11 @@ const SIPDetailsScreen = ({ route, navigation }) => {
                   amount: deficit,
                   paymentType: 'wallet_topup',
                   payloadData: { amount: deficit },
-                  title: 'Wallet Top-Up',
+                  title: 'Add Money to Wallet',
                   returnScreen: 'SIPDashboard',
                 });
               },
             },
-            { text: 'Pay via UPI', onPress: executeUpiFlow },
             { text: 'Cancel', style: 'cancel' },
           ]
         );

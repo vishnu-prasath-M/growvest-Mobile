@@ -290,15 +290,6 @@ const ChitPaymentScreen = ({ navigation, route }) => {
           </LinearGradient>
         </TouchableOpacity>
 
-        {/* Alternative: Direct UPI Payment link */}
-        <TouchableOpacity
-          style={styles.directUpiLink}
-          onPress={handleRazorpayPay}
-          disabled={loading}
-        >
-          <Text style={styles.directUpiText}>Or Pay Directly via UPI (GPay / PhonePe / Paytm)</Text>
-        </TouchableOpacity>
-
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Text style={styles.backBtnText}>Cancel</Text>
         </TouchableOpacity>

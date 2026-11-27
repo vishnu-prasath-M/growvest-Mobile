@@ -73,6 +73,24 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
   const [zapPolling, setZapPolling] = useState(false);
   const [zapPollingTimer, setZapPollingTimer] = useState(null);
 
+  // Save draft in AsyncStorage so if Android kills background app during GPay switch, user can resume UTR entry seamlessly
+  useEffect(() => {
+    if (cleanAmount > 0 && orderId) {
+      AsyncStorage.setItem(
+        'manualPaymentDraft',
+        JSON.stringify({
+          orderId,
+          amount: cleanAmount,
+          paymentType,
+          payloadData,
+          title,
+          returnScreen,
+          savedAt: Date.now(),
+        })
+      ).catch(() => {});
+    }
+  }, [orderId, cleanAmount, paymentType]);
+
   // Fetch company receiving UPI settings from backend
   useEffect(() => {
     let isMounted = true;
@@ -323,6 +341,7 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
       });
 
       if (res?.success) {
+        AsyncStorage.removeItem('manualPaymentDraft').catch(() => {});
         if (res?.autoApproved) {
           setIsZapVerified(true);
         }
@@ -348,7 +367,13 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <TouchableOpacity
+          onPress={() => {
+            AsyncStorage.removeItem('manualPaymentDraft').catch(() => {});
+            navigation.goBack();
+          }}
+          style={styles.backBtn}
+        >
           <MaterialCommunityIcons name="arrow-left" size={24} color={themeColors.text} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -470,13 +495,13 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
               )}
             </View>
             <Text style={styles.qrInstruction}>
-              Tap any UPI app below — it will auto-scan & fill ₹{cleanAmount}
+              Tap Google Pay below — it will auto-scan & fill ₹{cleanAmount}
             </Text>
 
-            {/* Primary Auto-Share QR to UPI App Button */}
+            {/* Primary Auto-Share QR to Google Pay (GPay) Button */}
             <TouchableOpacity
               style={[styles.zapPayBtn, { width: '100%', marginTop: 12 }]}
-              onPress={() => handleShareQrToUpiApp('UPI App')}
+              onPress={() => handleShareQrToUpiApp('Google Pay')}
               disabled={sharingQr || loadingConfig}
               activeOpacity={0.85}
             >
@@ -484,31 +509,18 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
                 <>
-                  <MaterialCommunityIcons name="qrcode-scan" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-                  <Text style={styles.zapPayBtnText}>Pay {formatCurrency(cleanAmount)} via UPI App</Text>
+                  <MaterialCommunityIcons name="google" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.zapPayBtnText}>Pay {formatCurrency(cleanAmount)} via Google Pay (GPay)</Text>
                 </>
               )}
             </TouchableOpacity>
 
-            {/* Quick App Buttons (Auto-Shares QR PNG to Selected UPI App) */}
-            <View style={[styles.zapBadgesRow, { marginTop: 12, marginBottom: 4, justifyContent: 'center' }]}>
-              {[
-                { label: 'GPay', icon: 'google', color: '#4285F4' },
-                { label: 'PhonePe', icon: 'cellphone-check', color: '#5F259F' },
-                { label: 'Paytm', icon: 'wallet', color: '#00BAF2' },
-                { label: 'BHIM / Other', icon: 'bank', color: '#10B981' },
-              ].map((appItem) => (
-                <TouchableOpacity
-                  key={appItem.label}
-                  style={[styles.appBadge, { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 8, paddingHorizontal: 12 }]}
-                  onPress={() => handleShareQrToUpiApp(appItem.label)}
-                  disabled={sharingQr || loadingConfig}
-                  activeOpacity={0.75}
-                >
-                  <MaterialCommunityIcons name={appItem.icon} size={14} color={appItem.color} />
-                  <Text style={styles.appBadgeText}>{appItem.label}</Text>
-                </TouchableOpacity>
-              ))}
+            {/* Clear Instruction for GPay vs Other UPI Apps */}
+            <View style={[styles.helperTipBox, { marginTop: 14, width: '100%' }]}>
+              <MaterialCommunityIcons name="information-outline" size={18} color="#10B981" style={{ marginTop: 1 }} />
+              <Text style={styles.helperTipText}>
+                <Text style={{ fontWeight: '700', color: themeColors.text }}>Google Pay (GPay)</Text> will open directly for payment. For all other UPI apps (PhonePe, Paytm, BHIM), please manually open your UPI app and pay by scanning the QR code or entering the UPI ID below.
+              </Text>
             </View>
           </View>
 
@@ -578,44 +590,6 @@ export const ManualUpiPaymentScreen = ({ navigation, route }) => {
             <Text style={styles.inputHelper}>
               Found in your GPay/PhonePe receipt as "UPI Ref ID" or "UTR Number"
             </Text>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Attach Payment Screenshot (Optional)</Text>
-            {screenshotUri ? (
-              <View style={styles.screenshotPreviewContainer}>
-                <Image source={{ uri: screenshotUri }} style={styles.screenshotThumb} resizeMode="cover" />
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={styles.screenshotAttachedText}>Screenshot Attached</Text>
-                  <TouchableOpacity onPress={() => { setScreenshotUri(null); setScreenshotBase64(null); }}>
-                    <Text style={styles.screenshotRemoveText}>Remove</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ) : (
-              <TouchableOpacity
-                onPress={handlePickScreenshot}
-                style={styles.screenshotPickerBtn}
-                activeOpacity={0.8}
-              >
-                <MaterialCommunityIcons name="image-plus" size={22} color="#10B981" />
-                <Text style={styles.screenshotPickerText}>Select Receipt Screenshot</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Remarks / Your Name (Optional)</Text>
-            <View style={styles.inputContainer}>
-              <MaterialCommunityIcons name="comment-text-outline" size={18} color="#64748B" style={{ marginRight: 8 }} />
-              <TextInput
-                style={styles.textInput}
-                placeholder="e.g. Paid via Google Pay"
-                placeholderTextColor={isDarkMode ? '#64748B' : '#94A3B8'}
-                value={userRemarks}
-                onChangeText={setUserRemarks}
-              />
-            </View>
           </View>
 
           <TouchableOpacity

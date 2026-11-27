@@ -382,17 +382,6 @@ const InvestmentPaymentScreen = ({ navigation, route }) => {
           </LinearGradient>
         </TouchableOpacity>
 
-        {/* Alternative: Direct UPI Payment link */}
-        {!isReinvestment && (
-          <TouchableOpacity
-            style={styles.directUpiLink}
-            onPress={handlePayNow}
-            disabled={loading}
-          >
-            <Text style={styles.directUpiText}>Or Pay Directly via UPI (GPay / PhonePe / Paytm)</Text>
-          </TouchableOpacity>
-        )}
-
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} disabled={loading}>
           <Text style={styles.backBtnText}>{isReinvestment ? 'Cancel' : 'Cancel Payment'}</Text>
         </TouchableOpacity>

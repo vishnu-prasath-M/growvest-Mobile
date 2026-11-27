@@ -352,7 +352,38 @@ const tabStyles = StyleSheet.create({
 });
 
 // ---------- Tab Navigator with cross-fade between screens ----------
-const TabNavigator = () => {
+const TabNavigator = ({ navigation }) => {
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem('manualPaymentDraft');
+        if (!raw || !mounted) return;
+        const draft = JSON.parse(raw);
+        const ageMs = Date.now() - (Number(draft?.savedAt) || 0);
+        if (draft?.amount > 0 && draft?.orderId && ageMs < 30 * 60 * 1000) {
+          setTimeout(() => {
+            if (mounted) {
+              navigation.navigate('ManualUpiPayment', {
+                amount: draft.amount,
+                paymentType: draft.paymentType,
+                payloadData: draft.payloadData,
+                title: draft.title,
+                returnScreen: draft.returnScreen,
+                existingOrderId: draft.orderId,
+              });
+            }
+          }, 250);
+        } else {
+          await AsyncStorage.removeItem('manualPaymentDraft');
+        }
+      } catch (_) {}
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
     <Tab.Navigator
       tabBar={(props) => <PrimeTabBar {...props} />}

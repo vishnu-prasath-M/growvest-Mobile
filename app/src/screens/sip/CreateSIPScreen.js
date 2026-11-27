@@ -208,7 +208,21 @@ const CreateSIPScreen = ({ navigation, route }) => {
     setShowConfirmModal(true);
   };
 
-  const handleConfirmAndPay = async (payMethod = 'auto') => {
+  const handleConfirmAndPay = async () => {
+    // Wallet-Only Investment Rule: require sufficient wallet balance first
+    if (walletBalance < currentAmount) {
+      const deficit = Math.max(10, Math.ceil(currentAmount - walletBalance));
+      setShowConfirmModal(false);
+      navigation.navigate('ManualUpiPayment', {
+        amount: deficit,
+        paymentType: 'wallet_topup',
+        payloadData: { amount: deficit },
+        title: 'Add Money to Wallet',
+        returnScreen: 'CreateSIP',
+      });
+      return;
+    }
+
     try {
       setSubmitting(true);
       setShowConfirmModal(false);
@@ -232,42 +246,10 @@ const CreateSIPScreen = ({ navigation, route }) => {
         throw new Error(res?.message || 'Failed to initialize SIP');
       }
 
-      const { sip, firstContribution, orderId } = res.data;
+      const { sip, firstContribution } = res.data;
 
-      // 2. If user has sufficient wallet balance, pay immediately from wallet!
-      if (payMethod !== 'upi' && walletBalance >= currentAmount) {
-        const walletPayRes = await api.post('/wallet/pay', {
-          amount: currentAmount,
-          paymentType: 'sip_initial',
-          payloadData: {
-            sipId: sip._id,
-            contributionId: firstContribution?._id,
-            installmentNumber: 1,
-          },
-          title: `SIP Initial Contribution (${sip.sipId})`,
-        });
-
-        if (walletPayRes?.data?.success) {
-          setSubmitting(false);
-          Alert.alert(
-            'SIP Activated Successfully! 🎉',
-            `₹${currentAmount.toLocaleString('en-IN')} paid directly from your Growvest Wallet! Daily installments will automatically be debited from your wallet.`,
-            [
-              {
-                text: 'View SIP Dashboard',
-                onPress: () => navigation.navigate('SIPDashboard'),
-              },
-            ]
-          );
-          return;
-        }
-      }
-
-      // 3. Otherwise navigate to manual UPI screen
-      setSubmitting(false);
-      setShowConfirmModal(false);
-
-      navigation.navigate('ManualUpiPayment', {
+      // 2. Pay directly from Growvest Wallet
+      const walletPayRes = await api.post('/wallet/pay', {
         amount: currentAmount,
         paymentType: 'sip_initial',
         payloadData: {
@@ -276,13 +258,27 @@ const CreateSIPScreen = ({ navigation, route }) => {
           installmentNumber: 1,
         },
         title: `SIP Initial Contribution (${sip.sipId})`,
-        returnScreen: 'SIPDashboard',
-        existingOrderId: orderId,
       });
-      return;
+
+      if (walletPayRes?.data?.success) {
+        setSubmitting(false);
+        Alert.alert(
+          'SIP Activated Successfully! 🎉',
+          `₹${currentAmount.toLocaleString('en-IN')} paid directly from your Growvest Wallet! Daily installments will automatically be debited from your wallet.`,
+          [
+            {
+              text: 'View SIP Dashboard',
+              onPress: () => navigation.navigate('SIPDashboard'),
+            },
+          ]
+        );
+        return;
+      }
+
+      throw new Error(walletPayRes?.data?.message || 'Wallet payment failed');
     } catch (error) {
       setSubmitting(false);
-      showError('Error', error?.message || 'Failed to create SIP. Please try again.');
+      showError('Error', error?.response?.data?.message || error?.message || 'Failed to create SIP. Please try again.');
     }
   };
 
@@ -710,8 +706,8 @@ const CreateSIPScreen = ({ navigation, route }) => {
               </View>
               <Text style={{ fontSize: 11.5, color: themeColors.textSecondary, lineHeight: 16 }}>
                 {walletBalance >= currentAmount
-                  ? '⚡ Contribution #1 will be paid from wallet. Daily installments will automatically be debited from your wallet balance.'
-                  : `⚠️ Wallet balance is low (Need ₹${(currentAmount - walletBalance).toLocaleString('en-IN')} more). You can pay via UPI now and top up wallet for daily autopay.`}
+                  ? '⚡ Contribution #1 will be paid from your Growvest Wallet. Future installments will also debit from your wallet.'
+                  : `⚠️ Insufficient Wallet Balance (Need ₹${(currentAmount - walletBalance).toLocaleString('en-IN')} more). Add money to your Growvest Wallet first, then start your SIP.`}
               </Text>
             </View>
 
@@ -726,10 +722,12 @@ const CreateSIPScreen = ({ navigation, route }) => {
               <TouchableOpacity
                 style={styles.modalConfirmBtn}
                 activeOpacity={0.85}
-                onPress={() => handleConfirmAndPay(walletBalance >= currentAmount ? 'wallet' : 'upi')}
+                onPress={() => handleConfirmAndPay()}
               >
                 <Text style={styles.modalConfirmBtnText}>
-                  {walletBalance >= currentAmount ? `Pay ₹${currentAmount.toLocaleString('en-IN')} from Wallet` : 'Pay via UPI'}
+                  {walletBalance >= currentAmount
+                    ? `Pay ₹${currentAmount.toLocaleString('en-IN')} from Wallet`
+                    : `Add ₹${Math.max(10, Math.ceil(currentAmount - walletBalance)).toLocaleString('en-IN')} to Wallet`}
                 </Text>
               </TouchableOpacity>
             </View>
