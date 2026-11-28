@@ -73,7 +73,11 @@ const SignupScreen = ({ navigation }) => {
 
   const validateForm = () => {
     const newErrors = {};
-    if (!username.trim()) newErrors.username = 'Username is required';
+    if (!username.trim()) {
+      newErrors.username = 'Username is required';
+    } else if (username.includes('@')) {
+      newErrors.username = 'Please enter your name or username (not an email)';
+    }
     if (!mobileNumber.trim()) {
       newErrors.mobileNumber = 'Mobile number is required';
     } else if (!/^\d{10}$/.test(mobileNumber.trim())) {
@@ -191,6 +195,8 @@ const SignupScreen = ({ navigation }) => {
                   placeholderTextColor={colors.textTertiary}
                   error={!!errors.username}
                   autoCapitalize="none"
+                  autoComplete="off"
+                  textContentType="none"
                   left={<TextInput.Icon icon="account-outline" color={colors.textMuted} />}
                 />
                 {errors.username && <Text style={styles.errorText}>{errors.username}</Text>}

@@ -337,7 +337,16 @@ const ProfileScreen = ({ navigation }) => {
         {/* Name & Info */}
         <View style={styles.nameSection}>
           <View style={styles.nameRow}>
-            <Text style={styles.profileName}>{activeUserObj?.name || activeUserObj?.username || 'User'}</Text>
+            <Text style={styles.profileName}>
+              {(() => {
+                const rawName = (activeUserObj?.name || '').trim();
+                const rawUsername = (activeUserObj?.username || '').trim();
+                if (rawName && !rawName.includes('@')) return rawName;
+                if (rawUsername && !rawUsername.includes('@')) return rawUsername;
+                const fallback = rawName || rawUsername || activeUserObj?.email || '';
+                return fallback.includes('@') ? fallback.split('@')[0] : (fallback || 'User');
+              })()}
+            </Text>
             <MaterialCommunityIcons name="check-decagram" size={18} color={colors.primary} />
           </View>
         </View>
